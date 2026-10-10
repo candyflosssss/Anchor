@@ -1,5 +1,5 @@
-import type { Provider as DesktopProvider, SaveProvider } from "../../desktop/contract.generated";
-export type { SaveProvider };
+import type { Provider as DesktopProvider, SaveProvider, DiscoverProviderModels, ProviderModels } from "../../desktop/contract.generated";
+export type { SaveProvider, DiscoverProviderModels, ProviderModels };
 export type Provider = DesktopProvider & { protocol: "responses" };
 export type SecretMode = 'keep' | 'replace' | 'clear';
 export interface ProviderDraft {
@@ -27,6 +27,7 @@ export const problemText: Record<ProblemCode, string> = {
 };
 export interface ProviderTransport {
   list(signal: AbortSignal): Promise<Provider[]>;
+  discover(input: DiscoverProviderModels, signal: AbortSignal): Promise<ProviderModels>;
   save(input: SaveProvider, signal: AbortSignal): Promise<Provider>;
 }
 export function newDraft(provider?: Provider): ProviderDraft {
@@ -68,4 +69,35 @@ export function toSave(draft: ProviderDraft, source?: Provider): SaveProvider {
 }
 export function isDirty(draft: ProviderDraft, source?: Provider): boolean {
   return JSON.stringify(draft) !== JSON.stringify(newDraft(source));
+}
+
+export const catalogFailureText: Record<string, string> = {
+  authentication: '上游拒绝目录授权（401 / 403）。请检查已存密钥与目录权限。',
+  unsupported: '上游未提供此模型目录接口（404 / 405）；不代表模型推理不可用。',
+  rate_limited: '上游限制目录请求频率。请稍后手动重试。',
+  http_error: '上游目录返回非成功 HTTP 状态；未展示其错误正文。',
+  network: '目录请求未完成。请检查上游地址和网络；未自动重试。',
+  timeout: '目录请求超时（最多 8 秒，受供应商超时限制）。',
+  busy: '当前全局或供应商并发已满，未发送目录请求。请稍后重试。',
+  too_large: '目录超过 512 KiB 上限，未返回部分列表。',
+  invalid_response: '上游目录格式不符合要求，未返回部分列表。',
+};
+export function checkedCatalog(value: ProviderModels, input: DiscoverProviderModels): ProviderModels {
+  if (!value || value.provider_id !== input.provider_id || value.revision !== input.expected_revision ||
+    !Number.isSafeInteger(value.revision) || value.revision < 1 ||
+    !Number.isInteger(value.http_status) || (value.http_status !== 0 && (value.http_status < 100 || value.http_status > 599)) ||
+    !Number.isSafeInteger(value.elapsed_ms) || value.elapsed_ms < 0 || typeof value.failure !== 'string' ||
+    (value.failure !== '' && !Object.hasOwn(catalogFailureText, value.failure)) ||
+    (value.failure === '' && value.http_status !== 200) ||
+    !Array.isArray(value.models) || value.models.length > 1000 ||
+    (value.failure !== '' && value.models.length !== 0) ||
+    value.models.some(id => typeof id !== 'string' || !id || id.trim() !== id || new TextEncoder().encode(id).length > 256 || /[\p{Cc}\p{Cf}]/u.test(id)) ||
+    new Set(value.models).size !== value.models.length) throw new ProviderProblem('read_error');
+  return { provider_id: value.provider_id, revision: value.revision, http_status: value.http_status,
+    elapsed_ms: value.elapsed_ms, failure: value.failure, models: [...value.models] };
+}
+export function catalogProblemText(code: ProblemCode): string {
+  if (code === 'conflict') return '配置版本已变化。请重新读取配置后再查询目录；没有覆盖配置。';
+  if (code === 'unauthorized' || code === 'offline') return problemText[code];
+  return '未能读取模型目录。配置未改变；可以重新读取配置后手动重试。';
 }

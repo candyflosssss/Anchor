@@ -1,5 +1,5 @@
 import { CONTRACT, PROBLEM_CODES, type DesktopBridge, type ProblemCode, type Provider as DesktopProvider, type SessionInfo } from './contract.generated';
-import { ProviderProblem, type Provider, type ProviderTransport, type SaveProvider } from '../features/providers/provider.model';
+import { ProviderProblem, checkedCatalog, type DiscoverProviderModels, type ProviderModels, type Provider, type ProviderTransport, type SaveProvider } from '../features/providers/provider.model';
 
 declare global { interface Window { go?: { desktop?: { Bridge?: DesktopBridge } } } }
 export class DesktopProblem extends Error { constructor(readonly code: ProblemCode) { super(code); } }
@@ -50,6 +50,17 @@ export class DesktopProviderTransport implements ProviderTransport {
       if (!Array.isArray(rows)) throw new ProviderProblem('read_error');
       return rows.map(checkedProvider);
     } catch (error) { return providerError(error, false); }
+  }
+  async discover(input: DiscoverProviderModels, signal: AbortSignal): Promise<ProviderModels> {
+    signal.throwIfAborted();
+    try {
+      const result = await call(() => this.getBridge().DiscoverProviderModels(input));
+      signal.throwIfAborted();
+      return checkedCatalog(result, input);
+    } catch (error) {
+      if (error instanceof DesktopProblem && error.code === 'unknown') throw new ProviderProblem('read_error');
+      return providerError(error, false);
+    }
   }
   async save(input: SaveProvider, signal: AbortSignal): Promise<Provider> {
     signal.throwIfAborted();

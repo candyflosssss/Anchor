@@ -3,11 +3,11 @@ import fixture from '../../contract/providers.json' with { type: 'json' };
 import updateFixture from '../../contract/updates.json' with { type: 'json' };
 import { CONTRACT, type DesktopBridge, type Provider } from '../src/desktop/contract.generated';
 
-declare global { interface Window { desktopTest: { starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
+declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 async function host(page: Page) {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
   await page.addInitScript(({ contract, rows, update }) => {
-    window.desktopTest = { starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
+    window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     let providers: Provider[] = rows;
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
@@ -25,6 +25,13 @@ async function host(page: Page) {
       },
       Start: async () => { counters.starts++; return { contract, data, problem: null }; },
       Status: async () => ({ contract, data: counters.status ? data : null, problem: counters.status ? null : { code: 'offline' } }),
+      DiscoverProviderModels: async input => {
+        counters.directories++;
+        await new Promise(resolve => setTimeout(resolve, 300));
+        const provider = providers.find(p => p.id === input.provider_id);
+        if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
+        return { contract, data: { provider_id: provider.id, revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '' }, problem: null };
+      },
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
         counters.saves++;
@@ -181,4 +188,37 @@ test('changing channels clears the previously downloaded installation candidate'
   await expect(page.getByRole('button', { name: '安装更新…', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '下载更新', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
+});
+
+test('directory discovery is explicit, read-only and scoped to the selected provider (simulated host)', async ({ page }) => {
+  await host(page);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByRole('complementary', { name: '摸鱼AI 的详情' });
+  await expect(detail.getByText('demo-model', { exact: true })).toHaveCount(0);
+  await detail.getByRole('button', { name: '获取模型目录', exact: true }).dblclick();
+  await expect(detail.getByText('demo-model', { exact: true })).toBeVisible();
+  await expect(detail).toContainText('已获取 1 个模型 · HTTP 200 · 42 ms');
+  await expect(detail).toContainText('目录成功不代表模型生成');
+  expect(await page.evaluate(() => ({ saves: window.desktopTest.saves, directories: window.desktopTest.directories }))).toEqual({ saves: 0, directories: 1 });
+  await detail.getByRole('button', { name: '收起供应商详情' }).click();
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await expect(detail.getByText('demo-model', { exact: true })).toHaveCount(0);
+});
+
+test('an unsupported directory does not label the provider unusable or show upstream errors', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => {
+    window.go!.desktop!.Bridge!.DiscoverProviderModels = async input => {
+      window.desktopTest.directories++;
+      return { contract: 'anchor-desktop-v1', data: { provider_id: input.provider_id, revision: input.expected_revision,
+        http_status: 404, elapsed_ms: 12, models: [], failure: 'unsupported' }, problem: null };
+    };
+  });
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByRole('complementary', { name: '摸鱼AI 的详情' });
+  await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  await expect(detail).toContainText('目录获取失败 · HTTP 404 · 12 ms');
+  await expect(detail).toContainText('不代表模型推理不可用');
+  expect(await page.evaluate(() => ({ saves: window.desktopTest.saves, directories: window.desktopTest.directories }))).toEqual({ saves: 0, directories: 1 });
+  await expect(detail.getByRole('button', { name: '获取模型目录', exact: true })).toBeEnabled();
 });

@@ -145,3 +145,29 @@ func (b *Bridge) StopCore(in ConfirmStop) StopResult {
 	s.cfg = nil
 	return r
 }
+
+func (b *Bridge) DiscoverProviderModels(in DiscoverProviderModels) ProviderModelsResult {
+	s := b.session
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := ProviderModelsResult{Contract: Contract}
+	if !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 || in.ExpectedRevision > MaxSafeRevision {
+		out.Problem = &Problem{"invalid"}
+		return out
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	defer cancel()
+	cl, _, err := s.connection(ctx)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	defer cl.Close()
+	result, err := cl.DiscoverProviderModels(ctx, in)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	out.Data = &result
+	return out
+}

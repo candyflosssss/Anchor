@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/client"
 	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/platform"
@@ -27,6 +28,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   status                             Query selected context
   stop --approve                     Request graceful shutdown of selected context
   provider list
+  provider models --id ID --revision N  Fetch upstream directory (no inference or config writes)
   provider add|put --id ID --base-url URL [--secret-stdin] [--revision N]
                 [--protocol responses] [--timeout 120] [--max-concurrent 4]
                 [--disabled]
@@ -391,7 +393,7 @@ func (a App) contexts(ctx context.Context, s *state.Store, args []string) error 
 }
 func (a App) providers(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("provider requires list, add or put")
+		return errors.New("provider requires list, models, add or put")
 	}
 	if args[0] == "list" {
 		if len(args) != 1 {
@@ -402,6 +404,22 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 			return err
 		}
 		return a.output(v)
+	}
+	if args[0] == "models" {
+		f := a.flags("provider models")
+		id := f.String("id", "", "saved provider ID")
+		revision := f.Int64("revision", 0, "expected current provider revision (required)")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		if !state.ValidProviderID(*id) || *revision < 1 {
+			return errors.New("provider models requires a valid --id and current --revision")
+		}
+		result, err := c.DiscoverProviderModels(ctx, catalog.DiscoverProviderModels{ProviderID: *id, ExpectedRevision: *revision})
+		if err != nil {
+			return err
+		}
+		return a.output(result)
 	}
 	if args[0] != "add" && args[0] != "put" {
 		return errors.New("unknown provider command")

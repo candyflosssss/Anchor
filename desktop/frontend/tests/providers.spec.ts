@@ -18,7 +18,7 @@ test('list, selection, search, filters and scope are truthful', async ({ page })
   await expect(page.getByText('摸鱼AI', { exact: true })).toHaveCount(1);
   await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
   await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('revision 3');
-  await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('上游连通性未测试');
+  await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('模型推理尚未测试');
   await page.getByLabel('搜索供应商名称或地址').fill('127.0.0.1');
   await expect(page.getByRole('button', { name: '本地调试', exact: true })).toBeVisible();
   await expect(page.getByLabel('摸鱼AI 的详情')).toHaveCount(0);
@@ -255,4 +255,15 @@ test('long Chinese IDs and root URLs stay readable without widening the window',
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await expect(detail.getByRole('button', { name: '编辑配置', exact: true })).toBeVisible();
   }
+});
+
+test('mock directory shares synthetic model IDs without importing or incrementing revision', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByLabel('摸鱼AI 的详情');
+  await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  await expect(detail.getByText('demo-model', { exact: true })).toBeVisible();
+  await expect(detail).toContainText('已获取 2 个模型');
+  await expect(detail).toContainText('revision 3');
+  await expect(page.getByText('所有数据均为模拟 · 刷新页面将重置')).toBeVisible();
 });

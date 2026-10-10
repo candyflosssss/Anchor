@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isDirty, newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft } from './provider.model';
+import { isDirty, newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
 import type { Scenario } from './provider.mock';
 import type { ProviderEnvironment } from '../../desktop/environment';
 type Phase = 'loading' | 'ready' | 'error';
@@ -23,7 +23,18 @@ export function useProviderController(environment: ProviderEnvironment) {
   const query = useRef<AbortController | null>(null);
   const write = useRef<AbortController | null>(null);
   const generation = useRef(0);
+  const [models, setModels] = useState<ProviderModels | null>(null);
+  const [modelsProblem, setModelsProblem] = useState<ProblemCode | null>(null);
+  const [modelsBusy, setModelsBusy] = useState(false);
+  const catalogQuery = useRef<AbortController | null>(null);
+  const catalogEpoch = useRef(0);
+  const clearModels = useCallback(() => {
+    catalogEpoch.current++;
+    if (catalogQuery.current) { catalogQuery.current.abort(); catalogQuery.current = null; locked.current = false; }
+    setModels(null); setModelsProblem(null); setModelsBusy(false);
+  }, []);
   const load = useCallback(async () => {
+    clearModels();
     query.current?.abort();
     const abort = new AbortController(); query.current = abort;
     const epoch = generation.current;
@@ -38,14 +49,14 @@ export function useProviderController(environment: ProviderEnvironment) {
       setProviders([]); setPhase('error');
       setProblem(error instanceof ProviderProblem ? error.code : 'read_error');
     }
-  }, [transport]);
+  }, [transport, clearModels]);
   useEffect(() => {
     void load();
-    return () => { query.current?.abort(); write.current?.abort(); };
+    return () => { query.current?.abort(); write.current?.abort(); catalogQuery.current?.abort(); };
   }, [load]);
   const visible = useMemo(() => providers.filter(p => (filter === 'all' || p.enabled === (filter === 'enabled')) && `${p.id} ${p.base_url}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [providers, filter, search]);
   const selected = visible.find(p => p.id === selectedId) ?? null;
-  const blocked = phase !== 'ready' || problem === 'unknown' || problem === 'conflict' || busy;
+  const blocked = phase !== 'ready' || problem === 'unknown' || problem === 'conflict' || busy || modelsBusy;
   function openEditor(source?: Provider) {
     if (blocked || locked.current) return;
     setNotice(''); setEditor({ source, draft: newDraft(source) }); setErrors({}); setDiscard(false);
@@ -66,6 +77,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     const nextErrors = validateDraft(draft, !source);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
+    clearModels();
     locked.current = true; setBusy(true); setNotice('');
     const abort = new AbortController(); write.current = abort;
     const epoch = generation.current;
@@ -89,21 +101,42 @@ export function useProviderController(environment: ProviderEnvironment) {
       if (epoch === generation.current) { locked.current = false; setBusy(false); }
     }
   }
+  async function discoverModels() {
+    if (!selected || blocked || locked.current || editor || toggle) return;
+    const target = { provider_id: selected.id, expected_revision: selected.revision };
+    clearModels(); locked.current = true; setModelsBusy(true);
+    const abort = new AbortController(); catalogQuery.current = abort;
+    const epoch = catalogEpoch.current;
+    try {
+      const result = await transport.discover(target, abort.signal);
+      if (abort.signal.aborted || epoch !== catalogEpoch.current) return;
+      setModels(result);
+    } catch (error) {
+      if (abort.signal.aborted || epoch !== catalogEpoch.current) return;
+      const code = error instanceof ProviderProblem ? error.code : 'read_error';
+      // This operation never writes; never show the "possibly saved" message.
+      setModelsProblem(code === 'unknown' ? 'read_error' : code);
+    } finally {
+      if (epoch === catalogEpoch.current) { catalogQuery.current = null; locked.current = false; setModelsBusy(false); }
+    }
+  }
   async function reloadFromEditor() {
     // Deliberate, labeled discard action: user has already been told their draft is lost.
     closeEditor(true); await load();
     setNotice(`${mock ? '演示：' : ''}已重新读取。请核对最新配置，再打开编辑；原草稿已丢弃。`);
   }
   function changeScenario(value: Scenario) {
-    if (!environment.reset || editor || busy || toggle) return;
-    query.current?.abort(); write.current?.abort(); generation.current++;
+    if (!environment.reset || editor || busy || modelsBusy || toggle) return;
+    clearModels(); query.current?.abort(); write.current?.abort(); generation.current++;
     environment.reset(value); setScenario(value); setSelectedId(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
     void load();
   }
   return {
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
-    notice, search, setSearch, filter, setFilter, editor, errors, discard, busy, blocked, toggle, scenario,
-    select: setSelectedId, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
+    notice, search, setSearch, filter, setFilter, editor, errors, discard, busy: busy || modelsBusy, blocked, toggle, scenario,
+    models: models?.provider_id === selected?.id && models?.revision === selected?.revision ? models : null,
+    modelsProblem, modelsBusy, discoverModels,
+    select: (id: string | null) => { if (!locked.current) { clearModels(); setSelectedId(id); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
     continueEditing: () => setDiscard(false),
     submit: () => editor && void save(editor.source, editor.draft),
     requestToggle: (provider: Provider) => { if (!blocked) { setNotice(''); setToggle(provider); } },

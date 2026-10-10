@@ -50,3 +50,7 @@ Windows / Linux 统一启用 Wails `Frameless`，以现有工作区 header 承�
 ## 5. 在线更新增量（2026-10-11）
 
 新增 UpdateInfo/ConfirmUpdate/UpdateResult DTO 和 integrity/permission 错误码，保留既有 anchor-desktop-v1 供应商与生命周期方法语义。更新读取／下载与核心业务分别用锁，长下载不占用供应商／Status 的会话锁。安装必须明确批准版本，重新校验磁盘文件，认证本机核心并等待正常退出，再交给独立 helper 等待窗口退出；核心抢占、身份变化、文件被修改或不兼容均拒绝，不强杀或自行提权。普通关窗仍不停服。本轮仅实现源码和隔离验证，安装器交接及双平台原生更新验收不是单元／模拟浏览器测试可替代的结果。
+
+## 上游模型目录增量边界（desktop.10）
+
+新增 `Bridge.DiscoverProviderModels`，输入仅已存 provider ID / revision，返回独立只读目录 DTO，不扩展通用网络／文件能力。调用复用管理连接、实例身份和核心目录规则；POST 网络错误按只读处理，不标记写入结果未知。单次上游请求总超时最多8秒，宿主包含握手仍最多15秒，Wails 前端取消仅丢弃过期结果。细节、共享样例与无推理保证见[供应商接口 §4](provider-interface.md)。

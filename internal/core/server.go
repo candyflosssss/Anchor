@@ -223,6 +223,7 @@ func (s *Server) Control() http.Handler {
 		}
 		writeJSON(w, 200, p)
 	})
+	mux.HandleFunc("POST /control/v1/providers/{id}/discover-models", s.discoverProviderModels)
 	mux.HandleFunc("GET /control/v1/models", func(w http.ResponseWriter, r *http.Request) {
 		m, err := s.Store.Models()
 		if err != nil {

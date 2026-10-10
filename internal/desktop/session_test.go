@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -308,5 +309,48 @@ func TestStartupDoesNotRecreateMissingOwnerCredential(t *testing.T) {
 	after, err := st.Settings()
 	if err != nil || after != cfg {
 		t.Fatal("existing settings overwritten")
+	}
+}
+
+func TestRealCoreProviderDirectory(t *testing.T) {
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Path != "/v1/models" || r.Method != "GET" || r.Header.Get("Authorization") != "Bearer synthetic-catalog-secret" {
+			t.Error("unexpected upstream request")
+		}
+		io.WriteString(w, `{"data":[{"id":"fixture-model"}]}`)
+	}))
+	defer upstream.Close()
+	s := testSession(t)
+	b := NewBridge(s)
+	requireReady(t, b)
+	secret := "synthetic-catalog-secret"
+	created := b.SaveProvider(SaveProvider{Provider: Provider{ID: "目录供应商", BaseURL: upstream.URL + "/v1", Protocol: "responses", Enabled: false, TimeoutSeconds: 2, MaxConcurrent: 1}, Secret: &secret})
+	if created.Problem != nil || created.Data == nil {
+		t.Fatal(created)
+	}
+	in := DiscoverProviderModels{ProviderID: created.Data.ID, ExpectedRevision: created.Data.Revision}
+	result := b.DiscoverProviderModels(in)
+	if result.Problem != nil || result.Data == nil || result.Data.HTTPStatus != 200 || result.Data.Failure != "" || len(result.Data.Models) != 1 || result.Data.Models[0] != "fixture-model" {
+		t.Fatal(result)
+	}
+	raw, _ := json.Marshal(result)
+	if strings.Contains(string(raw), secret) {
+		t.Fatal("secret leaked")
+	}
+	// Saved configuration and its revision remain unchanged after a real bridge call.
+	rows := b.Providers()
+	if rows.Problem != nil || len(rows.Data) != 1 || rows.Data[0] != *created.Data {
+		t.Fatal(rows)
+	}
+	in.ExpectedRevision++
+	conflict := b.DiscoverProviderModels(in)
+	if conflict.Problem == nil || conflict.Problem.Code != "conflict" || calls.Load() != 1 {
+		t.Fatal("revision conflict or retry", conflict, calls.Load())
+	}
+	in.ExpectedRevision = MaxSafeRevision + 1
+	if invalid := b.DiscoverProviderModels(in); invalid.Problem == nil || invalid.Problem.Code != "invalid" {
+		t.Fatal(invalid)
 	}
 }

@@ -93,3 +93,34 @@ func TestCoreSourceRequiresSpawnedProcessIdentity(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedProviderModelsContract(t *testing.T) {
+	raw, err := os.ReadFile("../../desktop/contract/provider-models.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Contract    string                 `json:"contract"`
+		Input       DiscoverProviderModels `json:"input"`
+		Success     ProviderModels         `json:"success"`
+		Empty       ProviderModels         `json:"empty"`
+		Unsupported ProviderModels         `json:"unsupported"`
+	}
+	if json.Unmarshal(raw, &fixture) != nil || fixture.Contract != Contract {
+		t.Fatal("catalog fixture drift")
+	}
+	for _, result := range []ProviderModels{fixture.Success, fixture.Empty, fixture.Unsupported} {
+		if result.ProviderID != fixture.Input.ProviderID || result.Revision != fixture.Input.ExpectedRevision || result.Models == nil {
+			t.Fatal("catalog identity drift")
+		}
+		encoded, _ := json.Marshal(result)
+		var fields map[string]any
+		_ = json.Unmarshal(encoded, &fields)
+		if len(fields) != 6 {
+			t.Fatal("unexpected catalog public fields")
+		}
+	}
+	if fixture.Success.HTTPStatus != 200 || fixture.Empty.Failure != "" || len(fixture.Empty.Models) != 0 || fixture.Unsupported.Failure != "unsupported" {
+		t.Fatal("catalog semantics drift")
+	}
+}

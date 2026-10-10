@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -119,6 +120,24 @@ func (c *Client) PutProvider(ctx context.Context, p state.Provider, revision int
 	e := c.call(ctx, "PUT", "/control/v1/providers/"+p.ID, map[string]any{"provider": p, "expected_revision": revision, "secret": secret}, &v)
 	return v, e
 }
+
+// DiscoverProviderModels only fetches the saved provider's directory; no writes or inference.
+func (c *Client) DiscoverProviderModels(ctx context.Context, in catalog.DiscoverProviderModels) (catalog.ProviderModels, error) {
+	if !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 {
+		return catalog.ProviderModels{}, errors.New("saved provider ID and revision are required")
+	}
+	var v catalog.ProviderModels
+	err := c.call(ctx, "POST", "/control/v1/providers/"+in.ProviderID+"/discover-models", in, &v)
+	// POST expresses an explicit external request, not a configuration write.
+	var requestErr *RequestError
+	if errors.As(err, &requestErr) {
+		copy := *requestErr
+		copy.Unknown = false
+		err = &copy
+	}
+	return v, err
+}
+
 func (c *Client) PutModel(ctx context.Context, m state.Model, revision int64) (state.Model, error) {
 	if !state.ValidID(m.ID) {
 		return state.Model{}, errors.New("invalid model ID")

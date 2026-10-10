@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import catalogFixture from '../../../contract/provider-models.json';
 import fixture from '../../../contract/providers.json';
 import { CONTRACT, PROBLEM_CODES, type DesktopBridge, type ProvidersResult, type Provider, type SessionResult } from './contract.generated';
 import { bridge, call, checkedProvider, checkedSession, DesktopProviderTransport, desktopSession } from './transport';
@@ -12,6 +13,7 @@ function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
     Start: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
     Status: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
     Providers: vi.fn(async () => ({ contract: CONTRACT, data: fixture.providers, problem: null })),
+    DiscoverProviderModels: vi.fn(async () => ({ contract: CONTRACT, data: catalogFixture.success, problem: null })),
     SaveProvider: vi.fn(async () => ({ contract: CONTRACT, data: publicRow, problem: null })),
     StopCore: vi.fn(async () => ({ contract: CONTRACT, data: { accepted: true }, problem: null })),
     UpdateStatus: vi.fn(), CheckUpdate: vi.fn(), DownloadUpdate: vi.fn(), InstallUpdate: vi.fn(),
@@ -70,5 +72,24 @@ describe('restricted desktop transport (not a native Wails test)', () => {
     const readAbort = new AbortController();
     const pending = new DesktopProviderTransport(() => testBridge({ Providers: async () => { readAbort.abort(); return { contract: CONTRACT, data: fixture.providers, problem: null }; } }));
     await expect(pending.list(readAbort.signal)).rejects.toThrow();
+  });
+});
+
+describe('upstream directory desktop boundary', () => {
+  it('uses the shared catalog fixture and drops unexpected fields', async () => {
+    const api = testBridge({ DiscoverProviderModels: async () => ({ contract: CONTRACT, data: { ...catalogFixture.success, secret: 'hidden' }, problem: null }) });
+    expect(await new DesktopProviderTransport(() => api).discover(catalogFixture.input, signal())).toEqual(catalogFixture.success);
+  });
+  it('does not classify a directory read as an uncertain save or retry', async () => {
+    const operation = vi.fn(async () => ({ contract: CONTRACT, data: null, problem: { code: 'unknown' as const } }));
+    await expect(new DesktopProviderTransport(() => testBridge({ DiscoverProviderModels: operation })).discover(catalogFixture.input, signal())).rejects.toMatchObject({ code: 'read_error' });
+    expect(operation).toHaveBeenCalledTimes(1);
+  });
+  it('rejects responses for another saved revision and cancelled results', async () => {
+    const operation = vi.fn(async () => ({ contract: CONTRACT, data: { ...catalogFixture.success, revision: 4 }, problem: null }));
+    await expect(new DesktopProviderTransport(() => testBridge({ DiscoverProviderModels: operation })).discover(catalogFixture.input, signal())).rejects.toMatchObject({ code: 'read_error' });
+    const abort = new AbortController();
+    const transport = new DesktopProviderTransport(() => testBridge({ DiscoverProviderModels: async () => { abort.abort(); return { contract: CONTRACT, data: catalogFixture.success, problem: null }; } }));
+    await expect(transport.discover(catalogFixture.input, abort.signal)).rejects.toMatchObject({ code: 'read_error' });
   });
 });

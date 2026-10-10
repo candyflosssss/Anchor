@@ -10,6 +10,7 @@
 | 前端端口 / Wails 方法 | 真实客户端与行为 |
 | --- | --- |
 | `list(signal)` / `Bridge.Providers()` | `client.Providers` → GET 当前实例目录；只回脱敏 DTO，空目录固定为空数组 |
+| `discover(input, signal)` / `Bridge.DiscoverProviderModels(input)` | `client.DiscoverProviderModels` → POST `/control/v1/providers/{id}/discover-models`；显式读取上游目录，不改配置 |
 | `save(input, signal)` / `Bridge.SaveProvider(input)` | `client.PutProvider` → PUT 指定 ID；revision=0 创建，>0 条件更新；普通字段完整替换 |
 
 Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_seconds`, `max_concurrent`, `revision`, `has_secret`。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。协议当前仅 `responses`，未知协议拒绝。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
@@ -44,3 +45,15 @@ Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_secon
 - `desktop`：仅真实桥接适配器，无场景入口；缺 Wails 绑定就报错，不能在普通浏览器中绕过管理鉴权。
 
 管理 API 的 Origin/Host 防护不放宽，不增加 CORS 或通用 URL／shell／文件接口。测试分为共享 DTO/Mock、浏览器模拟 Wails 边界、真实 Go 宿主→client→隔离核心、原生桌面四层；前三层通过不能替代最后一层。
+
+## 4. 上游模型目录小步（desktop.10）
+
+规范 DTO `DiscoverProviderModels` / `ProviderModels` 定义于 `internal/catalog/models.go`，经 `internal/desktop/contract.go` 别名纳入 Go → TS 单一生成源；桌面 envelope 为 `ProviderModelsResult`，继续使用 `anchor-desktop-v1`，增量新增方法，不改变既有方法。共享合成样例为 `desktop/contract/provider-models.json`，Mock 与 Go / TS 测试共用。
+
+- 输入仅 `provider_id` 与 `expected_revision`（桌面 1..MAX_SAFE_INTEGER）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
+- 后端从已存快照取地址／密钥，仅发一次 `GET <base_url 去尾斜杠>/models`，不自动追加 `/v1`。停用供应商也允许显式查询。复用无环境代理、禁止重定向的上游客户端与全局16／供应商并发上限；总耗时上限 `min(timeout_seconds, 8)` 秒，无重试、后台轮询或缓存持久化。
+- 输出固定六字段：`provider_id`, `revision`（本次使用的快照版本）, `http_status`（未收到状态为0）, `elapsed_ms`（整数毫秒）, `models`（字符串数组，始终非null）, `failure`（成功为空字符串）。只接受 OpenAI 风格 `data` 数组中的非空 `id`，去重排序、丢弃元数据；最多512 KiB、1000条原始记录、每 ID 256字节，无控制／格式字符。异常目录整体失败，不返回部分列表。
+- 请求受理后目录失败仍返回 HTTP200 与固定分类：`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
+- 不写配置、revision、模型映射或健康状态。一次目录成功仅说明此接口返回有效目录，不代表推理、工具、流式、余额或持续健康；404/405 不等于供应商推理不可用。
+- UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和只读限高列表。查询中阻止供应商切换、编辑和页面离开；选择、重读或保存后清空结果，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
+- CLI 等价入口为 `provider models --id ID --revision N`；与 `model list`（Anchor 已存公开映射）及网关 `/v1/models` 区分。测试分层沿 §3，原生两平台仍未验收。

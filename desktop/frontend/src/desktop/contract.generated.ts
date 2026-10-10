@@ -72,8 +72,26 @@ export interface UpdateResult {
   data: UpdateInfo | null;
   problem: Problem | null;
 }
+export interface DiscoverProviderModels {
+  provider_id: string;
+  expected_revision: number;
+}
+export interface ProviderModels {
+  provider_id: string;
+  revision: number;
+  http_status: number;
+  elapsed_ms: number;
+  models: string[];
+  failure: string;
+}
+export interface ProviderModelsResult {
+  contract: string;
+  data: ProviderModels | null;
+  problem: Problem | null;
+}
 export interface DesktopBridge {
   CheckUpdate(input1: string): Promise<UpdateResult>;
+  DiscoverProviderModels(input1: DiscoverProviderModels): Promise<ProviderModelsResult>;
   DownloadUpdate(input1: string): Promise<UpdateResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
   Providers(): Promise<ProvidersResult>;

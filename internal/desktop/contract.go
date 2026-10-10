@@ -1,6 +1,8 @@
 // Package desktop is the platform-independent, typed desktop boundary.
 package desktop
 
+import "github.com/candyflosssss/Anchor/internal/catalog"
+
 const Contract = "anchor-desktop-v1"
 const MaxSafeRevision int64 = 9007199254740991
 
@@ -77,4 +79,13 @@ type UpdateResult struct {
 	Contract string      `json:"contract"`
 	Data     *UpdateInfo `json:"data"`
 	Problem  *Problem    `json:"problem"`
+}
+
+// Discovery DTOs share the core's canonical read-only contract.
+type DiscoverProviderModels = catalog.DiscoverProviderModels
+type ProviderModels = catalog.ProviderModels
+type ProviderModelsResult struct {
+	Contract string          `json:"contract"`
+	Data     *ProviderModels `json:"data"`
+	Problem  *Problem        `json:"problem"`
 }

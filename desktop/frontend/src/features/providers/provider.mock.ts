@@ -1,6 +1,7 @@
+import catalogFixture from '../../../../contract/provider-models.json';
 import fixture from '../../../../contract/providers.json';
 import { checkedProvider } from '../../desktop/transport';
-import { ProviderProblem, type Provider, type ProviderTransport, type SaveProvider } from './provider.model';
+import { ProviderProblem, type Provider, type ProviderTransport, type DiscoverProviderModels, type ProviderModels, type SaveProvider } from './provider.model';
 export const scenarios = {
   normal: '正常列表', empty: '空数据', offline: '实例离线', unauthorized: '授权不可用',
   read_error: '读取错误', conflict: '保存冲突', unknown: '写入结果未知',
@@ -30,6 +31,13 @@ export class MockProviderTransport implements ProviderTransport {
     await delay(signal);
     if (this.scenario === 'offline' || this.scenario === 'unauthorized' || this.scenario === 'read_error') throw fixtureError(this.scenario);
     return this.rows.map(copy);
+  }
+  async discover(input: DiscoverProviderModels, signal: AbortSignal): Promise<ProviderModels> {
+    await delay(signal);
+    if (this.scenario === 'offline' || this.scenario === 'unauthorized') throw fixtureError(this.scenario);
+    const current = this.rows.find(p => p.id === input.provider_id);
+    if (current?.revision !== input.expected_revision) throw fixtureError('conflict');
+    return { ...catalogFixture.success, provider_id: current.id, revision: current.revision, models: [...catalogFixture.success.models] };
   }
   async save(input: SaveProvider, signal: AbortSignal): Promise<Provider> {
     await delay(signal);

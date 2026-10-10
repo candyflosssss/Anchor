@@ -5,7 +5,8 @@
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本轮新增本机 `update` 命令和桌面在线更新入口，仅当前源码，**未包含于 alpha.6 / desktop.8，尚未打包或发布**。
+- 本轮新增本机 `update` 命令和桌面在线更新入口，已包含本地 desktop.9，**未包含于 alpha.6 / desktop.8，未公开发布或部署更新源**。
+- 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -54,6 +55,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `status` | 查询核心状态 | 所选 Context 的核心在线 |
 | `stop --approve` | 请求核心正常停服 | 所选 Context 在线、已核验身份及管理授权；需要本轮新版核心 |
 | `provider list` | 列出供应商 | 所选 Context 的核心在线 |
+| `provider models` | 手动读取已存供应商的上游模型目录 | 核心在线；供应商 ID 与当前 revision |
 | `provider add` | 新增供应商 | 所选 Context 的核心在线 |
 | `provider put` | 条件更新供应商 | 核心在线；当前 revision |
 | `model list` | 列出公开模型映射 | 所选 Context 的核心在线 |
@@ -156,6 +158,7 @@ Context 目前仅支持本机 `--local`，没有 SSH、远程凭据或 Context �
 
 ```text
 anchor provider list
+anchor provider models --id ID --revision N
 anchor provider add --id ID --base-url URL [OPTIONS]
 anchor provider put --id ID --base-url URL --revision N [OPTIONS]
 ```
@@ -191,6 +194,20 @@ anchor model add --id public-model --candidate '摸鱼AI:upstream-model'
 ```
 
 中文 ID 可用于 `provider add/put/list` 以及 `model add/put --candidate` 的供应商部分。命令仍要求显式参数，不会进入交互式向导。已有 ASCII ID、JSON 字段、SQLite schema、revision 与密钥输入方式不变；无需重新初始化，但只替换 CLI、不重启旧核心仍不能创建中文供应商。公开模型 ID、Context 和 Agent ID 没有一并放开中文。
+
+### `provider models`（desktop.10 小步）
+
+```bash
+anchor provider models --id '摸鱼AI' --revision 3
+```
+
+`--id` 必填已存供应商 ID；`--revision` 必填正整数，来自 `provider list`。使用所选 Context 的在线核心、管理鉴权与实例身份校验；不允许临时地址、密钥、协议或生成参数。revision 不匹配、未授权、实例不符或参数错误时非零退出，不发起目录请求。停用供应商也可显式查询。
+
+只发一次 `GET <已存 base_url>/models`（保留已存 `/v1`，不自动补前缀），携带已存密钥，禁止重定向和环境代理，共用并发限额。总超时为供应商超时与8秒的较小值，无自动重试。仅解析 `data:[{id:...}]`，目录最多512 KiB、1000条记录、每 ID 256字节；去重排序，不返回部分列表或上游元数据。
+
+stdout 为 `{provider_id, revision, http_status, elapsed_ms, models, failure}`；成功 `failure=""`，空目录为 `models:[]`。目录层失败同样输出结构化结果并退出0，调用者必须检查 `failure`：`authentication`、`unsupported`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`；未取得 HTTP 状态为0。管理层失败仍非零退出。不会输出上游错误正文、密钥或原始网络异常。
+
+仅一次目录查询，不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。没有专用模型推理测试 CLI，本小步不自动导入模型。
 
 没有供应商删除命令；可用完整 `put ... --disabled` 暂停路由，但这不会删除存储的秘密。
 
@@ -366,6 +383,7 @@ anchor recover [--id ID]
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型新增/更新/查询 | provider / model 的 add、put、list | 已提供 CLI；删除未实现 |
+| 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 只读已存上游 /models，不导入映射、不测试推理；当前源码 / desktop.10 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 模型推理与模型目录数据面 | HTTP 网关 | 数据面供 Agent 调用，不强制新增 CLI 推理入口；无专用调用命令 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅/用量查询 CLI |
@@ -377,7 +395,7 @@ anchor recover [--id ID]
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
-发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；本轮源码的 36 个命令路径包含尚未公开发布的 stop 与 update，不反写旧发行能力。
+发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；本轮源码的 37 个命令路径包含尚未公开发布的 stop 与 update，不反写旧发行能力。
 
 
 ## 11. 本机在线更新

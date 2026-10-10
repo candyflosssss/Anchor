@@ -37,7 +37,7 @@ func TypeScript() string {
 			panic("unsupported contract type: " + t.String())
 		}
 	}
-	for _, v := range []any{Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}} {
+	for _, v := range []any{Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ProviderModels{}, ProviderModelsResult{}} {
 		t := reflect.TypeOf(v)
 		fmt.Fprintf(&out, "export interface %s {\n", t.Name())
 		for i := 0; i < t.NumField(); i++ {

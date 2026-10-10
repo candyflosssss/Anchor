@@ -173,6 +173,10 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 
 ## 8. 桌面供应商开发切片（2026-10-11）
 
-已新增 Wails v2.15.0 宿主、五方法受限桥接、Go DTO→TypeScript 生成与真实管理客户端接入。宿主自动安全初始化／启动／复用本机核心，独立子进程不随窗口 context 退出；供应商界面只在身份／API／授权／ready 通过后开放。状态轮询不重启核心，断开后清除供应商缓存与草稿。供应商密钥只入不出；写入仍使用核心完整替换与 revision 规则。
+已新增 Wails v2.15.0 宿主、受限桥接、Go DTO→TypeScript 生成与真实管理客户端接入。宿主自动安全初始化／启动／复用本机核心，独立子进程不随窗口 context 退出；供应商界面只在身份／API／授权／ready 通过后开放。状态轮询不重启核心，断开后清除供应商缓存与草稿。供应商密钥只入不出；写入仍使用核心完整替换与 revision 规则。
 
 接口细节见[桌面运行契约](desktop-runtime.md)和[供应商接口](provider-interface.md)，构建与平台缺口见[桌面开发版说明](../release/desktop.md)。真实 Go 隔离核心测试不等于原生 Wails 窗口已验证；后续安装包轮补齐 Windows NSIS 与 Ubuntu24.04 AMD64 `.deb` 的隔离构建入口，仅执行编译／打包，按用户要求不做本轮安装或原生验收，未对外发布。
+
+### desktop.10：只读上游目录
+
+管理面新增 `POST /control/v1/providers/{id}/discover-models`，复用身份／管理鉴权、已存 revision、禁止代理与重定向的 HTTP 客户端，以及网关／供应商并发边界。CLI 和受限桌面方法复用同一后端，最多8秒获取 OpenAI 风格 `/models`，限制响应大小和模型 ID，并固定错误脱敏；不会生成内容、导入映射或更新健康。DTO／失败语义见[供应商接口 §4](provider-interface.md)，实际指令见[最新大全](../cli/commands.md)。

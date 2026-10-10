@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/candyflosssss/Anchor/internal/catalog"
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/candyflosssss/Anchor/internal/core"
@@ -212,5 +215,60 @@ func TestHelpDocumentsChineseProviderIDs(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "including Chinese") {
 		t.Fatal("provider ID help missing")
+	}
+}
+
+func TestProviderModelsCLI(t *testing.T) {
+	dir := t.TempDir()
+	st, err := state.Open(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	server := core.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	defer server.Close()
+	control := httptest.NewServer(server.Control())
+	defer control.Close()
+	if _, err = st.Initialize(strings.TrimPrefix(control.URL, "http://"), "127.0.0.1:17860"); err != nil {
+		t.Fatal(err)
+	}
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.URL.Path != "/models" || r.Method != "GET" {
+			t.Error("unexpected request")
+		}
+		io.WriteString(w, `{"data":[{"id":"cli-model"}]}`)
+	}))
+	defer upstream.Close()
+	run := func(args ...string) (string, error) {
+		var out, diagnostics bytes.Buffer
+		err := (App{In: strings.NewReader(""), Out: &out, Err: &diagnostics}).Run(context.Background(), append([]string{"--data-dir", dir}, args...))
+		return out.String(), err
+	}
+	for _, args := range [][]string{{"context", "add", "local", "--local"}, {"context", "use", "local"}, {"provider", "add", "--id", "中文目录", "--base-url", upstream.URL, "--disabled"}} {
+		if _, err = run(args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := run("provider", "models", "--id", "中文目录", "--revision", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var result catalog.ProviderModels
+	if json.Unmarshal([]byte(raw), &result) != nil || result.HTTPStatus != 200 || result.Failure != "" || len(result.Models) != 1 || result.Models[0] != "cli-model" {
+		t.Fatal(raw)
+	}
+	for _, args := range [][]string{{"provider", "models", "--id", "中文目录"}, {"provider", "models", "--id", "中文目录", "--revision", "2"}, {"provider", "models", "--id", "中文目录", "--revision", "1", "--secret-stdin"}} {
+		if _, err = run(args...); err == nil {
+			t.Fatal("accepted invalid query", args)
+		}
+	}
+	if calls.Load() != 1 {
+		t.Fatal("unexpected upstream request count", calls.Load())
+	}
+	saved, _ := st.Provider("中文目录")
+	if saved.Revision != 1 || saved.Enabled {
+		t.Fatal("query changed config")
 	}
 }

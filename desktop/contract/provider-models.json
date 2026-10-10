@@ -1,0 +1,7 @@
+{
+  "contract": "anchor-desktop-v1",
+  "input": {"provider_id": "摸鱼AI", "expected_revision": 3},
+  "success": {"provider_id": "摸鱼AI", "revision": 3, "http_status": 200, "elapsed_ms": 42, "models": ["demo-model", "demo-model-mini"], "failure": ""},
+  "empty": {"provider_id": "摸鱼AI", "revision": 3, "http_status": 200, "elapsed_ms": 8, "models": [], "failure": ""},
+  "unsupported": {"provider_id": "摸鱼AI", "revision": 3, "http_status": 404, "elapsed_ms": 16, "models": [], "failure": "unsupported"}
+}
