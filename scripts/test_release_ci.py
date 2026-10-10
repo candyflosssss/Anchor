@@ -37,12 +37,20 @@ class CIReleaseTests(unittest.TestCase):
             artifacts.append({"file": name, "target": target, "bytes": (root / name).stat().st_size,
                               "sha256": hashlib.sha256((root / name).read_bytes()).hexdigest(),
                               "verification": acceptance})
+        standalone = []
+        for target in ("linux-amd64", "windows-amd64"):
+            name = ci_release.standalone_name(version, target)
+            (root / name).write_bytes(b"fake executable for offline gate test")
+            standalone.append({"file": name, "target": target, "bytes": (root / name).stat().st_size,
+                               "sha256": hashlib.sha256((root / name).read_bytes()).hexdigest(),
+                               "verification": "standalone_binary_smoke_passed" if target == "linux-amd64"
+                               else "cross_compile_only; native runtime acceptance pending"})
         data = {"schema_version": 1, "version": version, "channel": "alpha", "status": "packaged",
                 "source": {"revision": revision, "dirty": False, "inputs_sha256": "b" * 64},
                 "public_publish_ready": False,
                 "publish_blockers": ["windows-amd64: native runtime acceptance pending"],
                 "checks": ["module_verify", "go_race_tests", "go_vet", "release_tool_tests"],
-                "artifacts": artifacts}
+                "artifacts": artifacts, "standalone_artifacts": standalone}
         (root / "RELEASE_NOTES.md").write_text("Windows native acceptance pending\n")
         self.write_manifest(root, data)
         return version, revision, data
@@ -71,7 +79,13 @@ class CIReleaseTests(unittest.TestCase):
                  lambda d: d["artifacts"][0].update(verification="not tested"),
                  lambda d: d["artifacts"][0].update(bytes=0),
                  lambda d: d["artifacts"][0].update(sha256="0" * 64),
-                 lambda d: d.update(artifacts=[d["artifacts"][0], d["artifacts"][0]])]
+                 lambda d: d.update(artifacts=[d["artifacts"][0], d["artifacts"][0]]),
+                 lambda d: d.update(standalone_artifacts=[]),
+                 lambda d: d.update(standalone_artifacts=[d["standalone_artifacts"][0]] * 2),
+                 lambda d: d["standalone_artifacts"][0].update(file="other"),
+                 lambda d: d["standalone_artifacts"][0].update(verification="not tested"),
+                 lambda d: d["standalone_artifacts"][0].update(bytes=0),
+                 lambda d: d["standalone_artifacts"][0].update(sha256="0" * 64)]
         for edit in edits:
             with self.subTest(edit=edit), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
@@ -84,6 +98,8 @@ class CIReleaseTests(unittest.TestCase):
     def test_corruption_missing_and_extra_files_are_refused(self):
         for mutation in (lambda p: (p / "RELEASE_NOTES.md").write_text("corrupt"),
                          lambda p: (p / "SHA256SUMS").unlink(),
+                         lambda p: (p / "anchor_1.2.3-alpha.1_linux_amd64").unlink(),
+                         lambda p: (p / "anchor_1.2.3-alpha.1_windows_amd64.exe").write_bytes(b"corrupt"),
                          lambda p: (p / "unexpected").write_text("extra"),
                          lambda p: (p / "SHA256SUMS").write_text("0" * 64 + "  ../secret\n"),
                          lambda p: (p / "SHA256SUMS").write_text((p / "SHA256SUMS").read_text() * 2)):

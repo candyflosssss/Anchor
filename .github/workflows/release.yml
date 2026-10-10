@@ -65,10 +65,27 @@ jobs:
             printf -- '- Source: `%s`\n' "$GITHUB_SHA"
             printf -- '- Build: `%s`, attempt `%s`\n' "$GITHUB_RUN_NUMBER" "$GITHUB_RUN_ATTEMPT"
             printf -- '- Scope: Actions artifact; draft requested: `%s`; NOT publicly released.\n' "$DRAFT"
-            printf -- '- Linux: archived executable smoke passed.\n'
+            printf -- '- Linux: standalone and archived executable smoke passed.\n'
+            printf -- '- Quick download: choose the platform-specific single-file artifact.\n'
             printf -- '- Windows: cross-compile only; native acceptance pending.\n'
             printf -- '- Full metadata and SHA256: see release.json and SHA256SUMS.\n'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload single Linux core
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: anchor-linux-amd64-${{ steps.plan.outputs.version }}
+          path: dist/${{ steps.plan.outputs.version }}/anchor_${{ steps.plan.outputs.version }}_linux_amd64
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload single Windows core
+        if: success()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: anchor-windows-amd64-${{ steps.plan.outputs.version }}
+          path: dist/${{ steps.plan.outputs.version }}/anchor_${{ steps.plan.outputs.version }}_windows_amd64.exe
+          if-no-files-found: error
+          retention-days: 14
       - name: Preserve complete packages or partial diagnostics
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -78,8 +95,21 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  installer-windows:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Test installer with isolated state and offline downloads
+        run: python -m unittest discover -s scripts -p "test_release_installer.py" -v
+
   draft:
-    needs: build
+    needs: [build, installer-windows]
     if: needs.build.outputs.draft == 'true' && github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -110,6 +140,8 @@ jobs:
           set -euo pipefail
           dir="dist/$VERSION"
           gh release create "$GITHUB_REF_NAME" \
+            "$dir/anchor_${VERSION}_linux_amd64" \
+            "$dir/anchor_${VERSION}_windows_amd64.exe" \
             "$dir/anchor_${VERSION}_linux_amd64.tar.gz" \
             "$dir/anchor_${VERSION}_windows_amd64.zip" \
             "$dir/release.json" "$dir/RELEASE_NOTES.md" "$dir/SHA256SUMS" \

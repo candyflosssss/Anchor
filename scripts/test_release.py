@@ -36,7 +36,10 @@ class ReleaseTests(unittest.TestCase):
         with patch.object(release, "command", side_effect=AssertionError("unexpected command")), redirect_stderr(io.StringIO()):
             with patch("sys.stdout", new_callable=io.StringIO) as output:
                 self.assertEqual(release.main(["--version", "0.1.0-alpha.1", "--plan"]), 0)
-                self.assertFalse(json.loads(output.getvalue())["uploads"])
+                plan = json.loads(output.getvalue())
+                self.assertFalse(plan["uploads"])
+                self.assertEqual(plan["standalone_files"], ["anchor_0.1.0-alpha.1_linux_amd64",
+                                                          "anchor_0.1.0-alpha.1_windows_amd64.exe"])
 
     def test_archives_have_a_single_root_and_correct_permissions(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -116,6 +119,17 @@ class ReleaseTests(unittest.TestCase):
                 manifest = json.loads((output / "release.json").read_text())
                 self.assertEqual(manifest["status"], "packaged")
                 self.assertFalse(manifest["public_publish_ready"])
+                self.assertEqual(len(manifest["standalone_artifacts"]), 2)
+                for item in manifest["standalone_artifacts"]:
+                    binary = output / item["file"]
+                    self.assertEqual(binary.read_bytes(), b"FAKE_BINARY_NOT_FOR_DISTRIBUTION")
+                    self.assertEqual(item["sha256"], release.digest(binary))
+                    self.assertEqual(item["bytes"], binary.stat().st_size)
+                    self.assertEqual(binary.stat().st_mode & 0o777,
+                                     0o755 if item["target"] == "linux-amd64" else 0o644)
+                self.assertEqual(manifest["standalone_artifacts"][0]["verification"], "standalone_binary_smoke_passed")
+                self.assertEqual(manifest["standalone_artifacts"][1]["verification"],
+                                 "cross_compile_only; native runtime acceptance pending")
                 self.assertTrue(any("windows-amd64" in b for b in manifest["publish_blockers"]))
                 with tarfile.open(next(output.glob("*.tar.gz"))) as t:
                     names = {Path(m.name).name for m in t.getmembers() if m.isfile()}
@@ -139,6 +153,40 @@ class ReleaseTests(unittest.TestCase):
             partial = list((root / "dist").glob("*.failed-*"))
             self.assertEqual(len(partial), 1)
             self.assertEqual(json.loads((partial[0] / "release.json").read_text())["status"], "partial")
+            self.assertFalse((root / "dist/.release-lock").exists())
+
+    def test_standalone_export_refuses_symlinks_and_existing_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            binary = root / "built"
+            binary.write_bytes(b"fake")
+            link = root / "link"
+            link.symlink_to(binary)
+            with self.assertRaises(RuntimeError):
+                release.export_standalone(link, root, "linux-amd64", "0.1.0-alpha.1")
+            exported = release.export_standalone(binary, root, "linux-amd64", "0.1.0-alpha.1")
+            with self.assertRaises(FileExistsError):
+                release.export_standalone(binary, root, "linux-amd64", "0.1.0-alpha.1")
+            self.assertEqual(exported.read_bytes(), binary.read_bytes())
+
+    def test_failed_standalone_smoke_preserves_partial_without_archive(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.fixture(root)
+            args = release.arguments(["--version", "0.1.0-alpha.4", "--internal", "--allow-dirty",
+                                      "--targets", "linux-amd64"])
+            with patch.object(release, "ROOT", root), patch.object(release, "command", side_effect=self.fake_command), \
+                    patch.object(release, "dependencies", return_value=([], "notices")), \
+                    patch.object(release, "check_standalone", side_effect=RuntimeError("single-file smoke failed")), \
+                    redirect_stderr(io.StringIO()):
+                with self.assertRaises(RuntimeError):
+                    release.build(args, {}, {"dirty": True, "inputs_sha256": "fixed"}, [])
+            partial, = (root / "dist").glob("*.failed-*")
+            manifest = json.loads((partial / "release.json").read_text())
+            self.assertEqual(manifest["status"], "partial")
+            self.assertEqual(manifest["standalone_artifacts"][0]["verification"], "pending")
+            self.assertFalse(list(partial.glob("*.tar.gz")))
+            self.assertTrue((partial / manifest["standalone_artifacts"][0]["file"]).is_file())
             self.assertFalse((root / "dist/.release-lock").exists())
 
     def test_prepackage_failure_removes_own_stage_and_lock(self):

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build local Anchor prerelease packages; never commit, tag or publish."""
+"""Build standalone Anchor executables and optional audit bundles; never publish."""
 from __future__ import annotations
 
 import argparse
@@ -176,6 +176,31 @@ def archive(payload: Path, output: Path, target: str, epoch: int) -> Path:
     return destination
 
 
+def standalone_name(version: str, target: str) -> str:
+    goos, goarch = TARGETS[target]
+    return f"anchor_{version}_{goos}_{goarch}" + (".exe" if goos == "windows" else "")
+
+
+def export_standalone(executable: Path, output: Path, target: str, version: str) -> Path:
+    if executable.is_symlink() or not executable.is_file():
+        raise RuntimeError("standalone executable must be a regular, non-symlink file")
+    destination = output / standalone_name(version, target)
+    with executable.open("rb") as source, destination.open("xb") as result:
+        shutil.copyfileobj(source, result)
+    destination.chmod(0o755 if target.startswith("linux-") else 0o644)
+    if digest(destination) != digest(executable):
+        raise RuntimeError("standalone executable copy failed checksum validation")
+    return destination
+
+
+def check_standalone(path: Path, target: str, version: str, env: dict[str, str]) -> str:
+    if not native(target):
+        return "cross_compile_only; native runtime acceptance pending"
+    print(command([sys.executable, "scripts/smoke_test.py", "--binary", str(path),
+                   "--expected-version", version], env=env), file=sys.stderr)
+    return "standalone_binary_smoke_passed"
+
+
 def native(target: str) -> bool:
     return target == "linux-amd64" and sys.platform == "linux" and platform.machine().lower() in {"x86_64", "amd64"}
 
@@ -229,7 +254,7 @@ def build(args: argparse.Namespace, env: dict[str, str], source: dict[str, objec
                 "built_at": datetime.fromtimestamp(epoch, timezone.utc).isoformat(), "source": source,
                 "go_version": command(["go", "version"], env=env).strip(), "checks": passed,
                 "status": "building", "public_publish_ready": False, "publish_blockers": blockers,
-                "artifacts": [], "dependencies": []}
+                "artifacts": [], "standalone_artifacts": [], "dependencies": []}
     with output_lock() as dist:
         final = dist / args.version
         if final.exists() or final.is_symlink():
@@ -257,6 +282,11 @@ def build(args: argparse.Namespace, env: dict[str, str], source: dict[str, objec
                         (payload / "LEGAL-NOTICE.txt").write_text("Internal evaluation only. Project distribution license pending.\nDo not publish this package as an authorized public release.\n")
                     (payload / "BUILD-INFO.json").write_text(json.dumps({"version": args.version, "target": target,
                         "built_at": manifest["built_at"], "source": source}, indent=2, ensure_ascii=False) + "\n")
+                    standalone = export_standalone(executable, stage, target, args.version)
+                    standalone_entry = {"file": standalone.name, "target": target, "sha256": digest(standalone),
+                                        "bytes": standalone.stat().st_size, "verification": "pending"}
+                    manifest["standalone_artifacts"].append(standalone_entry)
+                    standalone_entry["verification"] = check_standalone(standalone, target, args.version, env)
                     artifact = archive(payload, stage, target, epoch)
                     entry = {"file": artifact.name, "target": target, "sha256": digest(artifact), "bytes": artifact.stat().st_size,
                              "verification": "pending"}
@@ -268,12 +298,12 @@ def build(args: argparse.Namespace, env: dict[str, str], source: dict[str, objec
                     raise RuntimeError("release inputs changed while building; discard this candidate")
             manifest["status"] = "packaged"
             manifest["public_publish_ready"] = not blockers
-            (stage / "RELEASE_NOTES.md").write_text(f"# Anchor {args.version}\n\nCLI/headless Responses gateway development milestone.\nNo desktop UI, SSH, Agent binding/recovery or cross-protocol conversion.\n\nPublication blockers:\n" + "".join(f"- {b}\n" for b in blockers) + "\nSee release.json for source and validation evidence.\n")
+            (stage / "RELEASE_NOTES.md").write_text(f"# Anchor {args.version}\n\nSingle-executable CLI/headless Responses gateway with Codex base-config binding, model catalogs and conditional recovery.\nUse the standalone file for your OS; audit bundles with documentation and dependency notices are optional for runtime.\nNo desktop UI, built-in SSH connector or cross-protocol conversion.\n\nPublication blockers:\n" + "".join(f"- {b}\n" for b in blockers) + "\nSee release.json for source and validation evidence.\n")
             save_manifest(stage, manifest)
             stage.rename(final)
             return final
         except BaseException as error:
-            if list(stage.glob("*.tar.gz")) or list(stage.glob("*.zip")):
+            if manifest["standalone_artifacts"] or list(stage.glob("*.tar.gz")) or list(stage.glob("*.zip")):
                 manifest["status"] = "partial"
                 manifest["error"] = str(error)[:4000]
                 save_manifest(stage, manifest)
@@ -289,7 +319,8 @@ def main(argv: list[str] | None = None) -> int:
     args = arguments(argv)
     if args.plan:
         print(json.dumps({"version": args.version, "targets": args.targets, "output": str(ROOT / "dist" / args.version),
-                          "steps": ["source/license checks", "tests and vet", "build", "package", "native archive smoke", "checksums"],
+                          "standalone_files": [standalone_name(args.version, t) for t in args.targets],
+                          "steps": ["source/license checks", "tests and vet", "build", "standalone smoke", "audit bundles", "native archive smoke", "checksums"],
                           "internal": args.internal, "uploads": False}, indent=2))
         return 0
     if Path("/home/mosaki/.codex/skills/resource-guard/SKILL.md").exists() and os.environ.get("ANCHOR_RELEASE_GUARDED") != "1":

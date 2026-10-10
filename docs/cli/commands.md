@@ -7,7 +7,7 @@
 
 ## 1. 调用与公共约定
 
-下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；尚无安装器。源码脚本不包含在用户包中。
+下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。当前尚无公开 Release，远程安装入口未上线。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
 
 ```text
 anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
@@ -337,6 +337,6 @@ anchor recover [--id ID]
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | 未实现 | 后续协议能力及其用户配置需同步核对 CLI 覆盖 |
-| 分发、系统服务、升级 | 本地发行脚本及手动升级说明；无产品 CLI 入口 | 便携预发行包构建已实现；公开发布、安装器、自启动、自动升级仍未实现，见发行流程 |
+| 分发、系统服务、升级 | 发行脚本与外部安装脚本；无产品 install/update 子命令 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；当前无公开 Release。脚本替换需显式授权，不停服/迁移；桌面安装器、自启动、自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。

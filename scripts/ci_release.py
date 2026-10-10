@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 import re
 
-from release import VERSION
+from release import VERSION, standalone_name
 
 
 def plan(event: str, ref: str, run_number: str) -> dict[str, str]:
@@ -28,6 +28,7 @@ def verify(directory: Path, version: str, revision: str) -> None:
     if not VERSION.fullmatch(version) or not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("invalid version or source revision")
     names = {f"anchor_{version}_linux_amd64.tar.gz", f"anchor_{version}_windows_amd64.zip",
+             standalone_name(version, "linux-amd64"), standalone_name(version, "windows-amd64"),
              "release.json", "RELEASE_NOTES.md"}
     if directory.is_symlink() or {p.name for p in directory.iterdir()} != names | {"SHA256SUMS"}:
         raise ValueError("unexpected release bundle contents")
@@ -72,6 +73,18 @@ def verify(directory: Path, version: str, revision: str) -> None:
                 or artifact.get("sha256") != sums[name]
                 or artifact.get("bytes") != (directory / name).stat().st_size):
             raise ValueError("artifact metadata mismatch")
+
+    standalone = data.get("standalone_artifacts", [])
+    if len(standalone) != 2 or {a.get("target") for a in standalone} != set(expected_artifacts):
+        raise ValueError("missing or duplicate standalone executables")
+    for artifact in standalone:
+        name = standalone_name(version, artifact["target"])
+        acceptance = ("standalone_binary_smoke_passed" if artifact["target"] == "linux-amd64"
+                      else "cross_compile_only; native runtime acceptance pending")
+        if (artifact.get("file") != name or artifact.get("verification") != acceptance
+                or artifact.get("sha256") != sums[name]
+                or artifact.get("bytes") != (directory / name).stat().st_size):
+            raise ValueError("standalone executable metadata mismatch")
 
 
 def main() -> None:
