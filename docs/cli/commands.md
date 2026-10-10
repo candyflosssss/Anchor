@@ -5,6 +5,7 @@
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
+- 本轮新增本机 `update` 命令和桌面在线更新入口，仅当前源码，**未包含于 alpha.6 / desktop.8，尚未打包或发布**。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -32,12 +33,17 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 
 ## 2. 当前命令索引
 
-共 31 个规范命令路径（别名单列于对应说明）。
+共 36 个规范命令路径（别名单列于对应说明）。
 
 | 指令 | 用途 | 作用域 / 前置条件 |
 | --- | --- | --- |
 | `help` | 查看总帮助 | 无需初始化 |
 | `version` | 查看程序版本 | 无需初始化 |
+| `update config` | 查看本机更新渠道与源 | 无需初始化 |
+| `update configure` | 配置本机更新渠道与源 | 无需初始化；源不能含凭据 |
+| `update check` | 查询兼容的新版本 | 无需核心在线；默认 CLI，桌面必须提供实际版本 |
+| `update download` | 下载并校验更新包 | 无需核心在线；仅接受更高版本 |
+| `update apply --approve` | 原位更新本机 CLI，保留上一版 | 已下载、核心已退出、用户可写安装路径；不自动重启 |
 | `init` | 初始化本机状态 | 本机；核心不应占用该状态目录 |
 | `serve` | 前台运行核心 | 本机已初始化 |
 | `context add` | 登记并验证本机实例 | 本机已初始化；核心在线 |
@@ -366,8 +372,33 @@ anchor recover [--id ID]
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | 未实现 | 后续协议能力及其用户配置需同步核对 CLI 覆盖 |
-| 分发、系统服务、升级 | 发行脚本与外部安装脚本；无产品 install/update 子命令 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，本轮不验收、不公开发布）；系统服务、自启动与自动更新未实现 |
+| 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；原生安装未验收、未发布，见 [在线更新](../design/online-updates.md) |
+| 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，本轮不验收、不公开发布）；系统服务、自启动与静默自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
-发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；本轮源码的 31 个命令路径包含尚未公开发布的 stop，不反写旧发行能力。
+发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；本轮源码的 36 个命令路径包含尚未公开发布的 stop 与 update，不反写旧发行能力。
+
+
+## 11. 本机在线更新
+
+```text
+anchor [--data-dir DIR] update config
+anchor [--data-dir DIR] update configure [--channel stable|alpha|beta|rc|dev]
+                                      [--manifest HTTPS_URL | --default-source]
+anchor [--data-dir DIR] update check|download [--channel CHANNEL] [--manifest HTTPS_URL]
+                                      [--product cli|desktop] [--current-version VERSION]
+anchor [--data-dir DIR] update apply --approve
+```
+
+- 作用域：本机程序／更新缓存，不是 selected Context，所有子命令拒绝 `--context`；无需 init 或数据库。检查／下载不停止核心，不修改 Agent 配置。`--json` 沿用正常 JSON 输出。
+- config：无参数，读取 `DIR/updates/config.json`；不存在时 `{channel:"alpha",manifest_url:""}`，无副作用。
+- configure：只修改更新配置；省略参数保留旧值，`--default-source` 清空源，不能同时指定 `--manifest`。合法渠道为上述五项。源为空时为 GitHub Releases；URL 必须 HTTPS，无凭据／query／fragment，字面量回环 IP 的 HTTP 仅用于本机测试。配置影响同一数据目录的桌面宿主，用户确保源可信。成功返回配置 JSON；无模型密钥、无 GitHub token。
+- check/download：参数只覆盖本次，不写配置。默认 product=cli、当前版本为当前 CLI 的注入版本；product=desktop 必须提供实际 `--current-version`，CLI 模式禁止该参数。默认只查所选渠道的最高已发布 SemVer，不取 draft，最多500个 Release；查不到返回 available=false。自定义清单版本／渠道／平台必须一致。跨渠道更新同样必须严格高于当前版本，不支持在线降级。
+- check 输出 `{current_version,version,channel,product,source,available,artifact}`，artifact 可为空；附件含 file/target/kind/url/sha256/bytes；可用性依据版本，不仅依据附件存在。成功查询无需更新时退出0；网络、限流、非法元数据失败退出1。
+- download：先检查，再将更高版本的当前平台文件流式下载到 `DIR/updates/`，大小／SHA256 双重校验后写入 `<product>-download.json`；返回 `{check,path}`，path 是绝对路径。有效完整缓存可复用，不续传 partial。失败不覆盖现有程序或旧的完整缓存；无新版本、无兼容文件、大小或 SHA 不符均退出1。
+- apply：仅处理已下载的 CLI receipt，不联网；必须 `--approve`、能取得本机实例锁（用户先显式停止核心）、文件与目录属于当前用户；Linux 还要求不对组／其他用户开放写入。重新检查平台、版本和实际哈希，再在可执行文件目录进行备份／替换，`.previous` 保留一份上一版，下次替换会覆盖该备份；普通替换失败尝试恢复。安装权限不足、符号链接／reparse 路径、Linux 硬链接、文件被修改、核心未退出等失败拒绝；Windows 缓存有受保护 ACL，但不声称已全面审计任意安装路径的 ACL／硬链接。不自动提权／重启／停远程服务。目标是 os.Executable 解析后的实际 CLI 路径，不允许任意目标路径。
+- apply 成功输出 `{installed:true,backup:ABS_PATH,restart_required:true,core_restarted:false}`；installed 仅表示本次 CLI 文件替换完成，当前命令仍是旧进程，用户下一次运行／重新启动核心才使用新版本。需要回退时，正常停服后人工恢复备份；不承诺数据库回滚或所有数据目录中的进程都已退出。请先停止使用同一程序的其他核心。
+- 当前平台包最多256 MiB、清单2 MiB；check/download 整个操作最多5分钟。更新清单格式、签名限制及 dev 投放步骤见 [在线更新](../design/online-updates.md)。SHA256 仅是完整性校验，不能替代独立发布签名。
+
+桌面宿主配置入口为 `anchor-desktop [--data-dir DIR] [--update-channel CHANNEL] [--update-manifest HTTPS_URL]`，只在指定时保存配置；窗口启动和供应商功能仍走原会话规则。桌面 GUI 只接收受控渠道和已检查版本，不提供任意 URL/路径/命令执行。Linux 安装权限交由系统安装器，不能等同于 CLI apply 原位替换 `/usr/bin`。

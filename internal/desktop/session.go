@@ -12,15 +12,20 @@ import (
 	"github.com/candyflosssss/Anchor/internal/client"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
+	"github.com/candyflosssss/Anchor/internal/updater"
 )
 
 // Options is host-only configuration. It is never exposed to JavaScript.
 type Options struct {
 	Dir, Executable, ControlAddress, GatewayAddress string
 	StartTimeout                                    time.Duration
+	Quit                                            func()
 }
 type Session struct {
 	mu          sync.Mutex
+	updateMu    sync.Mutex
+	updateCheck *updater.Check
+	updating    bool
 	ctx         context.Context
 	cancel      context.CancelFunc
 	options     Options
@@ -129,6 +134,10 @@ func (s *Session) start() SessionResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := SessionResult{Contract: Contract}
+	if s.updating {
+		result.Problem = &Problem{"conflict"}
+		return result
+	}
 	s.cfg = nil
 	s.launchedPID = 0
 	if s.ctx.Err() != nil {

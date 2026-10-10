@@ -4,7 +4,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupConte
 import { prototype } from '../../desktop/environment';
 import type { Appearance } from '../../app/use-appearance';
 
-export function AppSidebar({ appearance, setAppearance }: { appearance: Appearance; setAppearance: (value: Appearance) => void }) {
+export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }: { page: 'providers' | 'settings'; onNavigate: (page: 'providers' | 'settings') => void; busy: boolean; appearance: Appearance; setAppearance: (value: Appearance) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   return <Sidebar collapsible="icon" variant="inset" aria-label="工作台导航">
     <SidebarHeader><SidebarMenu><SidebarMenuItem>
@@ -17,13 +17,13 @@ export function AppSidebar({ appearance, setAppearance }: { appearance: Appearan
       {([
         [LayoutDashboard, '概览', false], [PlugZap, '供应商', true], [ArrowLeftRight, '模型映射', false], [Bot, 'Agent 托管', false], [FileText, '日志', false],
       ] as const).map(([Icon, title, current]) => <SidebarMenuItem key={title}>
-        <SidebarMenuButton tooltip={current ? title : `${title}：不在本版范围`} disabled={!current} isActive={current} aria-current={current ? 'page' : undefined} aria-label={title} onClick={() => { if (isMobile) setOpenMobile(false); }}>
+        <SidebarMenuButton tooltip={current ? title : `${title}：不在本版范围`} disabled={!current || busy} isActive={current && page === 'providers'} aria-current={current && page === 'providers' ? 'page' : undefined} aria-label={title} onClick={() => { onNavigate('providers'); if (isMobile) setOpenMobile(false); }}>
           <Icon /><span>{title}</span>{!current && <span className="ml-auto text-xs text-muted-foreground">后续</span>}
         </SidebarMenuButton>
       </SidebarMenuItem>)}
     </SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent>
     <SidebarFooter>
-      <SidebarMenu><SidebarMenuItem><SidebarMenuButton tooltip="设置：不在本版范围" disabled><Settings2 /><span>设置</span><span className="ml-auto text-xs">后续</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
+      <SidebarMenu><SidebarMenuItem><SidebarMenuButton tooltip="设置 / 在线更新" aria-label="设置 / 在线更新" disabled={busy} isActive={page === 'settings'} aria-current={page === 'settings' ? 'page' : undefined} onClick={() => { onNavigate('settings'); if (isMobile) setOpenMobile(false); }}><Settings2 /><span>设置</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
       <div className="appearance-control" role="group" aria-label="外观设置">{([['light', Sun, '浅色'], ['dark', Moon, '深色'], ['system', Monitor, '跟随系统']] as const).map(([value, Icon, title]) => <button key={value} aria-label={title} title={title} aria-pressed={appearance === value} onClick={() => setAppearance(value)}><Icon size={16} /></button>)}</div>
       <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden"><Monitor className="size-4" /><span>{prototype ? "Mock 设计预览 · 未接入核心" : "桌面版 · 关窗不停服"}</span></div>
     </SidebarFooter><SidebarRail />

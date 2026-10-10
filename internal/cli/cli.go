@@ -45,11 +45,16 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|single
   agent token ID                     Credential-helper stdout (local, raw secret)
   recover [--id ID]                   Conditional recovery with core stopped
+  update config | configure [--channel alpha|beta|rc|stable|dev]
+                [--manifest HTTPS_URL | --default-source]
+  update check|download [--channel CHANNEL] [--manifest HTTPS_URL]
+                [--product desktop --current-version VERSION]
+  update apply --approve             Replace local CLI; core must be stopped
   version
 All normal output except agent token is JSON; diagnostics and service logs go to stderr.
 Provider IDs accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
-init/serve/access/context/recover/agent token operate locally. Business commands use the selected context.
+init/serve/access/context/recover/update/agent token operate locally. Business commands use the selected context.
 Codex base-config/model-catalog management is available; actual Agent connection remains unverified.
 New agent add defaults to all-compatible; --model is the default, not the permission boundary.
 Catalog metadata must match the exact Codex version and actual upstream capabilities.
@@ -124,6 +129,11 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.output(map[string]string{"version": core.Version})
 	}
 	switch args[0] {
+	case "update":
+		if target != "" {
+			return errors.New("update is local-only; omit --context")
+		}
+		return a.update(ctx, dir, args[1:])
 	case "init":
 		if target != "" {
 			return errors.New("init is local-only; do not specify --context")

@@ -3,7 +3,7 @@
 - 更新：2026-10-11；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
 - 状态：真实 Go 桥接、桌面传输和共享契约已实现；隔离核心读写已测试，**不等于 Wails 原生窗口或安装验收通过**。
 - 桌面 DTO 权威：`internal/desktop/contract.go`；TypeScript 由 `go run ./cmd/desktop-contract` 生成，漂移由 Go 测试检查。核心业务规则仍归 `internal/state` / `internal/core`，不复制到宿主。
-- 五个受限方法、窗口／核心生命周期与构建边界见[桌面运行契约](desktop-runtime.md)。
+- 受限方法、窗口／核心生命周期与构建边界见[桌面运行契约](desktop-runtime.md)。
 
 ## 1. 读写与数据
 

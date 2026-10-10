@@ -8,6 +8,7 @@ import { AppSidebar } from '../components/shared/app-sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '../components/ui/breadcrumb';
 import { Separator } from '../components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '../components/ui/sidebar';
+import { UpdateSettings } from '../features/updates/update-settings.view';
 import { ProvidersPage } from '../pages/providers-page';
 import { useAppearance } from './use-appearance';
 import { useWindowController } from '../features/window/use-window-controller';
@@ -19,10 +20,11 @@ export function App() {
   const environment = useMemo(createEnvironment, []);
   const session = useDesktopSession();
   const windowController = useWindowController(!prototype);
+  const [page, setPage] = useState<'providers' | 'settings'>('providers');
   const [busy, setBusy] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   return <SidebarProvider>
-    <AppSidebar appearance={appearance} setAppearance={setAppearance} />
+    <AppSidebar appearance={appearance} setAppearance={setAppearance} page={page} onNavigate={setPage} busy={busy} />
     <SidebarInset className="min-w-0">
       <header onDoubleClick={windowController.onDragDoubleClick} className={cn("flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12", !prototype && "desktop-titlebar sticky top-0 z-20 bg-background pr-0 md:rounded-t-xl")}>
         <div className="flex min-w-0 items-center gap-2">
@@ -31,7 +33,7 @@ export function App() {
           <Breadcrumb><BreadcrumbList>
             <BreadcrumbItem className="hidden sm:block">工作台</BreadcrumbItem>
             <BreadcrumbSeparator className="hidden sm:block" />
-            <BreadcrumbItem><BreadcrumbPage>供应商</BreadcrumbPage></BreadcrumbItem>
+            <BreadcrumbItem><BreadcrumbPage>{page === 'providers' ? '供应商' : '设置 / 在线更新'}</BreadcrumbPage></BreadcrumbItem>
           </BreadcrumbList></Breadcrumb>
         </div>
         <div className="flex h-full min-w-0 items-center gap-2">
@@ -44,7 +46,7 @@ export function App() {
         <span>{session.info ? `${session.info.source === 'started' ? '本次启动' : '复用已有核心'} · ` : ''}关闭窗口不会停止核心 · 不自动设置开机自启动</span>
         {session.info?.can_stop && <Button variant="outline" size="sm" disabled={busy || session.stopping} onClick={() => setConfirmStop(true)}>停止核心</Button>}
       </div>}
-      {session.phase === 'ready' ? <ProvidersPage environment={environment} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
+      {page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <ProvidersPage environment={environment} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
         <h1 className="text-xl font-semibold">{session.phase === 'starting' ? '正在连接本机核心…' : session.phase === 'stopped' ? '停服请求已接受' : '本机核心暂不可用'}</h1>
         <p className="my-4 text-sm text-muted-foreground">{session.error ? desktopMessages[session.error] : session.phase === 'stopped' ? '核心正在处理退出与配置恢复；请求接受不代表恢复已完成。' : '自动初始化或核验已有实例，不会切换到模拟数据。'}</p>
         {session.phase !== 'starting' && <Button onClick={() => void session.connect()}>重新连接本机核心</Button>}

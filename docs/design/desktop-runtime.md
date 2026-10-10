@@ -6,7 +6,7 @@
 
 ## 1. 宿主接口
 
-规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的五个受限方法：Start、Status、Providers、SaveProvider、StopCore。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
+规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Providers、SaveProvider、StopCore，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
 
 每个结果带 `contract=anchor-desktop-v1`、data 与 problem；problem 仅含白名单 code，不返回原始错误、路径、管理令牌或供应商秘密。列表始终为数组。返回 Provider revision 为 1..Number.MAX_SAFE_INTEGER；写入 expected_revision 为 0..MAX_SAFE_INTEGER-1，且等于输入 provider.revision，超范围拒绝。SaveProvider 的 secret=null 保留、空字符串清除、非空替换；只入不出。写入发生网络/响应异常时返回 unknown，不自动重试；409 为 conflict、认证失败为 unauthorized。
 
@@ -45,3 +45,8 @@ Windows / Linux 统一启用 Wails `Frameless`，以现有工作区 header 承�
 此前宿主实现轮的 Go 全包 race/vet、Go→TS 漂移、共享样例以及真实隔离核心生命周期／供应商读写已通过；包括真正退出宿主进程后核心仍可服务、并发复用、丢失 owner.token 不重新创建凭据、认证与端口占用拒绝。前端 50 项单元、15 项原型浏览器和 6 项模拟 Wails 边界浏览器测试通过。
 
 此前 Windows `.3` 内部 EXE 已交叉编译；当时 Linux 因宿主缺 GTK3/WebKitGTK4.1 开发依赖未产出。后续安装包轮新增受限 Ubuntu24.04 构建容器、Windows NSIS／Linux `.deb`，不改上述接口或核心生命周期；Linux 图标与应用入口在宿主中对应同一 ProgramName。该轮按用户要求不运行测试、安装、真实 GUI／核心或业务验收，构建结果单独记录，不能沿用旧测试作为新包验收。当前产物与剩余门禁见[桌面开发版构建](../release/desktop.md)。公开 alpha.6 分发不变。
+
+
+## 5. 在线更新增量（2026-10-11）
+
+新增 UpdateInfo/ConfirmUpdate/UpdateResult DTO 和 integrity/permission 错误码，保留既有 anchor-desktop-v1 供应商与生命周期方法语义。更新读取／下载与核心业务分别用锁，长下载不占用供应商／Status 的会话锁。安装必须明确批准版本，重新校验磁盘文件，认证本机核心并等待正常退出，再交给独立 helper 等待窗口退出；核心抢占、身份变化、文件被修改或不兼容均拒绝，不强杀或自行提权。普通关窗仍不停服。本轮仅实现源码和隔离验证，安装器交接及双平台原生更新验收不是单元／模拟浏览器测试可替代的结果。

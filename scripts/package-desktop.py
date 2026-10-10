@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import update_manifest
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
@@ -40,7 +41,7 @@ def inputs_digest() -> str:
         files.extend(p for p in (ROOT / folder).rglob("*") if p.is_file())
     files.extend(p for p in (ROOT / "desktop/frontend/src").rglob("*") if p.is_file())
     files.extend(p for p in (ROOT / "desktop/frontend").iterdir() if p.is_file())
-    files.extend(ROOT / "scripts" / n for n in ("build-desktop.py", "package-desktop.py", "package-desktop.sh", "desktop-package-worker.py"))
+    files.extend(ROOT / "scripts" / n for n in ("build-desktop.py", "package-desktop.py", "package-desktop.sh", "desktop-package-worker.py", "update_manifest.py"))
     result = hashlib.sha256()
     for path in sorted(set(files)):
         if path.suffix == ".pyc" or "__pycache__" in path.parts:
@@ -54,7 +55,10 @@ def inputs_digest() -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True, help="X.Y.Z-dev.desktop.N (never overwritten)")
+    parser.add_argument("--update-base-url", help="optional HTTPS directory for update-desktop.json; no upload")
     args = parser.parse_args()
+    if args.update_base_url:
+        update_manifest.validate_base(args.update_base_url)
     match = re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-dev\.desktop\.(0|[1-9]\d*)", args.version)
     if not match or any(int(n) > 65535 for n in match.groups()):
         parser.error("Use X.Y.Z-dev.desktop.N; all components must fit the Windows version resource (0..65535)")
@@ -164,6 +168,15 @@ def main() -> int:
         (folder / "BUILD.json").write_text(json.dumps(metadata, indent=2) + "\n")
         artifacts["BUILD.json"] = digest(folder / "BUILD.json")
         (folder / "SHA256SUMS").write_text("".join(f"{sha}  {filename}\n" for filename, sha in sorted(artifacts.items())))
+    if args.update_base_url:
+        packages = {}
+        for target in build.TARGETS:
+            matches = list((output / target).glob("*-setup.exe" if target.startswith("windows") else "*.deb"))
+            if len(matches) != 1:
+                raise RuntimeError("Expected exactly one installer for the update feed")
+            packages[target] = matches[0]
+        feed = update_manifest.build_manifest("desktop", args.version, "dev", args.update_base_url, packages, "target")
+        (output / "update-desktop.json").write_text(json.dumps(feed, indent=2) + "\n")
     print(f"Created local desktop installers in {output}. No installation, application launch, tests, acceptance or publication performed.")
     return 0
 
@@ -171,6 +184,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (RuntimeError, OSError, subprocess.SubprocessError, KeyboardInterrupt) as error:
+    except (ValueError, RuntimeError, OSError, subprocess.SubprocessError, KeyboardInterrupt) as error:
         print(f"Desktop packaging failed: {error}", file=sys.stderr)
         raise SystemExit(1)

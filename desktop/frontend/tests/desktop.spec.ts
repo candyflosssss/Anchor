@@ -1,16 +1,28 @@
 import { expect, test, type Page } from '@playwright/test';
 import fixture from '../../contract/providers.json' with { type: 'json' };
+import updateFixture from '../../contract/updates.json' with { type: 'json' };
 import { CONTRACT, type DesktopBridge, type Provider } from '../src/desktop/contract.generated';
 
-declare global { interface Window { desktopTest: { starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | null } } }
+declare global { interface Window { desktopTest: { starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 async function host(page: Page) {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows }) => {
-    window.desktopTest = { starts: 0, saves: 0, stops: 0, status: true, writeError: null };
+  await page.addInitScript(({ contract, rows, update }) => {
+    window.desktopTest = { starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     let providers: Provider[] = rows;
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
     const api: DesktopBridge = {
+      UpdateStatus: async () => ({ contract, data: { ...update, latest_version: '', available: false, phase: 'idle', download_path: '', install_kind: '' }, problem: null }),
+      CheckUpdate: async channel => { counters.checks++; return { contract, data: { ...update, channel, phase: 'checked', download_path: '' }, problem: null }; },
+      DownloadUpdate: async () => {
+        counters.downloads++;
+        await new Promise(resolve => setTimeout(resolve, 300));
+        return counters.updateError ? { contract, data: null, problem: { code: 'integrity' } } : { contract, data: update, problem: null };
+      },
+      InstallUpdate: async input => {
+        if (!input.approved || input.version !== update.latest_version) return { contract, data: null, problem: { code: 'invalid' } };
+        counters.installs++; return { contract, data: { ...update, phase: 'installing' }, problem: null };
+      },
       Start: async () => { counters.starts++; return { contract, data, problem: null }; },
       Status: async () => ({ contract, data: counters.status ? data : null, problem: counters.status ? null : { code: 'offline' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
@@ -27,7 +39,7 @@ async function host(page: Page) {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -105,4 +117,68 @@ test('polling refreshes the authenticated source and stop capability without res
   await expect(page.getByText('复用已有核心 · 关闭窗口不会停止核心 · 不自动设置开机自启动')).toBeVisible({ timeout: 8000 });
   await expect(page.getByRole('button', { name: '停止核心', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.desktopTest.starts)).toBe(1);
+});
+
+test('online updates require a verified download and explicit confirmation (simulated host only)', async ({ page }) => {
+  await host(page);
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '在线更新', exact: true })).toBeVisible();
+  await page.getByLabel('更新渠道').selectOption('dev');
+  await page.getByRole('button', { name: '检查更新', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '发现新版本 0.1.0-dev.desktop.10' })).toBeVisible();
+  await page.getByRole('button', { name: '下载更新', exact: true }).dblclick();
+  await expect(page.getByRole('heading', { name: '安装包已下载并通过 SHA256 校验' })).toBeVisible();
+  expect(await page.evaluate(() => window.desktopTest.downloads)).toBe(1);
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
+  await page.getByRole('button', { name: '安装更新…', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('正常停止本机核心');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
+  await page.getByRole('button', { name: '安装更新…', exact: true }).click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '正在交接安装器' })).toBeVisible();
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(1);
+  await expect(page.getByRole('button', { name: '检查更新', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '供应商', exact: true })).toBeDisabled();
+});
+test('an integrity failure never offers installation', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => { window.desktopTest.updateError = true; });
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await page.getByRole('button', { name: '检查更新', exact: true }).click();
+  await page.getByRole('button', { name: '下载更新', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('SHA256 校验失败');
+  await expect(page.getByRole('button', { name: '安装更新…', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
+});
+
+
+test('initial update status cannot overwrite a selected channel', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    const original = api.UpdateStatus;
+    api.UpdateStatus = async () => {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      return original();
+    };
+  });
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await expect(page.getByLabel('更新渠道')).toBeDisabled();
+  await expect(page.getByRole('button', { name: '检查更新', exact: true })).toBeEnabled();
+  await page.getByLabel('更新渠道').selectOption('beta');
+  await page.getByRole('button', { name: '检查更新', exact: true }).click();
+  await expect(page.getByLabel('更新渠道')).toHaveValue('beta');
+});
+
+test('changing channels clears the previously downloaded installation candidate', async ({ page }) => {
+  await host(page);
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await page.getByRole('button', { name: '检查更新', exact: true }).click();
+  await page.getByRole('button', { name: '下载更新', exact: true }).click();
+  await expect(page.getByRole('button', { name: '安装更新…', exact: true })).toBeVisible();
+  await page.getByLabel('更新渠道').selectOption('beta');
+  await expect(page.getByRole('button', { name: '安装更新…', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '下载更新', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
 });

@@ -87,3 +87,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [供应商第一版界面设计](docs/design/providers-v1.md)：现有 CLI 能力对应的列表、详情、编辑与风险确认；支持明确标注的[本地 Mock 原型与真实 Wails 桌面模式](desktop/frontend/README.md)，真实接口已接入；原生安装与窗口验收单独记录。
 - [前后端分离与前端 MVC skill](.agents/skills/anchor-frontend-architecture/SKILL.md)：前端及相关接口开发时遵循的分层、文档同步与验证约束。
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
+
+
+### 在线更新（当前源码，尚未发行）
+
+新增 CLI 本机更新命令与桌面“设置 → 在线更新”，支持 dev/alpha/beta/rc/stable 渠道、可信 HTTPS 自定义清单、SHA256/大小校验与明确批准安装。CLI 原位替换保留上一版；桌面正常停服／退出后交给 Windows 安装器或 Linux 系统包安装器，不静默升级或自动提权。现有 alpha.6 / desktop.8 无该入口，首次需要人工安装新启动版本；本轮没有生成／发布新包。语法见[最新指令大全](docs/cli/commands.md)，测试投放与安全边界见[在线更新](docs/design/online-updates.md)。

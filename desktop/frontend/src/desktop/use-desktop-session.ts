@@ -13,6 +13,8 @@ export const desktopMessages: Record<ProblemCode, string> = {
   invalid: '操作未通过校验，未提交变更。',
   conflict: '配置已发生变更，请重新读取。',
   closed: '桌面会话已关闭。',
+  integrity: '更新文件校验失败，未安装。',
+  permission: '本机文件或安装器权限不足。',
 };
 export function useDesktopSession() {
   const [info, setInfo] = useState<SessionInfo | null>(null);

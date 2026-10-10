@@ -1,0 +1,14 @@
+{
+  "contract": "anchor-desktop-v1",
+  "downloaded": {
+    "current_version": "0.1.0-dev.desktop.9",
+    "latest_version": "0.1.0-dev.desktop.10",
+    "channel": "dev",
+    "source": "https://example.invalid/anchor/update-desktop.json",
+    "available": true,
+    "phase": "downloaded",
+    "download_path": "/isolated/anchor/updates/desktop-synthetic.deb",
+    "install_kind": "deb"
+  },
+  "confirmation": { "version": "0.1.0-dev.desktop.10", "approved": true }
+}

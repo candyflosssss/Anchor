@@ -129,7 +129,7 @@ desktop/                                     # Go 生成类型、受控传输、
 app/                                         # 导航、外观、会话装配；没有进程连接策略
 ```
 
-依赖方向是 View → hook Controller → Model／类型化传输。页面没有直接 HTTP／Wails 请求；没有数据库、CLI 命令拼接、Agent 文件访问、SSH 或任意系统能力。真实桌面适配器仅绑定五个受限方法，通过现有 Go client 访问核心，保留管理 API 的 Origin 与实例身份防护。
+依赖方向是 View → hook Controller → Model／类型化传输。页面没有直接 HTTP／Wails 请求；没有数据库、CLI 命令拼接、Agent 文件访问、SSH 或任意系统能力。供应商／会话仍通过五个受限业务方法访问现有 Go client；在线更新另增四个本机受限方法（见[在线更新](online-updates.md)），不开放任意系统操作。业务调用保留管理 API 的 Origin 与实例身份防护。
 
 类型来源为 `internal/desktop/contract.go`，生成 TS；Mock 与 Go 测试共享 `desktop/contract/providers.json`。Mock 单测、模拟绑定浏览器测试、Go 宿主→client→真实隔离核心和原生 Wails 是不同层的验证，前三层不能替代最后一层。
 
