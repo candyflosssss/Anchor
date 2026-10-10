@@ -74,6 +74,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 设计文档
 
+- [供应商能力路线图](docs/design/provider-roadmap.md)：完整优先级、当前进度与本轮第一优先六项范围。
 - [初版技术设计（总览）](docs/design/architecture.md)：会话确认的范围、总体架构、
   代理与托管职责、生命周期、远程管理、验收目标和待定技术决策。
 - [CLI 连接与实例管理](docs/design/cli-connections.md)：本机连接、SSH 远程管理、
