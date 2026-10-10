@@ -30,7 +30,7 @@ SQLite 供应商与模型配置、Responses 同协议代理，以及托管层/�
 ```
 
 服务前台运行，不由管理命令退出触发停服；关闭 serve 终端可能停止服务。
-Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后先审核计划再接管。操作契约见 [最新 CLI 指令大全](docs/cli/commands.md#8-agent-托管与独立恢复)。本次 Linux Alpha 候选包含上述能力；公开状态和验收结果见发行页及任务记录，旧测试包不包含它。
+Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后先审核计划再接管。操作契约见 [最新 CLI 指令大全](docs/cli/commands.md#8-agent-托管与独立恢复)。已公开的 Linux `0.1.0-alpha.3` 包含上述能力；验收结果见任务记录，旧测试包不包含它。
 
 桌面端通过 SSH 使用远端 Codex 的主路径：在远端批准 CODEX_HOME 基础配置 → Anchor provider + 默认模型 + 版本匹配模型目录 → 用户手动选择其他授权模型 → Anchor 路由实际供应商。新 CLI 绑定默认 `all-compatible`，旧绑定保留单模型权限；无需额外 profile。目录元数据需操作者显式导入并核对真实上游能力，修改目录后重启远端 app-server。Anchor 自己的 SSH Connector 和桌面 UI 验收不在本轮范围。
 
@@ -40,7 +40,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux AMD64 的公开 Alpha 候选为 `0.1.0-alpha.3`，远程安装仅在发行页正式公开后可用；Windows 暂不公开发行**。不从 Actions artifact 或草稿偷偷安装。
+已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux AMD64 `0.1.0-alpha.3` 已公开发布，并实际验证远程一键安装成功；Windows 暂不公开发行**。不从 Actions artifact 或草稿偷偷安装。
 
 **运行只需要一个文件**：Linux 的 `anchor` 或 Windows 的 `anchor.exe`，核心、CLI 和认证 helper 都在其中；不依赖旁边的文档或资源文件。配置/数据库仍独立存放于用户状态目录，首次使用仍需 init 和供应商/模型配置。
 

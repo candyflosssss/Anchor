@@ -341,4 +341,4 @@ anchor recover [--id ID]
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
-发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；公开候选首发只含 Linux AMD64。安装语法与核心 30 个命令路径未改变，Windows 程序暂不公开提供，详见 [安装说明](../release/install.md)。
+发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。安装语法与核心 30 个命令路径未改变，Windows 程序暂不公开提供，详见 [安装说明](../release/install.md)。

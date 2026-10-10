@@ -7,7 +7,7 @@
 
 ## 一键安装
 
-提供 [Linux / Windows 安装脚本](install.md)，自动下载并校验公开 Release 的单文件，默认用户级安装，可固定版本/显式替换，不改 Agent 或状态配置。Linux 公开 Alpha 候选为 `0.1.0-alpha.3`，远程命令需对应 Release 正式公开才可用；Windows 暂不公开发行，这不等于桌面安装器、自启动或自动升级。
+提供 [Linux / Windows 安装脚本](install.md)，自动下载并校验公开 Release 的单文件，默认用户级安装，可固定版本/显式替换，不改 Agent 或状态配置。Linux Alpha `0.1.0-alpha.3` 已正式公开，原始远程一键安装已实际验证成功；Windows 暂不公开发行，这不等于桌面安装器、自启动或自动升级。
 
 ## 只用一个程序
 
