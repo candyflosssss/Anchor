@@ -1,0 +1,6 @@
+interface:
+  display_name: "Anchor Git 提交节点"
+  short_description: "在合理节点按任务拆分提交、检查并推送 main，避免误触发发行 Actions"
+  default_prompt: "使用 $anchor-git-commits 判断当前改动是否到了提交节点，检查后提交并推送 Anchor 的 main。"
+policy:
+  allow_implicit_invocation: true
