@@ -17,3 +17,11 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+
+# Go build and runtime state
+/bin/
+/dist/
+/coverage.out
+*.test
+/state.db*
+/owner.token

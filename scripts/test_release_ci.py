@@ -1,0 +1,110 @@
+"""Offline tests for CI trigger selection and draft publication gates."""
+import hashlib
+import json
+from pathlib import Path
+import tempfile
+import unittest
+
+import ci_release
+
+
+class CIReleaseTests(unittest.TestCase):
+    def test_manual_is_internal_even_when_selected_ref_is_a_tag(self):
+        for ref in ("refs/heads/main", "refs/tags/v1.2.3-alpha.1"):
+            self.assertEqual(ci_release.plan("workflow_dispatch", ref, "12"),
+                             {"version": "0.0.0-alpha.12", "internal": "true", "draft": "false"})
+
+    def test_only_valid_prerelease_tags_can_create_drafts(self):
+        for channel in ("alpha", "beta", "rc"):
+            self.assertEqual(ci_release.plan("push", f"refs/tags/v1.2.3-{channel}.2", "12"),
+                             {"version": f"1.2.3-{channel}.2", "internal": "false", "draft": "true"})
+        for event, ref, number in (("pull_request", "refs/tags/v1.2.3-alpha.1", "1"),
+                                   ("push", "refs/heads/main", "1"),
+                                   ("push", "refs/tags/v1.2.3", "1"),
+                                   ("push", "refs/tags/v1.2.3-alpha.1\nevil=true", "1"),
+                                   ("workflow_dispatch", "refs/heads/main", "1\nevil=true")):
+            with self.subTest(ref=ref, number=number), self.assertRaises(ValueError):
+                ci_release.plan(event, ref, number)
+
+    def bundle(self, root):
+        version, revision = "1.2.3-alpha.1", "a" * 40
+        artifacts = []
+        for target, ext, acceptance in (
+                ("linux-amd64", "tar.gz", "packaged_binary_smoke_passed"),
+                ("windows-amd64", "zip", "cross_compile_only; native runtime acceptance pending")):
+            name = f"anchor_{version}_{target.replace('-', '_')}.{ext}"
+            (root / name).write_bytes(b"fake archive for offline gate test")
+            artifacts.append({"file": name, "target": target, "bytes": (root / name).stat().st_size,
+                              "sha256": hashlib.sha256((root / name).read_bytes()).hexdigest(),
+                              "verification": acceptance})
+        data = {"schema_version": 1, "version": version, "channel": "alpha", "status": "packaged",
+                "source": {"revision": revision, "dirty": False, "inputs_sha256": "b" * 64},
+                "public_publish_ready": False,
+                "publish_blockers": ["windows-amd64: native runtime acceptance pending"],
+                "checks": ["module_verify", "go_race_tests", "go_vet", "release_tool_tests"],
+                "artifacts": artifacts}
+        (root / "RELEASE_NOTES.md").write_text("Windows native acceptance pending\n")
+        self.write_manifest(root, data)
+        return version, revision, data
+
+    def write_manifest(self, root, data):
+        (root / "release.json").write_text(json.dumps(data))
+        files = sorted(p for p in root.iterdir() if p.name != "SHA256SUMS")
+        (root / "SHA256SUMS").write_text("".join(
+            f"{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.name}\n" for p in files))
+
+    def test_complete_clean_bundle_is_allowed_for_draft_only(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            version, revision, _ = self.bundle(root)
+            ci_release.verify(root, version, revision)
+
+    def test_internal_dirty_partial_or_wrong_source_bundle_is_refused(self):
+        edits = [lambda d: d.update(status="partial"),
+                 lambda d: d.update(version="1.2.3-alpha.2"),
+                 lambda d: d.update(channel="beta"),
+                 lambda d: d["source"].update(dirty=True),
+                 lambda d: d["source"].update(revision="c" * 40),
+                 lambda d: d.update(publish_blockers=["project distribution license has not been selected"]),
+                 lambda d: d.update(publish_blockers=[]),
+                 lambda d: d.update(checks=[]),
+                 lambda d: d["artifacts"][0].update(verification="not tested"),
+                 lambda d: d["artifacts"][0].update(bytes=0),
+                 lambda d: d["artifacts"][0].update(sha256="0" * 64),
+                 lambda d: d.update(artifacts=[d["artifacts"][0], d["artifacts"][0]])]
+        for edit in edits:
+            with self.subTest(edit=edit), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                version, revision, data = self.bundle(root)
+                edit(data)
+                self.write_manifest(root, data)
+                with self.assertRaises(ValueError):
+                    ci_release.verify(root, version, revision)
+
+    def test_corruption_missing_and_extra_files_are_refused(self):
+        for mutation in (lambda p: (p / "RELEASE_NOTES.md").write_text("corrupt"),
+                         lambda p: (p / "SHA256SUMS").unlink(),
+                         lambda p: (p / "unexpected").write_text("extra"),
+                         lambda p: (p / "SHA256SUMS").write_text("0" * 64 + "  ../secret\n"),
+                         lambda p: (p / "SHA256SUMS").write_text((p / "SHA256SUMS").read_text() * 2)):
+            with tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                version, revision, _ = self.bundle(root)
+                mutation(root)
+                with self.assertRaises((ValueError, FileNotFoundError)):
+                    ci_release.verify(root, version, revision)
+
+    def test_symlink_bundle_refused(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            root = base / "real"
+            root.mkdir()
+            version, revision, _ = self.bundle(root)
+            link = base / "link"
+            link.symlink_to(root, target_is_directory=True)
+            with self.assertRaises(ValueError):
+                ci_release.verify(link, version, revision)
+
+
+if __name__ == "__main__":
+    unittest.main()
