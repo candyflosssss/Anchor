@@ -59,9 +59,23 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	req.Header.Set("Accept", "application/json")
-	if p.Secret != "" {
-		req.Header.Set("Authorization", "Bearer "+p.Secret)
+	keys, e := s.Store.ProviderKeys(p.ID)
+	if e != nil {
+		out.Failure = "network"
+		return
 	}
+	p.Secret = ""
+	for _, k := range keys {
+		if k.Enabled {
+			p.Secret = k.Secret
+			break
+		}
+	}
+	if len(keys) > 0 && p.Secret == "" {
+		out.Failure = "authentication"
+		return
+	}
+	authorizeUpstream(req, p, p.Secret)
 	resp, err := s.upstream.Do(req)
 	if err != nil {
 		out.Failure = "network"

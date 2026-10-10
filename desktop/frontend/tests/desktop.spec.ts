@@ -32,6 +32,8 @@ async function host(page: Page) {
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
         return { contract, data: { provider_id: provider.id, revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '' }, problem: null };
       },
+      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: [], models: [], usage: [], probe: null, deleted: false }, problem: null }),
+      ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
         counters.saves++;

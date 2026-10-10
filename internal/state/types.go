@@ -81,8 +81,8 @@ func (p Provider) Validate() error {
 	if err := ValidateURL(p.BaseURL); err != nil {
 		return err
 	}
-	if p.Protocol != "responses" {
-		return errors.New("unsupported protocol: this milestone supports only responses")
+	if p.Protocol != "responses" && p.Protocol != "chat-completions" && p.Protocol != "anthropic" {
+		return errors.New("unsupported protocol")
 	}
 	if p.TimeoutSeconds < 1 || p.TimeoutSeconds > 3600 || p.MaxConcurrent < 1 || p.MaxConcurrent > 64 {
 		return errors.New("timeout must be 1..3600 seconds and concurrency 1..64")

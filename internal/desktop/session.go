@@ -76,6 +76,9 @@ func problem(err error, writing bool) *Problem {
 		case 401, 403:
 			return &Problem{"unauthorized"}
 		case 409:
+			if r.Code == "referenced" {
+				return &Problem{"referenced"}
+			}
 			return &Problem{"conflict"}
 		case 400:
 			return &Problem{"invalid"}

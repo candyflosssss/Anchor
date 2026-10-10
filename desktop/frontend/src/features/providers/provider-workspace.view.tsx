@@ -10,7 +10,7 @@ import { ProviderDetail } from './provider-detail.view';
 import { scenarios, type Scenario } from './provider.mock';
 import { prototype } from '../../desktop/environment';
 import type { ProviderController } from './use-provider-controller';
-import type { Provider } from './provider.model';
+import { protocolName, type Provider } from './provider.model';
 export function ProviderWorkspace({ c }: { c: ProviderController }) {
   const opener = useRef<HTMLElement | null>(null);
   const open = (source?: Provider) => { opener.current = document.activeElement as HTMLElement; c.openEditor(source); };
@@ -28,18 +28,18 @@ export function ProviderWorkspace({ c }: { c: ProviderController }) {
         <div className="table-scroll"><Table><TableCaption className="sr-only">{c.mock ? "模拟供应商配置列表；不含真实密钥或上游健康数据" : "供应商配置列表；不回传密钥，不含上游健康数据"}</TableCaption><TableHeader><TableRow><TableHead scope="col">供应商 / API 地址</TableHead><TableHead scope="col">协议</TableHead><TableHead scope="col">凭据</TableHead><TableHead scope="col">状态</TableHead><TableHead scope="col" className="text-right">操作</TableHead></TableRow></TableHeader><TableBody>
           {c.phase === 'ready' && c.visible.map(p => <TableRow key={p.id} className={c.selected?.id === p.id ? 'row-selected' : ''}>
             <TableCell><div className="provider-cell"><span className="provider-avatar" aria-hidden="true">{Array.from(p.id)[0]}</span><div><button className="provider-name" disabled={c.busy} onClick={() => c.select(p.id)} aria-expanded={c.selected?.id === p.id}>{p.id}<ArrowRight size={13} /></button><span className="provider-url mono" title={p.base_url}>{p.base_url}</span></div></div></TableCell>
-            <TableCell><span className="protocol-tag">Responses</span></TableCell><TableCell><span className="secret-status"><KeyRound size={14} />{p.has_secret ? '已配置' : '未配置'}</span></TableCell><TableCell><StatusBadge enabled={p.enabled} /></TableCell>
+            <TableCell><span className="protocol-tag">{protocolName[p.protocol]}</span></TableCell><TableCell><span className="secret-status"><KeyRound size={14} />{p.has_secret ? '已配置' : '未配置'}</span></TableCell><TableCell><StatusBadge enabled={p.enabled} /></TableCell>
             <TableCell className="text-right"><Button variant="ghost" size="icon" disabled={c.blocked} onClick={() => open(p)} aria-label={`编辑 ${p.id}`}><Pencil /></Button></TableCell>
           </TableRow>)}
         </TableBody></Table></div>
         {c.phase === 'loading' && <div className="empty-state" role="status"><LoaderCircle className="loading-icon" size={28} /><h2>正在读取供应商</h2><p>加载当前实例的配置…</p></div>}
         {c.phase === 'error' && <div className="empty-state"><Unplug size={32} /><h2>暂时无法展示供应商</h2><p>数据不可用不代表没有配置。请检查实例状态后重新读取。</p></div>}
         {c.phase === 'ready' && !c.visible.length && <div className="empty-state"><Server size={32} /><h2>{c.providers.length ? '没有匹配的供应商' : '添加你的第一个供应商'}</h2><p>{c.providers.length ? '尝试其他关键词，或重置状态筛选。' : '从一个 API 根地址开始，统一管理你的上游服务。'}</p><Button variant={c.providers.length ? 'outline' : 'default'} onClick={() => { if (c.providers.length) { c.setSearch(''); c.setFilter('all'); } else open(); }}>{c.providers.length ? '清除筛选' : '添加供应商'}</Button></div>}
-        {c.phase === 'ready' && c.providers.length > 0 && <footer className="table-footer"><span>显示 {c.visible.length} / {c.providers.length} 个供应商</span><span>仅配置数据 · 无健康探测</span></footer>}
+        {c.phase === 'ready' && c.providers.length > 0 && <footer className="table-footer"><span>显示 {c.visible.length} / {c.providers.length} 个供应商</span><span>选择供应商查看 Key、模型与用量</span></footer>}
       </div>
-      {c.selected && <ProviderDetail provider={c.selected} blocked={c.blocked} models={c.models} modelsBusy={c.modelsBusy} modelsProblem={c.modelsProblem} onDiscover={() => void c.discoverModels()} onClose={() => c.select(null)} onEdit={() => open(c.selected ?? undefined)} onToggle={() => c.selected && c.requestToggle(c.selected)} />}
+      {c.selected && <ProviderDetail provider={c.selected} features={c.features} blocked={c.blocked} models={c.models} modelsBusy={c.modelsBusy} modelsProblem={c.modelsProblem} onDiscover={() => void c.discoverModels()} onClose={() => c.select(null)} onEdit={() => open(c.selected ?? undefined)} onToggle={() => c.selected && c.requestToggle(c.selected)} />}
     </section>
-    <div className="capability-note"><CircleHelp size={16} /><p>当前版本仅支持 <strong>Responses</strong> 协议。停用请先选择供应商查看详情；可手动获取上游模型目录；删除、余额与模型推理测试不在本版范围内。</p></div>
+    <div className="capability-note"><CircleHelp size={16} /><p>支持 <strong>Responses、Chat Completions 与 Anthropic Messages</strong>。选择供应商管理多个 Key、导入模型和测试推理；所有测试均由你手动发起。</p></div>
     {prototype && c.mock && <footer className="prototype-controls"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={!!c.editor || c.busy || !!c.toggle} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div><span>所有数据均为模拟 · 刷新页面将重置</span></footer>}
     {c.editor && <ProviderEditor c={c} restoreFocus={() => { requestAnimationFrame(() => { if (opener.current?.isConnected) opener.current.focus(); }); }} />}
     <ConfirmAction open={!!c.toggle} title={`${c.toggle?.enabled ? '停用' : '启用'} ${c.toggle?.id ?? ''}？`} busy={c.busy} onCancel={c.cancelToggle} onConfirm={c.confirmToggle}>

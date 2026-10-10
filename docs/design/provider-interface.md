@@ -13,11 +13,11 @@
 | `discover(input, signal)` / `Bridge.DiscoverProviderModels(input)` | `client.DiscoverProviderModels` → POST `/control/v1/providers/{id}/discover-models`；显式读取上游目录，不改配置 |
 | `save(input, signal)` / `Bridge.SaveProvider(input)` | `client.PutProvider` → PUT 指定 ID；revision=0 创建，>0 条件更新；普通字段完整替换 |
 
-Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_seconds`, `max_concurrent`, `revision`, `has_secret`。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。协议当前仅 `responses`，未知协议拒绝。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
+Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_seconds`, `max_concurrent`, `revision`, `has_secret`。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。协议接受 `responses`、`chat-completions`、`anthropic`，未知协议拒绝。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
 
 - 返回 revision 范围 1..Number.MAX_SAFE_INTEGER；请求 expected_revision 为 0..MAX_SAFE_INTEGER-1，且与输入 provider.revision 一致，防止更新后超出 JS 安全整数范围。
 - 超时单位为秒，1..3600；并发为 1..64。前端即时校验只帮助填写，核心仍做最终业务校验。
-- secret=null 保留、空字符串清除、非空替换；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空表单，失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
+- secret=null 保留 default Key、空字符串清除 default Key、非空替换 default Key；命名 Key 不受影响；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空表单，失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
 - 保存成功返回新 revision，不表示供应商连通性已经验证。
 
 ## 2. 查询、写入与错误
@@ -28,6 +28,7 @@ Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_secon
 | --- | --- |
 | offline / read_error | 无法连接或无法读取；数据不可用不等于空列表 |
 | unauthorized | 401/403；授权留在 Go 层，不要求页面填管理令牌 |
+| referenced | 409；供应商仍被模型引用，或待删模型仍被 Binding 引用；先处理引用 |
 | conflict | 409；不覆盖新配置，丢弃旧草稿重读后重新编辑 |
 | invalid | 本地参数／核心校验拒绝，不以旧草稿静默覆盖 |
 | unknown | 写入网络中断、5xx 或无法验证回包；可能已生效，须先查询，不自动重放 |
@@ -57,3 +58,14 @@ Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_secon
 - 不写配置、revision、模型映射或健康状态。一次目录成功仅说明此接口返回有效目录，不代表推理、工具、流式、余额或持续健康；404/405 不等于供应商推理不可用。
 - UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和只读限高列表。查询中阻止供应商切换、编辑和页面离开；选择、重读或保存后清空结果，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
 - CLI 等价入口为 `provider models --id ID --revision N`；与 `model list`（Anchor 已存公开映射）及网关 `/v1/models` 区分。测试分层沿 §3，原生两平台仍未验收。
+
+
+## 5. 第一优先工作台（desktop.11）
+
+新增 `Bridge.ProviderWorkspace({provider_id})` 与 `Bridge.ProviderAction(Action)`，对应 GET `/control/v1/providers/{id}/workspace` 与 POST `/control/v1/providers/{id}/action`。动作白名单、默认值和 CLI 等价入口见[指令大全 §5](../cli/commands.md#5-供应商)及[实现契约](provider-priority-one.md)。`internal/catalog/workspace.go` 是核心 DTO 源，桌面规范以别名纳入生成器，共用 `desktop/contract/provider-workspace.json`。
+
+Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、连续失败次数、冷却结束时间和最近测试，绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
+
+每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。模型映射修改只增加模型 revision；配置/Key/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
+
+目录查询使用第一个启用的已存 Key，采用对应协议认证。存在 Key 但全部停用时返回 authentication，不退回匿名。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。

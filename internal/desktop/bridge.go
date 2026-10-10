@@ -39,7 +39,7 @@ func (b *Bridge) Status() SessionResult {
 	return r
 }
 func provider(p state.Provider) (Provider, bool) {
-	if p.Revision < 1 || p.Revision > MaxSafeRevision || p.Protocol != "responses" {
+	if p.Revision < 1 || p.Revision > MaxSafeRevision || (p.Protocol != "responses" && p.Protocol != "chat-completions" && p.Protocol != "anthropic") {
 		return Provider{}, false
 	}
 	return Provider{p.ID, p.BaseURL, p.Protocol, p.Enabled, p.TimeoutSeconds, p.MaxConcurrent, p.Revision, p.HasSecret}, true
@@ -169,5 +169,56 @@ func (b *Bridge) DiscoverProviderModels(in DiscoverProviderModels) ProviderModel
 		return out
 	}
 	out.Data = &result
+	return out
+}
+
+func (b *Bridge) ProviderWorkspace(in WorkspaceQuery) WorkspaceResult {
+	s := b.session
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := WorkspaceResult{Contract: Contract}
+	if !state.ValidProviderID(in.ProviderID) {
+		out.Problem = &Problem{"invalid"}
+		return out
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	defer cancel()
+	cl, _, err := s.connection(ctx)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	defer cl.Close()
+	data, err := cl.ProviderWorkspace(ctx, in.ProviderID)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	out.Data = &data
+	return out
+}
+func (b *Bridge) ProviderAction(in Action) WorkspaceResult {
+	s := b.session
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := WorkspaceResult{Contract: Contract}
+	if !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= MaxSafeRevision || in.ModelRevision < 0 || in.ModelRevision >= MaxSafeRevision {
+		out.Problem = &Problem{"invalid"}
+		return out
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	defer cancel()
+	cl, _, err := s.connection(ctx)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	defer cl.Close()
+	data, err := cl.ProviderAction(ctx, in)
+	if err != nil {
+		out.Problem = problem(err, true)
+		return out
+	}
+	out.Data = &data
 	return out
 }

@@ -261,7 +261,7 @@ func TestFallbackOnlyBeforeDownstreamOutput(t *testing.T) {
 		t.Fatal("fallback failed")
 	}
 }
-func TestUnauthorizedUpstreamDoesNotFallbackOrLeak(t *testing.T) {
+func TestUnauthorizedUpstreamFallsBackWithoutLeak(t *testing.T) {
 	f := setup(t)
 	var backup atomic.Int32
 	a := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -269,13 +269,17 @@ func TestUnauthorizedUpstreamDoesNotFallbackOrLeak(t *testing.T) {
 		io.WriteString(w, "SECRET authentication failure")
 	}))
 	defer a.Close()
-	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { backup.Add(1) }))
+	b := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		backup.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"output":[]}`)
+	}))
 	defer b.Close()
 	f.add(t, "a", a.URL, "")
 	f.add(t, "b", b.URL, "")
 	f.model(t, state.Candidate{ProviderID: "a", Model: "one"}, state.Candidate{ProviderID: "b", Model: "two"})
 	r := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public"}`)
-	if r.StatusCode != 502 || strings.Contains(text(t, r), "SECRET") || backup.Load() != 0 {
+	if r.StatusCode != 200 || strings.Contains(text(t, r), "SECRET") || backup.Load() != 1 {
 		t.Fatal("unsafe fallback/error reflection")
 	}
 }

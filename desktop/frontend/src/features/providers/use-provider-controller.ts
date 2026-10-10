@@ -1,3 +1,4 @@
+import { useProviderFeatures } from './use-provider-features';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { isDirty, newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
 import type { Scenario } from './provider.mock';
@@ -58,7 +59,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   const selected = visible.find(p => p.id === selectedId) ?? null;
   const blocked = phase !== 'ready' || problem === 'unknown' || problem === 'conflict' || busy || modelsBusy;
   function openEditor(source?: Provider) {
-    if (blocked || locked.current) return;
+    if (blocked || locked.current || features.isBusy()) return;
     setNotice(''); setEditor({ source, draft: newDraft(source) }); setErrors({}); setDiscard(false);
   }
   function changeDraft<K extends keyof ProviderDraft>(key: K, value: ProviderDraft[K]) {
@@ -73,7 +74,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     setEditor(null); setErrors({}); setDiscard(false);
   }
   async function save(source: Provider | undefined, draft: ProviderDraft, toggling = false) {
-    if (blocked || locked.current) return;
+    if (blocked || locked.current || features.isBusy()) return;
     const nextErrors = validateDraft(draft, !source);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
@@ -126,20 +127,22 @@ export function useProviderController(environment: ProviderEnvironment) {
     setNotice(`${mock ? '演示：' : ''}已重新读取。请核对最新配置，再打开编辑；原草稿已丢弃。`);
   }
   function changeScenario(value: Scenario) {
-    if (!environment.reset || editor || busy || modelsBusy || toggle) return;
+    if (!environment.reset || editor || busy || modelsBusy || features.isBusy() || toggle) return;
     clearModels(); query.current?.abort(); write.current?.abort(); generation.current++;
     environment.reset(value); setScenario(value); setSelectedId(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
     void load();
   }
+  const features = useProviderFeatures(selected, transport, async id => { await load(); setSelectedId(id); });
   return {
+    features,
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
-    notice, search, setSearch, filter, setFilter, editor, errors, discard, busy: busy || modelsBusy, blocked, toggle, scenario,
+    notice, search, setSearch, filter, setFilter, editor, errors, discard, busy: busy || modelsBusy || features.busy, blocked: blocked || features.busy, toggle, scenario,
     models: models?.provider_id === selected?.id && models?.revision === selected?.revision ? models : null,
     modelsProblem, modelsBusy, discoverModels,
-    select: (id: string | null) => { if (!locked.current) { clearModels(); setSelectedId(id); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
+    select: (id: string | null) => { if (!locked.current && !features.isBusy()) { clearModels(); setSelectedId(id); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
     continueEditing: () => setDiscard(false),
     submit: () => editor && void save(editor.source, editor.draft),
-    requestToggle: (provider: Provider) => { if (!blocked) { setNotice(''); setToggle(provider); } },
+    requestToggle: (provider: Provider) => { if (!blocked && !features.isBusy()) { setNotice(''); setToggle(provider); } },
     cancelToggle: () => { if (!locked.current) setToggle(null); },
     confirmToggle: () => { if (toggle) void save(toggle, { ...newDraft(toggle), enabled: !toggle.enabled }, true); },
   };

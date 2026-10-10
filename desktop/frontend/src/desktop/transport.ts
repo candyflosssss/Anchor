@@ -1,3 +1,4 @@
+import { checkedWorkspace } from '../features/providers/provider-features.model';
 import { CONTRACT, PROBLEM_CODES, type DesktopBridge, type ProblemCode, type Provider as DesktopProvider, type SessionInfo } from './contract.generated';
 import { ProviderProblem, checkedCatalog, type DiscoverProviderModels, type ProviderModels, type Provider, type ProviderTransport, type SaveProvider } from '../features/providers/provider.model';
 
@@ -24,24 +25,34 @@ export async function call<T>(operation: () => Promise<{ contract: string; data:
   }
 }
 export function checkedProvider(p: DesktopProvider): Provider {
-  if (!p || typeof p.id !== 'string' || typeof p.base_url !== 'string' || p.protocol !== 'responses' ||
+  if (!p || typeof p.id !== 'string' || typeof p.base_url !== 'string' || !['responses', 'chat-completions', 'anthropic'].includes(p.protocol) ||
     typeof p.enabled !== 'boolean' || typeof p.has_secret !== 'boolean' ||
     !Number.isSafeInteger(p.revision) || p.revision < 1 ||
     !Number.isInteger(p.timeout_seconds) || p.timeout_seconds < 1 || p.timeout_seconds > 3600 ||
     !Number.isInteger(p.max_concurrent) || p.max_concurrent < 1 || p.max_concurrent > 64) throw new ProviderProblem('read_error');
   // Pick only public DTO fields; unexpected response properties never reach state.
-  return { id: p.id, base_url: p.base_url, protocol: p.protocol, enabled: p.enabled,
+  return { id: p.id, base_url: p.base_url, protocol: p.protocol as Provider["protocol"], enabled: p.enabled,
     has_secret: p.has_secret, revision: p.revision, timeout_seconds: p.timeout_seconds, max_concurrent: p.max_concurrent };
 }
 function providerError(error: unknown, writing: boolean): never {
   if (error instanceof DesktopProblem) {
     const code = error.code;
-    if (code === 'conflict' || code === 'unauthorized' || code === 'unknown' || code === 'invalid' || code === 'offline') throw new ProviderProblem(code);
+    if (code === 'referenced' || code === 'conflict' || code === 'unauthorized' || code === 'unknown' || code === 'invalid' || code === 'offline') throw new ProviderProblem(code);
   }
   throw new ProviderProblem(writing ? 'unknown' : 'read_error');
 }
 export class DesktopProviderTransport implements ProviderTransport {
   constructor(private readonly getBridge = bridge) {}
+  async workspace(id: string, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const result = await call(() => this.getBridge().ProviderWorkspace({ provider_id: id })); signal.throwIfAborted(); return checkedWorkspace(result); }
+    catch (error) { return providerError(error, false); }
+  }
+  async action(input: import('./contract.generated').Action, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const result = await call(() => this.getBridge().ProviderAction(input), true); signal.throwIfAborted(); return checkedWorkspace(result); }
+    catch (error) { return providerError(error, true); }
+  }
   async list(signal: AbortSignal): Promise<Provider[]> {
     signal.throwIfAborted();
     try {

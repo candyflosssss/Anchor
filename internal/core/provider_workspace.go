@@ -1,0 +1,345 @@
+package core
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/protocol"
+	"github.com/candyflosssss/Anchor/internal/state"
+	"io"
+	"net/http"
+	"strings"
+	"time"
+)
+
+func (s *Server) workspace(id string) (catalog.Workspace, error) {
+	out := catalog.Workspace{Prices: []catalog.Price{}, Estimates: []catalog.Estimate{}, ProviderID: id, Keys: []catalog.KeyStatus{}, Models: []catalog.ModelMapping{}, Usage: []catalog.UsageRow{}}
+	p, err := s.Store.Provider(id)
+	if err != nil {
+		return out, err
+	}
+	out.Revision = p.Revision
+	out.Strategy = s.Store.KeyStrategy(id)
+	keys, err := s.Store.ProviderKeys(id)
+	if err != nil {
+		return out, err
+	}
+	for _, k := range keys {
+		out.Keys = append(out.Keys, s.keyStatus(p, k))
+	}
+	models, err := s.Store.Models()
+	if err != nil {
+		return out, err
+	}
+	for _, m := range models {
+		for _, c := range m.Candidates {
+			if c.ProviderID == id {
+				out.Models = append(out.Models, catalog.ModelMapping{ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates)})
+			}
+		}
+	}
+	usage, err := s.Store.Usage(id)
+	if err != nil {
+		return out, err
+	}
+	for _, u := range usage {
+		out.Usage = append(out.Usage, catalog.UsageRow(u))
+	}
+	out.Prices, err = s.Store.Prices(id)
+	if err != nil {
+		return out, err
+	}
+	for _, u := range out.Usage {
+		estimate := catalog.Estimate{Model: u.Model}
+		for _, price := range out.Prices {
+			if price.Model != u.Model || u.Known == 0 {
+				continue
+			}
+			if (u.CacheRead > 0 && price.CacheReadUSD == nil) || (u.CacheWrite > 0 && price.CacheWriteUSD == nil) {
+				continue
+			}
+			cost := float64(max(0, u.InputTokens-u.CacheRead-u.CacheWrite))*price.InputUSD + float64(u.OutputTokens)*price.OutputUSD
+			if price.CacheReadUSD != nil {
+				cost += float64(u.CacheRead) * *price.CacheReadUSD
+			}
+			if price.CacheWriteUSD != nil {
+				cost += float64(u.CacheWrite) * *price.CacheWriteUSD
+			}
+			cost /= 1e6
+			estimate.USD = &cost
+		}
+		out.Estimates = append(out.Estimates, estimate)
+	}
+	return out, nil
+}
+func (s *Server) providerFeatureRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /control/v1/providers/{id}/workspace", func(w http.ResponseWriter, r *http.Request) {
+		out, err := s.workspace(r.PathValue("id"))
+		if err != nil {
+			apiError(w, err)
+			return
+		}
+		writeJSON(w, 200, out)
+	})
+	mux.HandleFunc("GET /control/v1/usage", func(w http.ResponseWriter, r *http.Request) {
+		out, err := s.Store.Usage("")
+		if err != nil {
+			apiError(w, err)
+			return
+		}
+		writeJSON(w, 200, out)
+	})
+	mux.HandleFunc("POST /control/v1/providers/{id}/action", s.providerAction)
+}
+func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
+	if !s.identity(w, r) {
+		return
+	}
+	var in catalog.Action
+	if !decode(w, r, &in) {
+		return
+	}
+	if in.ProviderID != r.PathValue("id") || !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 {
+		apiError(w, state.ErrInvalid)
+		return
+	}
+	p, err := s.Store.Provider(in.ProviderID)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	if p.Revision != in.ExpectedRevision {
+		apiError(w, state.ErrConflict)
+		return
+	}
+	target := p.ID
+	var probe *catalog.Probe
+	var imported *catalog.Price
+	switch in.Action {
+	case "delete", "rename", "key-delete", "model-delete":
+		if !in.Approved {
+			apiError(w, state.ErrInvalid)
+			return
+		}
+	}
+	switch in.Action {
+	case "price-put":
+		if in.Price == nil {
+			err = state.ErrInvalid
+			break
+		}
+		in.Price.Model = in.Target
+		err = s.Store.PutPrice(p.ID, p.Revision, *in.Price)
+	case "price-import":
+		imported, err = s.importPrice(r.Context(), in.Target, in.CatalogProvider, in.Model)
+	case "delete", "copy", "rename", "key-put", "key-delete", "strategy":
+		err = s.Store.MutateProvider(p.ID, p.Revision, in.Action, in.Target, in.Secret, in.Strategy, in.Enabled, in.CopyKeys)
+		if in.Action == "rename" || in.Action == "copy" {
+			target = in.Target
+		}
+		if err == nil && in.Action == "delete" {
+			writeJSON(w, 200, catalog.Workspace{Prices: []catalog.Price{}, Estimates: []catalog.Estimate{}, ProviderID: p.ID, Deleted: true, Keys: []catalog.KeyStatus{}, Models: []catalog.ModelMapping{}, Usage: []catalog.UsageRow{}})
+			return
+		}
+	case "key-reset":
+		if !in.Approved {
+			err = state.ErrInvalid
+			break
+		}
+		keys, e := s.Store.ProviderKeys(p.ID)
+		err = e
+		found := false
+		for _, k := range keys {
+			if k.ID == in.Target {
+				found = true
+			}
+		}
+		if !found {
+			err = state.ErrNotFound
+			break
+		}
+		s.mu.Lock()
+		delete(s.health, healthID(p, in.Target))
+		s.mu.Unlock()
+	case "test":
+		if !in.Approved || in.Model == "" || len(in.Model) > 256 || strings.ContainsAny(in.Model, "\r\n") {
+			err = state.ErrInvalid
+			break
+		}
+		probe, err = s.probe(r.Context(), p, in.Target, in.Model)
+	case "model-put":
+		if !state.ValidID(in.Target) || in.Model == "" {
+			err = state.ErrInvalid
+			break
+		}
+		m := state.Model{ID: in.Target, DisplayName: in.Target, Tools: in.Tools, Streaming: in.Streaming, Candidates: []state.Candidate{{ProviderID: p.ID, Model: in.Model}}}
+		if in.ModelRevision > 0 {
+			old, e := s.Store.Model(in.Target)
+			if e != nil {
+				err = e
+				break
+			}
+			m = old
+			m.Tools = in.Tools
+			m.Streaming = in.Streaming
+			found := false
+			for i := range m.Candidates {
+				if m.Candidates[i].ProviderID == p.ID {
+					m.Candidates[i].Model = in.Model
+					found = true
+				}
+			}
+			if !found {
+				err = state.ErrInvalid
+				break
+			}
+		}
+		if m.Validate() != nil {
+			err = state.ErrInvalid
+			break
+		}
+		_, err = s.Store.PutProviderModel(m, in.ModelRevision, p.ID, p.Revision)
+	case "model-delete":
+		m, e := s.Store.Model(in.Target)
+		if e != nil {
+			err = e
+			break
+		}
+		found := false
+		for _, c := range m.Candidates {
+			if c.ProviderID == p.ID {
+				found = true
+			}
+		}
+		if !found {
+			err = state.ErrInvalid
+			break
+		}
+		err = s.Store.DeleteProviderModel(in.Target, in.ModelRevision, p.ID, p.Revision)
+	default:
+		err = state.ErrInvalid
+	}
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	out, err := s.workspace(target)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	out.Probe = probe
+	out.ImportedPrice = imported
+	writeJSON(w, 200, out)
+}
+func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model string) (*catalog.Probe, error) {
+	keys, err := s.Store.ProviderKeys(p.ID)
+	if err != nil {
+		return nil, err
+	}
+	key := state.ProviderKey{ID: "anonymous", Enabled: true}
+	if len(keys) > 0 {
+		found := false
+		for _, k := range keys {
+			if k.ID == keyID || (keyID == "" && k.Enabled) {
+				key = k
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, state.ErrInvalid
+		}
+	} else if keyID != "" && keyID != "anonymous" {
+		return nil, state.ErrInvalid
+	}
+	out := &catalog.Probe{Revision: p.Revision, KeyID: key.ID, Model: model, At: time.Now().Unix()}
+	start := time.Now()
+	attempted := false
+	after := ""
+	u := protocol.Usage{}
+	defer func() {
+		out.ElapsedMS = time.Since(start).Milliseconds()
+		if attempted {
+			s.finishKey(p, key.ID, out.HTTPStatus, after, out.Failure == "")
+			s.mu.Lock()
+			if h := s.health[healthID(p, key.ID)]; h != nil {
+				h.Test = out
+			}
+			s.mu.Unlock()
+			v := state.Usage{ProviderID: p.ID, Model: "test:" + model, Requests: 1, ElapsedMS: out.ElapsedMS, InputTokens: u.Input, OutputTokens: u.Output, CacheRead: u.CacheRead, CacheWrite: u.CacheWrite}
+			if u.Known {
+				v.Known = 1
+			}
+			if out.Failure != "" {
+				v.Failures = 1
+			}
+			if s.Store.RecordUsage(v) != nil {
+				s.Log.Error("test usage persistence failed")
+			}
+		}
+	}()
+	select {
+	case s.slots <- struct{}{}:
+		defer func() { <-s.slots }()
+	default:
+		out.Failure = "busy"
+		return out, nil
+	}
+	if !s.take(p.ID, p.MaxConcurrent) {
+		out.Failure = "busy"
+		return out, nil
+	}
+	defer s.release(p.ID)
+	raw, _ := json.Marshal(map[string]any{"model": model, "input": "Reply OK.", "max_output_tokens": 16, "store": false})
+	body, err := protocol.ConvertRequest(raw, "responses", p.Protocol)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, min(time.Duration(p.TimeoutSeconds)*time.Second, 10*time.Second))
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(p.BaseURL, "/")+protocol.Endpoint(p.Protocol), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	authorizeUpstream(req, p, key.Secret)
+	attempted = true
+	resp, err := s.upstream.Do(req)
+	if err != nil {
+		out.Failure = "network"
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			out.Failure = "timeout"
+		}
+		return out, nil
+	}
+	defer resp.Body.Close()
+	out.HTTPStatus = resp.StatusCode
+	after = resp.Header.Get("Retry-After")
+	switch resp.StatusCode {
+	case 200:
+	case 401, 403:
+		out.Failure = "authentication"
+	case 429:
+		out.Failure = "rate_limited"
+	default:
+		out.Failure = "http_error"
+	}
+	if out.Failure != "" {
+		return out, nil
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		out.Failure = "network"
+		return out, nil
+	}
+	parsed, err := protocol.ParseResponse(data, p.Protocol)
+	if err != nil {
+		out.Failure = "invalid_response"
+	} else {
+		u = parsed.Usage
+	}
+	return out, nil
+}

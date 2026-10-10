@@ -196,3 +196,25 @@ func (c *Client) Stop(ctx context.Context) error {
 	}
 	return nil
 }
+
+func (c *Client) ProviderWorkspace(ctx context.Context, id string) (catalog.Workspace, error) {
+	if !state.ValidProviderID(id) {
+		return catalog.Workspace{}, state.ErrInvalid
+	}
+	var out catalog.Workspace
+	err := c.call(ctx, "GET", "/control/v1/providers/"+id+"/workspace", nil, &out)
+	return out, err
+}
+func (c *Client) ProviderAction(ctx context.Context, in catalog.Action) (catalog.Workspace, error) {
+	if !state.ValidProviderID(in.ProviderID) {
+		return catalog.Workspace{}, state.ErrInvalid
+	}
+	var out catalog.Workspace
+	err := c.call(ctx, "POST", "/control/v1/providers/"+in.ProviderID+"/action", in, &out)
+	return out, err
+}
+func (c *Client) Usage(ctx context.Context) ([]state.Usage, error) {
+	var out []state.Usage
+	err := c.call(ctx, "GET", "/control/v1/usage", nil, &out)
+	return out, err
+}

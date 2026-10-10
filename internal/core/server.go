@@ -36,6 +36,8 @@ type Server struct {
 	upstream *http.Client
 	mu       sync.Mutex
 	active   map[string]int
+	health   map[string]*keyHealth
+	cursor   map[string]int
 	slots    chan struct{}
 	shutdown chan struct{}
 	stopOnce sync.Once
@@ -52,7 +54,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	tr.MaxConnsPerHost = 64
 	tr.MaxIdleConns = 32
 	tr.ResponseHeaderTimeout = 30 * time.Second
-	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, active: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
+	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() { s.upstream.CloseIdleConnections() }
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -66,6 +68,10 @@ func fail(w http.ResponseWriter, status int, code, message string) {
 }
 func apiError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, state.ErrReferenced):
+		fail(w, 409, "referenced", "resource is still referenced")
+	case errors.Is(err, state.ErrInvalid):
+		fail(w, 400, "invalid", "invalid operation")
 	case errors.Is(err, state.ErrConflict):
 		fail(w, 409, "conflict", "revision changed or resource already exists")
 	case errors.Is(err, state.ErrNotFound):
@@ -103,6 +109,9 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 			return
 		}
 		auth := r.Header.Get("Authorization")
+		if auth == "" && scope == "gateway" && r.Header.Get("x-api-key") != "" {
+			auth = "Bearer " + r.Header.Get("x-api-key")
+		}
 		valid := strings.HasPrefix(auth, "Bearer ") && s.Store.Authenticate(strings.TrimPrefix(auth, "Bearer "), scope)
 		if !valid && scope == "gateway" && strings.HasPrefix(auth, "Bearer ") {
 			if b, err := s.Store.BindingForToken(strings.TrimPrefix(auth, "Bearer ")); err == nil {
@@ -178,7 +187,7 @@ func (s *Server) Control() http.Handler {
 		if s.stopping.Load() {
 			phase = "stopping"
 		}
-		writeJSON(w, 200, map[string]any{"core": phase, "gateway": phase, "upstream_health": "not_probed", "agent_management": health, "bindings": agents, "agent_connection_verification": "unknown"})
+		writeJSON(w, 200, map[string]any{"core": phase, "gateway": phase, "upstream_health": "per_key", "agent_management": health, "bindings": agents, "agent_connection_verification": "unknown"})
 	})
 	mux.HandleFunc("GET /control/v1/providers", func(w http.ResponseWriter, r *http.Request) {
 		p, err := s.Store.Providers()
@@ -268,6 +277,7 @@ func (s *Server) Control() http.Handler {
 		}
 		writeJSON(w, 200, m)
 	})
+	s.providerFeatureRoutes(mux)
 	s.agentRoutes(mux)
 	return s.guard("manage", mux)
 }

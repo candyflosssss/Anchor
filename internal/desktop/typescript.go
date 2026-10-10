@@ -29,7 +29,7 @@ func TypeScript() string {
 			return "string"
 		case reflect.Bool:
 			return "boolean"
-		case reflect.Int, reflect.Int64:
+		case reflect.Int, reflect.Int64, reflect.Float64:
 			return "number"
 		case reflect.Struct:
 			return t.Name()
@@ -37,7 +37,7 @@ func TypeScript() string {
 			panic("unsupported contract type: " + t.String())
 		}
 	}
-	for _, v := range []any{Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ProviderModels{}, ProviderModelsResult{}} {
+	for _, v := range []any{Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}} {
 		t := reflect.TypeOf(v)
 		fmt.Fprintf(&out, "export interface %s {\n", t.Name())
 		for i := 0; i < t.NumField(); i++ {

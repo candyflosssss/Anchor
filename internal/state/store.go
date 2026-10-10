@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 2 {
+	if version > 3 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -94,6 +94,19 @@ COMMIT;`)
 		_, err = db.Exec(`BEGIN IMMEDIATE;
 CREATE TABLE bindings (id TEXT PRIMARY KEY, root TEXT UNIQUE NOT NULL, document TEXT NOT NULL, token TEXT NOT NULL, hash TEXT UNIQUE NOT NULL, enabled INTEGER NOT NULL, revision INTEGER NOT NULL);
 PRAGMA user_version=2;
+COMMIT;`)
+		if err != nil {
+			return fail(err)
+		}
+	}
+	if version < 3 {
+		_, err = db.Exec(`BEGIN IMMEDIATE;
+CREATE TABLE provider_keys (provider_id TEXT NOT NULL REFERENCES providers(id) ON DELETE CASCADE ON UPDATE CASCADE, id TEXT NOT NULL, secret TEXT NOT NULL, enabled INTEGER NOT NULL, PRIMARY KEY(provider_id,id));
+INSERT INTO provider_keys SELECT id,'default',secret,1 FROM providers WHERE secret!='';
+CREATE TABLE provider_strategy (provider_id TEXT PRIMARY KEY REFERENCES providers(id) ON DELETE CASCADE ON UPDATE CASCADE, strategy TEXT NOT NULL);
+CREATE TABLE provider_prices (provider_id TEXT NOT NULL REFERENCES providers(id) ON DELETE CASCADE ON UPDATE CASCADE, model TEXT NOT NULL, document TEXT NOT NULL, PRIMARY KEY(provider_id,model));
+CREATE TABLE usage_totals (provider_id TEXT NOT NULL, model TEXT NOT NULL, requests INTEGER NOT NULL, failures INTEGER NOT NULL, elapsed_ms INTEGER NOT NULL, known INTEGER NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL, cache_read INTEGER NOT NULL, cache_write INTEGER NOT NULL, PRIMARY KEY(provider_id,model));
+PRAGMA user_version=3;
 COMMIT;`)
 		if err != nil {
 			return fail(err)
@@ -354,6 +367,25 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 	if err != nil {
 		return Provider{}, err
 	}
+	if secret != nil {
+		if *secret == "" {
+			_, err = tx.Exec(`DELETE FROM provider_keys WHERE provider_id=? AND id='default'`, p.ID)
+		} else {
+			_, err = tx.Exec(`INSERT INTO provider_keys VALUES(?,'default',?,1) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=1`, p.ID, *secret)
+		}
+		if err != nil {
+			return Provider{}, err
+		}
+	}
+	var keyCount int
+	if err = tx.QueryRow(`SELECT count(*) FROM provider_keys WHERE provider_id=?`, p.ID).Scan(&keyCount); err != nil {
+		return Provider{}, err
+	}
+	p.HasSecret = keyCount > 0
+	b, _ = json.Marshal(p)
+	if _, err = tx.Exec(`UPDATE providers SET document=? WHERE id=?`, string(b), p.ID); err != nil {
+		return Provider{}, err
+	}
 	if err = tx.Commit(); err != nil {
 		return Provider{}, err
 	}
@@ -398,6 +430,9 @@ func (s *Store) Model(id string) (Model, error) {
 	return m, err
 }
 func (s *Store) PutModel(m Model, expected int64) (Model, error) {
+	return s.PutProviderModel(m, expected, "", 0)
+}
+func (s *Store) PutProviderModel(m Model, expected int64, providerID string, providerRevision int64) (Model, error) {
 	if err := m.Validate(); err != nil {
 		return Model{}, err
 	}
@@ -409,6 +444,15 @@ func (s *Store) PutModel(m Model, expected int64) (Model, error) {
 		return Model{}, err
 	}
 	defer tx.Rollback()
+	if providerID != "" {
+		var rev int64
+		if err = tx.QueryRow(`SELECT revision FROM providers WHERE id=?`, providerID).Scan(&rev); err != nil {
+			return Model{}, err
+		}
+		if rev != providerRevision {
+			return Model{}, ErrConflict
+		}
+	}
 	var current int64
 	err = tx.QueryRow(`SELECT revision FROM models WHERE id=?`, m.ID).Scan(&current)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {

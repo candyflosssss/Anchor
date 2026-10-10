@@ -7,7 +7,7 @@ const Contract = "anchor-desktop-v1"
 const MaxSafeRevision int64 = 9007199254740991
 
 // ProblemCodes is the sole source for generated TypeScript error literals.
-var ProblemCodes = []string{"offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission"}
+var ProblemCodes = []string{"offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"}
 
 type Problem struct {
 	Code string `json:"code"`
@@ -89,3 +89,21 @@ type ProviderModelsResult struct {
 	Data     *ProviderModels `json:"data"`
 	Problem  *Problem        `json:"problem"`
 }
+
+type Action = catalog.Action
+type KeyStatus = catalog.KeyStatus
+type Probe = catalog.Probe
+type ModelMapping = catalog.ModelMapping
+type UsageRow = catalog.UsageRow
+type Workspace = catalog.Workspace
+type WorkspaceQuery struct {
+	ProviderID string `json:"provider_id"`
+}
+type WorkspaceResult struct {
+	Contract string     `json:"contract"`
+	Data     *Workspace `json:"data"`
+	Problem  *Problem   `json:"problem"`
+}
+
+type Price = catalog.Price
+type Estimate = catalog.Estimate

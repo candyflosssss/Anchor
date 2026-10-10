@@ -5,15 +5,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/candyflosssss/Anchor/internal/protocol"
 	"io"
 	"mime"
 	"net/http"
+	"net/http/httptrace"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
 type bindingKey struct{}
+type protocolKey struct{}
 
 func (s *Server) Gateway() http.Handler {
 	mux := http.NewServeMux()
@@ -37,6 +42,8 @@ func (s *Server) Gateway() http.Handler {
 		writeJSON(w, 200, map[string]any{"object": "list", "data": data})
 	})
 	mux.HandleFunc("POST /v1/responses", s.responses)
+	mux.HandleFunc("POST /v1/chat/completions", s.protocolHandler("chat-completions"))
+	mux.HandleFunc("POST /v1/messages", s.protocolHandler("anthropic"))
 	return s.guard("gateway", mux)
 }
 func (s *Server) take(id string, max int) bool {
@@ -164,41 +171,112 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			apiError(w, err)
 			return
 		}
-		if !provider.Enabled || provider.Protocol != "responses" {
+		if !provider.Enabled {
 			continue
 		}
 		if !s.take(provider.ID, provider.MaxConcurrent) {
 			continue
 		}
-		retry := s.forward(w, r, request, modelID, c, provider, stream)
-		s.release(provider.ID)
-		if !retry {
+		keys, err := s.Store.ProviderKeys(provider.ID)
+		if err != nil {
+			s.release(provider.ID)
+			apiError(w, err)
 			return
 		}
+		tried := map[string]bool{}
+		for n := 0; n < max(1, len(keys)); n++ {
+			key, ok := s.chooseKey(provider, tried)
+			if !ok {
+				break
+			}
+			tried[key.ID] = true
+			retry := s.forward(w, r, request, modelID, c, provider, key, stream)
+			if !retry {
+				s.release(provider.ID)
+				return
+			}
+		}
+		s.release(provider.ID)
 	}
 	fail(w, 503, "no_available_candidate", "no enabled, supported and available candidate succeeded")
 }
-func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, stream bool) bool {
+func (s *Server) protocolHandler(from string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBytes)
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			fail(w, 413, "request_too_large", "request exceeds limit")
+			return
+		}
+		converted, err := protocol.ConvertRequest(raw, from, "responses")
+		if err != nil {
+			fail(w, 400, "unsupported_conversion", "unsupported field or content for protocol conversion")
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(converted))
+		r = r.WithContext(context.WithValue(r.Context(), protocolKey{}, from))
+		s.responses(w, r)
+	}
+}
+func authorizeUpstream(req *http.Request, p state.Provider, key string) {
+	if p.Protocol == "anthropic" {
+		if key != "" {
+			req.Header.Set("x-api-key", key)
+		}
+		req.Header.Set("anthropic-version", "2023-06-01")
+	} else if key != "" {
+		req.Header.Set("Authorization", "Bearer "+key)
+	}
+}
+func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool) bool {
 	started := time.Now()
 	status := 0
-	outcome := "failed"
+	success := false
+	attempted := false
+	after := ""
+	usage := protocol.Usage{}
 	defer func() {
-		s.Log.Info("model request", "request_id", w.Header().Get("X-Anchor-Request-ID"), "public_model", public, "upstream_model", c.Model, "provider", p.ID, "protocol", "responses->responses", "status", status, "outcome", outcome, "elapsed_ms", time.Since(started).Milliseconds(), "usage", "not_collected")
+		if !attempted { // Release a half-open reservation if local conversion was rejected.
+			s.mu.Lock()
+			if h := s.health[healthID(p, key.ID)]; h != nil {
+				h.Probing = false
+			}
+			s.mu.Unlock()
+			return
+		}
+		if r.Context().Err() == nil {
+			s.finishKey(p, key.ID, status, after, success)
+		} else {
+			s.mu.Lock()
+			if h := s.health[healthID(p, key.ID)]; h != nil {
+				h.Probing = false
+			}
+			s.mu.Unlock()
+		}
+		u := state.Usage{ProviderID: p.ID, Model: public, Requests: 1, ElapsedMS: time.Since(started).Milliseconds(), InputTokens: usage.Input, OutputTokens: usage.Output, CacheRead: usage.CacheRead, CacheWrite: usage.CacheWrite}
+		if !success {
+			u.Failures = 1
+		}
+		if usage.Known {
+			u.Known = 1
+		}
+		if err := s.Store.RecordUsage(u); err != nil {
+			s.Log.Error("usage persistence failed")
+		}
+		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "status", status, "success", success, "elapsed_ms", u.ElapsedMS)
 	}()
-	raw, _ := json.Marshal(c.Model)
-	request["model"] = raw
-	body, err := json.Marshal(request)
+	request["model"], _ = json.Marshal(c.Model)
+	raw, _ := json.Marshal(request)
+	body, err := protocol.ConvertRequest(raw, "responses", p.Protocol)
 	if err != nil {
-		fail(w, 400, "invalid_request", "request could not be encoded")
+		fail(w, 400, "unsupported_conversion", "candidate protocol cannot represent a request field or content")
 		return false
 	}
-	target, err := responseURL(p.BaseURL)
-	if err != nil {
-		apiError(w, err)
-		return false
-	}
+	target := strings.TrimRight(p.BaseURL, "/") + protocol.Endpoint(p.Protocol)
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.TimeoutSeconds)*time.Second)
 	defer cancel()
+	var connected atomic.Bool
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { connected.Store(true) }})
 	up, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
 	if err != nil {
 		apiError(w, err)
@@ -211,65 +289,93 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	} else {
 		up.Header.Set("Accept", "application/json")
 	}
-	if p.Secret != "" {
-		up.Header.Set("Authorization", "Bearer "+p.Secret)
-	}
-	response, err := s.upstream.Do(up)
+	authorizeUpstream(up, p, key.Secret)
+	attempted = true
+	resp, err := s.upstream.Do(up)
 	if err != nil {
-		// A transport timeout can follow upstream execution. Never replay an ambiguous request.
 		if r.Context().Err() != nil {
-			outcome = "canceled"
 			return false
+		}
+		if !connected.Load() {
+			return true
 		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			status = 504
-			fail(w, 504, "upstream_timeout", "upstream timed out; execution and billing may be unknown")
+			fail(w, 504, "upstream_timeout", "upstream timed out; execution may be unknown")
 		} else {
 			status = 502
 			fail(w, 502, "upstream_transport", "upstream transport failed; request was not replayed")
 		}
 		return false
 	}
-	defer response.Body.Close()
-	status = response.StatusCode
+	defer resp.Body.Close()
+	status = resp.StatusCode
+	after = resp.Header.Get("Retry-After")
 	if status != 200 {
-		// Do not reflect upstream error bodies, redirect locations, or authentication headers.
 		switch status {
-		case 429, 502, 503, 504:
-			outcome = "candidate_rejected"
+		case 401, 403, 429, 502, 503, 504:
 			return true
 		}
-		fail(w, 502, "upstream_rejected", "upstream rejected request; no automatic fallback for this status")
+		fail(w, 502, "upstream_rejected", "upstream rejected request")
 		return false
 	}
-	kind := response.Header.Get("Content-Type")
-	mediaType, _, mediaErr := mime.ParseMediaType(kind)
+	media, _, e := mime.ParseMediaType(resp.Header.Get("Content-Type"))
+	expected := "application/json"
 	if stream {
-		if mediaErr != nil || mediaType != "text/event-stream" {
-			fail(w, 502, "invalid_upstream_response", "expected an SSE response")
+		expected = "text/event-stream"
+	}
+	if e != nil || media != expected {
+		fail(w, 502, "invalid_upstream_response", "unexpected upstream content type")
+		return false
+	}
+	to, _ := r.Context().Value(protocolKey{}).(string)
+	if to == "" {
+		to = "responses"
+	}
+	if stream {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("X-Accel-Buffering", "no")
+		w.WriteHeader(200)
+		usage, err = protocol.Stream(w, resp.Body, p.Protocol, to, public)
+		success = err == nil
+		return false
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20+1))
+	if err != nil || len(data) > 16<<20 {
+		fail(w, 502, "invalid_upstream_response", "upstream response incomplete or oversized")
+		return false
+	}
+	if p.Protocol == to {
+		m, e := protocol.Decode(data)
+		if e != nil {
+			fail(w, 502, "invalid_upstream_response", "invalid upstream JSON")
 			return false
 		}
-	} else {
-		if mediaErr != nil || mediaType != "application/json" {
-			fail(w, 502, "invalid_upstream_response", "expected a JSON response")
+		usage = protocol.ReadUsage(m, p.Protocol)
+		if m["error"] != nil || m["status"] == "failed" {
+			fail(w, 502, "upstream_failed", "upstream generation failed")
 			return false
 		}
+		w.Header().Set("Content-Type", "application/json")
+		_, err = w.Write(data)
+		success = err == nil
+		return false
 	}
-	w.Header().Set("Content-Type", kind)
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("X-Accel-Buffering", "no")
-	w.WriteHeader(200)
-	// Once any downstream response is committed, no candidate replay is allowed.
-	if stream {
-		err = copyStream(w, response.Body)
-	} else {
-		err = copyBody(w, response.Body, false)
-	}
+	result, err := protocol.ParseResponse(data, p.Protocol)
 	if err != nil {
-		outcome = "stream_or_copy_interrupted"
+		fail(w, 502, "unsupported_upstream_response", "upstream returned unsupported content")
 		return false
 	}
-	outcome = "transport_completed"
+	usage = result.Usage
+	if to == "anthropic" && !usage.Known {
+		fail(w, 502, "unsupported_upstream_response", "upstream omitted usage required by Messages")
+		return false
+	}
+	result.Model = public
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(result.JSON(to))
+	success = err == nil
 	return false
 }
 func copyStream(w http.ResponseWriter, body io.Reader) error { return copyBody(w, body, true) }

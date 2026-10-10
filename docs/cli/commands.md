@@ -7,6 +7,7 @@
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
 - 本轮新增本机 `update` 命令和桌面在线更新入口，已包含本地 desktop.9，**未包含于 alpha.6 / desktop.8，未公开发布或部署更新源**。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
+- 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -20,7 +21,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
 推荐把全局选项放在命令之前。当前解析器也会从整条参数列表提取全局选项。值选项可写 `--name VALUE` 或 `--name=VALUE`；布尔选项关闭时用 `--name=false`，不要写 `--name false`。除表中指定的位置参数外，不添加额外位置参数。
@@ -34,7 +35,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 
 ## 2. 当前命令索引
 
-共 36 个规范命令路径（别名单列于对应说明）。
+以下列出当前已实现的命令路径；别名单列于对应说明。
 
 | 指令 | 用途 | 作用域 / 前置条件 |
 | --- | --- | --- |
@@ -58,6 +59,14 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `provider models` | 手动读取已存供应商的上游模型目录 | 核心在线；供应商 ID 与当前 revision |
 | `provider add` | 新增供应商 | 所选 Context 的核心在线 |
 | `provider put` | 条件更新供应商 | 核心在线；当前 revision |
+| `provider workspace` | 查询 Key 状态、映射、用量与价格 | 核心在线；已存供应商 |
+| `provider delete` / `rename` / `copy` | 删除、改名、复制供应商 | 核心在线；当前 revision；删除/改名须 approve |
+| `provider key-put` / `key-delete` / `key-reset` | 多 Key 管理与状态恢复 | 核心在线；当前 revision；删除/恢复须 approve |
+| `provider strategy` | 配置轮流或优先使用 Key | 核心在线；当前 revision |
+| `provider test` | 显式最小推理测试 | 核心在线；已存供应商/模型 ID；须 approve |
+| `provider model-put` / `model-delete` | 工作台模型映射写入/删除 | 核心在线；供应商与模型 revision；删除须 approve |
+| `provider price-put` / `price-import` | 保存单价 / models.dev 预览 | 核心在线；当前 revision；导入不自动保存 |
+| `usage` | 持久用量汇总 | 所选 Context 的核心在线 |
 | `model list` | 列出公开模型映射 | 所选 Context 的核心在线 |
 | `model add` | 新增公开模型 | 核心在线；候选供应商已配置 |
 | `model put` | 条件更新公开模型 | 核心在线；当前 revision |
@@ -168,15 +177,15 @@ anchor provider put --id ID --base-url URL --revision N [OPTIONS]
 | 参数（add/put） | 必填 / 默认 | 约束 |
 | --- | --- | --- |
 | `--id` | 必填 | 供应商 ID，支持中文，例如 `摸鱼AI`；1..128 个 Unicode 码点，完整规则见公共约定 |
-| `--base-url` | 必填 | API 根地址，可含 `/v1` 前缀，不含 `/responses`；HTTPS，仅数值回环测试地址允许 HTTP；禁止 userinfo/query/fragment |
-| `--protocol` | `responses` | 当前只接受 `responses` |
+| `--base-url` | 必填 | API 根地址，可含 `/v1` 前缀，不含 `/responses`、`/chat/completions` 或 `/messages`；HTTPS，仅数值回环测试地址允许 HTTP；禁止 userinfo/query/fragment |
+| `--protocol` | `responses` | `responses` / `chat-completions` / `anthropic` |
 | `--timeout` | `120` | 单候选总超时，秒，1..3600；仍受上游响应头 30 秒等待上限限制 |
 | `--max-concurrent` | `4` | 单供应商并发 1..64；网关全局另有限制 16 |
 | `--disabled` | `false` | 设置后禁用此供应商 |
 | `--revision` | `0` | add 必须为 0；put 必填当前值且 ≥1，通过 list 获取 |
 | `--secret-stdin` | `false` | 从 stdin 读取密钥，最多 8192 字节，去除首尾空白；内部换行无效 |
 
-更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商。密钥是例外：put 未提供 `--secret-stdin` 保留旧密钥，提供并读到空值会清空。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
+更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商。密钥是例外：put 未提供 `--secret-stdin` 保留 default Key，提供并读到空值会清除 default Key；其他命名 Key 保留。has_secret 表示至少存在一个已存 Key，不等于全部启用。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
 
 安全输入示例（变量须由用户安全提供；URL 为占位值）：
 
@@ -207,9 +216,51 @@ anchor provider models --id '摸鱼AI' --revision 3
 
 stdout 为 `{provider_id, revision, http_status, elapsed_ms, models, failure}`；成功 `failure=""`，空目录为 `models:[]`。目录层失败同样输出结构化结果并退出0，调用者必须检查 `failure`：`authentication`、`unsupported`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`；未取得 HTTP 状态为0。管理层失败仍非零退出。不会输出上游错误正文、密钥或原始网络异常。
 
-仅一次目录查询，不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。没有专用模型推理测试 CLI，本小步不自动导入模型。
+仅一次目录查询，不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。显式推理测试和映射写入使用下列独立命令，目录查询本身不自动导入。
 
-没有供应商删除命令；可用完整 `put ... --disabled` 暂停路由，但这不会删除存储的秘密。
+供应商可用下列 delete 删除；有模型引用时阻止。完整 `put ... --disabled` 仅暂停路由，不删除秘密。
+
+### 第一优先工作台（desktop.11）
+
+```text
+anchor provider workspace --id ID
+anchor provider delete --id ID --revision N --approve
+anchor provider rename --id ID --revision N --target NEW_ID --approve
+anchor provider copy --id ID --revision N --target NEW_ID [--copy-keys]
+anchor provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled]
+anchor provider key-delete --id ID --revision N --target KEY --approve
+anchor provider key-reset --id ID --revision N --target KEY --approve
+anchor provider strategy --id ID --revision N --strategy round-robin|priority
+anchor provider test --id ID --revision N --model UPSTREAM [--target KEY] --approve
+anchor provider model-put --id ID --revision N --target ALIAS --model UPSTREAM
+                          [--model-revision M] [--tools] [--streaming]
+anchor provider model-delete --id ID --revision N --target ALIAS --model-revision M --approve
+anchor provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD
+                          [--cache-read-price USD] [--cache-write-price USD]
+anchor provider price-import --id ID --revision N --target ALIAS --catalog-provider PROVIDER --model UPSTREAM
+anchor usage
+```
+
+上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商新 ID 沿用中文规则，Key ID/公开别名沿用 ASCII ID 规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
+
+| 动作 | 参数、默认值和语义 |
+| --- | --- |
+| delete / rename | `--approve` 必填；删除阻止模型引用，成功删除已存 Key/策略/价格；改名以事务迁移模型候选、Key、价格，模型和供应商 revision 增加，在途请求保留旧快照 |
+| copy | target 必填且不能已存在；默认不复制 Key，`--copy-keys` 才复制；新对象 revision=1、默认停用，复制配置/策略，不复制映射/价格/用量 |
+| key-put | target 必填，最多64个 Key；新 Key 必须有非空 stdin 秘密，已有 Key 省略或空 stdin 保留秘密；默认 enabled，`--disabled` 停用；替换秘密只经 stdin，删除用 key-delete |
+| key-delete / key-reset | target 与 approve 必填；delete 删除秘密，reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
+| strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
+| test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
+| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建，编辑必须提供当前正整数。tools/streaming 默认 false，不从目录推断；保留其他供应商候选，更新该供应商候选和该模型能力 |
+| model-delete | target、model-revision、approve 必填；删除整个公开模型及全部候选，不仅解除当前供应商映射；Binding 默认模型引用时409 referenced，成功清理价格 |
+| price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
+| price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；固定公开目录最多8秒/16MiB，无凭据/重定向/环境代理。只返回 imported_price **预览**，不保存；核对后另行 price-put |
+
+配置/Key/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
+
+usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
+
+GUI 在供应商详情的三个页签提供同等操作。数据库启动自动从 schema2 升至3并迁移旧 secret 为 default Key；安装前正常停止旧核心，升级后旧二进制不能再打开该数据库，无数据库降级入口。
 
 ## 6. 公开模型与候选路由
 
@@ -247,7 +298,7 @@ anchor model add --id anchor-code --candidate primary:upstream-model --tools --s
   --codex-model SOURCE_SLUG --codex-version X.Y.Z
 ```
 
-没有模型删除命令；这里的示例不会证明真实供应商或 Codex 已兼容。
+删除使用 `provider model-delete`（见 §5），会核对供应商和模型 revision，并阻止删除 Binding 默认模型。这里的示例不会证明真实供应商或 Codex 已兼容。
 
 ## 7. 本机授权
 
@@ -368,7 +419,7 @@ anchor recover [--id ID]
 ./scripts/anchor-dev.sh model list
 ```
 
-实际模型调用使用鉴权的 HTTP 数据面（`GET /v1/models`、`POST /v1/responses`），目前没有专用 CLI 推理命令；不要用拥有者管理令牌请求模型网关。
+实际模型调用使用鉴权的 HTTP 数据面（`GET /v1/models`、`POST /v1/responses`、`POST /v1/chat/completions`、`POST /v1/messages`）。CLI 的 `provider test` 仅执行固定最小诊断请求，不是任意提示词调用命令；不要用拥有者管理令牌请求模型网关。
 
 ## 10. 功能的 CLI 覆盖与缺口
 
@@ -382,20 +433,22 @@ anchor recover [--id ID]
 | 开机自启动设置 | 未实现；无 GUI 开关或 CLI | 独立、默认不启用；未来实现需同步提供 CLI，安装和启动宿主不自动注册服务 |
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
-| 供应商、模型新增/更新/查询 | provider / model 的 add、put、list | 已提供 CLI；删除未实现 |
-| 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 只读已存上游 /models，不导入映射、不测试推理；当前源码 / desktop.10 |
+| 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
+| 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
-| 模型推理与模型目录数据面 | HTTP 网关 | 数据面供 Agent 调用，不强制新增 CLI 推理入口；无专用调用命令 |
-| SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅/用量查询 CLI |
+| 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
+| 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
+| 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
+| SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
-| Chat/Anthropic 转换 | 未实现 | 后续协议能力及其用户配置需同步核对 CLI 覆盖 |
+| Chat/Anthropic 转换 | provider add/put --protocol；桌面协议选择 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
 | 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；原生安装未验收、未发布，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，本轮不验收、不公开发布）；系统服务、自启动与静默自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
-发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；本轮源码的 37 个命令路径包含尚未公开发布的 stop 与 update，不反写旧发行能力。
+发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；当前源码命令包含尚未公开发布的 stop、update 与第一优先供应商工作台，不反写旧发行能力。
 
 
 ## 11. 本机在线更新

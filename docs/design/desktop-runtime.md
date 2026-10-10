@@ -47,10 +47,17 @@ Windows / Linux 统一启用 Wails `Frameless`，以现有工作区 header 承�
 此前 Windows `.3` 内部 EXE 已交叉编译；当时 Linux 因宿主缺 GTK3/WebKitGTK4.1 开发依赖未产出。后续安装包轮新增受限 Ubuntu24.04 构建容器、Windows NSIS／Linux `.deb`，不改上述接口或核心生命周期；Linux 图标与应用入口在宿主中对应同一 ProgramName。该轮按用户要求不运行测试、安装、真实 GUI／核心或业务验收，构建结果单独记录，不能沿用旧测试作为新包验收。当前产物与剩余门禁见[桌面开发版构建](../release/desktop.md)。公开 alpha.6 分发不变。
 
 
-## 5. 在线更新增量（2026-10-11）
+## 6. 在线更新增量（2026-10-11）
 
 新增 UpdateInfo/ConfirmUpdate/UpdateResult DTO 和 integrity/permission 错误码，保留既有 anchor-desktop-v1 供应商与生命周期方法语义。更新读取／下载与核心业务分别用锁，长下载不占用供应商／Status 的会话锁。安装必须明确批准版本，重新校验磁盘文件，认证本机核心并等待正常退出，再交给独立 helper 等待窗口退出；核心抢占、身份变化、文件被修改或不兼容均拒绝，不强杀或自行提权。普通关窗仍不停服。本轮仅实现源码和隔离验证，安装器交接及双平台原生更新验收不是单元／模拟浏览器测试可替代的结果。
 
 ## 上游模型目录增量边界（desktop.10）
 
 新增 `Bridge.DiscoverProviderModels`，输入仅已存 provider ID / revision，返回独立只读目录 DTO，不扩展通用网络／文件能力。调用复用管理连接、实例身份和核心目录规则；POST 网络错误按只读处理，不标记写入结果未知。单次上游请求总超时最多8秒，宿主包含握手仍最多15秒，Wails 前端取消仅丢弃过期结果。细节、共享样例与无推理保证见[供应商接口 §4](provider-interface.md)。
+
+
+## 第一优先工作台增量（desktop.11）
+
+受控新增 ProviderWorkspace/ProviderAction；DTO、引用保护、确认和 revision 规则见[供应商接口 §5](provider-interface.md#5-第一优先工作台desktop11)。模型目录仍单独只读，推理测试是用户显式批准的一次最小请求。密钥仅输入不返回，价格导入只预填。前端保留 feature Model/View/hook Controller 边界。
+
+本轮真实 Go 桥接→client→隔离核心的读取/写入/冲突及契约漂移已通过；前端类型检查及55项定向单元通过。不运行浏览器和原生安装验收，不将这些结果代替系统 WebView 实测。升级须先显式正常停止旧核心并退出窗口，安装新包后再启动；本轮数据库自动升级至 schema3，旧二进制不能打开升级后的数据库。

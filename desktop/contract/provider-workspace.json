@@ -1,0 +1,5 @@
+{
+  "provider_id": "摸鱼AI", "revision": 3, "strategy": "round-robin", "deleted": false,
+  "keys": [{"id": "default", "enabled": true, "state": "ready", "failures": 0, "retry_at": 0, "test": null}],
+  "models": [], "usage": [], "probe": null, "prices": [], "estimates": [], "imported_price": null
+}

@@ -28,9 +28,18 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   status                             Query selected context
   stop --approve                     Request graceful shutdown of selected context
   provider list
-  provider models --id ID --revision N  Fetch upstream directory (no inference or config writes)
+  provider models --id ID --revision N  Fetch upstream directory
+  provider workspace --id ID           Keys, health, mappings and usage
+  provider delete|rename|copy --id ID --revision N [--target ID] [--approve] [--copy-keys]
+  provider key-put|key-delete|key-reset --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--approve]
+  provider strategy --id ID --revision N --strategy round-robin|priority
+  provider test --id ID --revision N --model MODEL [--target KEY] --approve
+  provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--tools] [--streaming] [--approve]
+  provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
+  provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
+  usage                                Persistent per-provider/model totals
   provider add|put --id ID --base-url URL [--secret-stdin] [--revision N]
-                [--protocol responses] [--timeout 120] [--max-concurrent 4]
+                [--protocol responses|chat-completions|anthropic] [--timeout 120] [--max-concurrent 4]
                 [--disabled]
   model list
   model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...]
@@ -61,7 +70,8 @@ Codex base-config/model-catalog management is available; actual Agent connection
 New agent add defaults to all-compatible; --model is the default, not the permission boundary.
 Catalog metadata must match the exact Codex version and actual upstream capabilities.
 Remote Codex app-server uses the remote base config; SSH connection management,
-other Agent adapters, named profiles, and cross-protocol conversion are not implemented.
+other Agent adapters and named profiles are not implemented.
+Protocol conversion supports stateless text, function tools and streaming; unsupported content is rejected.
 `
 
 type App struct {
@@ -256,6 +266,15 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.output(v)
 	case "agent":
 		return a.agents(ctx, cl, args[1:])
+	case "usage":
+		if len(args) != 1 {
+			return errors.New("usage takes no arguments")
+		}
+		v, err := cl.Usage(ctx)
+		if err != nil {
+			return err
+		}
+		return a.output(v)
 	case "provider":
 		return a.providers(ctx, cl, args[1:])
 	case "model":
@@ -421,8 +440,20 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 		}
 		return a.output(result)
 	}
+	if args[0] == "workspace" {
+		f := a.flags("provider workspace")
+		id := f.String("id", "", "provider ID")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		v, err := c.ProviderWorkspace(ctx, *id)
+		if err != nil {
+			return err
+		}
+		return a.output(v)
+	}
 	if args[0] != "add" && args[0] != "put" {
-		return errors.New("unknown provider command")
+		return a.providerFeature(ctx, c, args)
 	}
 	f := a.flags("provider " + args[0])
 	id := f.String("id", "", "provider ID: 1..128 Unicode letters (including Chinese), digits, or ._-; start with a letter or digit")
@@ -549,4 +580,59 @@ func Main(ctx context.Context, args []string) int {
 		return 1
 	}
 	return 0
+}
+
+func (a App) providerFeature(ctx context.Context, c *client.Client, args []string) error {
+	switch args[0] {
+	case "delete", "rename", "copy", "key-put", "key-delete", "key-reset", "strategy", "test", "model-put", "model-delete", "price-put", "price-import":
+	default:
+		return errors.New("unknown provider command")
+	}
+	f := a.flags("provider " + args[0])
+	inputPrice := f.Float64("input-price", -1, "USD per million input tokens")
+	outputPrice := f.Float64("output-price", -1, "USD per million output tokens")
+	readPrice := f.Float64("cache-read-price", -1, "USD per million cached input tokens; omitted means unknown")
+	writePrice := f.Float64("cache-write-price", -1, "USD per million cache creation tokens; omitted means unknown")
+	catalogProvider := f.String("catalog-provider", "", "models.dev provider ID")
+	id := f.String("id", "", "saved provider ID")
+	revision := f.Int64("revision", 0, "current provider revision")
+	target := f.String("target", "", "new provider ID, key ID, or model alias")
+	approve := f.Bool("approve", false, "confirm destructive operation or inference cost")
+	copyKeys := f.Bool("copy-keys", false, "explicitly copy credentials")
+	disabled := f.Bool("disabled", false, "disable key")
+	stdin := f.Bool("secret-stdin", false, "read secret from stdin; omission retains existing key")
+	strategy := f.String("strategy", "round-robin", "round-robin or priority")
+	model := f.String("model", "", "upstream model")
+	mr := f.Int64("model-revision", 0, "current model revision; zero creates")
+	tools := f.Bool("tools", false, "advertise function tools")
+	stream := f.Bool("streaming", false, "advertise streaming")
+	if err := parse(f, args[1:]); err != nil {
+		return err
+	}
+	if !state.ValidProviderID(*id) || *revision < 1 {
+		return errors.New("saved --id and current --revision are required")
+	}
+	in := catalog.Action{ProviderID: *id, ExpectedRevision: *revision, Action: args[0], Target: *target, Approved: *approve, CopyKeys: *copyKeys, Enabled: !*disabled, Strategy: *strategy, Model: *model, ModelRevision: *mr, Tools: *tools, Streaming: *stream}
+	if *stdin {
+		v, err := a.secret()
+		if err != nil {
+			return err
+		}
+		in.Secret = v
+	}
+	in.CatalogProvider = *catalogProvider
+	if args[0] == "price-put" {
+		in.Price = &catalog.Price{InputUSD: *inputPrice, OutputUSD: *outputPrice, Source: "custom"}
+		if *readPrice >= 0 {
+			in.Price.CacheReadUSD = readPrice
+		}
+		if *writePrice >= 0 {
+			in.Price.CacheWriteUSD = writePrice
+		}
+	}
+	out, err := c.ProviderAction(ctx, in)
+	if err != nil {
+		return err
+	}
+	return a.output(out)
 }

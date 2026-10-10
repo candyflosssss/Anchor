@@ -3,6 +3,7 @@ import type { ProblemCode, SessionInfo } from './contract.generated';
 import { DesktopProblem, desktopSession } from './transport';
 import { prototype } from './environment';
 export const desktopMessages: Record<ProblemCode, string> = {
+  referenced: '项目仍有引用，无法删除。',
   offline: '本机核心不可用。可重新连接；不会切换到其他实例。',
   unauthorized: '管理凭据不可用。请检查本机实例权限，不会要求在页面填写管理令牌。',
   identity: '实例身份或接口版本不匹配。未连接、覆盖或停止该进程。',

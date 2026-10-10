@@ -2,7 +2,7 @@
 
 - 日期：2026-10-10；桌面与正常停服补充：2026-10-11
 - 版本标识：`0.1.0-dev`，不是稳定发布。
-- 范围：本机核心 / CLI、Responses 同协议代理及 Codex 全局配置托管/恢复，不等于整体初版完成。
+- 范围：本机核心 / CLI、供应商第一优先工作台、三协议无状态文本/函数转换及 Codex 全局配置托管/恢复，不等于整体初版完成。
 - 总体产品边界继续以 `architecture.md` 为准；本文记录本轮已落地的决策与实际接口。
 
 ## 1. 已落地的决策
@@ -17,7 +17,7 @@
 | 凭据保护 | Linux 当前用户目录 0700 / 文件 0600；Windows 当前用户受保护 DACL | **不是静态加密**。供应商秘密暂存在受保护的 SQLite 中；本机拥有者令牌在 owner.token 中；普通 access 授权只保存 SHA-256 摘要；Binding helper 凭据另在受保护 SQLite 中保存秘密与摘要 |
 | 运行方式 | CLI 前台 `serve`；新增开发桌面宿主协调独立核心 | serve 仍不自动后台化；GUI 关窗不停止其独立核心；不注册系统服务／自启动；见[桌面运行契约](desktop-runtime.md) |
 | CLI 输出 | 正常输出 JSON（agent token 除外）；日志 / 诊断 stderr | `access grant --show-once` 和本机 `agent token` 是含秘密 stdout 例外；供应商秘密只从 stdin 输入 |
-| 协议顺序 | 先 Responses → Responses | 暂不支持 Chat / Anthropic 转换，Codex 仅全局配置/隔离 HTTP 文本烟测；不宣称 CC / DSH 或所有 Codex 能力已兼容 |
+| 协议支持 | Responses / Chat Completions / Anthropic Messages | 三入口及文本/函数/SSE/用量转换；不支持的内容明确报错，不宣称 CC / DSH 或所有 Codex 能力已兼容 |
 
 Linux / Windows 分别使用内核文件锁；进程退出释放锁，不根据残留锁文件猜测是否运行。
 数据库使用 WAL、FULL 同步、busy timeout 和 IMMEDIATE 写事务；写配置要求当前 revision，旧版本拒绝覆盖。
@@ -51,9 +51,9 @@ printf '%s' "$PROVIDER_KEY" | ./scripts/anchor-dev.sh provider add \
 ./scripts/anchor-dev.sh model list
 ```
 
-`api.example.com` 和 `upstream-model` 是占位示例，必须替换为供应商的实际 API 根地址与模型 ID。Base URL 不包含 `/responses`；代理保留该 URL 的路径前缀后追加 `/responses`。拒绝 URL 中的 userinfo、查询参数和 fragment；上游要求 HTTPS，仅数值回环测试端点允许 HTTP。
+`api.example.com` 和 `upstream-model` 是占位示例，必须替换为供应商的实际 API 根地址与模型 ID。Base URL 不包含推理端点；代理保留该 URL 的路径前缀，按协议追加 `/responses`、`/chat/completions` 或 `/messages`。拒绝 URL 中的 userinfo、查询参数和 fragment；上游要求 HTTPS，仅数值回环测试端点允许 HTTP。
 
-更新供应商 / 模型使用 `put --revision N`，通过 list 获取当前 revision；其余字段是完整替换，不是隐式合并。更新供应商时不提供 `--secret-stdin` 则保留旧秘密，显式输入空值则清空。删除操作尚未实现。
+更新供应商 / 模型使用 `put --revision N`，通过 list 获取当前 revision；其余字段是完整替换，不是隐式合并。更新供应商时不提供 `--secret-stdin` 则保留旧秘密，显式输入空值则清空。供应商删除/改名/复制、模型删除及多 Key 工作台已提供，见最新 CLI 大全 §5；删除有引用保护。
 
 可通过下面的命令显式签发测试网关令牌；stdout 此时含秘密，不应进入日志或公共记录：
 
@@ -69,19 +69,22 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 ## 3. 实际 HTTP 契约
 
-全部路由要求对应 scope 的 Bearer 认证；仅接受数值回环 Host，不接受浏览器 Origin；不开放公开管理或任意 CORS。
+全部路由要求对应 scope 的认证；管理面使用 Bearer，网关也接受 x-api-key；仅接受数值回环 Host，不接受浏览器 Origin；不开放公开管理或任意 CORS。
 
 | 接口 | 状态 |
 | --- | --- |
 | `GET /control/v1/instance` | 实例 ID、API 主版本、程序版本、平台、目标用户、地址、进程 ID（process_id）与能力 |
-| `GET /control/v1/status` | 核心与网关 starting / ready / stopping；供应商健康为 not_probed，托管为 ready/partial，并含逐 Binding 状态与实际连接 unknown |
+| `GET /control/v1/status` | 核心与网关 starting / ready / stopping；供应商健康为 per_key（详见工作台，不是总健康结论），托管为 ready/partial，并含逐 Binding 状态与实际连接 unknown |
 | `POST /control/v1/shutdown` | 管理鉴权与实例身份校验，严格空对象 `{}`；正常 Run 生命周期返回 `{accepted:true}`，不代表退出或恢复已完成；无生命周期503 |
 | `GET /control/v1/providers` | 脱敏供应商目录与 revision |
 | `PUT /control/v1/providers/{id}` | `{provider, expected_revision, secret?}`；secret 缺失 / null 保留旧值 |
 | `GET /control/v1/models` | 公开模型、能力与有序候选映射 |
 | `PUT /control/v1/models/{id}` | `{model, expected_revision}`，拒绝不存在的候选供应商 |
 | `GET /v1/models` | 已配置的公开模型目录；不代表真实供应商可用性 |
-| `POST /v1/responses` | 同协议、非后台、无服务器会话状态的 Responses 转发 |
+| `POST /v1/responses`、`POST /v1/chat/completions`、`POST /v1/messages` | 三协议入口，无状态文本、函数工具、SSE 与用量；Responses 同协议保持原有受限透传 |
+| `GET /control/v1/providers/{id}/workspace` | Key 状态、模型映射、用量、价格和当前价估算 |
+| `POST /control/v1/providers/{id}/action` | 固定动作 DTO，管理授权/实例/revision/必要确认；不开放任意 URL |
+| `GET /control/v1/usage` | 持久化的供应商/模型累计用量，包含已删除对象历史 |
 
 写管理 API 要求 `X-Anchor-Instance` 与目标一致。revision=0 只创建，N>0 只更新 revision=N 的资源；保存后 revision 加一。CLI 不自动重试写请求，断线后应查询目录、revision 和脱敏字段核对结果；配置托管已有稳定操作 ID 和恢复日志；通用持久操作查询、按幂等键查找及 SSH 写操作仍未实现。
 
@@ -91,19 +94,19 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 ## 4. 网关的真实支持边界
 
-- 只支持同协议透传，改写请求中的模型 ID 为候选实际模型，保留内容块、函数定义 / 调用 / 结果及上游响应事件。
+- 改写公共模型 ID 为候选上游 ID。Responses 同协议受限透传；Chat/Anthropic 入口和跨协议转换支持无状态文本、函数调用/结果、SSE 与用量；图片、音频、推理块、引用注解、服务端状态或无法表达的字段明确拒绝。
 - `function`、`custom`、仅含这两类工具的 namespace、`tool_search execution=client` 可同协议透传；工具由客户端执行。未知 / 服务端工具明确拒绝，不能借此宣称实际 Agent 工具兼容。
 - 默认设置 `store:false`。拒绝 `store:true`、非 null 的 `previous_response_id` / `conversation`、`background:true`；客户端需发送完整 input 历史。未来服务器状态需要供应商亲和与相应 API，不可直接沿备用路由重放。
 - `tools`、`streaming` 能力由用户在公开模型上显式声明；声明不等于真实上游探测通过。
 - 全局并发上限 16；单供应商并发可配置 1..64；请求体上限 8 MiB，管理写入上限 128 KiB。
 - 单次候选的总超时默认 120 秒，可配置 1..3600 秒；上游响应头等待上限 30 秒，下游每次写入等待上限 15 秒。
 - 候选按用户声明顺序调用；禁用、不支持或并发已满的候选跳过；所有候选不可用时失败，绝不选择未配置默认模型。
-- 只在明确收到上游 HTTP 429 / 502 / 503 / 504，且尚未提交下游响应时尝试下一个候选。不对同一个候选循环重试。
-- DNS / TLS / 网络错误、结果未知的超时、认证错误、重定向、无效成功响应不自动切换。显式 HTTP 失败也不能保证上游没有执行或计费。
+- 上游 HTTP 401/403/429/502/503/504 且尚未提交下游响应时，可尝试该供应商其他可用 Key 或后续候选；同一候选内每 Key 至多一次。认证失败阻断 Key，429 按 Retry-After 冷却，连续3次失败熔断30秒，冷却后只放一次半开探测。
+- DNS/连接拒绝/TLS 等未取得连接的失败允许切换；建立连接后结果未知的超时/传输错误、重定向、无效成功响应不自动切换。显式 HTTP 失败也不能保证上游没有执行或计费。
 - 下游已提交任何响应后不重放；断开 / 取消传播到上游。流式失败可能只留下不完整事件序列，客户端应核对终止事件，不以 HTTP 200 判断模型任务完成。
 - 不跟随上游重定向；不透传管理 / 网关令牌；上游仅收到供应商密钥。不把任意上游错误正文、认证头或 Location 返回给客户端。
 - 管理与上游客户端均不使用环境 HTTP 代理，避免回环管理泄漏和绕过显式供应商路由；显式代理支持是后续独立能力。
-- JSON 元数据日志记录请求 ID、公开 / 实际模型、供应商、协议、状态、耗时与传输结果；默认不记录请求 / 响应正文或认证秘密。用量目前标记 not_collected；上游用量在响应中原样保留，不伪造统计。
+- JSON 元数据日志记录请求 ID、公开 / 实际模型、供应商、协议、状态、耗时与传输结果；默认不记录请求 / 响应正文或认证秘密。用量按供应商/公共模型累计持久化，缺失用量标未知；请求数按上游尝试统计。价格与 models.dev 导入用于当前价估算已知部分，不是账单。
 
 ## 5. 生命周期与验证
 
@@ -129,9 +132,9 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 1. SSH Connector、远程独立凭据、远端实例绑定与隧道回收。
 2. Codex profile、升级后的 helper 路径更新、全工具实测与 Windows 原生接入；Binding 级鉴权与全局自动接管已提供。
 3. 更多适配器、JSON/YAML 声明式描述、通用多文件补偿；Codex 配置+自有 JSON 目录的补偿、字段所有权、持久恢复日志、条件恢复与 recover 已提供。
-4. Chat / Anthropic 转换、CC / DSH 与声明式适配器。
+4. 全量跨协议能力、CC / DSH 配置托管与声明式适配器。
 5. 桌面双平台原生窗口／安装验收、GUI 公开发行、系统服务、自启动和自动升级迁移。CLI 的公开版本与实际验收以仓库 README 为准；桌面内部构建见[桌面开发版说明](../release/desktop.md)，两者不能互相替代。
-6. 管理日志订阅、日志保留与用量汇总。
+6. 管理日志订阅、日志保留、用量时间筛选和历史计费；累计用量与当前价估算已实现。
 
 下一步继续补 Codex 覆盖与跨平台验收、其他适配器及核心连接契约（SSH / Context）。不能把当前里程碑对外称为完成 A01–A14。
 
@@ -180,3 +183,10 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 ### desktop.10：只读上游目录
 
 管理面新增 `POST /control/v1/providers/{id}/discover-models`，复用身份／管理鉴权、已存 revision、禁止代理与重定向的 HTTP 客户端，以及网关／供应商并发边界。CLI 和受限桌面方法复用同一后端，最多8秒获取 OpenAI 风格 `/models`，限制响应大小和模型 ID，并固定错误脱敏；不会生成内容、导入映射或更新健康。DTO／失败语义见[供应商接口 §4](provider-interface.md)，实际指令见[最新大全](../cli/commands.md)。
+
+
+### desktop.11：第一优先六项
+
+供应商工作台已接入删除/复制/改名、模型映射与删除、显式最小推理测试、独立 Key 健康与轮询/优先策略、三协议转换、持久用量及价格估算。详细支持边界见[实现契约](provider-priority-one.md)，入口见[CLI 大全](../cli/commands.md)。schema2 自动升级3，旧单 secret 迁移 default Key，命名 Key、策略、价格与用量独立存储。改名迁移配置引用但历史用量保持旧 ID；删除不抹掉统计。
+
+本轮仅定向检查和打包，不运行全量/race/浏览器或原生安装验收。当前价估算不包含未知用量；models.dev 只做解析样例验证，未请求线上目录；协议仅回环模拟上游，未调用真实付费服务。具体产物与提交见 release 任务记录。

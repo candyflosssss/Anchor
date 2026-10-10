@@ -212,3 +212,32 @@ input[readonly] { background: hsl(var(--muted)); color: hsl(var(--muted-foregrou
 .catalog-feedback { margin-top: .75rem; font-size: .8125rem; line-height: 1.6; }
 .catalog-list { max-height: 15rem; overflow: auto; margin-top: .5rem; border: 1px solid hsl(var(--border)); border-radius: .5rem; padding: .5rem .75rem; }
 .catalog-list li + li { margin-top: .25rem; }
+
+/* Provider workbench reuses the neutral surface, form and button system. */
+.provider-surface.has-detail { grid-template-columns: minmax(280px, 1fr) minmax(380px, 480px); }
+.provider-features { margin: 20px 0; min-width: 0; }
+.provider-operation-bar, .feature-form { display: grid; gap: 9px; padding: 16px 0; }
+.provider-operation-bar { border-top: 1px solid var(--border); }
+.provider-operation-bar > label, .feature-form > label { font-size: 12px; font-weight: 500; }
+.feature-tabs { display: flex; align-items: center; border-bottom: 1px solid var(--border); gap: 4px; margin-top: 16px; }
+.feature-tabs > button[role=tab] { padding: 12px 8px; font-size: 12px; color: var(--muted-foreground); border-bottom: 2px solid transparent; cursor: pointer; }
+.feature-tabs > button[aria-selected=true] { color: var(--foreground); border-color: var(--foreground); font-weight: 600; }
+.feature-tabs > button:last-child { margin-left: auto; }
+.feature-panel { padding-top: 16px; display: grid; gap: 12px; }
+.feature-panel h3, .feature-form h3 { font-size: 13px; font-weight: 600; }
+.feature-panel select, select.protocol-field { width: 100%; min-height: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--background); padding: 7px 9px; font-size: 12px; }
+.key-card, .usage-card { padding: 13px; border: 1px solid var(--border); border-radius: 8px; display: grid; gap: 7px; min-width: 0; }
+.key-card > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; }
+.health-label { font-size: 11px; border: 1px solid var(--border); border-radius: 5px; padding: 2px 6px; }
+.health-label.invalid, .probe-result.failed { color: var(--destructive); }
+.health-label.cooling, .health-label.half-open { color: #a56b1f; }
+.checkbox-row { display: flex; align-items: center; gap: 7px; font-size: 12px; }
+.checkbox-row input { accent-color: var(--foreground); }
+.probe-result { padding: 10px; background: var(--muted); border-radius: 6px; font-size: 11px; line-height: 1.7; }
+.feature-empty { padding: 18px 8px; text-align: center; color: var(--muted-foreground); font-size: 12px; }
+.feature-empty svg { margin: 0 auto 8px; }
+.usage-card h4 { font-size: 12px; font-weight: 600; }
+.usage-card dl { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 11px; }
+.usage-card dt { color: var(--muted-foreground); }
+.usage-card dd { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 1100px) { .provider-surface.has-detail { grid-template-columns: minmax(0,1fr); } }

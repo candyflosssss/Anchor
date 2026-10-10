@@ -1,9 +1,11 @@
 import type { Provider as DesktopProvider, SaveProvider, DiscoverProviderModels, ProviderModels } from "../../desktop/contract.generated";
 export type { SaveProvider, DiscoverProviderModels, ProviderModels };
-export type Provider = DesktopProvider & { protocol: "responses" };
+export type Provider = DesktopProvider & { protocol: "responses" | "chat-completions" | "anthropic" };
+export const protocolName: Record<string, string> = { responses: "Responses", "chat-completions": "Chat Completions", anthropic: "Anthropic Messages" };
 export type SecretMode = 'keep' | 'replace' | 'clear';
 export interface ProviderDraft {
   id: string;
+  protocol: Provider["protocol"];
   base_url: string;
   enabled: boolean;
   timeout: string;
@@ -13,7 +15,7 @@ export interface ProviderDraft {
   confirmClear: boolean;
 }
 export type FieldErrors = Partial<Record<'id' | 'base_url' | 'timeout' | 'concurrent' | 'secret', string>>;
-export type ProblemCode = 'offline' | 'unauthorized' | 'read_error' | 'conflict' | 'unknown' | 'invalid';
+export type ProblemCode = 'offline' | 'unauthorized' | 'read_error' | 'conflict' | 'unknown' | 'invalid' | 'referenced';
 export class ProviderProblem extends Error {
   constructor(readonly code: ProblemCode) { super(code); }
 }
@@ -23,15 +25,19 @@ export const problemText: Record<ProblemCode, string> = {
   read_error: '未能读取供应商配置。可以重试读取，不会改变已保存配置。',
   conflict: '配置已被其他操作修改。未覆盖新版本；请重新读取后再编辑。',
   unknown: '写入结果未知，可能已经保存。请先重新读取并核对配置与 revision，不要直接重试。',
+  referenced: '仍有模型或 Binding 引用此项目。请先移除引用，再执行删除。',
   invalid: '配置未通过校验。请核对字段后重新提交。',
 };
 export interface ProviderTransport {
+  workspace?(id: string, signal: AbortSignal): Promise<import("../../desktop/contract.generated").Workspace>;
+  action?(input: import("../../desktop/contract.generated").Action, signal: AbortSignal): Promise<import("../../desktop/contract.generated").Workspace>;
   list(signal: AbortSignal): Promise<Provider[]>;
   discover(input: DiscoverProviderModels, signal: AbortSignal): Promise<ProviderModels>;
   save(input: SaveProvider, signal: AbortSignal): Promise<Provider>;
 }
 export function newDraft(provider?: Provider): ProviderDraft {
   return {
+    protocol: provider?.protocol ?? "responses",
     id: provider?.id ?? '', base_url: provider?.base_url ?? '', enabled: provider?.enabled ?? true,
     timeout: String(provider?.timeout_seconds ?? 120), concurrent: String(provider?.max_concurrent ?? 4),
     secretMode: provider ? 'keep' : 'replace', secret: '', confirmClear: false,
@@ -60,7 +66,7 @@ export function toSave(draft: ProviderDraft, source?: Provider): SaveProvider {
   const expected_revision = source?.revision ?? 0;
   if (!Number.isSafeInteger(expected_revision) || expected_revision < 0) throw new ProviderProblem('invalid');
   return {
-    provider: { id: draft.id, base_url: draft.base_url.trim(), protocol: 'responses', enabled: draft.enabled,
+    provider: { id: draft.id, base_url: draft.base_url.trim(), protocol: draft.protocol, enabled: draft.enabled,
       timeout_seconds: +draft.timeout, max_concurrent: +draft.concurrent,
       revision: expected_revision, has_secret: source?.has_secret ?? false },
     expected_revision,
