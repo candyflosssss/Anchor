@@ -42,7 +42,7 @@ sh scripts/install.sh --help
 & ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/candyflosssss/Anchor/main/scripts/install.ps1')))
 
 # 固定版本：
-& ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/candyflosssss/Anchor/main/scripts/install.ps1'))) -Version '0.1.0-alpha.5'
+& ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/candyflosssss/Anchor/main/scripts/install.ps1'))) -Version '0.1.0-alpha.6'
 ```
 
 默认安装到 `%LOCALAPPDATA%\Anchor\bin\anchor.exe`。不自动改用户/系统 PATH；不在当前 PATH 时打印设置提示：

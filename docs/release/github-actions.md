@@ -35,8 +35,8 @@ git status --short
 git log -1 --oneline
 
 # 创建并推送版本标签，只推这个标签
-git tag -a v0.1.0-alpha.5 -m "Anchor 0.1.0-alpha.5"
-git push origin v0.1.0-alpha.5
+git tag -a v0.1.0-alpha.6 -m "Anchor 0.1.0-alpha.6"
+git push origin v0.1.0-alpha.6
 ```
 
 标签构建要求干净提交和 LICENSE；先下载完整模块图（冷缓存也能收集依赖许可），再串行执行依赖校验、Go race 测试、go vet、发行工具与 CI 门禁测试、两平台编译、对应源码导出（含 vendored 依赖）、Linux 单文件与最终归档程序烟测、SHA256 复核。

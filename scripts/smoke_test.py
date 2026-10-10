@@ -88,15 +88,17 @@ def main() -> None:
             # Inspect only our isolated state, never the user's real configuration.
             acl = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
                 "$ErrorActionPreference='Stop'; $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User; "
-                "foreach($p in @($env:ANCHOR_SMOKE_STATE, (Join-Path $env:ANCHOR_SMOKE_STATE 'owner.token'), "
-                "(Join-Path $env:ANCHOR_SMOKE_STATE 'state.db'))) { "
-                "$a=Get-Acl -LiteralPath $p; if(-not $a.AreAccessRulesProtected){throw 'unprotected ACL'}; "
+                "foreach($p in @($env:ANCHOR_SMOKE_STATE, ([IO.Path]::Combine($env:ANCHOR_SMOKE_STATE,'owner.token')), "
+                "([IO.Path]::Combine($env:ANCHOR_SMOKE_STATE,'state.db')))) { "
+                "if([IO.Directory]::Exists($p)){$a=[IO.Directory]::GetAccessControl($p)}"
+                "else{$a=[IO.File]::GetAccessControl($p)}; "
+                "if(-not $a.AreAccessRulesProtected){throw 'unprotected ACL'}; "
                 "$rules=$a.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]); "
                 "if($rules.Count -lt 1){throw 'missing ACL'}; foreach($r in $rules){ "
-                "if($r.IdentityReference -ne $sid -or $r.AccessControlType -ne 'Allow'){throw 'unexpected ACL'}}}"],
+                "if($r.IdentityReference.Value -ne $sid.Value -or $r.AccessControlType -ne 'Allow'){throw 'unexpected ACL'}}}"],
                 env={**os.environ, "ANCHOR_SMOKE_STATE": str(data)}, capture_output=True, timeout=30)
             if acl.returncode:
-                raise RuntimeError("isolated Windows state ACL verification failed")
+                raise RuntimeError("isolated Windows state ACL verification failed: " + acl.stderr.decode("utf-8", errors="replace"))
         service = None
         mock = None
         worker = None
