@@ -1,10 +1,10 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-11。
-- 本轮源码新增：手动在线更新（尚未打包／发布），见[在线更新与测试渠道投放](../design/online-updates.md)。下面 `.8` 的“不测试”说明是此前打包任务范围，不约束本轮隔离测试。
-- 范围：供应商第一版、本机自动启动／核验复用核心、关窗不停服；保持现有 shadcn Blocks sidebar-07 / neutral 界面。
-- 本轮：移除 Windows / Linux 原生系统标题栏，改用融入现有 header 的窗口控制；候选 `0.1.0-dev.desktop.8` 已完成双平台编译与安装包打包，未做原生验收。此前 `.7` 安装包保留，不覆盖。
-- **按用户要求，本轮不安装、不启动程序、不做测试或原生验收。编译和打包成功不代表已验证可用。** 后续公开发行门禁不因此取消；公开 alpha.6 下载仍为 CLI，不被替换。
+- 当前本地候选：`0.1.0-dev.desktop.9` 在线更新启动版，已完成 Windows / Linux 双平台编译、安装包打包与产物静态核验，未公开发布或部署更新源；见[在线更新与测试渠道投放](../design/online-updates.md)。
+- 范围：供应商第一版、本机自动启动／核验复用核心、关窗不停服、融合标题栏，以及手动检查／下载／批准安装更新；保持现有 shadcn Blocks sidebar-07 / neutral 界面。
+- 首次需人工安装 `.9` 才能获得在线更新入口，旧 `.8` 不含此功能；`.8` 安装包及日志保留，不覆盖。本轮未提供更新源地址，因此未生成发布清单，也未投放线上桌面更新。
+- **本轮仅打包及静态核验，不安装、不启动程序、不运行单元／集成／浏览器测试或原生验收。编译和打包成功不代表已验证可用。** 后续公开发行门禁不因此取消；此前公开 alpha.6 CLI 下载不被本次本地打包替换。
 
 ## 1. 安装与使用行为
 
@@ -27,7 +27,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.8_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.9_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -47,7 +47,9 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.8_amd64.deb
 构建机要求：Linux AMD64、可用的 Linux AMD64 Docker daemon、Go ≥1.25、Python ≥3.11、Node22.22.1、npm9.2.0，以及按锁文件安装的前端依赖。图标已纳入源码；只有重生成图标时需要 Pillow。宿主无需 GTK / WebKit 开发头文件或 NSIS。
 
 ```bash
-./scripts/package-desktop.sh --version 0.1.0-dev.desktop.8
+# 示例使用下一版，避免覆盖已存在的 .9：
+env NODE_OPTIONS=--max-old-space-size=768 \
+  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.10
 ```
 
 每次重建使用新的 `X.Y.Z-dev.desktop.N`，脚本拒绝覆盖已有版本目录。此入口不接受 stable / alpha 发行，不运行测试、程序、安装器或上传动作。
@@ -70,14 +72,46 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.8_amd64.deb
 ./scripts/build-desktop.sh --target windows-amd64 --check
 ./scripts/build-desktop.sh --target linux-amd64 --check
 # 使用尚不存在的版本号：
-./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.9
+./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.10
 ```
 
 Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主高版本发行版编译的文件不能声称具有 Ubuntu24.04 最低兼容性。双平台安装包入口用容器解决开发库缺失与 glibc 基线问题，不绕过资源保护。
 
 ## 3. 本地产物与实际构建状态
 
-### 当前标题栏修正版 `.8`
+### 当前在线更新启动版 `.9`
+
+候选 `0.1.0-dev.desktop.9`，`desktop-dev`，2026-10-11 本地构建。构建源码为已提交的 `d07799d6451f53e41ae13f1dce8d4e8563bea820`，`SOURCE.json` 的 `dirty=false`；没有临时修改源码或修改安装包内的版本信息。
+
+```bash
+env NODE_OPTIONS=--max-old-space-size=768 \
+  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.9
+```
+
+命令返回0。Go → TS 契约生成比对、TypeScript / Vite desktop 生产编译、Windows Go 交叉编译、Ubuntu24.04 容器 Linux Go 编译、NSIS（`-WX`）与 `.deb` 打包完成。本版包含“设置 → 在线更新”入口及受限检查／下载／安装桥接；没有启动生成的应用或安装器。
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.9/`：
+
+- Windows AMD64：`windows-amd64/Anchor-Desktop-0.1.0-dev.desktop.9-windows-amd64-setup.exe`，7,422,669 bytes。
+- Ubuntu24.04 AMD64：`linux-amd64/anchor-desktop_0.1.0-dev.desktop.9_amd64.deb`，5,266,492 bytes；Debian 包版本为 `0.1.0~dev.desktop.9`，架构为 `amd64`。
+- 构建日志：`dist/desktop/0.1.0-dev.desktop.9-build.log`；根目录含 `SOURCE.json` / `BUILD_ENVIRONMENT.txt`，各目标目录含程序、许可／通知、`BUILD.json` / `SHA256SUMS`。
+
+以下 SHA256 已重新读取最终文件并与元数据核对：
+
+```text
+b1e97b4deff0f790bb5eafaa3ffd687906e96eb2f7f5fad06bcbe603aa4a0513  Anchor-Desktop-0.1.0-dev.desktop.9-windows-amd64-setup.exe
+162131f4e56a544866c0504e05c3fc97eb78067fb943a8aff2aa4589f6d2e2c0  anchor-desktop_0.1.0-dev.desktop.9_amd64.deb
+```
+
+实际静态核验：两目标 `sha256sum -c SHA256SUMS` 全部通过，`BUILD.json` 的版本／渠道／源码标识及所有文件哈希一致；`file` 确认 PE32+ AMD64 GUI / NSIS 安装器和 ELF AMD64 / Debian 包格式；`go version -m` 确认 Go 1.26.0、目标平台及生产构建标签，构建日志与程序嵌入版本均为 `.9`。`dpkg-deb --field/--contents` 确认包版本、动态库依赖、主程序、应用入口、图标及许可／通知。前端产物含更新桥接方法及契约标记，不含构建脚本禁止的原型专用标记。这些核验不替代安装或原生行为测试。
+
+构建日志仍包含容器依赖安装时缺少 man 手册链接的提示及 `dpkg-shlibdeps` 暂存目录提示；后者返回0，后续打包完成，不宣称全链路零告警。两平台元数据均为 `native_gui_verified=false`、`installation_verified=false`、`public_release=false`、`signed=false`。未安装、启动、原生验收、上传或发布；发行记录状态为 partial（本地打包成功，原生及公开发行门禁未执行）。
+
+资源保护串行执行；构建前 MemAvailable 8749 MiB、SwapUsed 4311 MiB、/tmp 28 MiB、PSI 0.00，静态核验时 MemAvailable 8780 MiB、SwapUsed 4307 MiB、/tmp 28 MiB、PSI 0.00，无异常增长；本轮容器已删除。
+
+**首次安装 `.9` 前，先在旧版明确停止核心并等待退出，再关闭全部窗口后覆盖安装。** `.9` 只是在线更新启动包，本轮没有传入 `--update-base-url`，没有生成 `update-desktop.json`、部署更新源或创建 Release；安装后是否能发现更新取决于所选渠道是否已实际发布兼容清单和更高版本安装包，不能承诺现在即可线上升级。
+
+### 历史标题栏修正版 `.8`（本地产物保留）
 
 候选 `0.1.0-dev.desktop.8`，`desktop-dev`，2026-10-11 本地构建，未公开发布。`./scripts/package-desktop.sh --version 0.1.0-dev.desktop.8` 返回0；TypeScript / Vite desktop、Windows Go 交叉编译、Ubuntu24.04 容器 Linux Go 编译、NSIS（`-WX`）与 `.deb` 打包完成。
 
@@ -101,7 +135,7 @@ bceced55e5cfb2ff29ec755f5d2030c26b87af94c668177ec0c74a0aba69cf76  anchor-desktop
 
 ### 上一安装包版本 `.7`（历史结果；本地产物已清理）
 
-> 2026-10-11 工作区整理：`dist/desktop/` 只保留当前 `.8` 产物及其构建日志；`.1`～`.7` 本地目录和 `.4`～`.7` 构建日志已移入系统回收站，不再作为本地交付物。以下内容和各自任务记录仅作历史结果，路径不再存在。
+> 2026-10-11 此前工作区整理时：`dist/desktop/` 只保留了 `.8` 产物及其构建日志；`.1`～`.7` 本地目录和 `.4`～`.7` 构建日志已移入系统回收站，不再作为本地交付物。以下内容和各自任务记录仅作历史结果，路径不再存在。
 
 候选：`0.1.0-dev.desktop.7`，`desktop-dev`，本地构建，未公开发布。
 
@@ -137,9 +171,9 @@ dist/desktop/0.1.0-dev.desktop.7/
 
 `BUILD.json` 分别保留 `native_gui_verified=false`、`installation_verified=false`、`public_release=false` 和用户要求跳过验收的说明。开发安装器未签名，不做生产就绪承诺。`.1` / `.2` / `.3` Windows 开发 EXE 的历史结果见各自任务记录（本地产物已清理）。本轮 `.4` 仅产出 Windows 裸 EXE：Ubuntu 编译因发行版 Go 的跨目录符号链接未完整挂载而失败，没有安装包；修正只读挂载布局和 Go 通知文件收集后，`.5` 两平台裸程序均编译成功，但 npm 包缺少独立许可证文件导致通知收集中断，没有生成安装器。补充两份包通知并排除未安装的可选平台依赖后，`.6` 安装包生成成功，但 NSIS 报出卸载命令字符串的引号错误，标为非交付产物。`.7` 修正引号、启用 NSIS 编译警告视为错误，并按 Debian 标准暂存路径提取动态库依赖；`.4` / `.5` / `.6` 为非交付中间产物（本地产物已清理）。
 
-## 4. 本轮不执行的验收与公开发行门禁
+## 4. 本轮验证边界与公开发行门禁
 
-用户已明确本轮不用验收，因此不运行单元／集成／浏览器测试，不安装新包、不拉起真实 GUI 或核心。此前宿主实现轮的 Go／模拟浏览器测试只证明当时范围，不能作为新安装包已验收的证据。
+本轮范围为本地打包与产物静态核验，不运行单元／集成／浏览器测试，不安装新包、不拉起真实 GUI 或核心。此前在线更新实现轮的 Go／模拟浏览器测试只证明当时范围，不算本轮重跑，也不能作为新安装包已完成原生验收的证据。
 
 后续真正做原生验收时，必须使用 `anchor-desktop --data-dir <新的独立测试目录>`，无真实 Agent 绑定、无真实付费上游：
 
@@ -154,4 +188,4 @@ dist/desktop/0.1.0-dev.desktop.7/
 
 ## 5. 在线更新清单生成
 
-`package-desktop.sh --version X.Y.Z-dev.desktop.N --update-base-url <HTTPS版本目录>` 可在成功打包后生成根目录 `update-desktop.json`，URL 对应 `版本目录/target/安装包名`。不传参数保持旧打包输出；参数会先验证，不联网上传。已有最终文件可用 `scripts/update_manifest.py` 生成清单；默认 GitHub Release 附件路径一般使用 flat 布局，自建站点可使用 target。先上传包与许可证／对应源码，校验后再切换渠道清单，保留旧版，不覆盖已发布安装包。首次必须人工安装含更新入口的新包；旧 desktop.8 不支持更新检查。本任务未生成新安装包、部署测试更新源或发布 Release。
+`package-desktop.sh --version X.Y.Z-dev.desktop.N --update-base-url <HTTPS版本目录>` 可在成功打包后生成根目录 `update-desktop.json`，URL 对应 `版本目录/target/安装包名`。不传参数保持旧打包输出；参数会先验证，不联网上传。已有最终文件可用 `scripts/update_manifest.py` 生成清单；默认 GitHub Release 附件路径一般使用 flat 布局，自建站点可使用 target。先上传包与许可证／对应源码，校验后再切换渠道清单，保留旧版，不覆盖已发布安装包。首次必须人工安装含更新入口的新包；旧 desktop.8 不支持更新检查。本轮已本地生成 `.9` 启动安装包，但未提供真实更新源地址，未生成 `update-desktop.json`、部署测试更新源或发布 Release。
