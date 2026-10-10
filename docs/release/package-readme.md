@@ -5,9 +5,11 @@
 
 完整归档内版本/来源见 BUILD-INFO.json；许可见 LICENSE 或 LEGAL-NOTICE.txt，依赖声明见 THIRD_PARTY_NOTICES.txt。带 LEGAL-NOTICE.txt 的包仅供内部评估，不作为已获授权的公开发行。
 
+公开发行采用 AGPL-3.0-only，允许商用；分发和修改版网络服务须履行对应源码义务。发行页提供 `anchor_<版本>_source.tar.gz`（含 vendored 依赖）、LICENSE 和 THIRD_PARTY_NOTICES.txt；源码包内 PUBLIC-BUILD.md 说明重建方法。单文件运行不免除再分发义务。
+
 ## 安装与使用
 
-公开 Release 提供程序和 SHA256SUMS 后，可使用 [一键安装脚本](install.md)；当前尚无公开 Release，Actions 内部包仍按下面的手动方式使用。脚本不改 Agent/状态配置、不自动启动或初始化；已有程序须显式允许替换。
+公开 Release 提供程序和 SHA256SUMS 后，可使用 [一键安装脚本](install.md)；首个公开候选仅 Linux AMD64；Windows 暂仅内部交叉编译，是否已公开以发行页为准。Actions 内部包仍按下面的手动方式使用。脚本不改 Agent/状态配置、不自动启动或初始化；已有程序须显式允许替换。
 
 1. 优先下载对应系统/架构的单文件程序（Linux 无扩展名，Windows `.exe`）；也可以从完整归档取出其中的程序。Actions 浏览器下载的单文件 artifact 外层仍是一层 ZIP，解开即为程序。用发行页的 SHA256SUMS 检查完整性。校验值应来自可信渠道，SHA-256 文件本身不是数字签名。
 2. 可将文件放到固定目录并命名为 `anchor` / `anchor.exe`。Linux 下载后先 `chmod +x anchor`，在程序目录执行 `./anchor version`；Windows PowerShell 执行 `.\anchor.exe version`。不需要 Go 开发环境，也不需要自行安装 SQLite 驱动。

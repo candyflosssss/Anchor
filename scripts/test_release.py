@@ -139,6 +139,66 @@ class ReleaseTests(unittest.TestCase):
                     release.build(args, {}, source, ["test"])
                 self.assertFalse((root / "dist/.release-lock").exists())
 
+    def test_public_linux_exports_license_notices_source_and_has_no_windows_blocker(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            self.fixture(root)
+            (root / "LICENSE").write_text("AGPL fixture")
+            args = release.arguments(["--version", "0.1.0-alpha.3", "--targets", "linux-amd64"])
+            source = {"revision": "a" * 40, "dirty": False, "inputs_sha256": "fixed"}
+            def fake_export(output, scratch, version, source, env, epoch):
+                result = output / f"anchor_{version}_source.tar.gz"
+                result.write_bytes(b"offline source fixture")
+                return result
+            with patch.object(release, "ROOT", root), patch.object(release, "command", side_effect=self.fake_command), \
+                    patch.object(release, "dependencies", return_value=([], "notices")), \
+                    patch.object(release, "input_digest", return_value="fixed"), \
+                    patch.object(release, "export_source", side_effect=fake_export), \
+                    patch.object(release, "check_archive", return_value="packaged_binary_smoke_passed"):
+                output = release.build(args, {}, source, ["test"])
+            manifest = json.loads((output / "release.json").read_text())
+            self.assertTrue(manifest["public_publish_ready"])
+            self.assertEqual(manifest["publish_blockers"], [])
+            self.assertEqual((output / "LICENSE").read_text(), "AGPL fixture")
+            self.assertEqual((output / "THIRD_PARTY_NOTICES.txt").read_text(), "notices")
+            entry = manifest["corresponding_source"]
+            self.assertEqual(entry["revision"], source["revision"])
+            self.assertEqual(entry["sha256"], release.digest(output / entry["file"]))
+            self.assertEqual(entry["dependencies"], "vendored")
+            self.assertIn(entry["file"], (output / "SHA256SUMS").read_text())
+            self.assertIn("AGPL-3.0-only", (output / "RELEASE_NOTES.md").read_text())
+            self.assertFalse(list(output.glob("*windows*")))
+
+    def test_source_export_uses_only_committed_snapshot_and_vendors_dependencies(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            scratch, output = root / "scratch", root / "output"
+            scratch.mkdir(); output.mkdir()
+            (root / "owner.token").write_text("MUST_NOT_SHIP")
+            calls = []
+            def fake(argv, **kwargs):
+                calls.append((argv, kwargs))
+                if argv[:2] == ["git", "archive"]:
+                    snapshot = Path(next(a.split("=", 1)[1] for a in argv if a.startswith("--output=")))
+                    with tarfile.open(snapshot, "w") as t:
+                        for name in ("LICENSE", "go.mod", "cmd/anchor/main.go"):
+                            content = b"committed source fixture"
+                            info = tarfile.TarInfo(name); info.size = len(content)
+                            t.addfile(info, io.BytesIO(content))
+                elif argv == ["go", "mod", "vendor"]:
+                    vendor = kwargs["cwd"] / "vendor"
+                    vendor.mkdir()
+                    (vendor / "modules.txt").write_text("dependency fixture")
+                return ""
+            with patch.object(release, "ROOT", root), patch.object(release, "command", side_effect=fake):
+                source = release.export_source(output, scratch, "0.1.0-alpha.3", {"revision": "a" * 40}, {}, 1700000000)
+            self.assertEqual(calls[0][0][-1], "a" * 40)
+            with tarfile.open(source) as t:
+                names = {m.name for m in t.getmembers()}
+                self.assertTrue(any(n.endswith("vendor/modules.txt") for n in names))
+                self.assertTrue(any(n.endswith("PUBLIC-BUILD.md") for n in names))
+                self.assertFalse(any("owner.token" in n for n in names))
+
     def test_failed_native_smoke_retains_only_marked_partial_output(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

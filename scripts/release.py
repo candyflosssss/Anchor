@@ -47,9 +47,9 @@ def arguments(argv: list[str] | None = None) -> argparse.Namespace:
     return args
 
 
-def command(argv: list[str], *, env: dict[str, str] | None = None, timeout: int = 240) -> str:
+def command(argv: list[str], *, env: dict[str, str] | None = None, timeout: int = 240, cwd: Path | None = None) -> str:
     print("+ " + " ".join(argv), file=sys.stderr, flush=True)
-    result = subprocess.run(argv, cwd=ROOT, env=env, capture_output=True, text=True, timeout=timeout)
+    result = subprocess.run(argv, cwd=cwd or ROOT, env=env, capture_output=True, text=True, timeout=timeout)
     if result.returncode:
         raise RuntimeError(f"command failed ({result.returncode}): {argv[0]}\n{result.stdout[-4000:]}{result.stderr[-4000:]}")
     if result.stderr:
@@ -176,6 +176,32 @@ def archive(payload: Path, output: Path, target: str, epoch: int) -> Path:
     return destination
 
 
+def export_source(output: Path, scratch: Path, version: str, source: dict[str, object],
+                  env: dict[str, str], epoch: int) -> Path:
+    """Export committed sources and the exact compiled dependency sources, never local state."""
+    payload = scratch / f"anchor_{version}_source"
+    payload.mkdir()
+    snapshot = scratch / "committed-source.tar"
+    command(["git", "archive", "--format=tar", f"--output={snapshot}", str(source["revision"])], env=env)
+    with tarfile.open(snapshot) as t:
+        # No tracked symlinks or special files may escape the source payload.
+        if any(not (m.isfile() or m.isdir()) for m in t.getmembers()):
+            raise RuntimeError("source snapshot contains links or special files")
+        t.extractall(payload, filter="data")
+    command(["go", "mod", "vendor"], env=env, cwd=payload)
+    (payload / "PUBLIC-BUILD.md").write_text(
+        f"# Anchor {version} corresponding source\n\n"
+        f"Revision: {source['revision']}\n\n"
+        "Anchor is licensed under AGPL-3.0-only (see LICENSE). Dependencies retain their own licenses.\n"
+        "vendor/ contains the dependency source selected by go.mod/go.sum; do not remove its notices.\n"
+        "Use the Go version in release.json. From this directory on Linux AMD64:\n\n"
+        "```sh\n"
+        f"GOWORK=off CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=vendor -p=1 -trimpath -buildvcs=false -ldflags '-X {MODULE}/internal/core.Version={version}' -o anchor ./cmd/anchor\n"
+        "./anchor version\n```\n\n"
+        "The runtime needs only the executable. Secrets, state and Agent configurations are not included.\n")
+    return archive(payload, output, "linux-amd64", epoch)
+
+
 def standalone_name(version: str, target: str) -> str:
     goos, goarch = TARGETS[target]
     return f"anchor_{version}_{goos}_{goarch}" + (".exe" if goos == "windows" else "")
@@ -263,6 +289,9 @@ def build(args: argparse.Namespace, env: dict[str, str], source: dict[str, objec
         try:
             modules, notices = dependencies(env)
             manifest["dependencies"] = modules
+            if not args.internal:
+                shutil.copyfile(ROOT / "LICENSE", stage / "LICENSE")
+                (stage / "THIRD_PARTY_NOTICES.txt").write_text(notices)
             with tempfile.TemporaryDirectory(prefix="anchor-package-") as tmp:
                 scratch = Path(tmp)
                 for target in args.targets:
@@ -294,11 +323,18 @@ def build(args: argparse.Namespace, env: dict[str, str], source: dict[str, objec
                     entry["verification"] = check_archive(artifact, target, args.version, env, scratch)
                     if entry["verification"] != "packaged_binary_smoke_passed":
                         blockers.append(f"{target}: native runtime acceptance pending")
+                if not args.internal:
+                    source_archive = export_source(stage, scratch, args.version, source, env, epoch)
+                    manifest["corresponding_source"] = {
+                        "file": source_archive.name, "sha256": digest(source_archive),
+                        "bytes": source_archive.stat().st_size, "revision": source["revision"],
+                        "dependencies": "vendored", "license": "AGPL-3.0-only"}
                 if input_digest() != source["inputs_sha256"]:
                     raise RuntimeError("release inputs changed while building; discard this candidate")
             manifest["status"] = "packaged"
             manifest["public_publish_ready"] = not blockers
-            (stage / "RELEASE_NOTES.md").write_text(f"# Anchor {args.version}\n\nSingle-executable CLI/headless Responses gateway with Codex base-config binding, model catalogs and conditional recovery.\nUse the standalone file for your OS; audit bundles with documentation and dependency notices are optional for runtime.\nNo desktop UI, built-in SSH connector or cross-protocol conversion.\n\nPublication blockers:\n" + "".join(f"- {b}\n" for b in blockers) + "\nSee release.json for source and validation evidence.\n")
+            (stage / "RELEASE_NOTES.md").write_text(f"# Anchor {args.version}\n\nSingle-executable CLI/headless Responses gateway with Codex base-config binding, model catalogs and conditional recovery.\nUse the standalone file for your OS; audit bundles with documentation and dependency notices are optional for runtime.\nNo desktop UI, built-in SSH connector or cross-protocol conversion.\n\nPublication blockers:\n" + "".join(f"- {b}\n" for b in blockers) + "\nSee release.json for source and validation evidence.\n" +
+                (f"\nLicense: AGPL-3.0-only. Commercial use is allowed under its terms.\nCorresponding source (including vendored dependencies): anchor_{args.version}_source.tar.gz.\nSource revision: {source['revision']}.\nRetain LICENSE and THIRD_PARTY_NOTICES.txt when redistributing.\n" if not args.internal else ""))
             save_manifest(stage, manifest)
             stage.rename(final)
             return final

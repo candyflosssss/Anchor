@@ -12,12 +12,12 @@ class CIReleaseTests(unittest.TestCase):
     def test_manual_is_internal_even_when_selected_ref_is_a_tag(self):
         for ref in ("refs/heads/main", "refs/tags/v1.2.3-alpha.1"):
             self.assertEqual(ci_release.plan("workflow_dispatch", ref, "12"),
-                             {"version": "0.0.0-alpha.12", "internal": "true", "draft": "false"})
+                             {"version": "0.0.0-alpha.12", "internal": "true", "draft": "false", "targets": "linux-amd64,windows-amd64"})
 
     def test_only_valid_prerelease_tags_can_create_drafts(self):
         for channel in ("alpha", "beta", "rc"):
             self.assertEqual(ci_release.plan("push", f"refs/tags/v1.2.3-{channel}.2", "12"),
-                             {"version": f"1.2.3-{channel}.2", "internal": "false", "draft": "true"})
+                             {"version": f"1.2.3-{channel}.2", "internal": "false", "draft": "true", "targets": "linux-amd64"})
         for event, ref, number in (("pull_request", "refs/tags/v1.2.3-alpha.1", "1"),
                                    ("push", "refs/heads/main", "1"),
                                    ("push", "refs/tags/v1.2.3", "1"),
@@ -109,6 +109,49 @@ class CIReleaseTests(unittest.TestCase):
                 mutation(root)
                 with self.assertRaises((ValueError, FileNotFoundError)):
                     ci_release.verify(root, version, revision)
+
+    def linux_bundle(self, root):
+        version, revision, data = self.bundle(root)
+        for name in (f"anchor_{version}_windows_amd64.zip", ci_release.standalone_name(version, "windows-amd64")):
+            (root / name).unlink()
+        for field in ("artifacts", "standalone_artifacts"):
+            data[field] = [a for a in data[field] if a["target"] == "linux-amd64"]
+        data.update(public_publish_ready=True, publish_blockers=[])
+        name = f"anchor_{version}_source.tar.gz"
+        for file in (name, "LICENSE", "THIRD_PARTY_NOTICES.txt"):
+            (root / file).write_bytes(b"offline source/notice fixture")
+        data["corresponding_source"] = {
+            "file": name, "revision": revision, "bytes": (root / name).stat().st_size,
+            "sha256": hashlib.sha256((root / name).read_bytes()).hexdigest(),
+            "dependencies": "vendored", "license": "AGPL-3.0-only"}
+        self.write_manifest(root, data)
+        return version, revision, data
+
+    def test_public_linux_requires_ready_clean_source_and_correct_corresponding_source(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            version, revision, _ = self.linux_bundle(root)
+            ci_release.verify(root, version, revision, "linux-amd64")
+            with self.assertRaises(ValueError):
+                ci_release.verify(root, version, revision)  # Cannot silently switch targets.
+        edits = [lambda d: d.update(public_publish_ready=False),
+                 lambda d: d.update(publish_blockers=["internal evaluation package"]),
+                 lambda d: d.update(corresponding_source={}),
+                 lambda d: d["corresponding_source"].update(revision="c" * 40),
+                 lambda d: d["corresponding_source"].update(dependencies="missing"),
+                 lambda d: d["corresponding_source"].update(license="MIT"),
+                 lambda d: d["corresponding_source"].update(sha256="0" * 64),
+                 lambda d: d["corresponding_source"].update(bytes=0),
+                 lambda d: d["source"].update(dirty=True),
+                 lambda d: d.update(artifacts=[])]
+        for edit in edits:
+            with self.subTest(edit=edit), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                version, revision, data = self.linux_bundle(root)
+                edit(data)
+                self.write_manifest(root, data)
+                with self.assertRaises(ValueError):
+                    ci_release.verify(root, version, revision, "linux-amd64")
 
     def test_symlink_bundle_refused(self):
         with tempfile.TemporaryDirectory() as temp:

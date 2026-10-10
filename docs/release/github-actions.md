@@ -2,14 +2,14 @@
 
 日期：2026-10-10。配置入口：`.github/workflows/release.yml`；复用 `scripts/release.sh`，不另造一套编译/打包规则。
 
-**本文件描述项目配置；实际提交、推送与 GitHub 运行结果以 `docs/updates/` 对应记录为准。项目 LICENSE 尚未选择，Windows 原生运行验收待办。** 本机验证不替代托管 runner 验收。
+**本文件描述项目配置；实际提交、推送与 GitHub 运行结果以 `docs/updates/` 对应记录为准。项目已采用 AGPL-3.0-only，Windows 核心原生运行验收待办；公开候选仅 Linux AMD64。** 本机验证不替代托管 runner 验收。
 
 ## 1. 两个入口
 
 | 入口 | 版本 | 结果 | 是否公开 Release |
 | --- | --- | --- | --- |
 | Actions → Anchor prerelease → Run workflow | `0.0.0-alpha.<run_number>` | 内部评估包，下载 Actions artifact | 否；即便手动选择标签也不创建 Release |
-| 推送 `vX.Y.Z-alpha.N` / `vX.Y.Z-beta.N` / `vX.Y.Z-rc.N` 标签 | 去掉 `v` 的标签版本 | 验证、打包、上传 artifact，再创建草稿预发行并附两个裸程序、两个可选归档和三个校验/说明文件 | 否；需要人工确认草稿后 Publish |
+| 推送 `vX.Y.Z-alpha.N` / `vX.Y.Z-beta.N` / `vX.Y.Z-rc.N` 标签 | 去掉 `v` 的标签版本 | 验证、打包、上传 artifact，再创建仅 Linux 的草稿预发行，附裸程序、审计归档、对应源码和许可/校验文件 | 否；需要人工确认草稿后 Publish |
 
 普通分支 push、PR 和稳定版标签不触发这个发行 workflow。本阶段只支持 Linux/Windows amd64 CLI 便携包，没有 macOS、ARM、桌面安装器、代码签名或自动更新。
 
@@ -21,7 +21,7 @@
 4. 成功后在运行页面 **Artifacts** 优先下载 `anchor-linux-amd64-<版本>` 或 `anchor-windows-amd64-<版本>`；GitHub 浏览器下载仍为一层 ZIP，解开后只含一个对应平台程序，不再嵌套归档。Linux 下载文件需 `chmod +x`。`anchor-<run_id>-<run_attempt>` 作为可选完整审计包保留，包含裸程序、文档/依赖声明归档、`release.json`、发行说明和校验清单。artifact 保留 14 天，不是长期用户下载渠道。
 5. 检查日志、元数据、实际下载内容，确认本机包和 CI 包的功能一致；哈希因编译环境/时间不同不保证与先前本地包相同。
 
-当前缺少 LICENSE 时，手动内部评估允许构建，但**标签发行会直接失败**，不会悄悄改为内部包或创建 Release。
+如果未满足 LICENSE 检查，手动内部评估允许构建，但**标签发行会直接失败**，不会悄悄改为内部包或创建 Release。
 
 ## 3. 标签发行
 
@@ -35,17 +35,17 @@ git status --short
 git log -1 --oneline
 
 # 创建并推送版本标签，只推这个标签
-git tag -a v0.1.0-alpha.2 -m "Anchor 0.1.0-alpha.2"
-git push origin v0.1.0-alpha.2
+git tag -a v0.1.0-alpha.3 -m "Anchor 0.1.0-alpha.3"
+git push origin v0.1.0-alpha.3
 ```
 
-标签构建要求干净提交和 LICENSE；先下载完整模块图（冷缓存也能收集依赖许可），再串行执行依赖校验、Go race 测试、go vet、发行工具与 CI 门禁测试、两个系统交叉编译、Linux 单文件与最终归档程序烟测、SHA256 复核。
+标签构建要求干净提交和 LICENSE；先下载完整模块图（冷缓存也能收集依赖许可），再串行执行依赖校验、Go race 测试、go vet、发行工具与 CI 门禁测试、Linux 编译、对应源码导出（含 vendored 依赖）、Linux 单文件与最终归档程序烟测、SHA256 复核。
 
 本阶段固定 GitHub 托管 `ubuntu-24.04`、Go `1.26.0`（与首批本地包一致）、Python `3.12`；Go 模块和 action 均有锁定来源。官方 actions 固定完整 commit SHA，更新 action/工具链时需要重新验收。Go `go.mod` 是最低语言版本，不代表 CI 自动跟随最新工具链。
 
 构建成功后，独立的写权限 job 下载本次 artifact，复核校验和、目标文件、通过的检查、干净源码提交、版本和验收状态，再用 `GITHUB_TOKEN` 创建 **Draft + Prerelease**。只有这个 job 有 `contents: write`；checkout 不持久化凭据。没有加入个人凭据或额外 secrets。
 
-草稿优先附 Linux 裸程序与 Windows `.exe`，另包含可选 Linux tar.gz、Windows zip、`release.json`、`RELEASE_NOTES.md`、`SHA256SUMS`。`--verify-tag` 不会替你凭空新建标签，也不会静默覆盖已存在的 Release。
+草稿附 Linux 裸程序、可选 Linux tar.gz、对应源码 tar.gz、LICENSE、THIRD_PARTY_NOTICES.txt、`release.json`、`RELEASE_NOTES.md`、`SHA256SUMS`。`--verify-tag` 不会替你凭空新建标签，也不会静默覆盖已存在的 Release。
 
 ## 安装器回归门禁
 
@@ -56,8 +56,8 @@ Linux 安装器离线回归纳入现有发行工具测试；另有 `windows-2025
 ## 4. 从草稿到用户下载
 
 1. 在仓库 Releases 打开新草稿；确认版本、源码提交、附件和更新说明。
-2. **Windows 当前只有交叉编译检查**，草稿和 manifest 保留“native runtime acceptance pending”。CI 不会伪造 Windows 验收或自动去掉阻塞。完整对外发行前在 Windows 上测试初始化、权限、启动、配置、网关和退出；如发现问题，应修复后发行新候选，不替换旧包。
-3. 核对项目许可、依赖声明及本次发行范围；依赖根目录声明的收集不等于法律完整性审查。当前 manifest 的 Windows 待验收状态不会因手工测试自动修改；可将实际验收证据附到草稿说明，或下一轮实现 Windows CI 并生成新版本元数据，不能伪称现有 manifest 已通过。
+2. **公开候选只包含 Linux AMD64**，核对 manifest 无 Windows 产物、blockers 为空且 public_publish_ready=true。Windows 仍只有内部交叉编译检查；未来公开 Windows 前须另做初始化、权限、启动、配置、网关和退出验收，并生成新的候选，不替换旧包。
+3. 核对项目许可、依赖声明及本次发行范围；依赖根目录声明的收集不等于法律完整性审查。核对对应源码归档的 revision、源码和 vendored 依赖，并用包内构建指令重建；不能把删掉 Windows 阻塞项当作该平台通过。
 4. 在说明中写明目标机实际验证结果与已知限制，保留 prerelease 标识，然后人工 **Publish release**。
 5. 从用户可见页面重新下载附件，检查 SHA256 并运行单文件（若选归档再解压），记录本次发布验证。不要只验证 runner 工作目录里的文件。
 
@@ -66,7 +66,7 @@ Linux 安装器离线回归纳入现有发行工具测试；另有 `windows-2025
 ## 5. 常见失败与重跑
 
 - Actions 按钮/Run workflow 不出现：检查默认分支是否已有 workflow、仓库 Actions 是否启用、账号权限是否足够。
-- 标签任务报缺少 LICENSE：由项目拥有者确定许可后提交；对新的源码提交使用新的候选版本标签，不移动旧标签。
+- 标签任务报未满足 LICENSE 检查：由项目拥有者确定许可后提交；对新的源码提交使用新的候选版本标签，不移动旧标签。
 - 无法创建 Release：检查组织对 `GITHUB_TOKEN` 的限制及 `contents: write`；构建 artifact 仍可在运行页面下载，不要改为写入个人 token 规避策略。
 - Windows 包能编译但不能用：本阶段没有原生验收保障，不对用户宣称通过。
 - 包已生成但后续失败：build job 尽可能上传 `dist/` 下的 partial 诊断，失败包不创建 Release；若没有产物，upload 只警告，不掩盖原始错误。
@@ -82,3 +82,11 @@ CI 日志、Step summary、artifact 的 release.json/更新说明是每次构建
 - [GitHub CLI gh release create](https://cli.github.com/manual/gh_release_create)：`--draft`、`--prerelease`、`--verify-tag`。
 
 官方文档应以 GitHub 当前内容为准；本项目行为以 workflow 和发行脚本为准。
+
+## AGPL 与 Linux-only 公开候选（2026-10-10）
+
+项目采用 AGPL-3.0-only。手动运行仍构建两平台内部包，不生成草稿；预发行 tag 触发只构建 `linux-amd64` 非内部候选，Windows 未验收不再阻塞该范围。不会自动公开发布。
+
+标签草稿门禁要求干净且匹配 tag revision、完整 source/race/vet/release 工具检查、Linux 归档和裸程序烟测、`public_publish_ready=true`、空 blockers，以及对应源码归档元数据。另附 LICENSE、THIRD_PARTY_NOTICES.txt 和源码包（含 vendored 依赖），全部纳入 SHA256SUMS。Windows 安装器矩阵继续作为脚本回归检查，不表示 Windows 核心已验收。
+
+草稿上传只包含 Linux 程序、Linux 审计归档、对应源码和元数据/许可文件。审核并正式公开后，再用匿名 Release API 和真实远程安装脚本在任务临时目录验收；仅下载脚本或创建草稿不算一键安装上线。

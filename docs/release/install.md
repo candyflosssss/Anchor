@@ -1,8 +1,8 @@
 # 一键安装 Anchor
 
 - 日期：2026-10-10；入口为 `scripts/install.sh` / `scripts/install.ps1`，不是新增的 `anchor install` 子命令。
-- 支持当前已构建的 **Linux AMD64 / Windows AMD64**。ARM、macOS 等目标明确拒绝；不自动装其他架构的程序。
-- **下面的远程命令要求安装脚本已推送、对应附件已人工公开发布；当前仓库尚无公开 Release，不能视为已上线的安装入口。** Actions artifact 和 Draft Release 不是匿名安装下载源。许可及平台验收仍须遵循 [发行门禁](README.md)。
+- 安装脚本识别 **Linux AMD64 / Windows AMD64**；首个公开 Alpha 候选 `0.1.0-alpha.3` 只包含 Linux AMD64，Windows 核心原生验收完成前不公开提供程序。Windows 安装本版本会因缺少附件而失败，不回退安装内部包。ARM、macOS 等目标明确拒绝；不自动装其他架构的程序。
+- **下面的远程命令要求安装脚本已推送、对应附件已人工公开发布；候选为 `v0.1.0-alpha.3`，只有正式公开后才是已上线入口，实际结果见任务记录。** Actions artifact 和 Draft Release 不是匿名安装下载源。许可及平台验收仍须遵循 [发行门禁](README.md)。
 
 ## Linux
 
@@ -42,7 +42,7 @@ sh scripts/install.sh --help
 & ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/candyflosssss/Anchor/main/scripts/install.ps1')))
 
 # 固定版本：
-& ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/candyflosssss/Anchor/main/scripts/install.ps1'))) -Version '0.1.0-alpha.2'
+& ([scriptblock]::Create((Invoke-RestMethod 'https://raw.githubusercontent.com/candyflosssss/Anchor/main/scripts/install.ps1'))) -Version '0.1.0-alpha.3'
 ```
 
 默认安装到 `%LOCALAPPDATA%\Anchor\bin\anchor.exe`。不自动改用户/系统 PATH；不在当前 PATH 时打印设置提示：
@@ -74,3 +74,7 @@ SHA256SUMS 来自同一 HTTPS 发布源，提供完整性检查，**不是代码
 ## 实际验证边界
 
 本地离线测试使用隔离用户目录和模拟下载，验证 Linux 安装、替换、校验拒绝、路径、清理及不碰配置。另外使用临时 PowerShell 7（Linux）进行原始脚本语法/帮助检查，以及仅在测试副本适配平台/路径后的模拟安装回归；这不等于 Windows 原生验收。Windows 同类测试已加入 GitHub Actions 原生 runner 门禁；配置本身不代表已执行，本轮实际结果以任务记录为准。没有修改真实 Agent 配置，没有请求真实付费供应商。
+
+## 许可与源码
+
+Anchor 使用 AGPL-3.0-only，允许商用；修改/再分发及网络服务的源码义务见 [许可说明](../license.md)。发行页提供对应源码包、LICENSE 和依赖声明。安装器不下载源码或声明到运行目录，不等于免除再分发义务。

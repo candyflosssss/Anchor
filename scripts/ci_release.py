@@ -15,21 +15,27 @@ def plan(event: str, ref: str, run_number: str) -> dict[str, str]:
     if event == "workflow_dispatch":
         if not re.fullmatch(r"[1-9][0-9]*", run_number):
             raise ValueError("invalid workflow run number")
-        return {"version": f"0.0.0-alpha.{run_number}", "internal": "true", "draft": "false"}
+        return {"version": f"0.0.0-alpha.{run_number}", "internal": "true", "draft": "false", "targets": "linux-amd64,windows-amd64"}
     if event != "push" or not ref.startswith("refs/tags/v"):
         raise ValueError("only manual runs or prerelease tag pushes are supported")
     version = ref.removeprefix("refs/tags/v")
     if not VERSION.fullmatch(version):
         raise ValueError("tag must be vX.Y.Z-alpha.N, vX.Y.Z-beta.N or vX.Y.Z-rc.N")
-    return {"version": version, "internal": "false", "draft": "true"}
+    return {"version": version, "internal": "false", "draft": "true", "targets": "linux-amd64"}
 
 
-def verify(directory: Path, version: str, revision: str) -> None:
+def verify(directory: Path, version: str, revision: str, targets: str = "linux-amd64,windows-amd64") -> None:
     if not VERSION.fullmatch(version) or not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise ValueError("invalid version or source revision")
+    if targets not in {"linux-amd64", "linux-amd64,windows-amd64"}:
+        raise ValueError("unsupported release scope")
+    linux_public = targets == "linux-amd64"
     names = {f"anchor_{version}_linux_amd64.tar.gz", f"anchor_{version}_windows_amd64.zip",
              standalone_name(version, "linux-amd64"), standalone_name(version, "windows-amd64"),
              "release.json", "RELEASE_NOTES.md"}
+    if linux_public:
+        names -= {f"anchor_{version}_windows_amd64.zip", standalone_name(version, "windows-amd64")}
+        names |= {f"anchor_{version}_source.tar.gz", "LICENSE", "THIRD_PARTY_NOTICES.txt"}
     if directory.is_symlink() or {p.name for p in directory.iterdir()} != names | {"SHA256SUMS"}:
         raise ValueError("unexpected release bundle contents")
     if any(p.is_symlink() or not p.is_file() for p in directory.iterdir()):
@@ -55,8 +61,8 @@ def verify(directory: Path, version: str, revision: str) -> None:
         raise ValueError("package is incomplete or does not match the tagged clean source")
     if not re.fullmatch(r"[0-9a-f]{64}", str(source.get("inputs_sha256", ""))):
         raise ValueError("missing source input fingerprint")
-    pending = ["windows-amd64: native runtime acceptance pending"]
-    if data.get("publish_blockers") != pending or data.get("public_publish_ready") is not False:
+    pending = [] if linux_public else ["windows-amd64: native runtime acceptance pending"]
+    if data.get("publish_blockers") != pending or data.get("public_publish_ready") is not linux_public:
         raise ValueError("unexpected publication blockers; refusing even a release draft")
     if set(data.get("checks", [])) != {"module_verify", "go_race_tests", "go_vet", "release_tool_tests"}:
         raise ValueError("source checks did not all pass")
@@ -64,8 +70,18 @@ def verify(directory: Path, version: str, revision: str) -> None:
         "linux-amd64": (f"anchor_{version}_linux_amd64.tar.gz", "packaged_binary_smoke_passed"),
         "windows-amd64": (f"anchor_{version}_windows_amd64.zip", "cross_compile_only; native runtime acceptance pending"),
     }
+    if linux_public:
+        del expected_artifacts["windows-amd64"]
+        corresponding = data.get("corresponding_source", {})
+        name = f"anchor_{version}_source.tar.gz"
+        if (corresponding.get("file") != name or corresponding.get("revision") != revision
+                or corresponding.get("sha256") != sums[name]
+                or corresponding.get("bytes") != (directory / name).stat().st_size
+                or corresponding.get("dependencies") != "vendored"
+                or corresponding.get("license") != "AGPL-3.0-only"):
+            raise ValueError("missing or mismatched corresponding source")
     artifacts = data.get("artifacts", [])
-    if len(artifacts) != 2 or {a.get("target") for a in artifacts} != set(expected_artifacts):
+    if len(artifacts) != len(expected_artifacts) or {a.get("target") for a in artifacts} != set(expected_artifacts):
         raise ValueError("missing or duplicate target artifacts")
     for artifact in artifacts:
         name, acceptance = expected_artifacts[artifact["target"]]
@@ -75,7 +91,7 @@ def verify(directory: Path, version: str, revision: str) -> None:
             raise ValueError("artifact metadata mismatch")
 
     standalone = data.get("standalone_artifacts", [])
-    if len(standalone) != 2 or {a.get("target") for a in standalone} != set(expected_artifacts):
+    if len(standalone) != len(expected_artifacts) or {a.get("target") for a in standalone} != set(expected_artifacts):
         raise ValueError("missing or duplicate standalone executables")
     for artifact in standalone:
         name = standalone_name(version, artifact["target"])
@@ -99,6 +115,7 @@ def main() -> None:
     v.add_argument("--directory", type=Path, required=True)
     v.add_argument("--version", required=True)
     v.add_argument("--revision", required=True)
+    v.add_argument("--targets", default="linux-amd64,windows-amd64")
     args = parser.parse_args()
     try:
         if args.command == "plan":
@@ -106,8 +123,8 @@ def main() -> None:
             with args.output.open("a") as f:
                 f.write("".join(f"{key}={value}\n" for key, value in result.items()))
         else:
-            verify(args.directory, args.version, args.revision)
-            print("Checksums, metadata and tagged source match; draft only, Windows acceptance pending.")
+            verify(args.directory, args.version, args.revision, args.targets)
+            print("Checksums, metadata and tagged source match; draft only; scope: " + args.targets)
     except (ValueError, KeyError, TypeError, OSError) as exc:
         parser.exit(1, f"CI release validation failed: {exc}\n")
 
