@@ -118,7 +118,16 @@ try {
     if ($matchesFound.Count -ne 1) { throw 'Checksum entry is missing or duplicate.' }
     $staged = Join-Path $workDir 'anchor.exe'
     Get-HttpsFile "$base/$asset" $staged
-    if ((Get-FileHash -LiteralPath $staged -Algorithm SHA256).Hash -ine $matchesFound[0]) {
+    # Use the runtime directly: module discovery can differ between Windows
+    # PowerShell 5.1 and PowerShell 7, especially with an inherited PSModulePath.
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        $inputStream = [IO.File]::OpenRead($staged)
+        try {
+            $actualHash = [BitConverter]::ToString($hasher.ComputeHash($inputStream)).Replace('-', '')
+        } finally { $inputStream.Dispose() }
+    } finally { $hasher.Dispose() }
+    if ($actualHash -ine $matchesFound[0]) {
         throw 'SHA256 mismatch; refusing installation (existing program unchanged).'
     }
     Assert-Destination

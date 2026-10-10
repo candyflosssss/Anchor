@@ -226,7 +226,11 @@ print(f["os"] if sys.argv[1] == "-s" else f["arch"])
         self.assertFalse(self.requests())
 
 
-POWERSHELL = shutil.which("powershell.exe") or shutil.which("pwsh")
+REQUESTED_POWERSHELL = os.environ.get("ANCHOR_INSTALLER_TEST_POWERSHELL")
+POWERSHELL = (shutil.which(REQUESTED_POWERSHELL) if REQUESTED_POWERSHELL
+              else shutil.which("powershell.exe") or shutil.which("pwsh"))
+if REQUESTED_POWERSHELL and not POWERSHELL:
+    raise RuntimeError("Requested installer-test PowerShell executable is unavailable")
 
 
 @unittest.skipUnless(os.name == "nt" and POWERSHELL, "native Windows PowerShell required")
@@ -347,7 +351,8 @@ function New-TestRequest([Uri] $Uri) {
         self.destination.mkdir()
         (self.destination / "anchor.exe").write_bytes(b"old")
         self.fixture["sha"] = "0" * 64
-        self.run_install("-Replace", success=False)
+        result = self.run_install("-Replace", success=False)
+        self.assertIn("SHA256 mismatch", result.stdout + result.stderr)
         self.assertEqual((self.destination / "anchor.exe").read_bytes(), b"old")
 
     def test_missing_duplicate_and_invalid_checksums_fail(self):

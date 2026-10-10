@@ -49,7 +49,7 @@ git push origin v0.1.0-alpha.2
 
 ## 安装器回归门禁
 
-Linux 安装器离线回归纳入现有发行工具测试；另有 `windows-2025` job，用原生 Windows PowerShell 对安装脚本进行语法及模拟下载/校验/落盘回归。草稿 job 同时依赖打包与 Windows 安装器测试成功，未增加公开发布权限或自动发布步骤。测试只用隔离目录和假程序，不请求真实上游，**不等于 Windows 核心运行验收**。本轮尚未执行新托管任务，不能把新增 workflow 配置写成已通过的 CI。
+Linux 安装器离线回归纳入现有发行工具测试；另有 `windows-2025` job，以 `powershell.exe`（Windows PowerShell 5.1）和 `pwsh`（PowerShell 7）矩阵对安装脚本进行原生语法及模拟下载/校验/落盘回归；测试入口通过 `ANCHOR_INSTALLER_TEST_POWERSHELL` 选择运行时，请求的运行时缺失即失败，不静默换用另一个。草稿 job 同时依赖打包与 Windows 安装器测试成功，未增加公开发布权限或自动发布步骤。测试只用隔离目录和假程序，不请求真实上游，**不等于 Windows 核心运行验收**。配置门禁不代表已经通过；具体运行结果以 Actions 和对应任务记录为准。
 
 公开 Release 可配合 [一键安装脚本](install.md)；Actions 内部 artifact 和草稿不是匿名安装源。
 

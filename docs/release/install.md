@@ -35,7 +35,7 @@ sh scripts/install.sh --help
 
 ## Windows PowerShell
 
-支持 Windows PowerShell 5.1 / PowerShell 7，AMD64 系统（可识别 x64 系统上的 32 位 PowerShell）；不需要管理员权限。
+支持 Windows PowerShell 5.1 / PowerShell 7，AMD64 系统（可识别 x64 系统上的 32 位 PowerShell）；不需要管理员权限；SHA-256 使用 .NET 流式计算，不依赖 `Get-FileHash` 模块发现。
 
 ```powershell
 # 推送脚本并公开 Release 后可用；脚本在独立作用域执行：
