@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 var ErrConflict = errors.New("revision or identity conflict")
@@ -15,6 +16,14 @@ var ErrNotFound = errors.New("not found")
 var identifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
 
 func ValidID(s string) bool { return identifier.MatchString(s) }
+
+// Provider IDs are user-facing labels, not filesystem names or model slugs.
+// Keep the ASCII-only ValidID contract for contexts, models and bindings.
+var providerIdentifier = regexp.MustCompile(`^[\p{L}\p{Nd}][\p{L}\p{Nd}._-]{0,127}$`)
+
+func ValidProviderID(s string) bool {
+	return utf8.ValidString(s) && providerIdentifier.MatchString(s)
+}
 
 type Settings struct {
 	InstanceID     string `json:"instance_id"`
@@ -66,8 +75,8 @@ type Provider struct {
 }
 
 func (p Provider) Validate() error {
-	if !ValidID(p.ID) {
-		return errors.New("invalid provider ID")
+	if !ValidProviderID(p.ID) {
+		return errors.New("invalid provider ID: use 1..128 Unicode letters (including Chinese), decimal digits, or ._-; start with a letter or digit")
 	}
 	if err := ValidateURL(p.BaseURL); err != nil {
 		return err
@@ -112,7 +121,7 @@ func (m Model) Validate() error {
 	}
 	seen := map[string]bool{}
 	for _, c := range m.Candidates {
-		if !ValidID(c.ProviderID) || c.Model == "" || len(c.Model) > 256 || strings.ContainsAny(c.Model, "\r\n") {
+		if !ValidProviderID(c.ProviderID) || c.Model == "" || len(c.Model) > 256 || strings.ContainsAny(c.Model, "\r\n") {
 			return errors.New("invalid model candidate")
 		}
 		key := c.ProviderID + "\x00" + c.Model

@@ -79,6 +79,30 @@ func TestCLIManagementWorkflow(t *testing.T) {
 		t.Fatal("provider write leaked secret")
 	}
 	run("", "model", "add", "--id", "public", "--candidate", "p:actual", "--tools", "--streaming")
+	// Chinese IDs must survive CLI parsing, URL encoding, API checks and SQLite.
+	for _, id := range []string{"摸鱼AI", strings.Repeat("鱼", 128)} {
+		out := run("chinese-provider-secret", "provider", "add", "--id", id, "--base-url", "https://example.invalid/v1", "--secret-stdin")
+		var created state.Provider
+		if err := json.Unmarshal([]byte(out), &created); err != nil || created.ID != id || created.Revision != 1 || !created.HasSecret || strings.Contains(out, "chinese-provider-secret") {
+			t.Fatal("Chinese provider add failed or leaked secret", err)
+		}
+		out = run("", "provider", "put", "--id", id, "--base-url", "https://updated.invalid/v1", "--revision", "1")
+		var updated state.Provider
+		if err := json.Unmarshal([]byte(out), &updated); err != nil || updated.ID != id || updated.Revision != 2 || !updated.HasSecret {
+			t.Fatal("Chinese provider update failed", err)
+		}
+		stored, err := s.Provider(id)
+		if err != nil || stored.Secret != "chinese-provider-secret" {
+			t.Fatal("Chinese provider update lost secret", err)
+		}
+	}
+	run("", "model", "add", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:actual", "--tools", "--streaming")
+	run("", "model", "put", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:updated-model", "--revision", "1", "--tools", "--streaming")
+	listed := run("", "provider", "list")
+	if !strings.Contains(listed, "摸鱼AI") || strings.Contains(listed, "chinese-provider-secret") {
+		t.Fatal("Chinese provider list failed or leaked secret")
+	}
+
 	run("", "provider", "list")
 	run("", "model", "list")
 	run("", "context", "test", "local")
@@ -177,5 +201,16 @@ func TestVersionWithoutInitializedInstance(t *testing.T) {
 	var value map[string]string
 	if err := json.Unmarshal(out.Bytes(), &value); err != nil || value["version"] != core.Version || len(value) != 1 {
 		t.Fatal("version output must match the linked build version", out.String(), err)
+	}
+}
+
+func TestHelpDocumentsChineseProviderIDs(t *testing.T) {
+	var out bytes.Buffer
+	a := App{In: strings.NewReader(""), Out: &out, Err: io.Discard}
+	if err := a.Run(context.Background(), []string{"help"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "including Chinese") {
+		t.Fatal("provider ID help missing")
 	}
 }

@@ -112,7 +112,7 @@ func (c *Client) Models(ctx context.Context) ([]state.Model, error) {
 	return v, e
 }
 func (c *Client) PutProvider(ctx context.Context, p state.Provider, revision int64, secret *string) (state.Provider, error) {
-	if !state.ValidID(p.ID) {
+	if !state.ValidProviderID(p.ID) {
 		return state.Provider{}, errors.New("invalid provider ID")
 	}
 	var v state.Provider

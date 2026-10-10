@@ -156,51 +156,56 @@ func TestManagementRevisionIdentityAndRedaction(t *testing.T) {
 	}
 }
 func TestResponsesMappingAndToolResultPassthrough(t *testing.T) {
-	f := setup(t)
-	var calls atomic.Int32
-	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		if r.URL.Path != "/v1/responses" || r.Header.Get("Authorization") != "Bearer provider-secret" {
-			t.Errorf("bad upstream path/auth: %s", r.URL.Path)
-		}
-		if r.Header.Get("X-Anchor-Instance") != "" {
-			t.Error("management metadata leaked")
-		}
-		var in map[string]json.RawMessage
-		if e := json.NewDecoder(r.Body).Decode(&in); e != nil {
-			t.Error(e)
-		}
-		if string(in["model"]) != `"actual-model"` || string(in["store"]) != "false" {
-			t.Error("mapping/storage policy failed")
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if bytes.Contains(in["input"], []byte("function_call_output")) {
-			io.WriteString(w, `{"id":"r2","output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}`)
-		} else {
-			io.WriteString(w, `{"id":"r1","output":[{"type":"function_call","call_id":"call_1","name":"read_file","arguments":"{\"path\":\"test.txt\"}"}]}`)
-		}
-	}))
-	defer up.Close()
-	f.add(t, "p", up.URL+"/v1", "provider-secret")
-	f.model(t, state.Candidate{ProviderID: "p", Model: "actual-model"})
-	first := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hello","tools":[{"type":"function","name":"read_file","parameters":{"type":"object"}}]}`)
-	if first.StatusCode != 200 || !strings.Contains(text(t, first), "call_1") {
-		t.Fatal("tool call failed")
-	}
-	second := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":[{"type":"function_call","call_id":"call_1","name":"read_file","arguments":"{}"},{"type":"function_call_output","call_id":"call_1","output":"file contents"}]}`)
-	if second.StatusCode != 200 || !strings.Contains(text(t, second), "done") || calls.Load() != 2 {
-		t.Fatal("tool result roundtrip failed")
-	}
-	log := f.logs.String()
-	for _, s := range []string{"provider-secret", f.token, "file contents", "hello"} {
-		if strings.Contains(log, s) {
-			t.Fatal("log leaked secret/body")
-		}
-	}
-	if !strings.Contains(log, "actual-model") {
-		t.Fatal("route evidence missing")
+	for _, providerID := range []string{"p", "摸鱼AI"} {
+		t.Run(providerID, func(t *testing.T) {
+			f := setup(t)
+			var calls atomic.Int32
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				if r.URL.Path != "/v1/responses" || r.Header.Get("Authorization") != "Bearer provider-secret" {
+					t.Errorf("bad upstream path/auth: %s", r.URL.Path)
+				}
+				if r.Header.Get("X-Anchor-Instance") != "" {
+					t.Error("management metadata leaked")
+				}
+				var in map[string]json.RawMessage
+				if e := json.NewDecoder(r.Body).Decode(&in); e != nil {
+					t.Error(e)
+				}
+				if string(in["model"]) != `"actual-model"` || string(in["store"]) != "false" {
+					t.Error("mapping/storage policy failed")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if bytes.Contains(in["input"], []byte("function_call_output")) {
+					io.WriteString(w, `{"id":"r2","output":[{"type":"message","content":[{"type":"output_text","text":"done"}]}]}`)
+				} else {
+					io.WriteString(w, `{"id":"r1","output":[{"type":"function_call","call_id":"call_1","name":"read_file","arguments":"{\"path\":\"test.txt\"}"}]}`)
+				}
+			}))
+			defer up.Close()
+			f.add(t, providerID, up.URL+"/v1", "provider-secret")
+			f.model(t, state.Candidate{ProviderID: providerID, Model: "actual-model"})
+			first := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hello","tools":[{"type":"function","name":"read_file","parameters":{"type":"object"}}]}`)
+			if first.StatusCode != 200 || !strings.Contains(text(t, first), "call_1") {
+				t.Fatal("tool call failed")
+			}
+			second := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":[{"type":"function_call","call_id":"call_1","name":"read_file","arguments":"{}"},{"type":"function_call_output","call_id":"call_1","output":"file contents"}]}`)
+			if second.StatusCode != 200 || !strings.Contains(text(t, second), "done") || calls.Load() != 2 {
+				t.Fatal("tool result roundtrip failed")
+			}
+			log := f.logs.String()
+			for _, s := range []string{"provider-secret", f.token, "file contents", "hello"} {
+				if strings.Contains(log, s) {
+					t.Fatal("log leaked secret/body")
+				}
+			}
+			if !strings.Contains(log, "actual-model") {
+				t.Fatal("route evidence missing")
+			}
+		})
 	}
 }
+
 func TestStreamingIsFlushedAndPreserved(t *testing.T) {
 	f := setup(t)
 	release := make(chan struct{})

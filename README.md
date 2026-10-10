@@ -9,7 +9,7 @@
 SQLite 供应商与模型配置、Responses 同协议代理，以及托管层/条件恢复、Codex 基础配置与模型目录、多模型绑定授权。当前版本为 `0.1.0-dev`，
 不等于整体初版已完成；SSH、其他 Agent 适配器、Codex profile和跨协议转换仍待实现。
 
-必须支持 Linux / Windows；Windows 运行验收尚未完成。未来注重桌面端，
+必须支持 Linux / Windows；Windows 公开候选必须通过原生运行门禁。未来注重桌面端，
 不在本阶段开发 Web 或桌面界面。
 
 ## 开发运行
@@ -40,14 +40,14 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux AMD64 `0.1.0-alpha.3` 已公开发布，并实际验证远程一键安装成功；Windows 暂不公开发行**。不从 Actions artifact 或草稿偷偷安装。
+已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux AMD64 `0.1.0-alpha.3` 已公开发布，并实际验证远程一键安装成功；后续双平台候选须通过 Windows 原生门禁，具体公开版本见 Releases**。不从 Actions artifact 或草稿偷偷安装。
 
 **运行只需要一个文件**：Linux 的 `anchor` 或 Windows 的 `anchor.exe`，核心、CLI 和认证 helper 都在其中；不依赖旁边的文档或资源文件。配置/数据库仍独立存放于用户状态目录，首次使用仍需 init 和供应商/模型配置。
 
 已提供 [CLI 发行流程](docs/release/README.md)：输出两个平台各自的单文件可执行程序，并保留含文档/依赖声明的可选归档；进行校验与程序验收。入口为 `scripts/release.sh`，不会自动提交、打标签或上传。
-项目采用 **AGPL-3.0-only**：允许商用，分发及修改版网络服务的源码义务见 [许可说明](docs/license.md) 和 [LICENSE](LICENSE)。公开候选必须来自干净版本提交，并附对应源码（含 vendored 依赖）及声明；Windows 核心真机验收待办不阻塞仅包含已验证 Linux 的发行，不能把打包成功视为公开发行完成。
+项目采用 **AGPL-3.0-only**：允许商用，分发及修改版网络服务的源码义务见 [许可说明](docs/license.md) 和 [LICENSE](LICENSE)。公开候选必须来自干净版本提交，并附对应源码（含 vendored 依赖）及声明；双平台候选必须通过 Windows 原生 ACL/锁、初始化、中文供应商、模拟网关和正常退出检查，不能把打包成功视为公开发行完成。
 
-已配置 [GitHub Actions 自动打包与草稿发行](docs/release/github-actions.md)：手动运行生成内部测试程序，分别提供每个平台仅含一个程序的 artifact（GitHub 下载外层仍为 ZIP）；推送预发行标签后只构建 Linux 公开候选（含对应源码）并创建草稿 Release。配置已纳入项目源码；实际推送和托管运行结果见任务记录，不自动公开发布。
+已配置 [GitHub Actions 自动打包与草稿发行](docs/release/github-actions.md)：手动运行生成内部测试程序，分别提供每个平台仅含一个程序的 artifact（GitHub 下载外层仍为 ZIP）；推送预发行标签后构建两平台公开候选（含对应源码），经 Windows 原生验收与安装器矩阵通过后创建草稿 Release。配置已纳入项目源码；实际推送和托管运行结果见任务记录，不自动公开发布。
 
 ## CLI 指令与维护
 

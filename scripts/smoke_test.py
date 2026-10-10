@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Linux source or packaged-binary smoke test; run through resource_guard.sh run.
+"""Linux/Windows packaged-binary smoke test; run through resource_guard.sh run.
 
 Owns only its TemporaryDirectory, local mock HTTP server and process group.
 Never contacts a real provider or reads the user's existing Anchor/Agent state.
@@ -28,7 +28,7 @@ COMMAND = ["go", "run", "./cmd/anchor"]
 def run(data: Path, *args: str, stdin: str = "") -> object:
     result = subprocess.run(
         [*COMMAND, "--data-dir", str(data), *args],
-        cwd=ROOT, input=stdin, text=True, capture_output=True, timeout=60,
+        cwd=ROOT, input=stdin, text=True, encoding="utf-8", capture_output=True, timeout=60,
     )
     if result.returncode:
         raise RuntimeError(f"CLI command failed: {args[0]} (diagnostics retained only in task memory)")
@@ -66,13 +66,15 @@ class MockProvider(BaseHTTPRequestHandler):
 def main() -> None:
     global COMMAND
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, help="test an extracted Linux executable instead of go run")
+    parser.add_argument("--binary", type=Path, help="test an extracted native executable instead of go run")
     parser.add_argument("--expected-version", default="0.1.0-dev")
     args = parser.parse_args()
     if args.binary:
         COMMAND = [str(args.binary.resolve(strict=True))]
-    if os.name != "posix" or not Path("/proc").is_dir():
-        raise RuntimeError("this native process/signal smoke test requires Linux")
+    if os.name == "nt" and not args.binary:
+        raise RuntimeError("Windows acceptance requires the actual packaged executable")
+    if os.name != "nt" and not Path("/proc").is_dir():
+        raise RuntimeError("this smoke test requires Linux or Windows")
     os.environ.setdefault("GOMAXPROCS", "2")
     os.environ["GOFLAGS"] = os.environ.get("GOFLAGS", "") + " -p=1"
     with tempfile.TemporaryDirectory(prefix="anchor-smoke-") as temp:
@@ -82,6 +84,19 @@ def main() -> None:
         initialized = run(data, "init", "--control-address", control, "--gateway-address", gateway)
         assert initialized == run(data, "init")  # Stable identity and settings.
         owner = (data / "owner.token").read_text().strip()
+        if os.name == "nt":
+            # Inspect only our isolated state, never the user's real configuration.
+            acl = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command",
+                "$ErrorActionPreference='Stop'; $sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User; "
+                "foreach($p in @($env:ANCHOR_SMOKE_STATE, (Join-Path $env:ANCHOR_SMOKE_STATE 'owner.token'), "
+                "(Join-Path $env:ANCHOR_SMOKE_STATE 'state.db'))) { "
+                "$a=Get-Acl -LiteralPath $p; if(-not $a.AreAccessRulesProtected){throw 'unprotected ACL'}; "
+                "$rules=$a.GetAccessRules($true,$true,[System.Security.Principal.SecurityIdentifier]); "
+                "if($rules.Count -lt 1){throw 'missing ACL'}; foreach($r in $rules){ "
+                "if($r.IdentityReference -ne $sid -or $r.AccessControlType -ne 'Allow'){throw 'unexpected ACL'}}}"],
+                env={**os.environ, "ANCHOR_SMOKE_STATE": str(data)}, capture_output=True, timeout=30)
+            if acl.returncode:
+                raise RuntimeError("isolated Windows state ACL verification failed")
         service = None
         mock = None
         worker = None
@@ -89,7 +104,9 @@ def main() -> None:
             service = subprocess.Popen(
                 [*COMMAND, "--data-dir", str(data), "serve"],
                 cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                text=True, start_new_session=True,
+                text=True, encoding="utf-8",
+                **({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+                   else {"start_new_session": True}),
             )
             mock = HTTPServer(("127.0.0.1", 0), MockProvider)
             worker = threading.Thread(target=mock.serve_forever)
@@ -107,13 +124,16 @@ def main() -> None:
                     if time.monotonic() > until:
                         raise RuntimeError("readiness deadline exceeded")
                     time.sleep(0.05)
+            duplicate = subprocess.run([*COMMAND, "--data-dir", str(data), "serve"],
+                                       capture_output=True, timeout=10)
+            assert duplicate.returncode != 0 and b"instance already in use" in duplicate.stderr
             run(data, "context", "add", "local", "--local")
             run(data, "context", "use", "local")
             assert run(data, "status")["core"] == "ready"
-            saved = run(data, "provider", "add", "--id", "mock", "--base-url",
+            saved = run(data, "provider", "add", "--id", "摸鱼AI", "--base-url",
                         f"http://127.0.0.1:{mock.server_port}/v1", "--secret-stdin", stdin="smoke-provider-key")
             assert saved["has_secret"] and "smoke-provider-key" not in json.dumps(saved)
-            run(data, "model", "add", "--id", "public-smoke", "--candidate", "mock:upstream-smoke")
+            run(data, "model", "add", "--id", "public-smoke", "--candidate", "摸鱼AI:upstream-smoke")
             grant = run(data, "access", "grant", "--label", "smoke", "--scope", "gateway", "--show-once")
             request = Request(f"http://{gateway}/v1/responses", method="POST",
                               data=json.dumps({"model": "public-smoke", "input": "test"}).encode(),
@@ -134,15 +154,18 @@ def main() -> None:
                 applications = [pid for pid in children if Path(f"/proc/{pid}/exe").resolve().name == "anchor"]
                 assert len(applications) == 1, "expected one owned go-run application child"
                 application = applications[0]
-            os.kill(application, signal.SIGTERM)
+            if os.name == "nt":
+                service.send_signal(signal.CTRL_BREAK_EVENT)
+            else:
+                os.kill(application, signal.SIGTERM)
             stdout, stderr = service.communicate(timeout=15)
             assert service.returncode == 0 and stdout == "" and '"msg":"core stopped"' in stderr
             assert "smoke-provider-key" not in stderr and grant["token"] not in stderr
+            assert run(data, "init") == initialized  # Reopen persisted state after graceful shutdown.
             for address in (control, gateway):
                 host, port = address.rsplit(":", 1)
                 with socket.socket() as sock:
-                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-                    sock.bind((host, int(port)))  # Both owned listeners were released.
+                    assert sock.connect_ex((host, int(port))) != 0  # Both owned listeners were released.
         finally:
             if mock is not None:
                 if worker is not None and worker.is_alive():
@@ -150,13 +173,21 @@ def main() -> None:
                     worker.join(timeout=5)
                 mock.server_close()
             if service is not None and service.poll() is None:
-                os.killpg(service.pid, signal.SIGTERM)
+                if os.name == "nt":
+                    service.terminate()
+                else:
+                    os.killpg(service.pid, signal.SIGTERM)
                 try:
                     service.communicate(timeout=15)
                 except subprocess.TimeoutExpired:
-                    os.killpg(service.pid, signal.SIGKILL)
+                    if os.name == "nt":
+                        service.kill()
+                    else:
+                        os.killpg(service.pid, signal.SIGKILL)
                     service.communicate(timeout=5)
-        print(json.dumps({"native_cli_smoke": "passed", "mock_gateway": "passed", "sigterm_shutdown": "passed"}))
+        print(json.dumps({"native_cli_smoke": "passed", "mock_gateway": "passed", "graceful_shutdown": "passed", "instance_lock": "passed",
+                          "unicode_provider": "passed", "state_reopen": "passed",
+                          "windows_acl": "passed" if os.name == "nt" else "not_applicable"}))
 
 
 if __name__ == "__main__":

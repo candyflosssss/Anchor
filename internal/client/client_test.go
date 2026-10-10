@@ -41,33 +41,38 @@ func connection(t *testing.T) (*Client, *state.Store, state.Context, string) {
 	return cl, s, c, token
 }
 func TestTypedManagementClient(t *testing.T) {
-	c, _, _, _ := connection(t)
-	ctx := context.Background()
-	if status, e := c.Status(ctx); e != nil || status["core"] != "ready" {
-		t.Fatal(status, e)
-	}
-	key := "secret"
-	p := state.Provider{ID: "p", BaseURL: "https://example.invalid/v1", Protocol: "responses", Enabled: true, TimeoutSeconds: 10, MaxConcurrent: 2}
-	saved, e := c.PutProvider(ctx, p, 0, &key)
-	if e != nil || saved.Revision != 1 || saved.Secret != "" {
-		t.Fatal(saved, e)
-	}
-	if _, e = c.PutProvider(ctx, p, 0, nil); e == nil {
-		t.Fatal("duplicate create was retried/accepted")
-	}
-	list, e := c.Providers(ctx)
-	if e != nil || len(list) != 1 || !list[0].HasSecret {
-		t.Fatal(list, e)
-	}
-	m := state.Model{ID: "public", Candidates: []state.Candidate{{ProviderID: "p", Model: "actual"}}}
-	if _, e = c.PutModel(ctx, m, 0); e != nil {
-		t.Fatal(e)
-	}
-	models, e := c.Models(ctx)
-	if e != nil || len(models) != 1 {
-		t.Fatal(models, e)
+	for _, providerID := range []string{"p", "摸鱼AI"} {
+		t.Run(providerID, func(t *testing.T) {
+			c, _, _, _ := connection(t)
+			ctx := context.Background()
+			if status, e := c.Status(ctx); e != nil || status["core"] != "ready" {
+				t.Fatal(status, e)
+			}
+			key := "secret"
+			p := state.Provider{ID: providerID, BaseURL: "https://example.invalid/v1", Protocol: "responses", Enabled: true, TimeoutSeconds: 10, MaxConcurrent: 2}
+			saved, e := c.PutProvider(ctx, p, 0, &key)
+			if e != nil || saved.Revision != 1 || saved.Secret != "" {
+				t.Fatal(saved, e)
+			}
+			if _, e = c.PutProvider(ctx, p, 0, nil); e == nil {
+				t.Fatal("duplicate create was retried/accepted")
+			}
+			list, e := c.Providers(ctx)
+			if e != nil || len(list) != 1 || !list[0].HasSecret {
+				t.Fatal(list, e)
+			}
+			m := state.Model{ID: "public", Candidates: []state.Candidate{{ProviderID: providerID, Model: "actual"}}}
+			if _, e = c.PutModel(ctx, m, 0); e != nil {
+				t.Fatal(e)
+			}
+			models, e := c.Models(ctx)
+			if e != nil || len(models) != 1 {
+				t.Fatal(models, e)
+			}
+		})
 	}
 }
+
 func TestIdentityMismatchRejected(t *testing.T) {
 	_, _, c, token := connection(t)
 	c.InstanceID = "wrong"

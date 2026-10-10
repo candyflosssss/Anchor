@@ -1,13 +1,14 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-10
+- 最近核对：2026-10-11
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
+- 中文供应商 ID 适用于本次开发修订及 `0.1.0-alpha.5` 候选（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
 
-下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。当前尚无公开 Release，远程安装入口未上线。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
+下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。公开 Release 是安装源；实际公开版本及平台附件见发行页。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
 
 ```text
 anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
@@ -23,7 +24,8 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 
 - 正常操作 stdout 为一个 JSON 值，`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
-- ID 和 Context 名称为 1..128 个字符，首字符为字母/数字，其余为字母/数字、`.`、`_`、`-`。
+- 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
+- 其他 ID 和 Context 名称仍为 1..128 个 ASCII 字符，首字符为英文字母/数字，其余为英文字母/数字、`.`、`_`、`-`；Agent ID 另有 64 字符限制。
 - 管理写请求不自动重试。断线后结果可能未知，先查询并核对 revision，不盲目重复写入。
 - 密钥只从 stdin 输入；不要把真实密钥放进命令参数、历史或文档。供应商秘密目前依赖文件权限/ACL，**不是静态加密**。
 
@@ -142,7 +144,7 @@ anchor provider put --id ID --base-url URL --revision N [OPTIONS]
 
 | 参数（add/put） | 必填 / 默认 | 约束 |
 | --- | --- | --- |
-| `--id` | 必填 | 供应商 ID |
+| `--id` | 必填 | 供应商 ID，支持中文，例如 `摸鱼AI`；1..128 个 Unicode 码点，完整规则见公共约定 |
 | `--base-url` | 必填 | API 根地址，可含 `/v1` 前缀，不含 `/responses`；HTTPS，仅数值回环测试地址允许 HTTP；禁止 userinfo/query/fragment |
 | `--protocol` | `responses` | 当前只接受 `responses` |
 | `--timeout` | `120` | 单候选总超时，秒，1..3600；仍受上游响应头 30 秒等待上限限制 |
@@ -160,6 +162,16 @@ printf '%s' "$PROVIDER_KEY" | anchor provider add \
   --id primary --base-url https://api.example.com/v1 --secret-stdin
 ```
 
+中文供应商示例（`PROVIDER_KEY` 须先安全读取；URL 仍为占位值，需替换）：
+
+```bash
+printf '%s' "$PROVIDER_KEY" | anchor provider add \
+  --id '摸鱼AI' --base-url https://api.example.com/v1 --secret-stdin
+anchor model add --id public-model --candidate '摸鱼AI:upstream-model'
+```
+
+中文 ID 可用于 `provider add/put/list` 以及 `model add/put --candidate` 的供应商部分。命令仍要求显式参数，不会进入交互式向导。已有 ASCII ID、JSON 字段、SQLite schema、revision 与密钥输入方式不变；无需重新初始化，但只替换 CLI、不重启旧核心仍不能创建中文供应商。公开模型 ID、Context 和 Agent ID 没有一并放开中文。
+
 没有供应商删除命令；可用完整 `put ... --disabled` 暂停路由，但这不会删除存储的秘密。
 
 ## 6. 公开模型与候选路由
@@ -175,7 +187,7 @@ anchor model put --id ID --candidate PROVIDER:MODEL --revision N [OPTIONS]
 | 参数（add/put） | 必填 / 默认 | 约束 |
 | --- | --- | --- |
 | `--id` | 必填 | 对外公开模型 ID |
-| `--candidate` | 必填，可重复 | 1..16 个有序候选；格式 `供应商ID:上游模型ID`，按第一个冒号分隔；供应商须已配置，重复候选拒绝 |
+| `--candidate` | 必填，可重复 | 1..16 个有序候选；格式 `供应商ID:上游模型ID`，按第一个冒号分隔；供应商须已配置，供应商 ID 支持中文，重复候选拒绝 |
 | `--display-name` | 空字符串 | 最多 256 字节 |
 | `--tools` | `false` | 声明函数工具能力，不等于上游验证通过 |
 | `--streaming` | `false` | 声明 SSE 能力，不等于上游验证通过 |

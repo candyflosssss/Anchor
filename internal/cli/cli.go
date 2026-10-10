@@ -46,6 +46,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   recover [--id ID]                   Conditional recovery with core stopped
   version
 All normal output except agent token is JSON; diagnostics and service logs go to stderr.
+Provider IDs accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
 init/serve/access/context/recover/agent token operate locally. Business commands use the selected context.
 Codex base-config/model-catalog management is available; actual Agent connection remains unverified.
@@ -382,7 +383,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 		return errors.New("unknown provider command")
 	}
 	f := a.flags("provider " + args[0])
-	id := f.String("id", "", "provider ID")
+	id := f.String("id", "", "provider ID: 1..128 Unicode letters (including Chinese), digits, or ._-; start with a letter or digit")
 	base := f.String("base-url", "", "API base including optional /v1, not /responses")
 	protocol := f.String("protocol", "responses", "upstream protocol")
 	timeout := f.Int("timeout", 120, "total request timeout in seconds")

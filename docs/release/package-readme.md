@@ -9,7 +9,7 @@
 
 ## 安装与使用
 
-公开 Release 提供程序和 SHA256SUMS 后，可使用 [一键安装脚本](install.md)；首个公开版本 `0.1.0-alpha.3` 仅 Linux AMD64；Windows 暂仅内部交叉编译。Actions 内部包仍按下面的手动方式使用。脚本不改 Agent/状态配置、不自动启动或初始化；已有程序须显式允许替换。
+公开 Release 提供程序和 SHA256SUMS 后，可使用 [一键安装脚本](install.md)；首个公开版本 `0.1.0-alpha.3` 仅 Linux AMD64；后续两平台公开候选须经 Windows 原生门禁。Actions 内部包仍按下面的手动方式使用。脚本不改 Agent/状态配置、不自动启动或初始化；已有程序须显式允许替换。
 
 1. 优先下载对应系统/架构的单文件程序（Linux 无扩展名，Windows `.exe`）；也可以从完整归档取出其中的程序。Actions 浏览器下载的单文件 artifact 外层仍是一层 ZIP，解开即为程序。用发行页的 SHA256SUMS 检查完整性。校验值应来自可信渠道，SHA-256 文件本身不是数字签名。
 2. 可将文件放到固定目录并命名为 `anchor` / `anchor.exe`。Linux 下载后先 `chmod +x anchor`，在程序目录执行 `./anchor version`；Windows PowerShell 执行 `.\anchor.exe version`。不需要 Go 开发环境，也不需要自行安装 SQLite 驱动。
@@ -43,4 +43,4 @@
 - 回退前先停新进程，保留失败现场，恢复匹配版本的程序和完整状态备份；不覆盖升级后产生的有效新数据而不确认损失。
 - 卸载时停止服务并删除程序目录即可；用户状态保留。只有用户明确决定清除密钥/配置时才删除状态目录。
 
-已支持明确批准的 Codex 基础配置接管、模型目录、多模型授权与条件恢复；不代表任意 Agent 已兼容。尚不支持内建 SSH Connector、跨协议转换或桌面 UI，Windows 原生验收仍待完成。不要将隔离模拟上游的验证冒充真实付费供应商验收。
+已支持明确批准的 Codex 基础配置接管、模型目录、多模型授权与条件恢复；不代表任意 Agent 已兼容。尚不支持内建 SSH Connector、跨协议转换或桌面 UI，Windows 验收范围以本版本 release.json 为准。不要将隔离模拟上游的验证冒充真实付费供应商验收。

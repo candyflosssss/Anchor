@@ -7,7 +7,7 @@
 
 ## 一键安装
 
-提供 [Linux / Windows 安装脚本](install.md)，自动下载并校验公开 Release 的单文件，默认用户级安装，可固定版本/显式替换，不改 Agent 或状态配置。Linux Alpha `0.1.0-alpha.3` 已正式公开，原始远程一键安装已实际验证成功；Windows 暂不公开发行，这不等于桌面安装器、自启动或自动升级。
+提供 [Linux / Windows 安装脚本](install.md)，自动下载并校验公开 Release 的单文件，默认用户级安装，可固定版本/显式替换，不改 Agent 或状态配置。Linux Alpha `0.1.0-alpha.3` 已正式公开，原始远程一键安装已实际验证成功；后续两平台公开候选必须通过 Windows 原生门禁，这不等于桌面安装器、自启动或自动升级。
 
 ## 只用一个程序
 
@@ -25,11 +25,11 @@
 
 公开发行候选应来自已提交、可定位的代码和锁定的 go.mod/go.sum；选择明确的项目发行许可后才允许作为公开发行。脚本不会替项目拥有者选择 LICENSE。
 
-项目已采用 [AGPL-3.0-only](../license.md)。Linux-only 公开候选不使用 `--internal`，并附对应源码和声明；内部评估仍使用 `--internal`；仅当本地工作树确有未提交改动时再加 `--allow-dirty`。其 Git revision 不是这批未提交代码的完整标识；release.json 同时记录实际构建输入摘要。
+项目已采用 [AGPL-3.0-only](../license.md)。公开候选不使用 `--internal`，并附对应源码和声明；内部评估仍使用 `--internal`；仅当本地工作树确有未提交改动时再加 `--allow-dirty`。其 Git revision 不是这批未提交代码的完整标识；release.json 同时记录实际构建输入摘要。
 
 ## 2. 开发者怎么执行
 
-需要 Python 3.12+、满足 go.mod 的 Go 工具链、Git，以及 Go race 测试所需的 C 编译器。当前发行机限定 Linux amd64；Windows 是交叉构建目标，不代表已通过 Windows 验收。
+需要 Python 3.12+、满足 go.mod 的 Go 工具链、Git，以及 Go race 测试所需的 C 编译器。当前发行机限定 Linux amd64；本地 Windows 仅交叉构建；Actions 另在 Windows Server 2025 验收实际 EXE 和 ZIP，通过后才允许创建双平台草稿。
 
 从仓库根目录执行：
 
@@ -67,7 +67,7 @@
 3. 清除环境交叉编译/任意构建标志，禁用外部 Go workspace 和自动切换工具链。
 4. 按目标串行编译：CGO_ENABLED=0、trimpath、禁用自动 VCS 嵌入，通过 ldflags 注入本次版本。
 5. 将构建出的程序原样复制为版本目录下的单文件产物，校验复制哈希并执行 Linux 单文件烟测；Windows 明确标为交叉编译。另为可选归档仅拷贝白名单文件：可执行文件、随包说明、指令大全、构建信息、项目许可/内部提示及依赖模块根目录许可/声明。**不遍历打包工作树，不拷贝用户状态或秘密。**依赖声明的收集不是法律完整性审查。
-6. 另生成可选 Linux tar.gz / Windows zip；解压本机 Linux 的最终归档后，用真正的包内程序跑隔离状态/模拟上游/停服烟测，并核对注入版本。Windows 标为交叉编译完成、真机验收待办。
+6. 另生成可选 Linux tar.gz / Windows zip；解压本机 Linux 的最终归档后，用真正的包内程序跑隔离状态/模拟上游/停服烟测，并核对注入版本。本地 Windows 标为交叉编译完成、原生验收待办；Actions 的后续 Windows job 完成准确产物验收后才可晋升，见 GitHub Actions 文档。
 7. 非内部构建另外导出本次 revision 的已提交源码，拒绝链接/特殊文件，运行 `go mod vendor` 收集对应依赖源码，生成 `PUBLIC-BUILD.md` 和源码归档；输出独立 LICENSE 和 THIRD_PARTY_NOTICES.txt。再检查构建输入摘要未变化，生成 release.json、更新说明和 SHA256SUMS，以版本目录保留产物。
 
 成功输出 `status: packaged` 表示本地打包成功，**不表示已上传或具备公开发行条件**。release.json 的 `public_publish_ready` 和 `publish_blockers` 明确记录检查边界；它们也不是许可、人工验收或发布授权的替代品。
@@ -113,4 +113,4 @@ Linux 在产物目录运行 `sha256sum -c SHA256SUMS`。Windows 可用 PowerShel
 
 本次任务的构建验证与产物位置以对应 docs/updates release 记录为准。已在同一脚本基础上添加 GitHub Actions 配置；托管执行结果见任务记录；项目许可已落实；仅 Linux 的候选不再携带 Windows 未验收阻塞，草稿仍须审核后公开。
 
-公开 Linux-only 构建还生成 `anchor_<版本>_source.tar.gz`、`LICENSE` 和 `THIRD_PARTY_NOTICES.txt`，全部纳入 SHA256SUMS。安装器只安装一个可执行文件；再分发时仍须履行许可义务。
+公开构建还生成 `anchor_<版本>_source.tar.gz`、`LICENSE` 和 `THIRD_PARTY_NOTICES.txt`，全部纳入 SHA256SUMS。安装器只安装一个可执行文件；再分发时仍须履行许可义务。

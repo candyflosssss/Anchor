@@ -70,7 +70,7 @@ jobs:
             printf -- '- Linux: standalone and archived executable smoke passed.\n'
             printf -- '- Quick download: choose the platform-specific single-file artifact.\n'
             if [[ "$DRAFT" == true ]]; then
-              printf -- '- Public candidate scope: Linux AMD64 only; AGPL-3.0-only; vendored corresponding source included.\n'
+              printf -- '- Public candidate scope: Linux/Windows AMD64; Windows native acceptance runs in the next job; AGPL-3.0-only; vendored corresponding source included.\n'
             else
               printf -- '- Windows: cross-compile only; native acceptance pending.\n'
             fi
@@ -85,7 +85,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Upload single Windows core
-        if: success() && steps.plan.outputs.internal == 'true'
+        if: success()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: anchor-windows-amd64-${{ steps.plan.outputs.version }}
@@ -120,8 +120,36 @@ jobs:
       - name: Test installer with isolated state and offline downloads
         run: python -m unittest discover -s scripts -p "test_release_installer.py" -v
 
+  native-windows:
+    needs: build
+    if: needs.build.outputs.draft == 'true'
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: anchor-${{ github.run_id }}-${{ github.run_attempt }}
+          path: dist
+      - name: Native acceptance of the exact standalone and ZIP executables
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          PYTHONUTF8: '1'
+        run: python scripts/windows_acceptance.py --directory "dist/$env:VERSION" --version "$env:VERSION" --revision "$env:GITHUB_SHA" --output windows-native.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: windows-native.json
+          if-no-files-found: error
+          retention-days: 14
+
   draft:
-    needs: [build, installer-windows]
+    needs: [build, installer-windows, native-windows]
     if: needs.build.outputs.draft == 'true' && github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -138,12 +166,20 @@ jobs:
         with:
           name: anchor-${{ github.run_id }}-${{ github.run_attempt }}
           path: dist
-      - name: Verify bundle against tag and source
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-native-${{ github.run_id }}-${{ github.run_attempt }}
+          path: native-evidence
+      - name: Complete native acceptance gate and verify bundle against tag and source
         env:
           VERSION: ${{ needs.build.outputs.version }}
         run: |
+          python3 scripts/ci_release.py finalize-windows --directory "dist/$VERSION" \
+            --version "$VERSION" --revision "$GITHUB_SHA" \
+            --evidence native-evidence/windows-native.json \
+            --run-id "$GITHUB_RUN_ID" --run-attempt "$GITHUB_RUN_ATTEMPT"
           python3 scripts/ci_release.py verify --directory "dist/$VERSION" \
-            --version "$VERSION" --revision "$GITHUB_SHA" --targets linux-amd64
+            --version "$VERSION" --revision "$GITHUB_SHA"
       - name: Create draft prerelease without replacing existing assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -154,9 +190,10 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             "$dir/anchor_${VERSION}_linux_amd64" \
             "$dir/anchor_${VERSION}_linux_amd64.tar.gz" \
+            "$dir/anchor_${VERSION}_windows_amd64.exe" "$dir/anchor_${VERSION}_windows_amd64.zip" \
             "$dir/anchor_${VERSION}_source.tar.gz" "$dir/LICENSE" "$dir/THIRD_PARTY_NOTICES.txt" \
             "$dir/release.json" "$dir/RELEASE_NOTES.md" "$dir/SHA256SUMS" \
             --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --latest=false \
             --title "Anchor $VERSION" --notes-file "$dir/RELEASE_NOTES.md"
-          printf 'Draft created for `%s`. Linux-only candidate; review sources, license and publication gates before publishing.\n' \
+          printf 'Draft created for `%s`. Linux/Windows native-verified candidate; review sources, license and publication gates before publishing.\n' \
             "$GITHUB_REF_NAME" >> "$GITHUB_STEP_SUMMARY"
