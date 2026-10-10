@@ -127,3 +127,39 @@ func (c *Client) PutModel(ctx context.Context, m state.Model, revision int64) (s
 	e := c.call(ctx, "PUT", "/control/v1/models/"+m.ID, map[string]any{"model": m, "expected_revision": revision}, &v)
 	return v, e
 }
+
+func (c *Client) Agents(ctx context.Context) ([]state.Binding, error) {
+	var v []state.Binding
+	e := c.call(ctx, "GET", "/control/v1/agents", nil, &v)
+	return v, e
+}
+func (c *Client) AddAgent(ctx context.Context, b state.Binding) (state.Binding, error) {
+	var v state.Binding
+	e := c.call(ctx, "POST", "/control/v1/agents", map[string]any{"binding": b, "approved": true}, &v)
+	return v, e
+}
+func (c *Client) AgentQuery(ctx context.Context, id, action string) (map[string]any, error) {
+	if !state.ValidID(id) || (action != "inspect" && action != "plan") {
+		return nil, errors.New("invalid agent query")
+	}
+	var v map[string]any
+	e := c.call(ctx, "GET", "/control/v1/agents/"+id+"/"+action, nil, &v)
+	return v, e
+}
+func (c *Client) AgentAction(ctx context.Context, id, action string, revision int64, fp string) (map[string]any, error) {
+	if !state.ValidID(id) || (action != "apply" && action != "restore" && action != "enable" && action != "disable") {
+		return nil, errors.New("invalid agent action")
+	}
+	var v map[string]any
+	e := c.call(ctx, "POST", "/control/v1/agents/"+id+"/"+action, map[string]any{"expected_revision": revision, "fingerprint": fp}, &v)
+	return v, e
+}
+
+func (c *Client) SetAgentModels(ctx context.Context, id string, revision int64, model, scope string) (map[string]any, error) {
+	if !state.ValidID(id) || !state.ValidID(model) || revision < 1 || (scope != "single" && scope != "all-compatible") {
+		return nil, errors.New("invalid binding model policy")
+	}
+	var v map[string]any
+	err := c.call(ctx, "POST", "/control/v1/agents/"+id+"/set-models", map[string]any{"expected_revision": revision, "model": model, "model_scope": scope}, &v)
+	return v, err
+}

@@ -6,8 +6,8 @@
 ## 当前阶段
 
 已开始实现首个开发里程碑：Go 无头核心与 CLI、本机 Context、独立管理 / 网关鉴权、
-SQLite 供应商与模型配置，以及 Responses 同协议代理。当前版本为 `0.1.0-dev`，
-不等于整体初版已完成；SSH、Agent 托管 / 恢复和跨协议转换仍待实现。
+SQLite 供应商与模型配置、Responses 同协议代理，以及托管层/条件恢复、Codex 基础配置与模型目录、多模型绑定授权。当前版本为 `0.1.0-dev`，
+不等于整体初版已完成；SSH、其他 Agent 适配器、Codex profile和跨协议转换仍待实现。
 
 必须支持 Linux / Windows；Windows 运行验收尚未完成。未来注重桌面端，
 不在本阶段开发 Web 或桌面界面。
@@ -30,6 +30,10 @@ SQLite 供应商与模型配置，以及 Responses 同协议代理。当前版�
 ```
 
 服务前台运行，不由管理命令退出触发停服；关闭 serve 终端可能停止服务。
+Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后先审核计划再接管。操作契约见 [最新 CLI 指令大全](docs/cli/commands.md#8-agent-托管与独立恢复)。新功能仍未打包发布，旧测试包不包含它。
+
+桌面端通过 SSH 使用远端 Codex 的主路径：在远端批准 CODEX_HOME 基础配置 → Anchor provider + 默认模型 + 版本匹配模型目录 → 用户手动选择其他授权模型 → Anchor 路由实际供应商。新 CLI 绑定默认 `all-compatible`，旧绑定保留单模型权限；无需额外 profile。目录元数据需操作者显式导入并核对真实上游能力，修改目录后重启远端 app-server。Anchor 自己的 SSH Connector 和桌面 UI 验收不在本轮范围。
+
 完整配置命令、实际 API、安全限制和未实现能力见
 [首个实施里程碑](docs/design/implementation.md)。
 凭据当前依赖用户文件权限 / Windows ACL，**不是静态加密**。

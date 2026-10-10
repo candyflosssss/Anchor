@@ -1,0 +1,17 @@
+{
+  "models": [{
+    "slug": "fixture-source", "display_name": "Synthetic test-only model",
+    "description": "Offline test fixture; never use as production model metadata.",
+    "shell_type": "shell_command", "visibility": "list", "priority": 1,
+    "supported_in_api": true, "support_verbosity": false,
+    "supports_parallel_tool_calls": true,
+    "supported_reasoning_levels": [{"effort": "medium", "description": "Fixture"}],
+    "default_reasoning_level": "medium", "experimental_supported_tools": [],
+    "truncation_policy": {"mode": "tokens", "limit": 10000},
+    "context_window": 32000,
+    "base_instructions": "Test fixture only. Respond using the local mock endpoint.",
+    "upgrade": {"model": "unconfigured-upgrade"},
+    "prefer_websockets": true, "use_responses_lite": true,
+    "apply_patch_tool_type": "freeform", "input_modalities": ["text"]
+  }]
+}

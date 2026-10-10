@@ -89,15 +89,21 @@ type Candidate struct {
 	Model      string `json:"model"`
 }
 type Model struct {
-	ID          string      `json:"id"`
-	DisplayName string      `json:"display_name"`
-	Tools       bool        `json:"tools"`
-	Streaming   bool        `json:"streaming"`
-	Candidates  []Candidate `json:"candidates"` // Ordered, explicit priority.
-	Revision    int64       `json:"revision"`
+	ID          string         `json:"id"`
+	DisplayName string         `json:"display_name"`
+	Tools       bool           `json:"tools"`
+	Streaming   bool           `json:"streaming"`
+	Candidates  []Candidate    `json:"candidates"` // Ordered, explicit priority.
+	Revision    int64          `json:"revision"`
+	Codex       *CodexMetadata `json:"codex,omitempty"`
 }
 
 func (m Model) Validate() error {
+	if m.Codex != nil {
+		if err := m.Codex.Validate(); err != nil {
+			return err
+		}
+	}
 	if !ValidID(m.ID) || len(m.DisplayName) > 256 {
 		return errors.New("invalid model ID or display name")
 	}

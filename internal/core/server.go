@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -27,6 +28,7 @@ var Version = "0.1.0-dev"
 const MaxRequestBytes = 8 << 20
 
 type Server struct {
+	Agents   *managed.Manager
 	Store    *state.Store
 	Log      *slog.Logger
 	upstream *http.Client
@@ -43,7 +45,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	tr.MaxConnsPerHost = 64
 	tr.MaxIdleConns = 32
 	tr.ResponseHeaderTimeout = 30 * time.Second
-	return &Server{Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, active: map[string]int{}, slots: make(chan struct{}, 16)}
+	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, active: map[string]int{}, slots: make(chan struct{}, 16)}
 }
 func (s *Server) Close() { s.upstream.CloseIdleConnections() }
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -94,7 +96,14 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 			return
 		}
 		auth := r.Header.Get("Authorization")
-		if !strings.HasPrefix(auth, "Bearer ") || !s.Store.Authenticate(strings.TrimPrefix(auth, "Bearer "), scope) {
+		valid := strings.HasPrefix(auth, "Bearer ") && s.Store.Authenticate(strings.TrimPrefix(auth, "Bearer "), scope)
+		if !valid && scope == "gateway" && strings.HasPrefix(auth, "Bearer ") {
+			if b, err := s.Store.BindingForToken(strings.TrimPrefix(auth, "Bearer ")); err == nil {
+				valid = true
+				r = r.WithContext(context.WithValue(r.Context(), bindingKey{}, b))
+			}
+		}
+		if !valid {
 			fail(w, 401, "unauthorized", "valid bearer credential required")
 			return
 		}
@@ -113,10 +122,21 @@ func (s *Server) Control() http.Handler {
 		if u, err := user.Current(); err == nil {
 			username = u.Username
 		}
-		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"responses_passthrough", "local_context", "provider_model_revision"}})
+		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth"}})
 	})
 	mux.HandleFunc("GET /control/v1/status", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]any{"core": "ready", "gateway": "ready", "upstream_health": "not_probed", "agent_management": "not_implemented"})
+		agents, err := s.Agents.Status()
+		if err != nil {
+			apiError(w, err)
+			return
+		}
+		health := "ready"
+		for _, a := range agents {
+			if a.Status != "applied" && a.Status != "restored" && a.Status != "unmanaged" {
+				health = "partial"
+			}
+		}
+		writeJSON(w, 200, map[string]any{"core": "ready", "gateway": "ready", "upstream_health": "not_probed", "agent_management": health, "bindings": agents, "agent_connection_verification": "unknown"})
 	})
 	mux.HandleFunc("GET /control/v1/providers", func(w http.ResponseWriter, r *http.Request) {
 		p, err := s.Store.Providers()
@@ -205,6 +225,7 @@ func (s *Server) Control() http.Handler {
 		}
 		writeJSON(w, 200, m)
 	})
+	s.agentRoutes(mux)
 	return s.guard("manage", mux)
 }
 func (s *Server) identity(w http.ResponseWriter, r *http.Request) bool {
@@ -230,7 +251,7 @@ func listenerServer(address string, h http.Handler, ctx context.Context) (*http.
 	return &http.Server{Handler: h, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10, BaseContext: func(net.Listener) context.Context { return ctx }}, ln, nil
 }
 
-// Run binds both listeners before publishing ready; no Agent configuration is touched.
+// Run binds both listeners before any approved configuration is applied.
 func (s *Server) Run(ctx context.Context) error {
 	lock, err := platform.AcquireLock(filepath.Join(s.Store.Dir, "instance.lock"))
 	if err != nil {
@@ -259,11 +280,25 @@ func (s *Server) Run(ctx context.Context) error {
 	errs := make(chan error, 2)
 	go func() { errs <- control.Serve(cl) }()
 	go func() { errs <- gateway.Serve(gl) }()
+	managedResults, managedErr := s.Agents.Start()
+	if managedErr != nil {
+		s.Log.Warn("agent startup reconciliation unavailable")
+	}
+	for _, result := range managedResults {
+		s.Log.Info("binding startup", "binding_id", result.BindingID, "status", result.Status)
+	}
 	s.Log.Info("core ready", "instance_id", cfg.InstanceID, "control_address", cl.Addr().String(), "gateway_address", gl.Addr().String())
 	var runErr error
 	select {
 	case <-ctx.Done():
 	case runErr = <-errs:
+	}
+	restored, restoreErr := s.Agents.Stop()
+	if restoreErr != nil {
+		s.Log.Warn("agent recovery incomplete; run anchor recover")
+	}
+	for _, result := range restored {
+		s.Log.Info("binding shutdown", "binding_id", result.BindingID, "status", result.Status)
 	}
 	deadline, stop := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stop()

@@ -1,0 +1,173 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/candyflosssss/Anchor/internal/client"
+	"github.com/candyflosssss/Anchor/internal/managed"
+	"github.com/candyflosssss/Anchor/internal/platform"
+	"github.com/candyflosssss/Anchor/internal/state"
+)
+
+func (a App) agents(ctx context.Context, c *client.Client, args []string) error {
+	if len(args) == 0 {
+		return errors.New("agent requires add/list/inspect/plan/apply/restore/enable/disable/set-models")
+	}
+	switch args[0] {
+	case "list":
+		if len(args) != 1 {
+			return errors.New("agent list takes no arguments")
+		}
+		v, e := c.Agents(ctx)
+		if e != nil {
+			return e
+		}
+		return a.output(v)
+	case "add":
+		f := a.flags("agent add")
+		id := f.String("id", "", "binding ID")
+		adapter := f.String("adapter", "codex", "adapter (codex only)")
+		root := f.String("codex-home", "", "approved absolute CODEX_HOME; must exist")
+		model := f.String("model", "", "default public model (tools and streaming required)")
+		scope := f.String("model-scope", "all-compatible", "model permission scope: all-compatible or single; legacy bindings stay single")
+		exe := f.String("anchor-executable", "", "stable absolute Anchor binary path")
+		approved := f.Bool("approve", false, "approve long-term configuration management; applies on next serve or agent apply")
+		if e := parse(f, args[1:]); e != nil {
+			return e
+		}
+		if *scope != "single" && *scope != "all-compatible" {
+			return errors.New("--model-scope must be all-compatible or single")
+		}
+		if !*approved {
+			return errors.New("--approve is required; review the configuration root first")
+		}
+		if *exe == "" {
+			v, e := os.Executable()
+			if e != nil {
+				return e
+			}
+			*exe = v
+		}
+		b := state.Binding{ID: *id, AdapterID: *adapter, AdapterVersion: "1", ConfigRoot: *root, Model: *model, ModelScope: *scope, Executable: *exe, Enabled: true}
+		// The core resolves catalog version from the selected default model and
+		// performs full Binding/target/policy validation before approval is stored.
+		v, e := c.AddAgent(ctx, b)
+		if e != nil {
+			return e
+		}
+		return a.output(v)
+	case "set-models":
+		if len(args) < 2 {
+			return errors.New("agent set-models requires binding ID")
+		}
+		f := a.flags("agent set-models")
+		revision := f.Int64("revision", 0, "expected binding revision (required)")
+		model := f.String("model", "", "new default public model (required)")
+		scope := f.String("model-scope", "", "single or all-compatible (required; explicit authorization)")
+		if err := parse(f, args[2:]); err != nil {
+			return err
+		}
+		if *revision < 1 || *model == "" || (*scope != "single" && *scope != "all-compatible") {
+			return errors.New("--revision, --model and explicit --model-scope required")
+		}
+		v, err := c.SetAgentModels(ctx, args[1], *revision, *model, *scope)
+		if err != nil {
+			return err
+		}
+		return a.output(v)
+	case "inspect", "plan":
+		if len(args) != 2 {
+			return errors.New("agent query requires one binding ID")
+		}
+		v, e := c.AgentQuery(ctx, args[1], args[0])
+		if e != nil {
+			return e
+		}
+		return a.output(v)
+	case "apply", "restore", "enable", "disable":
+		if len(args) < 2 {
+			return errors.New("agent action requires binding ID")
+		}
+		f := a.flags("agent " + args[0])
+		revision := f.Int64("revision", 0, "expected binding revision (required)")
+		fp := f.String("fingerprint", "", "reviewed plan fingerprint (required for apply)")
+		if e := parse(f, args[2:]); e != nil {
+			return e
+		}
+		if *revision < 1 {
+			return errors.New("--revision is required")
+		}
+		if args[0] == "apply" && *fp == "" {
+			return errors.New("review agent plan and pass --fingerprint")
+		}
+		v, e := c.AgentAction(ctx, args[1], args[0], *revision, *fp)
+		if e != nil {
+			return e
+		}
+		if e = a.output(v); e != nil {
+			return e
+		}
+		if v["status"] == "conflict" {
+			return errors.New("conditional restore has conflicts; third-party changes preserved")
+		}
+		if m, ok := v["management"].(map[string]any); ok && m["status"] == "conflict" {
+			return errors.New("binding disabled; restore conflicts preserved")
+		}
+		return nil
+	default:
+		return errors.New("unknown agent command")
+	}
+}
+func (a App) recover(s *state.Store, args []string) error {
+	f := a.flags("recover")
+	id := f.String("id", "", "optional binding ID; otherwise recover all registered targets")
+	if e := parse(f, args); e != nil {
+		return e
+	}
+	if *id != "" && !state.ValidID(*id) {
+		return errors.New("invalid binding ID")
+	}
+	// The OS lock prevents standalone recovery racing a running core.
+	lock, e := platform.AcquireLock(filepath.Join(s.Dir, "instance.lock"))
+	if e != nil {
+		return errors.New("stop Anchor before running independent recovery")
+	}
+	defer lock.Close()
+	bs, e := s.Bindings()
+	if e != nil {
+		return e
+	}
+	results := []managed.Result{}
+	failed := false
+	found := *id == ""
+	engine := managed.NewEngine(s)
+	for _, b := range bs {
+		if *id != "" && *id != b.ID {
+			continue
+		}
+		found = true
+		r, e := engine.Recover(b.ID)
+		if e != nil {
+			r = managed.Result{BindingID: b.ID, Status: "recovery_pending"}
+			failed = true
+		}
+		if r.Status == "conflict" {
+			failed = true
+		}
+		results = append(results, r)
+	}
+	if !found {
+		return state.ErrNotFound
+	}
+	if e = a.output(results); e != nil {
+		return e
+	}
+	if failed {
+		return fmt.Errorf("recovery incomplete; conflicts were preserved")
+	}
+	return nil
+}

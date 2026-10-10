@@ -13,6 +13,8 @@ import (
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
+type bindingKey struct{}
+
 func (s *Server) Gateway() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/models", func(w http.ResponseWriter, r *http.Request) {
@@ -20,6 +22,13 @@ func (s *Server) Gateway() http.Handler {
 		if err != nil {
 			apiError(w, err)
 			return
+		}
+		if b, ok := r.Context().Value(bindingKey{}).(state.Binding); ok {
+			models, err = s.Store.BindingModels(b)
+			if err != nil {
+				apiError(w, err)
+				return
+			}
 		}
 		data := []map[string]any{}
 		for _, m := range models {
@@ -77,6 +86,17 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "invalid_model", "a public model ID is required")
 		return
 	}
+	if b, ok := r.Context().Value(bindingKey{}).(state.Binding); ok {
+		allowed, err := s.Store.BindingAllows(b, modelID)
+		if err != nil {
+			apiError(w, err)
+			return
+		}
+		if !allowed {
+			fail(w, 403, "binding_model_denied", "model is outside the binding route scope")
+			return
+		}
+	}
 	var stream bool
 	if raw, ok := request["stream"]; ok {
 		if err = json.Unmarshal(raw, &stream); err != nil {
@@ -132,11 +152,8 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, raw := range tools {
-			var t struct {
-				Type string `json:"type"`
-			}
-			if json.Unmarshal(raw, &t) != nil || t.Type != "function" {
-				fail(w, 400, "unsupported_tool", "only Agent-executed function tools are supported")
+			if !agentExecutedTool(raw, false) {
+				fail(w, 400, "unsupported_tool", "only Agent-executed function/custom tools, their namespaces and client tool_search are supported")
 				return
 			}
 		}

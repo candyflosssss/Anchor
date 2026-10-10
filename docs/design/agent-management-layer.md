@@ -1,11 +1,11 @@
 # Anchor 托管层与 Agent 接入契约
 
 - 日期：2026-10-10
-- 状态：设计提案，尚未实现
+- 状态：部分落地；托管/恢复引擎与 Codex 全局配置 v1 已实现，其余仍是设计
 - 适用范围：无头常驻服务与 CLI；Linux / Windows；优先 Codex、CC（Claude Code）、DSH。
 - 不提供：Agent 执行引擎、任意脚本执行平台、系统全局代理、多设备同步。
 
-> 本文命令、接口、描述格式都是拟定设计，不是已实现能力。Agent 配置字段必须按安装版本验证，不以示例代替真实兼容性测试。
+> 本文描述整体目标，声明式描述示例仍未实现。当前已支持的 CLI 以 [指令大全](../cli/commands.md) 为准，已落地边界见 [实施说明](implementation.md#7-托管层与-codex-配置闭环)。Agent 配置字段须按安装版本验证，不以示例代替真实兼容性测试。
 
 ## 1. 总体分层
 
@@ -299,3 +299,15 @@ anchor recover
 - DSH DeepSeek 适配器、baseURL 与模型能力：[上游 llm-deepseek README](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/llm/llm-deepseek/README.zh.md)。
 
 具体实现必须绑定实际安装版本和测试样本；上游 master 和在线文档会继续变化。
+
+
+## 13. 当前落地补充：Codex 基础配置、多模型与目录（2026-10-10）
+
+本节是实现状态，不把上文通用适配器/profile 等设计全算成已完成。操作入口以 [唯一最新 CLI 大全](../cli/commands.md#8-agent-托管与独立恢复) 为准。
+
+- 桌面端 SSH 使用远端 app-server 时，托管远端已批准 CODEX_HOME 基础配置；Anchor 是统一 provider，profile 不是本路径必需的“消费者”或模型组，不生成额外 profile。
+- Binding 分开记录 default/model_scope/CodexVersion：新 CLI add 默认 all-compatible，旧记录保持 single；模型目录表示选择能力，Binding 凭据和网关检查才表示权限。可选模型动态限定到工具/流式、同精确版本元数据与 enabled 供应商候选。
+- `model add/put` 显式导入本地、精确版本目录的完整模型条目；操作者负责与实际模型能力对应。目录生成保留真实能力和指令，只改公开 slug/可选展示名、选取与 HTTP 传输字段，禁用 upgrade 自动越到未授权名称。
+- 接管生成绑定专有 JSON 目录，先持久恢复材料再写目录/配置；保留原目录指针，不覆盖已有同名文件。停止/recover 只移除内容仍相同且基础配置/独立 profile 均不再引用的自有目录；用户修改和引用均保留。
+- 目录是接管快照，网关权限是当前配置动态判断；模型变动后显式恢复/重建目录，再重启远端 app-server。`set-models` 先恢复再更新 revision，恢复冲突不改授权，token 不旋转。
+- 版本 0.159.3 的隔离真实 CLI 与 app-server 验证覆盖目录列表及默认/显式模型请求，只有回环模拟上游。未验收桌面 UI、真实供应商、所有工具闭环、Windows 原生或全部网络出口接管。

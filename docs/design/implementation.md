@@ -2,7 +2,7 @@
 
 - 日期：2026-10-10
 - 版本标识：`0.1.0-dev`，不是稳定发布。
-- 范围：本机核心 / CLI 和 Responses 同协议代理，不等于整体初版完成。
+- 范围：本机核心 / CLI、Responses 同协议代理及 Codex 全局配置托管/恢复，不等于整体初版完成。
 - 总体产品边界继续以 `architecture.md` 为准；本文记录本轮已落地的决策与实际接口。
 
 ## 1. 已落地的决策
@@ -14,10 +14,10 @@
 | 存储 | SQLite + `modernc.org/sqlite v1.53.0` | 无 CGO 驱动，依赖锁在 go.mod/go.sum；后续 schema 必须显式迁移 |
 | 默认目录 | `os.UserConfigDir()/anchor`，可用 `--data-dir` 覆盖 | 持久状态、当前用户引导凭据与本机 Context 存在这个目录；后续远程控制端仍不复制远端供应商数据 |
 | 默认端口 | 模型 `127.0.0.1:17860`，管理 `127.0.0.1:17861` | 初始化可覆盖，仅允许数值回环地址与 1..65535 端口；已初始化实例不会被再次 init 改写 |
-| 凭据保护 | Linux 当前用户目录 0700 / 文件 0600；Windows 当前用户受保护 DACL | **不是静态加密**。供应商秘密暂存在受保护的 SQLite 中；本机拥有者令牌在 owner.token 中；授权令牌只保存 SHA-256 摘要 |
+| 凭据保护 | Linux 当前用户目录 0700 / 文件 0600；Windows 当前用户受保护 DACL | **不是静态加密**。供应商秘密暂存在受保护的 SQLite 中；本机拥有者令牌在 owner.token 中；普通 access 授权只保存 SHA-256 摘要；Binding helper 凭据另在受保护 SQLite 中保存秘密与摘要 |
 | 运行方式 | 前台 `serve`，独立于管理 CLI 的生命周期 | 不自动注册系统服务、不自动后台化；关闭 serve 或承载它的终端可能停服 |
-| CLI 输出 | 正常输出 JSON；日志 / 诊断 stderr | 仅明确 `access grant --show-once` 输出新授权令牌；供应商秘密只从 stdin 输入 |
-| 协议顺序 | 先 Responses → Responses | 暂不支持 Chat / Anthropic 转换，不宣称 Codex / CC / DSH 已兼容 |
+| CLI 输出 | 正常输出 JSON（agent token 除外）；日志 / 诊断 stderr | `access grant --show-once` 和本机 `agent token` 是含秘密 stdout 例外；供应商秘密只从 stdin 输入 |
+| 协议顺序 | 先 Responses → Responses | 暂不支持 Chat / Anthropic 转换，Codex 仅全局配置/隔离 HTTP 文本烟测；不宣称 CC / DSH 或所有 Codex 能力已兼容 |
 
 Linux / Windows 分别使用内核文件锁；进程退出释放锁，不根据残留锁文件猜测是否运行。
 数据库使用 WAL、FULL 同步、busy timeout 和 IMMEDIATE 写事务；写配置要求当前 revision，旧版本拒绝覆盖。
@@ -64,7 +64,7 @@ printf '%s' "$PROVIDER_KEY" | ./scripts/anchor-dev.sh provider add \
 ./scripts/anchor-dev.sh access revoke ACCESS_ID
 ```
 
-`manage` 与 `gateway` scope 不互通，拥有者引导令牌只授权管理面。当前测试网关授权还没有绑定到 Agent Binding；绑定级授权将在托管阶段补齐。
+`manage` 与 `gateway` scope 不互通，拥有者引导令牌只授权管理面。普通 access grant 授权无 Binding；托管阶段已另加 Binding 级凭据，按 Binding 的 single / 动态 all-compatible 模型范围访问，网关列表与配置模型目录使用同一范围规则。
 Context 当前只支持 `--local`，创建时必须连通并验证实例身份，后续每次管理连接再次验证身份与 API 主版本。缺少 / 不可达 Context 不回退到其他目标。`init` / `serve` / `access` / Context 编辑只作用于本机；业务操作通过类型化客户端调用管理 API。
 
 ## 3. 实际 HTTP 契约
@@ -74,7 +74,7 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 | 接口 | 状态 |
 | --- | --- |
 | `GET /control/v1/instance` | 实例 ID、API 主版本、程序版本、平台、目标用户、地址与能力 |
-| `GET /control/v1/status` | 核心与网关就绪；供应商健康为 not_probed，托管为 not_implemented |
+| `GET /control/v1/status` | 核心与网关就绪；供应商健康为 not_probed，托管为 ready/partial，并含逐 Binding 状态与实际连接 unknown |
 | `GET /control/v1/providers` | 脱敏供应商目录与 revision |
 | `PUT /control/v1/providers/{id}` | `{provider, expected_revision, secret?}`；secret 缺失 / null 保留旧值 |
 | `GET /control/v1/models` | 公开模型、能力与有序候选映射 |
@@ -82,14 +82,14 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 | `GET /v1/models` | 已配置的公开模型目录；不代表真实供应商可用性 |
 | `POST /v1/responses` | 同协议、非后台、无服务器会话状态的 Responses 转发 |
 
-写管理 API 要求 `X-Anchor-Instance` 与目标一致。revision=0 只创建，N>0 只更新 revision=N 的资源；保存后 revision 加一。CLI 不自动重试写请求，断线后应查询目录、revision 和脱敏字段核对结果；完整持久操作查询与幂等键将在托管 / SSH 写操作阶段实现。
+写管理 API 要求 `X-Anchor-Instance` 与目标一致。revision=0 只创建，N>0 只更新 revision=N 的资源；保存后 revision 加一。CLI 不自动重试写请求，断线后应查询目录、revision 和脱敏字段核对结果；配置托管已有稳定操作 ID 和恢复日志；通用持久操作查询、按幂等键查找及 SSH 写操作仍未实现。
 
 响应错误采用 `{error:{code,message}}`，常见状态：400 无效 / 未支持字段，401 鉴权失败，403 浏览器请求，404 未配置资源，409 实例或 revision 冲突，413 网关请求过大，429 网关总并发超限，502 上游拒绝 / 传输错误，503 无可用候选，504 总超时。
 
 ## 4. 网关的真实支持边界
 
 - 只支持同协议透传，改写请求中的模型 ID 为候选实际模型，保留内容块、函数定义 / 调用 / 结果及上游响应事件。
-- 只有 `function` 工具得到支持；工具由客户端执行。未知 / 服务端工具明确拒绝，不能借此宣称实际 Agent 工具兼容。
+- `function`、`custom`、仅含这两类工具的 namespace、`tool_search execution=client` 可同协议透传；工具由客户端执行。未知 / 服务端工具明确拒绝，不能借此宣称实际 Agent 工具兼容。
 - 默认设置 `store:false`。拒绝 `store:true`、非 null 的 `previous_response_id` / `conversation`、`background:true`；客户端需发送完整 input 历史。未来服务器状态需要供应商亲和与相应 API，不可直接沿备用路由重放。
 - `tools`、`streaming` 能力由用户在公开模型上显式声明；声明不等于真实上游探测通过。
 - 全局并发上限 16；单供应商并发可配置 1..64；请求体上限 8 MiB，管理写入上限 128 KiB。
@@ -124,10 +124,45 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 ## 6. 明确尚未完成
 
 1. SSH Connector、远程独立凭据、远端实例绑定与隧道回收。
-2. Codex 实际版本兼容、模型选择器、Binding 级鉴权与自动接管。
-3. 配置字段所有权、持久恢复日志、条件恢复与独立 recover。
+2. Codex profile、升级后的 helper 路径更新、全工具实测与 Windows 原生接入；Binding 级鉴权与全局自动接管已提供。
+3. 更多适配器、JSON/YAML 声明式描述、通用多文件补偿；Codex 配置+自有 JSON 目录的补偿、字段所有权、持久恢复日志、条件恢复与 recover 已提供。
 4. Chat / Anthropic 转换、CC / DSH 与声明式适配器。
 5. Windows 真机测试、公开发行、安装器、系统服务、自启动和升级迁移。本地便携预发行包构建已提供，见发行流程。
 6. 管理日志订阅、日志保留与用量汇总。
 
-下一步优先补核心连接契约（SSH / Context），然后完成 Codex 的真实接入和安全托管闭环。不能把当前里程碑对外称为完成 A01–A14。
+下一步继续补 Codex 覆盖与跨平台验收、其他适配器及核心连接契约（SSH / Context）。不能把当前里程碑对外称为完成 A01–A14。
+
+
+## 7. 托管层与 Codex 配置闭环
+
+### 已落地
+
+- `internal/managed`：Adapter 的 Discover/Inspect/Plan/Verify 契约；Editor 字段读写契约；引擎独占配置写入与恢复。当前仅注册 Codex/TOML 基础配置与专有 JSON 模型目录能力，不是动态插件/脚本执行运行时。
+- SQLite schema 1 → 2 显式增加 bindings，不旋转实例/拥有者/供应商凭据；旧二进制会拒绝新版 schema，不能直接回退旧程序。升级前应在核心停止时自行保存完整受保护状态，勿公开备份。
+- Binding 固定已批准 config root、适配器版本、默认模型、模型授权范围、Codex 元数据精确版本、helper 路径、enabled 与 revision。v1 用整个规范化根保守拒绝重叠，禁用不释放目标所有权；Windows 比较根时忽略大小写。
+- 网关只认识 Binding 授权与模型范围，不读 Agent 配置。独立随机凭据存在受保护 SQLite 中，管理查询/配置计划/日志不返回秘密；Codex 配置只写稳定二进制 helper 命令，运行时取 token。禁用后 helper 与网关鉴权均失效。
+- 引擎先将原文件（可能含原有秘密）、字段前/后值、接管适配器版本和操作 ID 同步持久化到 `DATA_DIR/recovery/ID.json`，有目录时同时记录其精确内容/路径，先原子创建目录，再比较配置 fingerprint 并原子替换配置指针；公开计划 fingerprint 还覆盖目录和模型策略。Linux 保留原文件模式，Windows 保留原 DACL 并使用 MoveFileEx；新文件限制到当前用户。目录/配置拒绝链接与 reparse，Linux 另拒绝组/其他用户可写或硬链接文件。
+- 原值/第三方值的处理按字段比较：等于写入值才恢复，等于原值视为完成，第三值保留并报告冲突。恢复可先完成无冲突字段；provider/模型目录被基础配置或独立 `*.config.toml` 引用时保留并报告冲突；专有目录已被用户修改也保留，无法安全检查引用时中止删除。备份不用于无条件整文件覆盖。由 Anchor 创建的空配置可保留，而非冒险删除。
+- 根级字符串行和带标记的专有 provider 表局部编辑，保留无关字节；编辑后校验整个 TOML 语义。受管理键的行内注释/排版可能规范化，复杂/引用/多行等不可安全编辑的受管理表达形式拒绝，不重新序列化用户整文件。
+- 正常停止冻结托管写入并条件恢复，再排空两面。重新启动沿用原已接管日志，不把 Anchor 值重新当成原值；prepared 记录先按条件恢复再接管。独立 recover 取得实例锁，不依赖运行核心、Agent 或 HTTP。
+
+### Codex v1 边界与证据
+
+当前写入根级 model/model_provider/web_search=disabled、可选 model_catalog_json 和独立 model_providers.anchor_<binding> 表，采用 Responses HTTP、关闭 provider WebSocket 与自动重试。认证配置依官方 command-backed auth 契约：command/args、timeout_ms、refresh_interval_ms，helper stdout 是原始 token。官方依据：<https://developers.openai.com/codex/config-advanced>。
+
+仅全局 CODEX_HOME；用户选择的 profile 与显式 WebSocket 配置拒绝，未探测安装版本、系统策略、环境/命令行/项目覆盖，inspect 始终区分 configuration_only 与实际连接 unknown。Anchor 用操作者导入的、与精确 Codex 版本匹配的完整元数据生成 `anchor_ID.models.json`：复制指令/上下文/工具/reasoning，slug 改为公开别名、展示名可覆盖，visibility=list/supported_in_api=true、upgrade=null、prefer_websockets/use_responses_lite=false。不猜能力、不自动下载、不自动探测版本；操作者必须核对模板和真实供应商能力。自定义目录替代而非合并 Codex 自带目录。single 且无元数据的旧方式仍要求 Codex 自行识别别名；不更改登录状态、审批或沙箱策略。
+
+新 CLI 绑定默认 all-compatible；旧省略 scope 的记录仍为单模型。兼容范围动态要求 tools/streaming、精确版本有效元数据和至少一个 enabled 候选供应商；默认模型仅初始选择。网关 `/v1/models` 和请求授权复用规则，未知/非兼容模型拒绝，Binding token 不可访问管理 API。`agent set-models` 显式更新 default/scope/版本，先安全恢复、后递增 revision，凭据不旋转，留待重新 plan/apply。目录是接管快照，模型/供应商变更影响实时授权但不偷偷改目录；刷新需 restore → plan → apply 或正常停服/启动，然后重启 Codex app-server。
+
+桌面 SSH 主路径在远端 CODEX_HOME 的**基础配置**设置 Anchor provider + 默认模型 + 目录，无需 profile。实际 Codex 的模型选择/显式 model 参数可切换目录内公开模型，经 Anchor 路由各供应商。它不等于 Anchor 自己实现了 SSH Connector，也不是拦截全部网络出口；独立 profile/更高优先级覆盖不会被冒充成受控。
+
+`scripts/agent_smoke_test.py` 在受限磁盘临时目录构建一次性测试二进制（非发行包），验证真实 CLI、认证 helper、流式 custom 工具载荷透传、正常停止、重启、SIGKILL 后独立恢复与第三值冲突。可选 `--codex-binary` 使用全新 HOME/CODEX_HOME、无继承密钥环境与纯回环模拟上游；2026-10-10 已在 **codex-cli 0.159.3** 验证版本匹配的官方 gpt-5.5 元数据映射为两个模拟别名：CLI 默认/`--model` 请求成功，实际 app-server JSON-RPC `model/list` 返回两个别名，`thread/start` + `turn/start` 的默认/显式模型均完成回环模拟 Responses 请求。`set-models`、认证 helper、正常停止、重启、崩溃恢复和冲突均使用隔离状态。为此支持客户端 function/custom、其 namespace 和 `tool_search execution=client` 透传，namespace 中的 hosted/nested 非兼容工具以及 server tool_search 仍拒绝。它不等于真实付费上游、Codex 全工具调用闭环、桌面模型选择器 UI 或 Windows 原生验收通过。
+
+```bash
+/home/mosaki/.codex/skills/resource-guard/scripts/resource_guard.sh run \
+  --expected-mib 2048 --max-mib 3072 --swap-max-mib 256 \
+  --label anchor-agent-smoke -- python3 scripts/agent_smoke_test.py
+/home/mosaki/.codex/skills/resource-guard/scripts/resource_guard.sh status
+```
+
+没有 Binding 删除/路径更新、代码插件、声明式 JSON/YAML、多文件原子提交、通用操作幂等键或独立日志订阅。内核实例/引擎锁只协调 Anchor；外部编辑器的最后检查与 rename 之间仍有竞争窗口，不宣称防御具有同等用户权限的恶意进程。旧会话可能保留网关地址，停服恢复后需要重启 Agent。

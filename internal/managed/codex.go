@@ -1,0 +1,205 @@
+package managed
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/candyflosssss/Anchor/internal/state"
+)
+
+type GatewayBinding struct {
+	BaseURL        string
+	Model          string
+	DataDir        string
+	Ready          bool
+	Tools          bool
+	Streaming      bool
+	Models         []state.Model
+	CatalogVersion string
+}
+type Inspection struct {
+	AdapterID           string   `json:"adapter_id"`
+	AdapterVersion      string   `json:"adapter_version"`
+	ConfigPath          string   `json:"config_path"`
+	Exists              bool     `json:"exists"`
+	Support             string   `json:"support"`
+	EffectiveConnection string   `json:"effective_connection"`
+	Reload              string   `json:"reload_policy"`
+	Limitations         []string `json:"limitations"`
+}
+
+// Adapters only describe facts and field edits. The engine is the sole writer.
+type Adapter interface {
+	Discover(state.Binding) (Inspection, error)
+	Inspect(state.Binding) (Inspection, error)
+	Plan(state.Binding, GatewayBinding) (Plan, error)
+	Verify(state.Binding, GatewayBinding) (Inspection, error)
+}
+type Codex struct{}
+
+func (Codex) Discover(b state.Binding) (Inspection, error) { return (Codex{}).Inspect(b) }
+func (Codex) Inspect(b state.Binding) (Inspection, error) {
+	path := filepath.Join(b.ConfigRoot, "config.toml")
+	raw, exists, e := readConfig(b.ConfigRoot, path)
+	if e != nil {
+		return Inspection{}, e
+	}
+	m, e := document(raw)
+	if e != nil {
+		return Inspection{}, e
+	}
+	if profile, ok := m["profile"]; ok && profile != "" {
+		return Inspection{}, errors.New("selected Codex profiles are not supported by this adapter revision")
+	}
+	if features, ok := m["features"].(map[string]any); ok {
+		for _, k := range []string{"responses_websockets", "responses_websockets_v2"} {
+			if features[k] == true {
+				return Inspection{}, errors.New("WebSocket transport is not supported; disable it before approval")
+			}
+		}
+	}
+	return Inspection{AdapterID: "codex", AdapterVersion: "1", ConfigPath: path, Exists: exists, Support: "configuration_only", EffectiveConnection: "unknown", Reload: "restart_required", Limitations: []string{"global config only; no selected profile or project scope", "CLI/environment/managed overrides and installed Codex version are not probed", "catalog version/upstream capabilities are operator-declared; restart remote app-server after changes", "no WebSocket, compaction endpoint, server state or real upstream verification"}}, nil
+}
+func (Codex) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
+	if e := b.Validate(); e != nil {
+		return Plan{}, e
+	}
+	if !g.Ready || !g.Tools || !g.Streaming {
+		return Plan{}, errors.New("gateway must be ready and selected model must advertise tools and streaming")
+	}
+	if _, e := (Codex{}).Inspect(b); e != nil {
+		return Plan{}, e
+	}
+	path := filepath.Join(b.ConfigRoot, "config.toml")
+	raw, exists, e := readConfig(b.ConfigRoot, path)
+	if e != nil {
+		return Plan{}, e
+	}
+	provider := "anchor_" + strings.NewReplacer("-", "_", ".", "_").Replace(b.ID)
+	paths := [][]string{{"model"}, {"model_provider"}, {"web_search"}, {"model_providers", provider}}
+	var catalog []byte
+	var modelIDs []string
+	var catalogPath string
+	if len(g.Models) > 0 && g.CatalogVersion != "" {
+		catalog, modelIDs, e = buildCatalog(g.Models, g.CatalogVersion)
+		if e != nil {
+			return Plan{}, e
+		}
+		catalogPath = filepath.Join(b.ConfigRoot, catalogName(b.ID))
+		_, catalogExists, err := readConfig(b.ConfigRoot, catalogPath)
+		if err != nil {
+			return Plan{}, err
+		}
+		if catalogExists {
+			return Plan{}, errors.New("reserved Anchor catalog already exists; recover or resolve conflict first")
+		}
+		paths = append(paths, []string{"model_catalog_json"})
+	} else if b.ModelScope == "all-compatible" {
+		return Plan{}, errors.New("all-compatible requires catalog metadata")
+	}
+	editor := TOMLEditor{}
+	values, e := editor.Values(raw, paths)
+	if e != nil {
+		return Plan{}, e
+	}
+	for _, value := range values[:3] {
+		if value.Exists {
+			if _, ok := value.Data.(string); !ok {
+				return Plan{}, ErrUnsafe
+			}
+		}
+	}
+	if len(values) > 4 && values[4].Exists {
+		if _, ok := values[4].Data.(string); !ok {
+			return Plan{}, ErrUnsafe
+		}
+	}
+	if values[3].Exists {
+		return Plan{}, errors.New("reserved Anchor provider already exists; recover the previous operation first")
+	}
+	after := []any{g.Model, provider, "disabled", map[string]any{
+		"name": "Anchor (" + b.ID + ")", "base_url": g.BaseURL, "wire_api": "responses", "supports_websockets": false,
+		"request_max_retries": 0, "stream_max_retries": 0,
+		"auth": map[string]any{"command": b.Executable, "args": []string{"--data-dir", g.DataDir, "agent", "token", b.ID}, "timeout_ms": 5000, "refresh_interval_ms": 300000},
+	}}
+	if catalogPath != "" {
+		after = append(after, catalogPath)
+	}
+	p := Plan{BindingID: b.ID, ExpectedRevision: b.Revision, Model: g.Model, GatewayURL: g.BaseURL, CredentialMethod: "command-backed binding token (not embedded)", AdapterVersion: "1", Path: path, Fingerprint: fingerprint(raw, exists), Fields: paths, Reload: "restart_required", Verification: "configuration_only; effective Agent connection unknown", original: raw, existed: exists}
+	p.ModelScope = b.ModelScope
+	p.AvailableModels = modelIDs
+	p.CatalogPath = catalogPath
+	p.CatalogVersion = g.CatalogVersion
+	if catalogPath != "" {
+		p.configFingerprint = p.Fingerprint
+		p.catalog = &catalogArtifact{Path: catalogPath, Written: catalog}
+		p.Fingerprint = fingerprint(append(append([]byte(p.configFingerprint+"\n"), catalog...), []byte(b.ModelScope+"\n"+g.CatalogVersion)...), true)
+	}
+	for i, path := range paths {
+		p.Edits = append(p.Edits, Edit{Path: path, Before: values[i], After: Value{true, normalize(after[i])}})
+	}
+	if _, e = editor.Patch(raw, p.Edits); e != nil {
+		return Plan{}, e
+	}
+	return p, nil
+}
+func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
+	out, e := (Codex{}).Inspect(b)
+	if e != nil {
+		return out, e
+	}
+	raw, _, e := readConfig(b.ConfigRoot, out.ConfigPath)
+	if e != nil {
+		return out, e
+	}
+	provider := "anchor_" + strings.NewReplacer("-", "_", ".", "_").Replace(b.ID)
+	m, e := document(raw)
+	if e != nil {
+		return out, e
+	}
+	v := at(m, []string{"model_providers", provider})
+	table, ok := v.Data.(map[string]any)
+	if m["model"] != g.Model || m["model_provider"] != provider || !ok || table["base_url"] != g.BaseURL {
+		return out, ErrChanged
+	}
+	if len(g.Models) > 0 && g.CatalogVersion != "" {
+		path := filepath.Join(b.ConfigRoot, catalogName(b.ID))
+		if m["model_catalog_json"] != path {
+			return out, ErrChanged
+		}
+		raw, exists, err := readConfig(b.ConfigRoot, path)
+		if err != nil {
+			return out, err
+		}
+		expected, _, err := buildCatalog(g.Models, g.CatalogVersion)
+		if err != nil {
+			return out, err
+		}
+		if !exists || !bytes.Equal(raw, expected) {
+			return out, ErrChanged
+		}
+	}
+	return out, nil
+}
+func ValidateTarget(b *state.Binding) error {
+	root, e := filepath.Abs(b.ConfigRoot)
+	if e != nil {
+		return e
+	}
+	root = filepath.Clean(root)
+	b.ConfigRoot = root
+	if e = b.Validate(); e != nil {
+		return e
+	}
+	if _, e = (Codex{}).Inspect(*b); e != nil {
+		return e
+	}
+	st, e := os.Stat(b.Executable)
+	if e != nil || !st.Mode().IsRegular() {
+		return errors.New("anchor executable must be an existing stable binary")
+	}
+	return nil
+}

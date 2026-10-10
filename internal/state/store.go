@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 1 {
+	if version > 2 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -85,6 +85,15 @@ CREATE TABLE models (id TEXT PRIMARY KEY, document TEXT NOT NULL, revision INTEG
 CREATE TABLE access (id TEXT PRIMARY KEY, label TEXT NOT NULL, scope TEXT NOT NULL, hash TEXT UNIQUE NOT NULL, expires_at INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE contexts (name TEXT PRIMARY KEY, document TEXT NOT NULL);
 PRAGMA user_version=1;
+COMMIT;`)
+		if err != nil {
+			return fail(err)
+		}
+	}
+	if version < 2 {
+		_, err = db.Exec(`BEGIN IMMEDIATE;
+CREATE TABLE bindings (id TEXT PRIMARY KEY, root TEXT UNIQUE NOT NULL, document TEXT NOT NULL, token TEXT NOT NULL, hash TEXT UNIQUE NOT NULL, enabled INTEGER NOT NULL, revision INTEGER NOT NULL);
+PRAGMA user_version=2;
 COMMIT;`)
 		if err != nil {
 			return fail(err)

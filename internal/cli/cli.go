@@ -32,13 +32,27 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   model list
   model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...]
                [--display-name NAME] [--tools] [--streaming] [--revision N]
+               [--codex-catalog FILE --codex-model SOURCE --codex-version X.Y.Z]
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
   access list | access revoke ID      Local-owner authorization operations
+  agent add --id ID --adapter codex --codex-home ABS_DIR --model MODEL --approve
+            [--model-scope all-compatible|single] [--anchor-executable ABS_PATH]
+                                            Register; apply explicitly or on next serve
+  agent list | agent inspect ID | agent plan ID
+  agent apply ID --revision N --fingerprint SHA256
+  agent restore|enable|disable ID --revision N
+  agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|single
+  agent token ID                     Credential-helper stdout (local, raw secret)
+  recover [--id ID]                   Conditional recovery with core stopped
   version
-All normal output is JSON; diagnostics and service logs go to stderr.
+All normal output except agent token is JSON; diagnostics and service logs go to stderr.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
-init/serve/access/context operate locally. Business commands use the selected context.
-SSH, Agent management/recovery, and cross-protocol conversion are not implemented yet.
+init/serve/access/context/recover/agent token operate locally. Business commands use the selected context.
+Codex base-config/model-catalog management is available; actual Agent connection remains unverified.
+New agent add defaults to all-compatible; --model is the default, not the permission boundary.
+Catalog metadata must match the exact Codex version and actual upstream capabilities.
+Remote Codex app-server uses the remote base config; SSH connection management,
+other Agent adapters, named profiles, and cross-protocol conversion are not implemented.
 `
 
 type App struct {
@@ -162,6 +176,23 @@ func (a App) Run(ctx context.Context, args []string) error {
 	}
 	defer store.Close()
 	switch args[0] {
+	case "recover":
+		if target != "" {
+			return errors.New("recover is local-only; omit --context")
+		}
+		return a.recover(store, args[1:])
+	case "agent":
+		if len(args) > 1 && args[1] == "token" {
+			if target != "" || len(args) != 3 || !state.ValidID(args[2]) {
+				return errors.New("agent token requires a local binding ID")
+			}
+			token, err := store.BindingToken(args[2])
+			if err != nil {
+				return err
+			}
+			_, err = fmt.Fprintln(a.Out, token)
+			return err
+		}
 	case "access":
 		if target != "" {
 			return errors.New("access is local-only; do not specify --context")
@@ -196,6 +227,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 			return err
 		}
 		return a.output(v)
+	case "agent":
+		return a.agents(ctx, cl, args[1:])
 	case "provider":
 		return a.providers(ctx, cl, args[1:])
 	case "model":
@@ -412,6 +445,9 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	tools := f.Bool("tools", false, "advertise function tools")
 	stream := f.Bool("streaming", false, "advertise SSE")
 	rev := f.Int64("revision", 0, "expected current revision")
+	catalog := f.String("codex-catalog", "", "local version-matched Codex catalog JSON (max 1 MiB)")
+	source := f.String("codex-model", "", "source catalog model; verify upstream capabilities match")
+	version := f.String("codex-version", "", "exact source/target Codex version X.Y.Z")
 	var candidates repeated
 	f.Var(&candidates, "candidate", "ordered provider:model mapping")
 	if err := parse(f, args[1:]); err != nil {
@@ -424,6 +460,24 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 		return errors.New("put requires the current --revision")
 	}
 	m := state.Model{ID: *id, DisplayName: *display, Tools: *tools, Streaming: *stream}
+	if *catalog != "" || *source != "" || *version != "" {
+		if *catalog == "" || *source == "" || *version == "" {
+			return errors.New("--codex-catalog, --codex-model and --codex-version must be supplied together")
+		}
+		file, err := os.Open(*catalog)
+		if err != nil {
+			return errors.New("cannot read Codex catalog")
+		}
+		raw, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
+		file.Close()
+		if err != nil {
+			return errors.New("cannot read Codex catalog")
+		}
+		m.Codex, err = state.ImportCodexMetadata(raw, *source, *version)
+		if err != nil {
+			return err
+		}
+	}
 	for _, v := range candidates {
 		provider, model, ok := strings.Cut(v, ":")
 		if !ok {
