@@ -1,6 +1,6 @@
 # 在线更新 v1
 
-- 日期：2026-10-11；在线更新已实现，**已本地打包桌面启动版 `0.1.0-dev.desktop.9`，尚未公开发行或部署更新源**。旧 CLI alpha.6 和 desktop.8 不含更新入口；新包未做原生安装验收，构建结果见[桌面开发版](../release/desktop.md)。
+- 日期：2026-10-11；在线更新已实现，**在线更新首次随 `0.1.0-dev.desktop.9` 打包；当前本地功能包为 `0.1.0-dev.desktop.11`，尚未公开发行或部署更新源**。旧 CLI alpha.6 和 desktop.8 不含更新入口；新包未做原生安装验收，构建结果见[桌面开发版](../release/desktop.md)。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 
@@ -34,19 +34,19 @@ CLI 的 apply 只更新正在调用的 CLI 程序，不替换桌面程序、不�
 
 - 新 feed 附件：`update-cli.json`／`update-desktop.json`。
 - 兼容已有 CLI `release.json` 的 standalone_artifacts，哈希与大小来自原发行清单、URL 来自相同 Release；**现有发行没有 desktop feed，不能用 CLI 冒充桌面包**。
-- 自定义 feed 与包目录可由可信 HTTPS 静态站点托管。需要先上传不可变版本包并验证，再原子切换渠道清单；清单生成器只写文件，不部署或上传；本轮 `.9` 打包未提供真实更新源地址，因此未生成发布清单。
+- 自定义 feed 与包目录可由可信 HTTPS 静态站点托管。需要先上传不可变版本包并验证，再原子切换渠道清单；清单生成器只写文件，不部署或上传；当前 `.11` 打包未提供真实更新源地址，因此未生成发布清单。
 
 ```json
 {
   "schema_version": 1,
   "product": "desktop",
-  "version": "0.1.0-dev.desktop.10",
+  "version": "0.1.0-dev.desktop.12",
   "channel": "dev",
   "artifacts": [{
-    "file": "anchor-desktop_0.1.0-dev.desktop.10_amd64.deb",
+    "file": "anchor-desktop_0.1.0-dev.desktop.12_amd64.deb",
     "target": "linux-amd64",
     "kind": "deb",
-    "url": "https://example.invalid/anchor/0.1.0-dev.desktop.10/linux-amd64/anchor-desktop_0.1.0-dev.desktop.10_amd64.deb",
+    "url": "https://example.invalid/anchor/0.1.0-dev.desktop.12/linux-amd64/anchor-desktop_0.1.0-dev.desktop.12_amd64.deb",
     "sha256": "<64个小写十六进制字符>",
     "bytes": 123456
   }]
@@ -61,18 +61,18 @@ SHA256 是完整性检查，不是独立签名认证。Manifest 和包来自同�
 
 ## 3. 快速测试投放
 
-首次需要人工安装包含更新入口的 `.9` 启动版本；已有 desktop.8 无法自动获得本功能。`.9` 仅在本地打包，尚未投放更高版本与清单；有更新入口不等于当前渠道已存在可安装版本。之后每次递增 `dev.desktop.N`，保留旧版包，上传新版与 feed 即可在线安装，无需每次人工寻找下载链接。
+首次需要人工安装包含更新入口的版本（从 `.9` 开始，当前为 `.11`）；已有 desktop.8 无法自动获得本功能。`.11` 仅在本地打包，未上传安装包或更新清单；有更新入口不等于当前渠道已存在可安装版本。安装 `.11` 前须停止旧核心并关闭窗口，schema 2 会迁移到3，旧程序不能打开升级后的数据库。之后每次递增 `dev.desktop.N`，保留旧版包，上传新版与 feed 即可在线安装，无需每次人工寻找下载链接。
 
 ```bash
-# 只打包，不上传。base URL 应指向未来实际发布的版本目录。
-./scripts/package-desktop.sh --version 0.1.0-dev.desktop.10 \
-  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.10
+# 示例使用尚不存在的 .12；只打包，不上传。base URL 应指向未来实际发布的版本目录。
+./scripts/package-desktop.sh --version 0.1.0-dev.desktop.12 \
+  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.12
 # 输出根目录额外生成 update-desktop.json，URL 对应 target/文件名。
 
 # 已有最终产物也可单独生成清单，输出必须是新文件。
 python3 scripts/update_manifest.py --product desktop \
-  --version 0.1.0-dev.desktop.10 --channel dev \
-  --base-url https://example.invalid/anchor/0.1.0-dev.desktop.10 --layout target \
+  --version 0.1.0-dev.desktop.12 --channel dev \
+  --base-url https://example.invalid/anchor/0.1.0-dev.desktop.12 --layout target \
   --artifact linux-amd64=/absolute/path/linux-amd64/package.deb \
   --artifact windows-amd64=/absolute/path/windows-amd64/setup.exe \
   --output /absolute/path/update-desktop.json
