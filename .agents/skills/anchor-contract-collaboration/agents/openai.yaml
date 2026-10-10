@@ -1,0 +1,6 @@
+interface:
+  display_name: "Anchor 多 agent 契约协作"
+  short_description: "规范前后端并行开发的共同契约、文件归属、接口变更与真实联调验收"
+  default_prompt: "使用 $anchor-contract-collaboration 为本次 Anchor 前后端并行任务确定共同契约、文件写入范围、变更流程和集成验收。"
+policy:
+  allow_implicit_invocation: true

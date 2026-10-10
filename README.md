@@ -19,10 +19,13 @@
 SQLite 供应商与模型配置、Responses 同协议代理，以及托管层/条件恢复、Codex 基础配置与模型目录、多模型绑定授权。当前版本为 `0.1.0-dev`，
 不等于整体初版已完成；SSH、其他 Agent 适配器、Codex profile和跨协议转换仍待实现。
 
-支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。未来注重桌面端，
-不在本阶段开发 Web 或桌面界面。
+支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。现有公开包仍是 CLI；当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮按用户要求只编译打包，不执行安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
+
+**已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；关闭窗口／退出界面默认不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。这不是当前下载包已具备的能力。
 
 ## 开发运行
+
+以下为 CLI 开发流程。GUI 开发／构建见[前端说明](desktop/frontend/README.md)及[桌面开发版构建](docs/release/desktop.md)，不是打开公开 CLI 包就出现图形窗口。
 
 需要 Go 1.25.0 或更新版本。当前机器的开发入口会自动使用资源保护脚本。
 
@@ -39,7 +42,7 @@ SQLite 供应商与模型配置、Responses 同协议代理，以及托管层/�
 ./scripts/anchor-dev.sh status --json
 ```
 
-服务前台运行，不由管理命令退出触发停服；关闭 serve 终端可能停止服务。
+服务前台运行，不由管理命令退出触发停服；关闭 serve 终端可能停止服务。本轮源码新增 Context 作用域 `stop --approve` 请求正常退出（尚未公开发布），只报告接受、不保证恢复完成；桌面关窗不会调用它。
 Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后先审核计划再接管。操作契约见 [最新 CLI 指令大全](docs/cli/commands.md#8-agent-托管与独立恢复)。已公开的 Linux `0.1.0-alpha.3` 包含上述能力；验收结果见任务记录，旧测试包不包含它。
 
 桌面端通过 SSH 使用远端 Codex 的主路径：在远端批准 CODEX_HOME 基础配置 → Anchor provider + 默认模型 + 版本匹配模型目录 → 用户手动选择其他授权模型 → Anchor 路由实际供应商。新 CLI 绑定默认 `all-compatible`，旧绑定保留单模型权限；无需额外 profile。目录元数据需操作者显式导入并核对真实上游能力，修改目录后重启远端 app-server。Anchor 自己的 SSH Connector 和桌面 UI 验收不在本轮范围。
@@ -49,6 +52,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 凭据当前依赖用户文件权限 / Windows ACL，**不是静态加密**。
 
 ## 打包与发行
+
+以下公开分发仍是 CLI。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 的本地开发产物、构建结果与使用方式见[桌面安装说明](docs/release/desktop.md)，未对外发布，未做本轮安装／运行验收。
 
 已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux / Windows AMD64 `0.1.0-alpha.6` 已公开发布；两平台附件匿名下载与校验通过，Linux 远程一键安装已验证**。不从 Actions artifact 或草稿偷偷安装。
 
@@ -78,4 +83,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
   声明式接入、绑定对象，以及常驻服务的自动接管和条件恢复。
 
 - [桌面前端技术设计](docs/design/frontend.md)：UI 基调、React / TypeScript / shadcn/ui 选型、
-  Wails 桌面容器与 Linux / Windows 跨平台目标；前后端对接另议。
+  Wails 桌面容器、前端功能模块 MVC、前后端职责边界与 Linux / Windows 跨平台目标；本机真实接入契约已实现。
+- [供应商第一版界面设计](docs/design/providers-v1.md)：现有 CLI 能力对应的列表、详情、编辑与风险确认；支持明确标注的[本地 Mock 原型与真实 Wails 桌面模式](desktop/frontend/README.md)，真实接口已接入；原生安装与窗口验收单独记录。
+- [前后端分离与前端 MVC skill](.agents/skills/anchor-frontend-architecture/SKILL.md)：前端及相关接口开发时遵循的分层、文档同步与验证约束。
+- [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。

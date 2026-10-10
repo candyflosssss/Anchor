@@ -1,6 +1,6 @@
 # Anchor 首个实施里程碑
 
-- 日期：2026-10-10
+- 日期：2026-10-10；桌面与正常停服补充：2026-10-11
 - 版本标识：`0.1.0-dev`，不是稳定发布。
 - 范围：本机核心 / CLI、Responses 同协议代理及 Codex 全局配置托管/恢复，不等于整体初版完成。
 - 总体产品边界继续以 `architecture.md` 为准；本文记录本轮已落地的决策与实际接口。
@@ -15,7 +15,7 @@
 | 默认目录 | `os.UserConfigDir()/anchor`，可用 `--data-dir` 覆盖 | 持久状态、当前用户引导凭据与本机 Context 存在这个目录；后续远程控制端仍不复制远端供应商数据 |
 | 默认端口 | 模型 `127.0.0.1:17860`，管理 `127.0.0.1:17861` | 初始化可覆盖，仅允许数值回环地址与 1..65535 端口；已初始化实例不会被再次 init 改写 |
 | 凭据保护 | Linux 当前用户目录 0700 / 文件 0600；Windows 当前用户受保护 DACL | **不是静态加密**。供应商秘密暂存在受保护的 SQLite 中；本机拥有者令牌在 owner.token 中；普通 access 授权只保存 SHA-256 摘要；Binding helper 凭据另在受保护 SQLite 中保存秘密与摘要 |
-| 运行方式 | 前台 `serve`，独立于管理 CLI 的生命周期 | 不自动注册系统服务、不自动后台化；关闭 serve 或承载它的终端可能停服 |
+| 运行方式 | CLI 前台 `serve`；新增开发桌面宿主协调独立核心 | serve 仍不自动后台化；GUI 关窗不停止其独立核心；不注册系统服务／自启动；见[桌面运行契约](desktop-runtime.md) |
 | CLI 输出 | 正常输出 JSON（agent token 除外）；日志 / 诊断 stderr | `access grant --show-once` 和本机 `agent token` 是含秘密 stdout 例外；供应商秘密只从 stdin 输入 |
 | 协议顺序 | 先 Responses → Responses | 暂不支持 Chat / Anthropic 转换，Codex 仅全局配置/隔离 HTTP 文本烟测；不宣称 CC / DSH 或所有 Codex 能力已兼容 |
 
@@ -73,8 +73,9 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 | 接口 | 状态 |
 | --- | --- |
-| `GET /control/v1/instance` | 实例 ID、API 主版本、程序版本、平台、目标用户、地址与能力 |
-| `GET /control/v1/status` | 核心与网关就绪；供应商健康为 not_probed，托管为 ready/partial，并含逐 Binding 状态与实际连接 unknown |
+| `GET /control/v1/instance` | 实例 ID、API 主版本、程序版本、平台、目标用户、地址、进程 ID（process_id）与能力 |
+| `GET /control/v1/status` | 核心与网关 starting / ready / stopping；供应商健康为 not_probed，托管为 ready/partial，并含逐 Binding 状态与实际连接 unknown |
+| `POST /control/v1/shutdown` | 管理鉴权与实例身份校验，严格空对象 `{}`；正常 Run 生命周期返回 `{accepted:true}`，不代表退出或恢复已完成；无生命周期503 |
 | `GET /control/v1/providers` | 脱敏供应商目录与 revision |
 | `PUT /control/v1/providers/{id}` | `{provider, expected_revision, secret?}`；secret 缺失 / null 保留旧值 |
 | `GET /control/v1/models` | 公开模型、能力与有序候选映射 |
@@ -84,7 +85,9 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 写管理 API 要求 `X-Anchor-Instance` 与目标一致。revision=0 只创建，N>0 只更新 revision=N 的资源；保存后 revision 加一。CLI 不自动重试写请求，断线后应查询目录、revision 和脱敏字段核对结果；配置托管已有稳定操作 ID 和恢复日志；通用持久操作查询、按幂等键查找及 SSH 写操作仍未实现。
 
-响应错误采用 `{error:{code,message}}`，常见状态：400 无效 / 未支持字段，401 鉴权失败，403 浏览器请求，404 未配置资源，409 实例或 revision 冲突，413 网关请求过大，429 网关总并发超限，502 上游拒绝 / 传输错误，503 无可用候选，504 总超时。
+响应错误采用 `{error:{code,message}}`，常见状态：400 无效 / 未支持字段，401 鉴权失败，403 浏览器请求，404 未配置资源，409 实例或 revision 冲突，413 网关请求过大，429 网关总并发超限，502 上游拒绝 / 传输错误，503 无可用候选或核心 starting/stopping/not_running，504 总超时。
+
+实例能力增加 `graceful_stop`。真实 Run 未 ready 时拒绝新管理写入（正常停服请求除外）和网关调用；正在 stopping 时拒绝新管理写入／网关调用，读取状态仍可进行。管理客户端用结构化 RequestError 返回受限分类；写入网络错误、5xx、无效／超大回包标记 Unknown，不重放。
 
 ## 4. 网关的真实支持边界
 
@@ -104,7 +107,7 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 ## 5. 生命周期与验证
 
-两监听面全部绑定成功后才发布 ready；第二个端口失败会关闭第一个监听器。CLI 管理请求结束不会停止核心；Linux Ctrl+C / SIGTERM 与 Windows Ctrl+C 可触发停服流程。停服同时排空两面，最多等待 10 秒，然后取消剩余请求并关闭连接。
+两监听面全部绑定成功后才发布 ready；第二个端口失败会关闭第一个监听器。CLI 管理请求或桌面窗口结束不会停止核心；Linux Ctrl+C / SIGTERM、Windows Ctrl+C 或带批准的 `stop --approve` 可触发停服流程。停服同时排空两面，最多等待 10 秒，然后取消剩余请求并关闭连接。
 
 本轮自动测试使用临时 SQLite 与回环模拟上游，没有读取 / 修改现有 Agent 配置，没有真实付费供应商请求。
 
@@ -127,7 +130,7 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 2. Codex profile、升级后的 helper 路径更新、全工具实测与 Windows 原生接入；Binding 级鉴权与全局自动接管已提供。
 3. 更多适配器、JSON/YAML 声明式描述、通用多文件补偿；Codex 配置+自有 JSON 目录的补偿、字段所有权、持久恢复日志、条件恢复与 recover 已提供。
 4. Chat / Anthropic 转换、CC / DSH 与声明式适配器。
-5. Windows 真机测试、公开发行、安装器、系统服务、自启动和升级迁移。本地便携预发行包构建已提供，见发行流程。
+5. 桌面双平台原生窗口／安装验收、GUI 公开发行、系统服务、自启动和自动升级迁移。CLI 的公开版本与实际验收以仓库 README 为准；桌面内部构建见[桌面开发版说明](../release/desktop.md)，两者不能互相替代。
 6. 管理日志订阅、日志保留与用量汇总。
 
 下一步继续补 Codex 覆盖与跨平台验收、其他适配器及核心连接契约（SSH / Context）。不能把当前里程碑对外称为完成 A01–A14。
@@ -166,3 +169,10 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 ```
 
 没有 Binding 删除/路径更新、代码插件、声明式 JSON/YAML、多文件原子提交、通用操作幂等键或独立日志订阅。内核实例/引擎锁只协调 Anchor；外部编辑器的最后检查与 rename 之间仍有竞争窗口，不宣称防御具有同等用户权限的恶意进程。旧会话可能保留网关地址，停服恢复后需要重启 Agent。
+
+
+## 8. 桌面供应商开发切片（2026-10-11）
+
+已新增 Wails v2.15.0 宿主、五方法受限桥接、Go DTO→TypeScript 生成与真实管理客户端接入。宿主自动安全初始化／启动／复用本机核心，独立子进程不随窗口 context 退出；供应商界面只在身份／API／授权／ready 通过后开放。状态轮询不重启核心，断开后清除供应商缓存与草稿。供应商密钥只入不出；写入仍使用核心完整替换与 revision 规则。
+
+接口细节见[桌面运行契约](desktop-runtime.md)和[供应商接口](provider-interface.md)，构建与平台缺口见[桌面开发版说明](../release/desktop.md)。真实 Go 隔离核心测试不等于原生 Wails 窗口已验证；后续安装包轮补齐 Windows NSIS 与 Ubuntu24.04 AMD64 `.deb` 的隔离构建入口，仅执行编译／打包，按用户要求不做本轮安装或原生验收，未对外发布。

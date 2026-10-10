@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Anchor
+Name[zh_CN]=Anchor
+Comment=Local AI provider management
+Comment[zh_CN]=本机 AI 供应商管理
+Exec=anchor-desktop
+TryExec=anchor-desktop
+Icon=anchor-desktop
+Terminal=false
+Categories=Development;Utility;
+StartupWMClass=anchor-desktop
+StartupNotify=true

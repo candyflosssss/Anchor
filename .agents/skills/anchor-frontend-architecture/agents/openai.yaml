@@ -1,0 +1,6 @@
+interface:
+  display_name: "Anchor 前端架构与开发约束"
+  short_description: "约束前后端分离、前端功能模块 MVC，并同步界面规范与实际验证"
+  default_prompt: "使用 $anchor-frontend-architecture 约束本次 Anchor 开发，核对前后端边界、前端 MVC、现有界面规范与文档同步。"
+policy:
+  allow_implicit_invocation: true
