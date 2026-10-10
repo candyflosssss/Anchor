@@ -10,11 +10,13 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/managed"
@@ -35,6 +37,11 @@ type Server struct {
 	mu       sync.Mutex
 	active   map[string]int
 	slots    chan struct{}
+	shutdown chan struct{}
+	stopOnce sync.Once
+	stopping atomic.Bool
+	running  atomic.Bool
+	ready    atomic.Bool
 }
 
 func New(store *state.Store, log *slog.Logger) *Server {
@@ -45,7 +52,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	tr.MaxConnsPerHost = 64
 	tr.MaxIdleConns = 32
 	tr.ResponseHeaderTimeout = 30 * time.Second
-	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, active: map[string]int{}, slots: make(chan struct{}, 16)}
+	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, active: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() { s.upstream.CloseIdleConnections() }
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -107,11 +114,39 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 			fail(w, 401, "unauthorized", "valid bearer credential required")
 			return
 		}
+		if s.running.Load() && !s.ready.Load() && !s.stopping.Load() && (scope == "gateway" || (r.Method != http.MethodGet && r.URL.Path != "/control/v1/shutdown")) {
+			fail(w, 503, "starting", "core is starting")
+			return
+		}
+		if s.stopping.Load() && (scope == "gateway" || r.Method != http.MethodGet) {
+			fail(w, 503, "stopping", "core is stopping")
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
 func (s *Server) Control() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /control/v1/shutdown", func(w http.ResponseWriter, r *http.Request) {
+		if !s.identity(w, r) {
+			return
+		}
+		var in *struct{}
+		if !decode(w, r, &in) {
+			return
+		}
+		if in == nil {
+			fail(w, 400, "invalid_json", "an empty JSON object is required")
+			return
+		}
+		if !s.running.Load() {
+			fail(w, 503, "not_running", "no running lifecycle")
+			return
+		}
+		s.stopping.Store(true)
+		writeJSON(w, 200, map[string]bool{"accepted": true})
+		s.stopOnce.Do(func() { close(s.shutdown) })
+	})
 	mux.HandleFunc("GET /control/v1/instance", func(w http.ResponseWriter, r *http.Request) {
 		cfg, err := s.Store.Settings()
 		if err != nil {
@@ -122,7 +157,7 @@ func (s *Server) Control() http.Handler {
 		if u, err := user.Current(); err == nil {
 			username = u.Username
 		}
-		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth"}})
+		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "process_id": os.Getpid(), "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"graceful_stop", "responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth"}})
 	})
 	mux.HandleFunc("GET /control/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		agents, err := s.Agents.Status()
@@ -136,7 +171,14 @@ func (s *Server) Control() http.Handler {
 				health = "partial"
 			}
 		}
-		writeJSON(w, 200, map[string]any{"core": "ready", "gateway": "ready", "upstream_health": "not_probed", "agent_management": health, "bindings": agents, "agent_connection_verification": "unknown"})
+		phase := "ready"
+		if s.running.Load() && !s.ready.Load() {
+			phase = "starting"
+		}
+		if s.stopping.Load() {
+			phase = "stopping"
+		}
+		writeJSON(w, 200, map[string]any{"core": phase, "gateway": phase, "upstream_health": "not_probed", "agent_management": health, "bindings": agents, "agent_connection_verification": "unknown"})
 	})
 	mux.HandleFunc("GET /control/v1/providers", func(w http.ResponseWriter, r *http.Request) {
 		p, err := s.Store.Providers()
@@ -253,6 +295,8 @@ func listenerServer(address string, h http.Handler, ctx context.Context) (*http.
 
 // Run binds both listeners before any approved configuration is applied.
 func (s *Server) Run(ctx context.Context) error {
+	s.running.Store(true)
+	defer s.running.Store(false)
 	lock, err := platform.AcquireLock(filepath.Join(s.Store.Dir, "instance.lock"))
 	if err != nil {
 		return err
@@ -287,12 +331,16 @@ func (s *Server) Run(ctx context.Context) error {
 	for _, result := range managedResults {
 		s.Log.Info("binding startup", "binding_id", result.BindingID, "status", result.Status)
 	}
+	s.ready.Store(true)
 	s.Log.Info("core ready", "instance_id", cfg.InstanceID, "control_address", cl.Addr().String(), "gateway_address", gl.Addr().String())
 	var runErr error
 	select {
 	case <-ctx.Done():
+	case <-s.shutdown:
 	case runErr = <-errs:
 	}
+	s.stopping.Store(true)
+	s.ready.Store(false)
 	restored, restoreErr := s.Agents.Stop()
 	if restoreErr != nil {
 		s.Log.Warn("agent recovery incomplete; run anchor recover")

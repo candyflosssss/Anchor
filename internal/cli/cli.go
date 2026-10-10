@@ -25,6 +25,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   context add NAME --local           Authenticate and bind a local instance
   context use NAME | context list | context inspect NAME | context test NAME
   status                             Query selected context
+  stop --approve                     Request graceful shutdown of selected context
   provider list
   provider add|put --id ID --base-url URL [--secret-stdin] [--revision N]
                 [--protocol responses] [--timeout 120] [--max-concurrent 4]
@@ -219,6 +220,19 @@ func (a App) Run(ctx context.Context, args []string) error {
 	}
 	defer cl.Close()
 	switch args[0] {
+	case "stop":
+		f := a.flags("stop")
+		approved := f.Bool("approve", false, "confirm graceful shutdown of the selected instance")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		if !*approved {
+			return errors.New("stop requires --approve; closes listeners and restores managed configuration")
+		}
+		if err := cl.Stop(ctx); err != nil {
+			return err
+		}
+		return a.output(map[string]any{"accepted": true, "instance_id": c.InstanceID, "shutdown_complete": false})
 	case "status":
 		if len(args) != 1 {
 			return errors.New("status has no command-specific arguments")

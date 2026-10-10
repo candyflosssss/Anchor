@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -19,6 +18,7 @@ type Client struct {
 	http                      *http.Client
 }
 type Instance struct {
+	ProcessID      int      `json:"process_id,omitempty"`
 	InstanceID     string   `json:"instance_id"`
 	Version        string   `json:"version"`
 	APIVersion     int      `json:"api_version"`
@@ -43,7 +43,7 @@ func Connect(ctx context.Context, c state.Context, token string) (*Client, Insta
 	}
 	if instance.APIVersion != 1 || instance.InstanceID != c.InstanceID {
 		cl.Close()
-		return nil, Instance{}, errors.New("instance identity or API version mismatch; explicitly rebind the context")
+		return nil, Instance{}, ErrIdentity
 	}
 	return cl, instance, nil
 }
@@ -68,12 +68,12 @@ func (c *Client) call(ctx context.Context, method, path string, in, out any) err
 	}
 	response, err := c.http.Do(r)
 	if err != nil {
-		return errors.New("management endpoint unavailable; no fallback target was used")
+		return &RequestError{Code: "offline", Unknown: method != http.MethodGet}
 	}
 	defer response.Body.Close()
 	b, err = io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
 	if err != nil || len(b) > 1<<20 {
-		return errors.New("invalid or oversized management response")
+		return &RequestError{Code: "invalid_response", Unknown: method != http.MethodGet}
 	}
 	if response.StatusCode != 200 {
 		// Interpret a bounded error code only; do not reflect arbitrary remote error text.
@@ -87,11 +87,11 @@ func (c *Client) call(ctx context.Context, method, path string, in, out any) err
 		if !state.ValidID(code) {
 			code = "request_failed"
 		}
-		return fmt.Errorf("management request failed: HTTP %d (%s); writes are not automatically retried", response.StatusCode, code)
+		return &RequestError{Status: response.StatusCode, Code: code, Unknown: method != http.MethodGet && response.StatusCode >= 500}
 	}
 	if out != nil {
 		if err = json.Unmarshal(b, out); err != nil {
-			return errors.New("invalid management JSON response")
+			return &RequestError{Code: "invalid_response", Unknown: method != http.MethodGet}
 		}
 	}
 	return nil
@@ -162,4 +162,18 @@ func (c *Client) SetAgentModels(ctx context.Context, id string, revision int64, 
 	var v map[string]any
 	err := c.call(ctx, "POST", "/control/v1/agents/"+id+"/set-models", map[string]any{"expected_revision": revision, "model": model, "model_scope": scope}, &v)
 	return v, err
+}
+
+// Stop requests graceful shutdown. Acceptance is not proof of completed recovery.
+func (c *Client) Stop(ctx context.Context) error {
+	var result struct {
+		Accepted bool `json:"accepted"`
+	}
+	if err := c.call(ctx, "POST", "/control/v1/shutdown", struct{}{}, &result); err != nil {
+		return err
+	}
+	if !result.Accepted {
+		return &RequestError{Code: "invalid_response", Unknown: true}
+	}
+	return nil
 }

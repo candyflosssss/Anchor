@@ -4,6 +4,7 @@
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
+- 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -17,7 +18,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`provider`、`model`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
 推荐把全局选项放在命令之前。当前解析器也会从整条参数列表提取全局选项。值选项可写 `--name VALUE` 或 `--name=VALUE`；布尔选项关闭时用 `--name=false`，不要写 `--name false`。除表中指定的位置参数外，不添加额外位置参数。
@@ -26,12 +27,12 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
 - 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
 - 其他 ID 和 Context 名称仍为 1..128 个 ASCII 字符，首字符为英文字母/数字，其余为英文字母/数字、`.`、`_`、`-`；Agent ID 另有 64 字符限制。
-- 管理写请求不自动重试。断线后结果可能未知，先查询并核对 revision，不盲目重复写入。
+- 管理写请求不自动重试。断线、5xx、无效／超大回包可能使写入结果未知，先查询并核对 revision，不盲目重复写入。客户端以 `RequestError` 保留 HTTP 状态、受限 code 与 Unknown 标记，不把原始远端 message 或秘密写到 stderr；网络错误文案使用 `offline`，响应异常使用 `invalid_response`。退出码规则不变。
 - 密钥只从 stdin 输入；不要把真实密钥放进命令参数、历史或文档。供应商秘密目前依赖文件权限/ACL，**不是静态加密**。
 
 ## 2. 当前命令索引
 
-共 30 个规范命令路径（别名单列于对应说明）。
+共 31 个规范命令路径（别名单列于对应说明）。
 
 | 指令 | 用途 | 作用域 / 前置条件 |
 | --- | --- | --- |
@@ -45,6 +46,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `context inspect` | 查看已保存连接信息 | 本机；名称已登记 |
 | `context test` | 验证连接与实例身份 | 本机；名称已登记，核心在线 |
 | `status` | 查询核心状态 | 所选 Context 的核心在线 |
+| `stop --approve` | 请求核心正常停服 | 所选 Context 在线、已核验身份及管理授权；需要本轮新版核心 |
 | `provider list` | 列出供应商 | 所选 Context 的核心在线 |
 | `provider add` | 新增供应商 | 所选 Context 的核心在线 |
 | `provider put` | 条件更新供应商 | 核心在线；当前 revision |
@@ -108,9 +110,21 @@ anchor init [--control-address ADDRESS] [--gateway-address ADDRESS]
 anchor serve
 ```
 
-无专属参数；前台运行管理/网关两监听面，日志在 stderr。只有两端口均成功绑定才 ready；第二面失败释放第一面，同一实例已有核心或端口冲突则失败。管理 CLI 退出不会停止它。Linux Ctrl+C/SIGTERM、Windows Ctrl+C 触发最多 10 秒的优雅停服；关闭承载终端可能停服。没有已实现的 `stop`/后台化/系统服务命令。
+无专属参数；前台运行管理/网关两监听面，日志在 stderr。只有两端口均成功绑定才 ready；第二面失败释放第一面，同一实例已有核心或端口冲突则失败。管理 CLI 退出不会停止它。Linux Ctrl+C/SIGTERM、Windows Ctrl+C 触发最多 10 秒的优雅停服；关闭承载终端可能停服。本轮新增 `stop --approve` 可在另一进程请求正常停服；`serve` 不自行后台化，也没有系统服务管理命令。桌面宿主的独立核心模式见[桌面运行契约](../design/desktop-runtime.md)，不改变 `serve` 的前台语义。
 
 两面绑定后才对已批准且 enabled 的 Binding 自动接管；某个目标失败不阻断其他目标，`status.bindings` 分别报告 pending/applied/overridden/conflict 等状态。正常停止先冻结托管写入并条件恢复，然后最多 10 秒排空请求。崩溃不会自动执行恢复；重新启动会核对原日志，或核心离线后用 `recover`。已运行的 Codex 会话可能缓存旧地址，恢复后应重启 Codex。
+
+### `stop`（当前开发版）
+
+```text
+anchor [--context NAME] stop --approve
+```
+
+- `--approve` 为必需确认开关，默认 false；不弹出交互提示。无位置参数。缺少确认、未知参数、目标不可达、授权／身份校验失败时不发送停服写请求。
+- 作用域为所选 Context，不是无条件停止本机所有进程；须先登记 Context，与其他管理命令一致。请求携带 Bearer 管理授权与 `X-Anchor-Instance`，调用 `POST /control/v1/shutdown`，不按 PID 强杀或关闭其他服务。
+- 成功 stdout：`{"accepted":true,"instance_id":"<目标实例>","shutdown_complete":false}`。退出 0 **只代表请求被接受**，不代表进程已退出、在途请求全部成功或托管配置已恢复；未知／失败退出 1，不自动重放。
+- 接受后核心拒绝新管理写请求和网关请求，执行既有托管条件恢复与最长 10 秒请求排空，再关闭监听；恢复冲突仍按核心日志与恢复流程处理。外部服务管理器可能重新启动进程，本命令不修改服务策略或开机自启动。
+- 旧核心无该接口（通常 404），正在停止／未运行生命周期会拒绝（503）；升级须用户明确操作，命令不会替换核心、绕过锁或回退强杀。
 
 ## 4. Context 与状态
 
@@ -127,8 +141,8 @@ anchor [--context NAME] status
 - **`context use`**：`NAME` 必须存在；保存默认选择，返回 `current_context`。本步骤不检测在线状态。
 - **`context list`**：无专属参数，返回连接对象数组；不检测可达性，当前实现不附带“当前选中”标记。
 - **`context inspect`**：返回指定名称的已保存连接对象；不请求核心，不检测可达性。
-- **`context test`**：连接指定实例并验证身份/API 主版本；返回实例信息，包括版本、平台、用户、监听地址和能力。失败不重新绑定或切换目标。
-- **`status`**：无专属参数，查询显式或默认 Context，返回 `core`、`gateway`、`upstream_health`、`agent_management`；当前不会附带实例 ID、配置 revision 或网关地址；缺少 Context、不可达、认证失败或身份不一致均失败，不回退。
+- **`context test`**：连接指定实例并验证身份/API 主版本；返回实例信息，包括版本、平台、用户、监听地址和能力；新版核心另返回 process_id，旧核心没有该字段。不按 PID 判断授权或强杀进程。失败不重新绑定或切换目标。
+- **`status`**：无专属参数，查询显式或默认 Context，返回 `core`、`gateway`、`upstream_health`、`agent_management`；`core` / `gateway` 在运行生命周期中为 `starting`、`ready` 或 `stopping`，就绪前不接受管理写入或网关调用（可请求正常停服）；不会附带实例 ID、配置 revision 或网关地址；缺少 Context、不可达、认证失败或身份不一致均失败，不回退。
 
 Context 目前仅支持本机 `--local`，没有 SSH、远程凭据或 Context 删除/重绑定入口。
 
@@ -339,7 +353,10 @@ anchor recover [--id ID]
 
 | 功能 | 当前入口 / 状态 | 说明 |
 | --- | --- | --- |
-| 初始化、启动、版本/帮助 | init / serve / version / help | 已提供 CLI；退出靠信号，尚无后台服务管理 |
+| 初始化、启动、停服、版本/帮助 | init / serve / stop --approve / version / help | CLI 已提供；serve 仍为前台；无后台服务管理 |
+| 桌面自动后台启动／复用 | 开发宿主已实现；原生两平台待验收 | 自动启动协调属于宿主机制，不要求单独命令；详见[桌面运行契约](../design/desktop-runtime.md) |
+| 桌面窗口最小化／最大化／还原／关闭 | 桌面自定义顶栏；原生行为未验收 | 本机窗口展示行为，不新增 CLI 命令；关闭窗口不等于 stop，不停止核心 |
+| 开机自启动设置 | 未实现；无 GUI 开关或 CLI | 独立、默认不启用；未来实现需同步提供 CLI，安装和启动宿主不自动注册服务 |
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型新增/更新/查询 | provider / model 的 add、put、list | 已提供 CLI；删除未实现 |
@@ -349,8 +366,8 @@ anchor recover [--id ID]
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | 未实现 | 后续协议能力及其用户配置需同步核对 CLI 覆盖 |
-| 分发、系统服务、升级 | 发行脚本与外部安装脚本；无产品 install/update 子命令 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；当前无公开 Release。脚本替换需显式授权，不停服/迁移；桌面安装器、自启动、自动更新未实现 |
+| 分发、系统服务、升级 | 发行脚本与外部安装脚本；无产品 install/update 子命令 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，本轮不验收、不公开发布）；系统服务、自启动与自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
-发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。安装语法与核心 30 个命令路径未改变，Windows 程序暂不公开提供，详见 [安装说明](../release/install.md)。
+发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；本轮源码的 31 个命令路径包含尚未公开发布的 stop，不反写旧发行能力。
