@@ -61,6 +61,8 @@ SHA256 是完整性检查，不是独立签名认证。Manifest 和包来自同�
 
 ## 3. 快速测试投放
 
+执行本节的桌面迭代交付时使用项目 [anchor-desktop-release skill](../../.agents/skills/anchor-desktop-release/SKILL.md)，沿用已授权的投放范围，只做必要检查。
+
 已有 `.9`～`.11` 选择 dev 即可发现并下载 `.12`，无需填写源地址；desktop.8 首次须人工安装包含更新入口的新版本。`.12` 已于 2026-10-11 发布为 GitHub prerelease，非 latest。手动安装前须停止旧核心并退出全部窗口；应用内确认安装会执行正常停服与宿主退出。schema 2 会迁移到3，旧程序不能打开升级后的数据库。之后每次递增 `dev.desktop.N`，保留旧版包。
 
 ```bash

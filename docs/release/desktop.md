@@ -44,6 +44,8 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.12_amd64.deb
 
 ## 2. 构建入口（不执行验收）
 
+打包与已授权的在线投放统一按 [anchor-desktop-release skill](../../.agents/skills/anchor-desktop-release/SKILL.md) 执行；本节脚本只负责生成安装包，线上交付还需发布安装包及同版清单。
+
 ### 同时生成两平台安装包
 
 构建机要求：Linux AMD64、可用的 Linux AMD64 Docker daemon、Go ≥1.25、Python ≥3.11、Node22.22.1、npm9.2.0，以及按锁文件安装的前端依赖。图标已纳入源码；只有重生成图标时需要 Pillow。宿主无需 GTK / WebKit 开发头文件或 NSIS。

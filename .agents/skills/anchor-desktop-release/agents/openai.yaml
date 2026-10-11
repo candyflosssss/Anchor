@@ -1,0 +1,4 @@
+interface:
+  display_name: "Anchor 桌面开发版交付"
+  short_description: "打包桌面开发版并按已授权范围投放 dev 在线更新，只做必要检查"
+  default_prompt: "使用 $anchor-desktop-release 完成 Anchor 桌面开发版交付；沿用本轮已授权的在线更新范围并记录实际结果。"
