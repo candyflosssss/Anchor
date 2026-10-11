@@ -39,12 +39,12 @@ export function useLogController() {
   async function copy(row: RequestLog) { try { await navigator.clipboard.writeText(safeSummary(row)); setNotice('已复制'); } catch { setNotice('复制失败'); } }
   async function exportLogs() { if (exporting) return; setExporting(true); try { const v = await logService.export({ ...query, cursor: 0 }); if (lifecycle.alive) setNotice(v.accepted ? '已导出' : '已取消'); } catch { if (lifecycle.alive) setNotice('导出失败'); } finally { if (lifecycle.alive) setExporting(false); } }
   async function saveSettings() { if (!config || saving) return; setSaving(true); try { const v = await logService.configure(config); if (lifecycle.alive) { setConfig(v); showSettings(false); setNotice('已保存'); refresh(v => v + 1); } } catch { if (lifecycle.alive) setNotice('保存失败'); } finally { if (lifecycle.alive) setSaving(false); } }
-  return { tab, setTab, filters, filter, resetFilters, level, setLevel, paused, setPaused, selected, select, loading, error, notice, copy, exportLogs,
+  return { tab, setTab, filters, filter, resetFilters, level, setLevel: (value: string) => { setLevel(value); setCursors([0]); setSnapshot(0); setPage(null); }, paused, setPaused, selected, select, loading, error, notice, copy, exportLogs,
     exporting, saving, settings, showSettings, config, setConfig, saveSettings, visible: (page?.requests ?? []).map(requestLog), systems: (page?.events ?? []).map(systemLog), health: page?.health,
     pageNumber: cursors.length, hasMore: page?.has_more ?? false, refresh: () => { setCursors([0]); setSnapshot(0); refresh(v => v + 1); },
     next: () => { if (page?.has_more) { setSnapshot(v => v || page.latest); setCursors(v => [...v, page.next_cursor]); setPage(null); } },
     previous: () => { setCursors(v => v.slice(0, -1)); setPage(null); },
-    findRequest: async (id: string) => { try { const row = await logService.detail(id); if (lifecycle.alive) setSelected(row); } catch { if (lifecycle.alive) setNotice('关联请求不存在'); } },
+    findRequest: async (id: string) => { const generation = ++lifecycle.detail; setSelected(null); try { const row = await logService.detail(id); if (lifecycle.alive && generation === lifecycle.detail) setSelected(row); } catch { if (lifecycle.alive && generation === lifecycle.detail) setNotice('关联请求不存在'); } },
   };
 }
 export type LogController = ReturnType<typeof useLogController>;
