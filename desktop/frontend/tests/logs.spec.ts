@@ -88,3 +88,66 @@ test('new rows stay queued, degraded and empty states, dark/mobile layout', asyn
   expect(await page.getByRole('dialog').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-mobile.png'), fullPage: false });
 });
+
+test('column selection, ordering, local preference and preset reset', async ({ page }) => {
+  await openLogs(page);
+  const list = page.getByRole('region', { name: '请求日志列表' });
+  const opener = page.getByRole('button', { name: /显示内容/ });
+  await opener.click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('checkbox', { name: /^供应商/ }).uncheck();
+  await dialog.getByRole('checkbox', { name: /^思考深度/ }).check();
+  await dialog.getByRole('button', { name: '左移思考深度', exact: true }).click();
+  await dialog.getByRole('button', { name: '完成', exact: true }).click();
+  await expect(opener).toBeFocused();
+  await expect(list.getByRole('columnheader', { name: '供应商', exact: true })).toHaveCount(0);
+  await expect(list.getByRole('columnheader', { name: '思考深度', exact: true })).toBeVisible();
+  const custom = await list.getByRole('columnheader').allTextContents();
+  expect(custom.indexOf('思考深度')).toBeLessThan(custom.indexOf('错误码'));
+  await page.reload();
+  await page.getByRole('button', { name: '日志', exact: true }).click();
+  await expect(list.getByRole('columnheader')).toHaveText(custom);
+  await opener.click();
+  await dialog.getByRole('button', { name: '排障', exact: true }).click();
+  await dialog.getByRole('button', { name: '完成', exact: true }).click();
+  await expect(list.getByRole('columnheader', { name: '上游 HTTP', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '查看请求 req_demo_8f2c91' }).click();
+  await expect(page.getByRole('dialog')).toContainText('HTTP 200');
+  await page.keyboard.press('Escape');
+  await opener.click();
+  await dialog.getByRole('button', { name: '恢复默认', exact: true }).click();
+  while (await dialog.getByRole('checkbox', { checked: true }).count() > 1) {
+    await dialog.getByRole('checkbox', { checked: true }).first().uncheck();
+  }
+  await expect(dialog.getByRole('checkbox', { checked: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: '恢复默认', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果', '模型名称', '供应商', '首字时间', '总耗时', 'TPS', '错误码', '详情']);
+});
+
+test('performance fields distinguish measured speed, request effort and unknown metrics', async ({ page }) => {
+  await openLogs(page);
+  await page.getByRole('button', { name: /显示内容/ }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '性能', exact: true }).click();
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-panel.png') });
+  await dialog.getByRole('button', { name: '完成', exact: true }).click();
+  const retry = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 req_demo_b7a403' }) });
+  await expect(retry).toContainText('584 ms');
+  await expect(retry).toContainText('271.7 t/s');
+  await expect(retry).toContainText('medium');
+  const reasoningOnly = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 req_demo_e910af' }) });
+  await expect(reasoningOnly).toContainText('high');
+  await expect(reasoningOnly.getByRole('cell').nth(4)).toHaveText('未知');
+  await expect(reasoningOnly.getByRole('cell').nth(6)).toHaveText('未知');
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-performance.png'), fullPage: true });
+  await page.getByRole('button', { name: '系统日志', exact: true }).click();
+  await expect(page.getByRole('button', { name: /显示内容/ })).toHaveCount(0);
+  await page.getByRole('button', { name: /^请求日志/ }).click();
+  await expect(page.getByRole('columnheader', { name: '思考深度', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: /显示内容/ }).click();
+  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-mobile.png') });
+});

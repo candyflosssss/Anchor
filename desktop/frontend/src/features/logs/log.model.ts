@@ -9,6 +9,9 @@ export interface RequestLog {
   model: string; protocol: string; elapsed: number | null; http: number | null;
   provider: string; key: string; revision: number; delivery: string;
   summary: string; stage: string; code?: string; input: number | null; output: number | null;
+  reasoningEffort?: string | null; stream?: boolean; generationStatus?: string;
+  metrics?: { timeToFirstTextMs: number | null; generationMs: number | null; outputTextTokens: number | null;
+    textIntervalComplete: boolean; cacheReadTokens: number | null; reasoningTokens: number | null };
   attempts: LogAttempt[]; evidence: Record<string, string | number | boolean>;
 }
 export interface SystemLog {

@@ -1,6 +1,6 @@
 import type { RequestLog, SystemLog } from './log.model';
 const attempt = (provider: string, key: string, model: string, http: number | null, elapsed: number, outcome = '成功', note = '响应校验通过，已完成交付。') => ({ number: 1, provider, key, model, protocol: 'Responses', http, elapsed, outcome, note });
-export const requestFixtures: RequestLog[] = [
+const baseFixtures: RequestLog[] = [
   { id: 'req_demo_8f2c91', ageMinutes: 1, time: '23:10:18', status: 'failed', source: 'probe', model: 'codex-auto-review', protocol: 'Responses', elapsed: 2606, http: 200, provider: '摸鱼AI', key: 'default', revision: 2, delivery: '测试结果已返回', summary: '上游返回成功状态，但响应缺少协议必需字段。', stage: 'response_validate', code: 'invalid_response', input: null, output: null,
     attempts: [{ ...attempt('摸鱼AI', 'default', 'codex-auto-review', 200, 2606, '校验失败', '缺少响应 ID，无法确认响应符合 Responses 协议。'), code: 'missing_required_field' }], evidence: { expected_format: 'Responses JSON', json_parse: 'passed', has_response_id: false, response_bytes: 824, max_output_tokens: 16 } },
   { id: 'req_demo_b7a403', ageMinutes: 2, time: '23:09:42', status: 'succeeded', source: 'proxy', model: 'coding-fast', protocol: 'Responses', elapsed: 1834, http: 200, provider: 'OpenAI', key: 'key-2', revision: 5, delivery: '完整写出', summary: '首次请求触发限流，切换候选后成功。', stage: 'respond', input: 1840, output: 326,
@@ -19,6 +19,21 @@ export const requestFixtures: RequestLog[] = [
   { id: 'req_demo_34abc0', ageMinutes: 95, time: '21:37:24', status: 'succeeded', source: 'proxy', model: 'coding-fast', protocol: 'Responses', elapsed: 646, http: 200, provider: 'OpenAI', key: 'key-2', revision: 5, delivery: '完整写出', summary: '响应校验通过，已完成交付。', stage: 'respond', input: 860, output: 140,
     attempts: [attempt('OpenAI', 'key-2', 'gpt-5.4', 200, 646)], evidence: { generation_status: 'completed' } },
 ];
+// Explicit synthetic request snapshots; absent timing/usage stays unknown.
+export const requestFixtures: RequestLog[] = baseFixtures.map(row => {
+  const snapshots: Record<string, Partial<RequestLog>> = {
+    req_demo_8f2c91: { reasoningEffort: 'high', stream: false },
+    req_demo_b7a403: { reasoningEffort: 'medium', stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 584, generationMs: 1200, outputTextTokens: 326, textIntervalComplete: true, cacheReadTokens: 1024, reasoningTokens: 0 } },
+    req_demo_c102ee: { reasoningEffort: null, stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 284, generationMs: 640, outputTextTokens: 482, textIntervalComplete: true, cacheReadTokens: 1536, reasoningTokens: 0 } },
+    req_demo_d39e20: { reasoningEffort: 'high', stream: true, metrics: { timeToFirstTextMs: 820, generationMs: null, outputTextTokens: null, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: null } },
+    req_demo_e910af: { reasoningEffort: 'high', stream: false, generationStatus: 'incomplete', metrics: { timeToFirstTextMs: null, generationMs: null, outputTextTokens: 0, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: 16 } },
+    req_demo_f21d64: { reasoningEffort: null, stream: true, metrics: { timeToFirstTextMs: 390, generationMs: null, outputTextTokens: null, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: null } },
+    req_demo_a098bc: { reasoningEffort: 'low', stream: false },
+    req_demo_109ea4: { reasoningEffort: 'medium', stream: true },
+    req_demo_34abc0: { reasoningEffort: 'low', stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 180, generationMs: 420, outputTextTokens: 140, textIntervalComplete: true, cacheReadTokens: 0, reasoningTokens: 0 } },
+  };
+  return { ...row, ...snapshots[row.id] };
+});
 export const incomingFixture: RequestLog = { ...requestFixtures[8], id: 'req_demo_new001', ageMinutes: 0, time: '23:12:00', elapsed: 721, attempts: [{ ...requestFixtures[8].attempts[0], elapsed: 721 }] };
 export const systemFixtures: SystemLog[] = [
   { id: 'evt_demo_01', ageMinutes: 1, time: '23:10:18', level: 'warn', source: 'core', event: 'probe.validation_failed', message: '推理测试响应校验未通过，上游 HTTP 200。', requestId: 'req_demo_8f2c91' },

@@ -446,7 +446,7 @@ anchor recover [--id ID]
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
-| 日志 UI 设计预览 | 无 CLI；仅虚拟数据界面 | 搜索、详情、导出与保留设置仅在内存模拟，不代表真实日志能力；真实查询/跟随/导出 CLI 尚未实现，见[日志设计](../design/logging.md) |
+| 日志 UI 设计预览 | 无 CLI；仅虚拟数据界面 | 搜索、详情、导出与保留设置仅在内存模拟；27 项字段选择、排序与预设只保存本机显示偏好，纯展示不新增 CLI，不代表真实日志能力；真实查询/跟随/导出 CLI 尚未实现，见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
