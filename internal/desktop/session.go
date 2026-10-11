@@ -19,6 +19,7 @@ import (
 type Options struct {
 	Dir, Executable, ControlAddress, GatewayAddress string
 	StartTimeout                                    time.Duration
+	SaveLogFile                                     func() (string, error)
 	Quit                                            func()
 }
 type Session struct {

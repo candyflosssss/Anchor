@@ -21,12 +21,12 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
 推荐把全局选项放在命令之前。当前解析器也会从整条参数列表提取全局选项。值选项可写 `--name VALUE` 或 `--name=VALUE`；布尔选项关闭时用 `--name=false`，不要写 `--name false`。除表中指定的位置参数外，不添加额外位置参数。
 
-- 正常操作 stdout 为一个 JSON 值，`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
+- 正常操作 stdout 为一个 JSON 值；`logs export` 为逐条 JSONL，`logs follow` 为重复页 JSON；`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
 - 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
 - 其他 ID 和 Context 名称仍为 1..128 个 ASCII 字符，首字符为英文字母/数字，其余为英文字母/数字、`.`、`_`、`-`；Agent ID 另有 64 字符限制。
@@ -66,6 +66,12 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `provider test` | 显式最小推理测试 | 核心在线；已存供应商/模型 ID；须 approve |
 | `provider model-put` / `model-delete` | 工作台模型映射写入/删除 | 核心在线；供应商与模型 revision；删除须 approve |
 | `provider price-put` / `price-import` | 保存单价 / models.dev 预览 | 核心在线；当前 revision；导入不自动保存 |
+| `logs list` | 结构化日志分页/筛选 | 所选 Context 核心在线，支持日志接口 |
+| `logs detail REQUEST_ID` | 完整安全请求详情 | 对应记录仍在保留期 |
+| `logs follow` | 每 2 秒输出日志页快照 | 核心在线；可重复更新记录 |
+| `logs export` | 流式 JSONL 导出 | 核心在线；最多 200,000 条/2 分钟 |
+| `logs settings` | 查询日志保留设置 | 所选 Context 核心在线 |
+| `logs configure` | 校验并持久化保留设置 | 所选 Context 管理授权 |
 | `usage` | 持久用量汇总 | 所选 Context 的核心在线 |
 | `model list` | 列出公开模型映射 | 所选 Context 的核心在线 |
 | `model add` | 新增公开模型 | 核心在线；候选供应商已配置 |
@@ -446,7 +452,7 @@ anchor recover [--id ID]
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
-| 日志 UI 设计预览 | 无 CLI；仅虚拟数据界面 | 搜索、详情、导出与保留设置仅在内存模拟；27 项字段选择、排序与预设只保存本机显示偏好，纯展示不新增 CLI，不代表真实日志能力；真实查询/跟随/导出 CLI 尚未实现，见[日志设计](../design/logging.md) |
+| 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
@@ -481,3 +487,45 @@ anchor [--data-dir DIR] update apply --approve
 - 当前平台包最多256 MiB、清单2 MiB；check/download 整个操作最多5分钟。更新清单格式、签名限制及 dev 投放步骤见 [在线更新](../design/online-updates.md)。SHA256 仅是完整性校验，不能替代独立发布签名。
 
 桌面宿主配置入口为 `anchor-desktop [--data-dir DIR] [--update-channel CHANNEL] [--update-manifest HTTPS_URL]`，首次 GUI 启动时只在指定参数后保存配置；当前用户已有 GUI 时再次启动只恢复已有窗口，不切换其 `--data-dir` 或保存新更新参数。已有宿主未响应时有界等待后退出1，不再开第二个 GUI。核心 `--core` 和内部安装 helper 不受 GUI 锁限制。窗口连接和供应商功能仍走原会话规则。桌面 GUI 只接收受控渠道和已检查版本，不提供任意 URL/路径/命令执行。Linux 安装权限交由系统安装器，不能等同于 CLI apply 原位替换 `/usr/bin`。
+
+
+## 12. 请求与系统日志（当前源码）
+
+需要升级并正常重启到支持日志的核心；旧版不会补采历史。使用所选 Context、owner 管理授权及实例身份核验。日志独立于累计 usage，配置日志保留不删除累计用量。
+
+```text
+anchor logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
+  [--cursor N] [--until N] [--status VALUE] [--source VALUE]
+  [--provider ID] [--model NAME] [--key ID] [--http N]
+  [--code VALUE] [--stage VALUE] [--level VALUE] [--search PREFIX]
+anchor logs detail REQUEST_ID
+anchor logs settings
+anchor logs configure [--days N] [--system-days N] [--max-requests N]
+  [--request-mib N] [--system-mib N]
+```
+
+| 选项 | 默认 / 范围 / 行为 |
+| --- | --- |
+| kind | requests；system 查询系统事件 |
+| since | 1h，Go duration，>0 且 ≤2160h（90 天）；24h、168h 可用，不支持 `7d` |
+| limit | 50，1–200；导出内部固定每页 100 条 |
+| cursor / until | 0；列表 next_cursor 读取更旧记录，latest 固定序号上界 |
+| status / source / provider / model / key / code / stage / level | 空表示不筛选；非空按原值精确匹配；requests 与 system 适用字段不同 |
+| http | 0 表示不筛选；显式值 100–599，代表实际收到的上游状态 |
+| search | 空；区分大小写的标识前缀（请求 ID / 模型 / 供应商 / Key / 错误码；系统事件名），不搜索正文 |
+| days / system-days | 查询当前值再修改；初始均 7，范围 1–90 |
+| max-requests | 初始 50,000，100–200,000 |
+| request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
+
+`list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts/evidence 大字段，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
+
+`follow` 每 2 秒输出一页完整 JSON（不是逐条去重订阅，可重复且 pending 后续会更新）；窗口起点在启动时固定，cursor/until 按提供值使用。Ctrl+C 终止，正常退出规则沿用应用。`export` 忽略 cursor/limit，从固定 latest 上界按页流式写 JSONL 到 stdout，最多 200,000 条、2分钟；每条为完整请求或系统事件，适合重定向到文件。记录到期/更新仍可能改变导出内容，不承诺事务级快照。中途失败返回非零，CLI 输出文件可能不完整，应按退出码处理。
+
+`settings` 输出 `{days,max_requests,request_bytes,system_bytes,system_days}`；`configure` 沿用未提供项并校验、持久化配置，返回最终设置。收紧限制后每次清理有限删除，逐步收敛；没有 clear/delete 命令。未知记录 ID 返回错误；无授权、实例不匹配、存储不可用或超时均非零，禁止 Mock 回退。隐藏 UI 字段不影响采集、详情或导出。
+
+```bash
+anchor logs list --status failed --http 200 --since 24h
+anchor logs detail REQUEST_ID
+anchor logs export --kind requests --since 168h > anchor-logs.jsonl
+anchor logs configure --days 14 --max-requests 100000
+```

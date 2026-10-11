@@ -1,0 +1,182 @@
+{
+  "contract": "anchor-desktop-v1",
+  "query": {
+    "kind": "requests",
+    "limit": 50,
+    "cursor": 0,
+    "until": 0,
+    "since_ms": 1791734000000,
+    "before_ms": 0,
+    "status": "",
+    "source": "",
+    "provider": "",
+    "model": "",
+    "key": "",
+    "http": null,
+    "code": "",
+    "stage": "",
+    "level": "",
+    "search": ""
+  },
+  "page": {
+    "requests": [
+      {
+        "id": "fixture_failed",
+        "started_at_ms": 1791738000000,
+        "status": "failed",
+        "source": "probe",
+        "upstream_model": "codex-auto-review",
+        "model": "codex-auto-review",
+        "protocol": "responses",
+        "elapsed_ms": 2606,
+        "http": 200,
+        "provider": "provider-a",
+        "key": "default",
+        "revision": 2,
+        "delivery": "none",
+        "stage": "response_validate",
+        "code": "invalid_response",
+        "input": null,
+        "output": null,
+        "reasoning_effort": null,
+        "reasoning_observed": false,
+        "stream": false,
+        "generation_status": "",
+        "metrics": {
+          "time_to_first_text_ms": null,
+          "generation_ms": null,
+          "output_text_tokens": null,
+          "text_interval_complete": false,
+          "cache_read_tokens": null,
+          "reasoning_tokens": null
+        },
+        "attempt_count": 1,
+        "attempts_truncated": false,
+        "evidence": {
+          "json_valid": "true",
+          "body_bytes": "128"
+        },
+        "attempts": [
+          {
+            "number": 1,
+            "provider": "provider-a",
+            "key": "default",
+            "model": "codex-auto-review",
+            "protocol": "responses",
+            "http": 200,
+            "elapsed_ms": 2606,
+            "outcome": "failed",
+            "code": "invalid_response",
+            "stage": "response_validate",
+            "input": null,
+            "output": null
+          }
+        ]
+      },
+      {
+        "id": "fixture_success",
+        "started_at_ms": 1791738000000,
+        "status": "succeeded",
+        "source": "proxy",
+        "upstream_model": "codex-auto-review",
+        "model": "public",
+        "protocol": "responses",
+        "elapsed_ms": 2100,
+        "http": 200,
+        "provider": "provider-a",
+        "key": "default",
+        "revision": 2,
+        "delivery": "complete",
+        "stage": "respond",
+        "code": "",
+        "input": 12,
+        "output": 120,
+        "reasoning_effort": "high",
+        "reasoning_observed": true,
+        "stream": true,
+        "generation_status": "completed",
+        "metrics": {
+          "time_to_first_text_ms": 584,
+          "generation_ms": 1500,
+          "output_text_tokens": 100,
+          "text_interval_complete": true,
+          "cache_read_tokens": 0,
+          "reasoning_tokens": 20
+        },
+        "attempt_count": 1,
+        "attempts_truncated": false,
+        "evidence": {
+          "json_valid": "true",
+          "body_bytes": "128"
+        },
+        "attempts": [
+          {
+            "number": 1,
+            "provider": "provider-a",
+            "key": "default",
+            "model": "codex-auto-review",
+            "protocol": "responses",
+            "http": 200,
+            "elapsed_ms": 2100,
+            "outcome": "succeeded",
+            "code": "",
+            "stage": "respond",
+            "input": 12,
+            "output": 120
+          }
+        ]
+      }
+    ],
+    "events": [],
+    "next_cursor": 0,
+    "latest": 2,
+    "has_more": false,
+    "health": {
+      "dropped": 0,
+      "write_failures": 0,
+      "queue_depth": 0,
+      "request_count": 2,
+      "request_bytes": 4096,
+      "event_count": 1,
+      "event_bytes": 1024,
+      "error": ""
+    }
+  },
+  "system": {
+    "requests": [],
+    "events": [
+      {
+        "id": "fixture_event",
+        "at_ms": 1791738000000,
+        "level": "warn",
+        "source": "core",
+        "event": "request.failed",
+        "request_id": "fixture_failed",
+        "fields": {
+          "code": "invalid_response",
+          "stage": "response_validate"
+        }
+      }
+    ],
+    "next_cursor": 0,
+    "latest": 1,
+    "has_more": false,
+    "health": {
+      "dropped": 0,
+      "write_failures": 0,
+      "queue_depth": 0,
+      "request_count": 2,
+      "request_bytes": 4096,
+      "event_count": 1,
+      "event_bytes": 1024,
+      "error": ""
+    }
+  },
+  "settings": {
+    "days": 7,
+    "system_days": 7,
+    "max_requests": 50000,
+    "request_bytes": 268435456,
+    "system_bytes": 33554432
+  }
+}

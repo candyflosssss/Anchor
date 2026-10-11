@@ -17,7 +17,7 @@ import { useWindowController } from '../features/window/use-window-controller';
 import { WindowControls } from '../features/window/window-controls.view';
 import { cn } from '../lib/utils';
 
-const pageTitle: Record<Page, string> = { overview: '概览', providers: '供应商', models: '模型映射', logs: '日志 / 设计预览', settings: '设置 / 在线更新' };
+const pageTitle: Record<Page, string> = { overview: '概览', providers: '供应商', models: '模型映射', logs: '日志', settings: '设置 / 在线更新' };
 
 export function App() {
   const { appearance, setAppearance } = useAppearance();
@@ -49,7 +49,7 @@ export function App() {
         </div>
       </header>
       {windowController.error && <p role="status" className="border-b px-4 py-2 text-xs text-destructive">{windowController.error}</p>}
-      {page === 'logs' ? <LogsPreview /> : page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage environment={environment} page={page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
+      {page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage environment={environment} page={page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
         <h1 className="text-xl font-semibold">{session.phase === 'starting' ? '正在连接本机核心…' : session.phase === 'stopped' ? '停服请求已接受' : '本机核心暂不可用'}</h1>
         <p className="my-4 text-sm text-muted-foreground">{session.error ? desktopMessages[session.error] : session.phase === 'stopped' ? '核心正在处理退出与配置恢复；请求接受不代表恢复已完成。' : '自动初始化或核验已有实例，不会切换到模拟数据。'}</p>
         {session.phase !== 'starting' && <Button onClick={() => void session.connect()}>重新连接本机核心</Button>}

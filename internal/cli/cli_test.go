@@ -81,6 +81,15 @@ func TestCLIManagementWorkflow(t *testing.T) {
 	if strings.Contains(out, "provider-secret") {
 		t.Fatal("provider write leaked secret")
 	}
+	if out := run("", "logs", "list"); !strings.Contains(out, `"requests":[]`) {
+		t.Fatal(out)
+	}
+	if out := run("", "logs", "settings"); !strings.Contains(out, `"max_requests":50000`) {
+		t.Fatal(out)
+	}
+	if out := run("", "logs", "configure", "--days", "14"); !strings.Contains(out, `"days":14`) {
+		t.Fatal(out)
+	}
 	run("", "model", "add", "--id", "public", "--candidate", "p:actual", "--tools", "--streaming")
 	// Chinese IDs must survive CLI parsing, URL encoding, API checks and SQLite.
 	for _, id := range []string{"摸鱼AI", strings.Repeat("鱼", 128)} {

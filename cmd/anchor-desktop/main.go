@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -104,7 +105,15 @@ func run() int {
 	var hostContext context.Context
 	var contextMu sync.RWMutex
 	var tray desktoptray.Tray
-	session := desktop.NewSession(desktop.Options{Dir: *dir, Executable: executable, Quit: func() {
+	session := desktop.NewSession(desktop.Options{Dir: *dir, Executable: executable, SaveLogFile: func() (string, error) {
+		contextMu.RLock()
+		ctx := hostContext
+		contextMu.RUnlock()
+		if ctx == nil {
+			return "", errors.New("window unavailable")
+		}
+		return wailsruntime.SaveFileDialog(ctx, wailsruntime.SaveDialogOptions{Title: "导出日志", DefaultFilename: "anchor-logs.jsonl", Filters: []wailsruntime.FileFilter{{DisplayName: "JSON Lines", Pattern: "*.jsonl"}}})
+	}, Quit: func() {
 		window.RequestExit()
 		go func() {
 			time.Sleep(250 * time.Millisecond)

@@ -187,12 +187,134 @@ export interface WorkspaceResult {
   data: Workspace | null;
   problem: Problem | null;
 }
+export interface Metrics {
+  time_to_first_text_ms: number | null;
+  generation_ms: number | null;
+  output_text_tokens: number | null;
+  text_interval_complete: boolean;
+  cache_read_tokens: number | null;
+  reasoning_tokens: number | null;
+}
+export interface Attempt {
+  number: number;
+  provider: string;
+  key: string;
+  model: string;
+  protocol: string;
+  http: number | null;
+  elapsed_ms: number;
+  outcome: string;
+  code: string;
+  stage: string;
+  input: number | null;
+  output: number | null;
+}
+export interface Request {
+  id: string;
+  started_at_ms: number;
+  status: string;
+  source: string;
+  upstream_model: string;
+  model: string;
+  protocol: string;
+  elapsed_ms: number | null;
+  http: number | null;
+  provider: string;
+  key: string;
+  revision: number;
+  delivery: string;
+  stage: string;
+  code: string;
+  input: number | null;
+  output: number | null;
+  reasoning_effort: string | null;
+  reasoning_observed: boolean;
+  stream: boolean | null;
+  generation_status: string;
+  metrics: Metrics;
+  attempts: Attempt[];
+  attempt_count: number;
+  attempts_truncated: boolean;
+  evidence: Record<string, string>;
+}
+export interface Event {
+  id: string;
+  at_ms: number;
+  level: string;
+  source: string;
+  event: string;
+  request_id: string;
+  fields: Record<string, string>;
+}
+export interface Query {
+  kind: string;
+  limit: number;
+  cursor: number;
+  until: number;
+  since_ms: number;
+  before_ms: number;
+  status: string;
+  source: string;
+  provider: string;
+  model: string;
+  key: string;
+  http: number | null;
+  code: string;
+  stage: string;
+  level: string;
+  search: string;
+}
+export interface Page {
+  requests: Request[];
+  events: Event[];
+  next_cursor: number;
+  latest: number;
+  has_more: boolean;
+  health: Health;
+}
+export interface Health {
+  dropped: number;
+  write_failures: number;
+  queue_depth: number;
+  request_count: number;
+  request_bytes: number;
+  event_count: number;
+  event_bytes: number;
+  error: string;
+}
+export interface Settings {
+  days: number;
+  max_requests: number;
+  request_bytes: number;
+  system_bytes: number;
+  system_days: number;
+}
+export interface LogsResult {
+  contract: string;
+  data: Page | null;
+  problem: Problem | null;
+}
+export interface LogDetailResult {
+  contract: string;
+  data: Request | null;
+  problem: Problem | null;
+}
+export interface LogSettingsResult {
+  contract: string;
+  data: Settings | null;
+  problem: Problem | null;
+}
 export interface DesktopBridge {
   CheckUpdate(input1: string): Promise<UpdateResult>;
+  ConfigureLogs(input1: Settings): Promise<LogSettingsResult>;
   DiscoverProviderModels(input1: DiscoverProviderModels): Promise<ProviderModelsResult>;
   DownloadUpdate(input1: string): Promise<UpdateResult>;
   ExitDesktop(): Promise<StopResult>;
+  ExportLogs(input1: Query): Promise<StopResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
+  LogDetail(input1: string): Promise<LogDetailResult>;
+  LogSettings(): Promise<LogSettingsResult>;
+  Logs(input1: Query): Promise<LogsResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;

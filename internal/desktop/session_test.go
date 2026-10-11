@@ -389,3 +389,41 @@ func TestRealBridgeKeyProtocolSettings(t *testing.T) {
 		t.Fatal(written)
 	}
 }
+
+func TestRealLogBridgeQuerySettingsAndExport(t *testing.T) {
+	s := testSession(t)
+	b := NewBridge(s)
+	if v := b.Start(); v.Problem != nil {
+		t.Fatal(v.Problem)
+	}
+	v := b.Logs(LogQuery{Limit: 50})
+	if v.Problem != nil || v.Data == nil || v.Data.Requests == nil {
+		t.Fatal(v)
+	}
+	cfg := b.LogSettings()
+	if cfg.Problem != nil || cfg.Data == nil {
+		t.Fatal(cfg)
+	}
+	cfg.Data.Days = 14
+	saved := b.ConfigureLogs(*cfg.Data)
+	if saved.Problem != nil || saved.Data == nil || saved.Data.Days != 14 {
+		t.Fatal(saved)
+	}
+	path := filepath.Join(t.TempDir(), "logs.jsonl")
+	s.options.SaveLogFile = func() (string, error) { return path, nil }
+	exported := b.ExportLogs(LogQuery{Kind: "system"})
+	if exported.Problem != nil || exported.Data == nil || !exported.Data.Accepted {
+		t.Fatal(exported)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatal(err)
+	}
+	parts, err := filepath.Glob(filepath.Join(filepath.Dir(path), "*.partial"))
+	if err != nil || len(parts) != 0 {
+		t.Fatal(parts, err)
+	}
+	s.options.SaveLogFile = func() (string, error) { return "", nil }
+	if v := b.ExportLogs(LogQuery{}); v.Problem != nil || v.Data.Accepted {
+		t.Fatal(v)
+	}
+}

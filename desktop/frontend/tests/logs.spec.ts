@@ -1,153 +1,106 @@
 import { expect, test, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
+import fixture from '../../contract/logs.json' with { type: 'json' };
+import type { DesktopBridge, Query } from '../src/desktop/contract.generated';
 const capture = process.env.ANCHOR_LOG_SCREENSHOTS;
+declare global { interface Window { logTest: { queries: Query[]; exports: number; settings: typeof fixture.settings; unavailable: boolean; paged: boolean } } }
 async function openLogs(page: Page) {
+  await page.addInitScript(f => {
+    window.logTest = { queries: [], exports: 0, settings: f.settings, unavailable: false, paged: false };
+    const result = <T,>(data: T) => ({ contract: f.contract, data, problem: null });
+    const session = { instance_id: 'logs-isolated', phase: 'ready', source: 'started', can_stop: true };
+    const rows = f.page.requests.map(r => ({ ...r, started_at_ms: Date.now() }));
+    const api = {
+      Start: async () => result(session), Status: async () => result(session), Providers: async () => result([]),
+      Logs: async (q: Query) => {
+        window.logTest.queries.push(q);
+        if (window.logTest.unavailable) return { contract: f.contract, data: null, problem: { code: 'offline' } };
+        if (q.kind === 'system') return result(f.system);
+        const selected = rows.filter(r => (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
+        return result({ ...f.page, requests: selected.map(r => ({ ...r, attempts: [], evidence: {} })), latest: q.cursor ? 3 : 2, has_more: window.logTest.paged && !q.cursor, next_cursor: 1 });
+      },
+      LogDetail: async (id: string) => result(rows.find(r => r.id === id)),
+      LogSettings: async () => result(window.logTest.settings),
+      ConfigureLogs: async (s: typeof f.settings) => { window.logTest.settings = s; return result(s); },
+      ExportLogs: async () => { window.logTest.exports++; return result({ accepted: true }); },
+    } as unknown as DesktopBridge;
+    window.go = { desktop: { Bridge: api } };
+  }, fixture);
   await page.goto('/');
   await page.getByRole('button', { name: '日志', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '日志', exact: true })).toBeVisible();
-  await expect(page.getByText('所有记录均为虚拟数据，用于预览页面与排障交互。')).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看请求 fixture_failed' })).toBeVisible();
 }
-test('request filters, HTTP 200 failure evidence and keyboard detail focus', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
+test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard focus', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await openLogs(page);
   const list = page.getByRole('region', { name: '请求日志列表' });
-  await expect(list.getByRole('row')).toHaveCount(9);
+  await expect(list.getByRole('row')).toHaveCount(3);
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-light.png'), fullPage: true });
   await page.getByLabel('请求结果', { exact: true }).selectOption('failed');
-  await expect(list.getByRole('row')).toHaveCount(4);
-  await page.getByLabel('请求来源', { exact: true }).selectOption('probe');
   await expect(list.getByRole('row')).toHaveCount(2);
-  const opener = page.getByRole('button', { name: '查看请求 req_demo_8f2c91' });
+  const opener = page.getByRole('button', { name: '查看请求 fixture_failed' });
   await opener.focus(); await page.keyboard.press('Enter');
   const detail = page.getByRole('dialog');
-  await expect(detail).toContainText('上游返回成功状态，但响应缺少协议必需字段。');
-  await expect(detail).toContainText('has_response_id');
-  await expect(detail).toContainText('false');
-  await expect(detail).toContainText('未知');
-  if (capture) await page.screenshot({ path: resolve(capture, 'logs-failure-detail.png'), fullPage: true });
-  await page.keyboard.press('Escape');
-  await expect(detail).toBeHidden();
-  await expect(opener).toBeFocused();
-  await page.getByRole('button', { name: '清除筛选', exact: true }).click();
-  await page.getByLabel('日志供应商', { exact: true }).selectOption('摸鱼AI');
-  await expect(page.getByRole('button', { name: '查看请求 req_demo_b7a403' })).toBeVisible();
-  await page.getByLabel('搜索日志', { exact: true }).fill('no-such-request');
-  await expect(page.getByRole('heading', { name: '没有匹配的日志' })).toBeVisible();
+  await expect(detail).toContainText('invalid_response');
+  await expect(detail).toContainText('response_validate');
+  await expect(detail).toContainText('200');
+  await expect(detail).toContainText('json_valid');
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-failure-detail.png') });
+  await page.keyboard.press('Escape'); await expect(detail).toBeHidden(); await expect(opener).toBeFocused();
+  await page.getByRole('button', { name: '重置', exact: true }).click();
+  await page.getByLabel('供应商筛选').fill('provider-a');
+  await expect(page.getByRole('button', { name: '查看请求 fixture_success' })).toBeVisible();
+  await page.getByLabel('搜索日志').fill('no-such-request'); await expect(page.getByText('暂无日志', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '重置', exact: true }).click();
+  await page.getByRole('button', { name: '深色', exact: true }).click();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-dark.png'), fullPage: true });
   expect(errors).toEqual([]);
 });
-test('retry timeline, system correlation, mock export and retention preview', async ({ page }) => {
-  await openLogs(page);
-  await page.getByRole('button', { name: '查看请求 req_demo_b7a403' }).click();
-  let detail = page.getByRole('dialog');
-  await expect(detail).toContainText('2 次上游尝试');
-  await expect(detail).toContainText('HTTP 429');
-  await expect(detail).toContainText('首次尝试用量未知');
-  await page.getByRole('button', { name: '关闭请求详情' }).click();
-  await page.getByRole('button', { name: '系统日志', exact: true }).click();
-  await page.getByLabel('系统日志级别').selectOption('error');
-  await expect(page.getByRole('region', { name: '系统日志列表' }).getByRole('row')).toHaveCount(2);
-  await page.getByRole('button', { name: 'req_demo_d39e20', exact: true }).click();
-  detail = page.getByRole('dialog');
-  await expect(detail).toContainText('已输出部分内容');
-  await expect(detail).toContainText('未自动切换供应商或重放');
-  await page.keyboard.press('Escape');
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: '导出示例' }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe('anchor-system-demo.json');
-  await page.getByRole('button', { name: '日志保留设置' }).click();
-  await expect(page.getByRole('dialog')).toContainText('不修改真实实例');
-  await page.getByLabel('请求明细保留', { exact: true }).selectOption('14');
-  await page.getByRole('button', { name: '完成预览' }).click();
-  await expect(page.getByText('保留 14 天', { exact: true })).toBeVisible();
-});
-test('new rows stay queued, degraded and empty states, dark/mobile layout', async ({ page }) => {
-  await openLogs(page);
-  await page.getByRole('button', { name: '暂停刷新' }).click();
-  await page.getByRole('button', { name: '模拟新记录' }).click();
-  await expect(page.getByRole('button', { name: '查看请求 req_demo_new001' })).toHaveCount(0);
-  await page.getByRole('button', { name: '有 1 条新记录，点击加载' }).click();
-  await expect(page.getByRole('button', { name: '查看请求 req_demo_new001' })).toBeVisible();
-  await page.getByLabel('预览场景').selectOption('degraded');
-  await expect(page.getByText('日志记录不完整', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '深色', exact: true }).click();
-  if (capture) {
-    await page.evaluate(() => window.scrollTo(0, 0));
-    await page.screenshot({ path: resolve(capture, 'logs-dark.png'), fullPage: true });
-  }
-  await page.getByLabel('预览场景').selectOption('empty');
-  await expect(page.getByRole('heading', { name: '还没有请求记录' })).toBeVisible();
-  await page.getByLabel('预览场景').selectOption('offline');
-  await expect(page.getByRole('heading', { name: '核心暂不可用', exact: true })).toBeVisible();
-  await page.getByLabel('预览场景').selectOption('normal');
-  await page.setViewportSize({ width: 390, height: 844 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await page.getByRole('button', { name: '查看请求 req_demo_8f2c91' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  expect(await page.getByRole('dialog').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
-  if (capture) await page.screenshot({ path: resolve(capture, 'logs-mobile.png'), fullPage: false });
-});
-
-test('column selection, ordering, local preference and preset reset', async ({ page }) => {
+test('column preferences preserve collected values and survive reload', async ({ page }) => {
   await openLogs(page);
   const list = page.getByRole('region', { name: '请求日志列表' });
   const opener = page.getByRole('button', { name: /显示内容/ });
-  await opener.click();
-  const dialog = page.getByRole('dialog');
+  await opener.click(); const dialog = page.getByRole('dialog');
   await dialog.getByRole('checkbox', { name: /^供应商/ }).uncheck();
   await dialog.getByRole('checkbox', { name: /^思考深度/ }).check();
   await dialog.getByRole('button', { name: '左移思考深度', exact: true }).click();
   await dialog.getByRole('button', { name: '完成', exact: true }).click();
   await expect(opener).toBeFocused();
   await expect(list.getByRole('columnheader', { name: '供应商', exact: true })).toHaveCount(0);
-  await expect(list.getByRole('columnheader', { name: '思考深度', exact: true })).toBeVisible();
-  const custom = await list.getByRole('columnheader').allTextContents();
-  expect(custom.indexOf('思考深度')).toBeLessThan(custom.indexOf('错误码'));
-  await page.reload();
-  await page.getByRole('button', { name: '日志', exact: true }).click();
-  await expect(list.getByRole('columnheader')).toHaveText(custom);
-  await opener.click();
-  await dialog.getByRole('button', { name: '排障', exact: true }).click();
-  await dialog.getByRole('button', { name: '完成', exact: true }).click();
-  await expect(list.getByRole('columnheader', { name: '上游 HTTP', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '查看请求 req_demo_8f2c91' }).click();
-  await expect(page.getByRole('dialog')).toContainText('HTTP 200');
-  await page.keyboard.press('Escape');
-  await opener.click();
-  await dialog.getByRole('button', { name: '恢复默认', exact: true }).click();
-  while (await dialog.getByRole('checkbox', { checked: true }).count() > 1) {
-    await dialog.getByRole('checkbox', { checked: true }).first().uncheck();
-  }
-  await expect(dialog.getByRole('checkbox', { checked: true })).toBeDisabled();
-  await dialog.getByRole('button', { name: '恢复默认', exact: true }).click();
-  await page.keyboard.press('Escape');
-  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果', '模型名称', '供应商', '首字时间', '总耗时', 'TPS', '错误码', '详情']);
-});
-
-test('performance fields distinguish measured speed, request effort and unknown metrics', async ({ page }) => {
-  await openLogs(page);
-  await page.getByRole('button', { name: /显示内容/ }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '性能', exact: true }).click();
+  const headers = await list.getByRole('columnheader').allTextContents();
+  expect(headers.indexOf('思考深度')).toBeLessThan(headers.indexOf('错误码'));
+  await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) })).toContainText('high');
+  expect(await page.evaluate(() => window.logTest.queries.every(q => !('columns' in q)))).toBe(true);
+  await page.reload(); await page.getByRole('button', { name: '日志', exact: true }).click();
+  await expect(list.getByRole('columnheader')).toHaveText(headers);
+  await opener.click(); await dialog.getByRole('button', { name: '性能', exact: true }).click();
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-panel.png') });
   await dialog.getByRole('button', { name: '完成', exact: true }).click();
-  const retry = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 req_demo_b7a403' }) });
-  await expect(retry).toContainText('584 ms');
-  await expect(retry).toContainText('271.7 t/s');
-  await expect(retry).toContainText('medium');
-  const reasoningOnly = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 req_demo_e910af' }) });
-  await expect(reasoningOnly).toContainText('high');
-  await expect(reasoningOnly.getByRole('cell').nth(4)).toHaveText('未知');
-  await expect(reasoningOnly.getByRole('cell').nth(6)).toHaveText('未知');
-  if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-performance.png'), fullPage: true });
-  await page.getByRole('button', { name: '系统日志', exact: true }).click();
-  await expect(page.getByRole('button', { name: /显示内容/ })).toHaveCount(0);
-  await page.getByRole('button', { name: /^请求日志/ }).click();
-  await expect(page.getByRole('columnheader', { name: '思考深度', exact: true })).toBeVisible();
+  const success = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
+  await expect(success).toContainText('584 ms'); await expect(success).toContainText('66.7 t/s');
+  await opener.click(); await dialog.getByRole('button', { name: '恢复默认', exact: true }).click();
+  while (await dialog.getByRole('checkbox', { checked: true }).count() > 1) await dialog.getByRole('checkbox', { checked: true }).first().uncheck();
+  await expect(dialog.getByRole('checkbox', { checked: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: '恢复默认', exact: true }).click(); await page.keyboard.press('Escape');
+  await expect(success).toContainText('provider-a');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: /显示内容/ }).click();
-  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await opener.click(); expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-mobile.png') });
+});
+test('retention, export, stable cursor snapshot and system correlation', async ({ page }) => {
+  await openLogs(page);
+  await page.evaluate(() => { window.logTest.paged = true; }); await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await page.getByRole('button', { name: '下一页日志' }).click(); await expect(page.getByText('第 2 页', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.logTest.queries.at(-1)?.until)).toBe(2);
+  await page.getByRole('button', { name: '上一页日志' }).click();
+  await page.getByRole('button', { name: '日志保留设置' }).click();
+  const dialog = page.getByRole('dialog'); await dialog.getByLabel('请求保留天数').fill('14'); await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(dialog).toBeHidden(); expect(await page.evaluate(() => window.logTest.settings.days)).toBe(14);
+  await page.getByRole('button', { name: '导出', exact: true }).click(); await expect(page.getByText('已导出', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.logTest.exports)).toBe(1);
+  await page.getByRole('button', { name: '系统日志', exact: true }).click();
+  await page.getByRole('button', { name: 'fixture_failed', exact: true }).click(); await expect(dialog).toContainText('invalid_response'); await page.keyboard.press('Escape');
+  await page.evaluate(() => { window.logTest.unavailable = true; }); await page.getByRole('button', { name: '刷新', exact: true }).click(); await expect(page.getByText('日志不可用', { exact: true })).toBeVisible();
 });

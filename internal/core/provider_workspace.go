@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/protocol"
 	"github.com/candyflosssss/Anchor/internal/state"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -260,12 +262,68 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	p.Protocol = key.EffectiveProtocol(model)
 	out := &catalog.Probe{Revision: p.Revision, KeyID: key.ID, Model: model, At: time.Now().Unix()}
 	start := time.Now()
+	id, err := state.Token()
+	if err != nil {
+		return nil, err
+	}
+	callerCtx := ctx
+	stream := false
+	row := logbook.Request{ID: id, StartedAtMS: start.UnixMilli(), Status: "pending", Source: "probe", ReasoningObserved: true, Stream: &stream, UpstreamModel: model, Model: model, Protocol: p.Protocol, Provider: p.ID, Key: key.ID, Revision: p.Revision, Delivery: "none", Stage: "route", Attempts: []logbook.Attempt{}, Evidence: map[string]string{}}
+	if s.logs != nil {
+		s.logs.Request(row)
+	}
+	var actualHTTP *int
+	stage := "route"
+	defer func() {
+		ms := time.Since(start).Milliseconds()
+		row.ElapsedMS = &ms
+		row.HTTP = actualHTTP
+		row.Stage = stage
+		row.Code = out.Failure
+		row.Status = "failed"
+		if out.Failure == "" && actualHTTP != nil {
+			row.Status = "succeeded"
+			row.Delivery = "complete"
+			row.Stage = "respond"
+		}
+		if callerCtx.Err() != nil {
+			row.Status = "cancelled"
+			if row.Code == "" {
+				row.Code = "client_cancelled"
+			}
+		}
+		if row.Code == "" && row.Status != "succeeded" {
+			row.Code = "probe_interrupted"
+		}
+		if s.logs != nil {
+			s.logs.Request(row)
+		}
+	}()
+
 	attempted := false
 	after := ""
 	u := protocol.Usage{}
 	defer func() {
 		out.ElapsedMS = time.Since(start).Milliseconds()
 		if attempted {
+			row.AttemptCount = 1
+			a := logbook.Attempt{Number: 1, Provider: p.ID, Key: key.ID, Model: model, Protocol: p.Protocol, HTTP: actualHTTP, ElapsedMS: out.ElapsedMS, Outcome: "failed", Code: out.Failure, Stage: stage}
+			if out.Failure == "" {
+				a.Outcome = "succeeded"
+			}
+			if u.Known {
+				a.Input = &u.Input
+				a.Output = &u.Output
+				row.Input = &u.Input
+				row.Output = &u.Output
+			}
+			row.Attempts = []logbook.Attempt{a}
+			if u.CacheReadKnown {
+				row.Metrics.CacheReadTokens = &u.CacheRead
+			}
+			if u.ReasoningKnown {
+				row.Metrics.ReasoningTokens = &u.Reasoning
+			}
 			s.finishKey(p, key.ID, out.HTTPStatus, after, out.Failure == "")
 			s.mu.Lock()
 			if h := s.health[healthID(p, key.ID)]; h != nil {
@@ -310,6 +368,7 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	req.Header.Set("Content-Type", "application/json")
 	authorizeUpstream(req, p, key.Secret)
 	attempted = true
+	stage = "upstream_connect"
 	resp, err := s.upstream.Do(req)
 	if err != nil {
 		out.Failure = "network"
@@ -320,6 +379,9 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	}
 	defer resp.Body.Close()
 	out.HTTPStatus = resp.StatusCode
+	v := resp.StatusCode
+	actualHTTP = &v
+	stage = "upstream_response"
 	after = resp.Header.Get("Retry-After")
 	switch resp.StatusCode {
 	case 200:
@@ -338,11 +400,15 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 		out.Failure = "network"
 		return out, nil
 	}
+	stage = "response_validate"
+	row.Evidence["body_bytes"] = strconv.Itoa(len(data))
+	row.Evidence["json_valid"] = strconv.FormatBool(json.Valid(data))
 	usage, err := protocol.ValidateProbeResponse(data, p.Protocol)
 	if err != nil {
 		out.Failure = "invalid_response"
 	} else {
 		u = usage
+		row.Evidence["validation"] = "passed"
 	}
 	return out, nil
 }

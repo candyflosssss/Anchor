@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -30,20 +31,23 @@ var Version = "0.1.0-dev"
 const MaxRequestBytes = 8 << 20
 
 type Server struct {
-	Agents   *managed.Manager
-	Store    *state.Store
-	Log      *slog.Logger
-	upstream *http.Client
-	mu       sync.Mutex
-	active   map[string]int
-	health   map[string]*keyHealth
-	cursor   map[string]int
-	slots    chan struct{}
-	shutdown chan struct{}
-	stopOnce sync.Once
-	stopping atomic.Bool
-	running  atomic.Bool
-	ready    atomic.Bool
+	Agents    *managed.Manager
+	Store     *state.Store
+	Log       *slog.Logger
+	upstream  *http.Client
+	mu        sync.Mutex
+	active    map[string]int
+	health    map[string]*keyHealth
+	cursor    map[string]int
+	slots     chan struct{}
+	shutdown  chan struct{}
+	stopOnce  sync.Once
+	stopping  atomic.Bool
+	running   atomic.Bool
+	ready     atomic.Bool
+	logOnce   sync.Once
+	closeOnce sync.Once
+	logs      *logbook.Store
 }
 
 func New(store *state.Store, log *slog.Logger) *Server {
@@ -56,7 +60,14 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	tr.ResponseHeaderTimeout = 30 * time.Second
 	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
-func (s *Server) Close() { s.upstream.CloseIdleConnections() }
+func (s *Server) Close() {
+	s.closeOnce.Do(func() {
+		s.upstream.CloseIdleConnections()
+		if s.logs != nil {
+			_ = s.logs.Close()
+		}
+	})
+}
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -64,6 +75,9 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 func fail(w http.ResponseWriter, status int, code, message string) {
+	if recorder, ok := w.(interface{ logFailure(string) }); ok {
+		recorder.logFailure(code)
+	}
 	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": message}})
 }
 func apiError(w http.ResponseWriter, err error) {
@@ -135,7 +149,9 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 	})
 }
 func (s *Server) Control() http.Handler {
+	s.initLogs()
 	mux := http.NewServeMux()
+	s.logRoutes(mux)
 	mux.HandleFunc("POST /control/v1/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		if !s.identity(w, r) {
 			return

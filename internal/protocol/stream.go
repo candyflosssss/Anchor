@@ -13,7 +13,10 @@ import (
 
 // Stream incrementally forwards/converts bounded SSE events. EOF without a terminal
 // event is an error and cannot produce a successful completion or replay.
-func Stream(w http.ResponseWriter, body io.Reader, from, to, model string) (usage Usage, streamErr error) {
+func Stream(w http.ResponseWriter, body io.Reader, from, to, model string) (Usage, error) {
+	return StreamObserved(w, body, from, to, model, nil)
+}
+func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model string, observation *Observation) (usage Usage, streamErr error) {
 	r := Result{ID: fmt.Sprintf("resp_anchor_%d", time.Now().UnixNano()), Model: model}
 	emit := &emitter{w: w, p: to, r: &r}
 	same := from == to
@@ -83,6 +86,7 @@ func Stream(w http.ResponseWriter, body io.Reader, from, to, model string) (usag
 		}
 
 		if same {
+			observation.event(m, from)
 			switch from {
 			case "responses":
 				if m["type"] == "response.completed" || m["type"] == "response.incomplete" {
@@ -311,6 +315,7 @@ func Stream(w http.ResponseWriter, body io.Reader, from, to, model string) (usag
 				return ErrUnsupported
 			}
 		}
+		observation.event(m, from)
 		return nil
 	}
 	for scanner.Scan() {

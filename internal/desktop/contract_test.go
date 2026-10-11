@@ -124,3 +124,32 @@ func TestSharedProviderModelsContract(t *testing.T) {
 		t.Fatal("catalog semantics drift")
 	}
 }
+
+func TestSharedLogContract(t *testing.T) {
+	raw, err := os.ReadFile("../../desktop/contract/logs.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Contract string      `json:"contract"`
+		Query    LogQuery    `json:"query"`
+		Page     LogPage     `json:"page"`
+		Settings LogSettings `json:"settings"`
+	}
+	if err = json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if fixture.Contract != Contract || fixture.Query.Validate() != nil || fixture.Settings.Validate() != nil || len(fixture.Page.Requests) != 2 {
+		t.Fatal("log contract drift")
+	}
+	failed, ok := fixture.Page.Requests[0], fixture.Page.Requests[1]
+	if failed.HTTP == nil || *failed.HTTP != 200 || failed.Code != "invalid_response" || failed.Input != nil || failed.Metrics.TimeToFirstTextMS != nil || ok.Metrics.CacheReadTokens == nil || *ok.Metrics.CacheReadTokens != 0 {
+		t.Fatal("log null/zero semantics drift")
+	}
+	encoded, _ := json.Marshal(failed)
+	var keys map[string]any
+	json.Unmarshal(encoded, &keys)
+	if len(keys) != 26 {
+		t.Fatalf("unexpected log keys: %d", len(keys))
+	}
+}

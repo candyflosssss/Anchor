@@ -39,6 +39,13 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--tools] [--streaming] [--approve]
   provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
   provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
+  logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
+      [--cursor N] [--until N] [--status RESULT] [--source SOURCE] [--provider ID]
+      [--model MODEL] [--key ID] [--http CODE] [--code CODE] [--stage STAGE]
+      [--level LEVEL] [--search PREFIX]
+  logs detail REQUEST_ID | logs settings
+  logs configure [--days 7] [--system-days 7] [--max-requests 50000]
+      [--request-mib 256] [--system-mib 32]
   usage                                Persistent per-provider/model totals
   provider add|put --id ID --base-url URL [--secret-stdin] [--revision N]
                 [--protocol responses|chat-completions|anthropic] [--timeout 120] [--max-concurrent 4]
@@ -64,7 +71,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
                 [--product desktop --current-version VERSION]
   update apply --approve             Replace local CLI; core must be stopped
   version
-All normal output except agent token is JSON; diagnostics and service logs go to stderr.
+Normal output is JSON; logs export is JSONL, logs follow emits repeated JSON pages, agent token is raw secret.
+Diagnostics and service logs go to stderr.
 Provider IDs accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
 init/serve/access/context/recover/update/agent token operate locally. Business commands use the selected context.
@@ -277,6 +285,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 			return err
 		}
 		return a.output(v)
+	case "logs":
+		return a.logs(ctx, cl, args[1:])
 	case "provider":
 		return a.providers(ctx, cl, args[1:])
 	case "model":

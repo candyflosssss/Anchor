@@ -12,6 +12,11 @@ async function host(page: Page) {
     let providers: Provider[] = rows;
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
     const api: DesktopBridge = {
+      Logs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      LogDetail: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      LogSettings: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ConfigureLogs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ExportLogs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       UpdateStatus: async () => ({ contract, data: { ...update, latest_version: '', available: false, phase: 'idle', download_path: '', install_kind: '' }, problem: null }),
       CheckUpdate: async channel => { counters.checks++; return { contract, data: { ...update, channel, phase: 'checked', download_path: '' }, problem: null }; },
       DownloadUpdate: async () => {
@@ -234,15 +239,10 @@ test('an unsupported directory does not label the provider unusable or show upst
 });
 
 
-test('logs preview is explicitly synthetic when desktop bridge is unavailable', async ({ page }) => {
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: '本机核心暂不可用' })).toBeVisible();
-  await page.getByRole('button', { name: '日志', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '日志', exact: true })).toBeVisible();
-  await expect(page.getByText('所有记录均为虚拟数据，用于预览页面与排障交互。')).toBeVisible();
-  await page.getByRole('button', { name: '查看请求 req_demo_8f2c91' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '供应商', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '本机核心暂不可用' })).toBeVisible();
+test('logs reports unavailable without a desktop bridge', async ({ page }) => {
+ await page.goto('/');
+ await page.getByRole('button', { name: '日志', exact:true }).click();
+ await expect(page.getByRole('heading',{name:'日志',exact:true})).toBeVisible();
+ await expect(page.getByText('日志读取失败',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:/查看请求/})).toHaveCount(0);
 });

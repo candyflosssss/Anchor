@@ -69,3 +69,10 @@ ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置�
 受控新增 ProviderWorkspace/ProviderAction；DTO、引用保护、确认和 revision 规则见[供应商接口 §5](provider-interface.md#5-第一优先工作台desktop11)。模型目录仍单独只读，推理测试是用户显式批准的一次最小请求。密钥仅输入不返回，价格导入只预填。前端保留 feature Model/View/hook Controller 边界。
 
 本轮真实 Go 桥接→client→隔离核心的读取/写入/冲突及契约漂移已通过；前端类型检查及55项定向单元通过。不运行浏览器和原生安装验收，不将这些结果代替系统 WebView 实测。升级须先显式正常停止旧核心并退出窗口，安装新包后再启动；本轮数据库自动升级至 schema3，旧二进制不能打开升级后的数据库。
+
+
+## 日志桥接（2026-10-12）
+
+新增 Logs / LogDetail / LogSettings / ConfigureLogs / ExportLogs，DTO 规范源仍是 contract.go；共享样例为 desktop/contract/logs.json。宿主连接复用现有 client 管理 API，保留鉴权和实例身份保护。列表/详情超时5秒；导出2分钟，连接核验后释放 session mutex，不占住其他桌面操作。
+
+ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径；创建目标目录的600权限 partial，流式写入、Sync/Close/Rename，失败清理任务自己的部分文件；取消返回 accepted=false。列偏好在前端保存，不送核心；缺桥接或读取失败不使用 mock。核心日志生命周期独立于窗口，宿主退出不停止日志采集。具体语义和边界见[日志实现](logging.md)。

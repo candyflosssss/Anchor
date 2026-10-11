@@ -25,6 +25,11 @@ func TypeScript() string {
 			return ts(t.Elem()) + " | null"
 		case reflect.Slice:
 			return ts(t.Elem()) + "[]"
+		case reflect.Map:
+			if t.Key().Kind() != reflect.String {
+				panic("invalid map key")
+			}
+			return "Record<string, " + ts(t.Elem()) + ">"
 		case reflect.String:
 			return "string"
 		case reflect.Bool:
@@ -37,7 +42,7 @@ func TypeScript() string {
 			panic("unsupported contract type: " + t.String())
 		}
 	}
-	for _, v := range []any{Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, ModelProtocol{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}} {
+	for _, v := range []any{Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, ModelProtocol{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}, LogMetrics{}, LogAttempt{}, RequestLog{}, SystemLog{}, LogQuery{}, LogPage{}, LogHealth{}, LogSettings{}, LogsResult{}, LogDetailResult{}, LogSettingsResult{}} {
 		t := reflect.TypeOf(v)
 		fmt.Fprintf(&out, "export interface %s {\n", t.Name())
 		for i := 0; i < t.NumField(); i++ {

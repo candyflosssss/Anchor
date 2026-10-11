@@ -11,6 +11,8 @@ import (
 type Usage struct {
 	Known                                bool
 	Input, Output, CacheRead, CacheWrite int64
+	CacheReadKnown, ReasoningKnown       bool
+	Reasoning                            int64
 }
 
 func ReadUsage(m Object, p string) Usage {
@@ -36,6 +38,25 @@ func ReadUsage(m Object, p string) Usage {
 		r.CacheRead = num(obj(u["prompt_tokens_details"])["cached_tokens"])
 	} else {
 		r.CacheRead = num(obj(u["input_tokens_details"])["cached_tokens"])
+	}
+	details := obj(u["output_tokens_details"])
+	if p == "chat-completions" {
+		details = obj(u["completion_tokens_details"])
+	}
+	if validToken(details["reasoning_tokens"]) {
+		r.ReasoningKnown = true
+		r.Reasoning = num(details["reasoning_tokens"])
+	}
+	if r.Reasoning > r.Output {
+		return Usage{}
+	}
+	switch p {
+	case "anthropic":
+		r.CacheReadKnown = validToken(u["cache_read_input_tokens"])
+	case "chat-completions":
+		r.CacheReadKnown = validToken(obj(u["prompt_tokens_details"])["cached_tokens"])
+	default:
+		r.CacheReadKnown = validToken(obj(u["input_tokens_details"])["cached_tokens"])
 	}
 	if r.CacheRead < 0 || r.CacheWrite < 0 || r.CacheRead+r.CacheWrite > r.Input {
 		return Usage{}

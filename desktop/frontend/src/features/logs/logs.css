@@ -1,5 +1,7 @@
-.log-workspace { max-width: 1560px; }
-.log-page-header { margin-bottom: 20px; }
+.log-workspace { max-width: 1560px; padding: 24px; }
+.log-page-header { display: flex; justify-content: space-between; align-items:center; gap:16px; margin-bottom: 20px; }
+.log-page-header > div { flex-wrap:wrap; }
+.log-filters > input { width: 160px; flex: 1 1 140px; max-width:280px; }
 .log-preview-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: 5px; padding: 3px 7px; }
 .log-preview-notice { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 24px; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--muted) / .4); color: hsl(var(--muted-foreground)); font-size: 12px; }
 .log-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid hsl(var(--border)); }

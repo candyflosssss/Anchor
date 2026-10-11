@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/protocol"
 	"io"
 	"mime"
 	"net/http"
 	"net/http/httptrace"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -21,6 +23,7 @@ type bindingKey struct{}
 type protocolKey struct{}
 
 func (s *Server) Gateway() http.Handler {
+	s.initLogs()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /v1/models", func(w http.ResponseWriter, r *http.Request) {
 		models, err := s.Store.Models()
@@ -44,7 +47,7 @@ func (s *Server) Gateway() http.Handler {
 	mux.HandleFunc("POST /v1/responses", s.responses)
 	mux.HandleFunc("POST /v1/chat/completions", s.protocolHandler("chat-completions"))
 	mux.HandleFunc("POST /v1/messages", s.protocolHandler("anthropic"))
-	return s.guard("gateway", mux)
+	return s.guard("gateway", s.recordRequests(mux))
 }
 func (s *Server) take(id string, max int) bool {
 	s.mu.Lock()
@@ -64,12 +67,7 @@ func (s *Server) release(id string) {
 	}
 }
 func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
-	requestID, err := state.Token()
-	if err != nil {
-		apiError(w, err)
-		return
-	}
-	w.Header().Set("X-Anchor-Request-ID", requestID[:16])
+	var err error
 	select {
 	case s.slots <- struct{}{}:
 		defer func() { <-s.slots }()
@@ -135,6 +133,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	request["store"] = json.RawMessage("false")
+	setLogStage(r, "route")
 	model, err := s.Store.Model(modelID)
 	if err != nil {
 		if errors.Is(err, state.ErrNotFound) {
@@ -143,6 +142,12 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			apiError(w, err)
 		}
 		return
+	}
+	observeRequest(r, modelID, stream, request, model.Revision)
+	if s.logs != nil {
+		if t := trace(r); t != nil {
+			s.logs.Request(t.row)
+		}
 	}
 	if stream && !model.Streaming {
 		fail(w, 400, "unsupported_capability", "public model does not advertise streaming")
@@ -198,6 +203,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		}
 		s.release(provider.ID)
 	}
+	setLogStage(r, "route")
 	fail(w, 503, "no_available_candidate", "no enabled, supported and available candidate succeeded")
 }
 func (s *Server) protocolHandler(from string) http.HandlerFunc {
@@ -228,7 +234,7 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 }
-func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool) bool {
+func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool) (retry bool) {
 	// Resolve after key selection: the upstream model override wins over this key's default.
 	p.Protocol = key.EffectiveProtocol(c.Model)
 	started := time.Now()
@@ -237,6 +243,17 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	attempted := false
 	after := ""
 	usage := protocol.Usage{}
+	observation := protocol.Observation{}
+	var upstreamHTTP *int
+	code := ""
+	setLogStage(r, "request_convert")
+	if t := trace(r); t != nil {
+		if _, exists := t.row.Evidence["model_revision"]; !exists {
+			t.row.Evidence["model_revision"] = strconv.FormatInt(t.row.Revision, 10)
+		}
+		t.row.Revision = p.Revision
+		t.row.Code = ""
+	}
 	defer func() {
 		if !attempted { // Release a half-open reservation if local conversion was rejected.
 			s.mu.Lock()
@@ -254,6 +271,40 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 				h.Probing = false
 			}
 			s.mu.Unlock()
+		}
+		t := trace(r)
+		outcome := "failed"
+		if success {
+			outcome = "succeeded"
+			if t != nil {
+				t.row.Status = "succeeded"
+				t.row.Code = ""
+			}
+		} else if retry {
+			outcome = "retry"
+		} else if r.Context().Err() != nil {
+			outcome = "cancelled"
+		}
+		stage := "dispatch"
+		if t != nil {
+			stage = t.row.Stage
+			if t.row.Code != "" {
+				code = t.row.Code
+			}
+		}
+		if !success && code == "" {
+			code = "upstream_failed"
+		}
+		a := logbook.Attempt{Number: 1, Provider: p.ID, Key: key.ID, Model: c.Model, Protocol: p.Protocol, HTTP: upstreamHTTP, ElapsedMS: time.Since(started).Milliseconds(), Outcome: outcome, Code: code, Stage: stage}
+		if usage.Known {
+			in, out := usage.Input, usage.Output
+			a.Input = &in
+			a.Output = &out
+		}
+		if t != nil {
+			a.Number = t.row.AttemptCount + 1
+			t.addAttempt(a, usage)
+			setLogMetrics(t, observation, usage, p.Protocol, success)
 		}
 		u := state.Usage{ProviderID: p.ID, Model: public, Requests: 1, ElapsedMS: time.Since(started).Milliseconds(), InputTokens: usage.Input, OutputTokens: usage.Output, CacheRead: usage.CacheRead, CacheWrite: usage.CacheWrite}
 		if !success {
@@ -293,12 +344,14 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	}
 	authorizeUpstream(up, p, key.Secret)
 	attempted = true
+	setLogStage(r, "dispatch")
 	resp, err := s.upstream.Do(up)
 	if err != nil {
 		if r.Context().Err() != nil {
 			return false
 		}
 		if !connected.Load() {
+			code = "upstream_connect"
 			return true
 		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -312,15 +365,26 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	}
 	defer resp.Body.Close()
 	status = resp.StatusCode
+	upstreamHTTP = &status
+	setLogStage(r, "response_validate")
 	after = resp.Header.Get("Retry-After")
+	setLogStage(r, "upstream_response")
 	if status != 200 {
 		switch status {
 		case 401, 403, 429, 502, 503, 504:
+			code = "upstream_unavailable"
+			if status == 429 {
+				code = "rate_limited"
+			}
+			if status == 401 || status == 403 {
+				code = "authentication"
+			}
 			return true
 		}
 		fail(w, 502, "upstream_rejected", "upstream rejected request")
 		return false
 	}
+	setLogStage(r, "response_validate")
 	media, _, e := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	expected := "application/json"
 	if stream {
@@ -339,7 +403,15 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Accel-Buffering", "no")
 		w.WriteHeader(200)
-		usage, err = protocol.Stream(w, resp.Body, p.Protocol, to, public)
+		setLogStage(r, "stream")
+		usage, err = protocol.StreamObserved(w, resp.Body, p.Protocol, to, public, &observation)
+		if err != nil {
+			code = "stream_interrupted"
+			if t := trace(r); t != nil {
+				t.row.Status = "failed"
+				t.row.Code = code
+			}
+		}
 		success = err == nil
 		return false
 	}
@@ -355,10 +427,12 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 			return false
 		}
 		usage = protocol.ReadUsage(m, p.Protocol)
+		observation.Status = safeGenerationStatus(m, p.Protocol)
 		if m["error"] != nil || m["status"] == "failed" {
 			fail(w, 502, "upstream_failed", "upstream generation failed")
 			return false
 		}
+		setLogStage(r, "respond")
 		w.Header().Set("Content-Type", "application/json")
 		_, err = w.Write(data)
 		success = err == nil
@@ -370,10 +444,15 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		return false
 	}
 	usage = result.Usage
+	observation.Status = "completed"
+	if result.Finish == "length" {
+		observation.Status = "incomplete"
+	}
 	if to == "anthropic" && !usage.Known {
 		fail(w, 502, "unsupported_upstream_response", "upstream omitted usage required by Messages")
 		return false
 	}
+	setLogStage(r, "respond")
 	result.Model = public
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(result.JSON(to))

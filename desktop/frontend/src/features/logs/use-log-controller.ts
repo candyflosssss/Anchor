@@ -1,42 +1,50 @@
-import { useMemo, useState } from 'react';
-import { filterRequests, initialFilters, safeSummary, type LogFilters, type RequestLog } from './log.model';
-import { incomingFixture, requestFixtures, systemFixtures } from './log.mock';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { initialFilters, safeSummary, type LogFilters, type RequestLog } from './log.model';
+import { logService, requestLog, systemLog, type LogQuery, type LogSettings } from './log.service';
+import type { Page } from '../../desktop/contract.generated';
 export function useLogController() {
   const [tab, setTab] = useState<'requests' | 'system'>('requests');
-  const [filters, setFilters] = useState(initialFilters);
-  const [rows, setRows] = useState(requestFixtures);
-  const [selected, select] = useState<RequestLog | null>(null);
-  const [level, setLevel] = useState('all');
-  const [paused, setPaused] = useState(false);
-  const [pending, setPending] = useState(false);
-  const [received, setReceived] = useState(false);
-  const [scenario, setScenario] = useState('normal');
-  const [notice, setNotice] = useState('');
-  const [settings, showSettings] = useState(false);
-  const [days, setDays] = useState('7');
-  const filtered = useMemo(() => filterRequests(rows, filters), [rows, filters]);
-  const systems = useMemo(() => systemFixtures.filter(row => row.ageMinutes <= Number(filters.window)
-    && (level === 'all' || row.level === level)
-    && `${row.event} ${row.message} ${row.source} ${row.requestId ?? ''}`.toLowerCase().includes(filters.query.trim().toLowerCase())), [filters, level]);
-  function filter<K extends keyof LogFilters>(key: K, value: LogFilters[K]) { setFilters(current => ({ ...current, [key]: value })); }
-  function resetFilters() { setFilters(initialFilters); setLevel('all'); }
-  async function copy(row: RequestLog) {
-    try { await navigator.clipboard.writeText(safeSummary(row)); setNotice('已复制虚拟数据的安全排障摘要'); }
-    catch { setNotice('无法访问剪贴板，请从详情中手动选择文本。'); }
+  const [filters, setFilters] = useState(initialFilters), [level, setLevel] = useState('all');
+  const [page, setPage] = useState<Page | null>(null), [cursors, setCursors] = useState<number[]>([0]);
+  const [snapshot, setSnapshot] = useState(0), [paused, setPaused] = useState(false);
+  const [selected, setSelected] = useState<RequestLog | null>(null), [loading, setLoading] = useState(false);
+  const [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [settings, showSettings] = useState(false), [config, setConfig] = useState<LogSettings | null>(null);
+  const [revision, refresh] = useState(0), [exporting, setExporting] = useState(false), [saving, setSaving] = useState(false);
+  const lifecycle = useRef({ request: 0, detail: 0, alive: true }).current;
+  const query = useMemo<LogQuery>(() => ({ kind: tab, limit: 50, cursor: cursors.at(-1) ?? 0, until: snapshot,
+    since_ms: Date.now() - Number(filters.window) * 60000, before_ms: 0, status: tab === 'requests' && filters.status !== 'all' ? filters.status : '',
+    source: filters.source !== 'all' ? filters.source : '', provider: tab === 'requests' && filters.provider !== 'all' ? filters.provider : '',
+    model: filters.model, key: filters.key, http: filters.http ? Number(filters.http) : null, code: filters.code, stage: filters.stage,
+    level: level === 'all' ? '' : level, search: filters.query.trim() }), [tab, filters, level, cursors, snapshot]);
+  const load = useCallback(async () => {
+    const id = ++lifecycle.request; setLoading(true);
+    try { const p = await logService.list({ ...query, since_ms: Date.now() - Number(filters.window) * 60000 }); if (lifecycle.alive && id === lifecycle.request) { setPage(p); setError(''); } }
+    catch { if (lifecycle.alive && id === lifecycle.request) { setPage(null); setError('日志读取失败'); } }
+    finally { if (lifecycle.alive && id === lifecycle.request) setLoading(false); }
+  }, [query, filters.window, lifecycle]);
+  useEffect(() => { lifecycle.alive = true; return () => { lifecycle.alive = false; lifecycle.request++; lifecycle.detail++; }; }, [lifecycle]);
+  useEffect(() => { let stopped = false; let timer: ReturnType<typeof setTimeout>;
+    async function poll() { await load(); if (!stopped && !paused && cursors.length === 1) timer = setTimeout(() => void poll(), 3000); }
+    void poll(); return () => { stopped = true; clearTimeout(timer); lifecycle.request++; };
+  }, [load, paused, cursors.length, revision, lifecycle]);
+  useEffect(() => { let cancelled = false; void logService.settings().then(v => { if (!cancelled) setConfig(v); }).catch(() => {}); return () => { cancelled = true; }; }, []);
+  function filter<K extends keyof LogFilters>(key: K, value: LogFilters[K]) { setFilters(current => ({ ...current, [key]: value })); setCursors([0]); setSnapshot(0); setPage(null); }
+  function resetFilters() { setFilters(initialFilters); setLevel('all'); setCursors([0]); setSnapshot(0); setPage(null); }
+  async function select(row: RequestLog | null) {
+    const id = ++lifecycle.detail; if (!row) { setSelected(null); return; }
+    setSelected(null); try { const v = await logService.detail(row.id); if (lifecycle.alive && id === lifecycle.detail) setSelected(v); }
+    catch { if (lifecycle.alive && id === lifecycle.detail) setNotice('详情读取失败'); }
   }
-  function exportPreview() {
-    const data = tab === 'requests' ? filtered : systems;
-    const blob = new Blob([JSON.stringify({ preview: true, schema_version: 1, data }, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a'); link.href = url; link.download = `anchor-${tab}-demo.json`; link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    setNotice(`已导出 ${data.length} 条虚拟记录，不包含真实请求。`);
-  }
-  function loadNew() { setRows(current => [incomingFixture, ...current]); setPending(false); setReceived(true); }
-  return { tab, setTab, filters, filter, resetFilters, filtered, systems, selected, select, level, setLevel, paused, setPaused,
-    pending, setPending, received, loadNew, total: rows.length, findRequest: (id: string) => rows.find(row => row.id === id) ?? null, scenario, setScenario, notice, copy, exportPreview, settings, showSettings, days, setDays,
-    providers: [...new Set(requestFixtures.flatMap(row => row.attempts.map(attempt => attempt.provider)))],
-    visible: scenario === 'empty' || scenario === 'offline' ? [] : filtered,
+  async function copy(row: RequestLog) { try { await navigator.clipboard.writeText(safeSummary(row)); setNotice('已复制'); } catch { setNotice('复制失败'); } }
+  async function exportLogs() { if (exporting) return; setExporting(true); try { const v = await logService.export({ ...query, cursor: 0 }); if (lifecycle.alive) setNotice(v.accepted ? '已导出' : '已取消'); } catch { if (lifecycle.alive) setNotice('导出失败'); } finally { if (lifecycle.alive) setExporting(false); } }
+  async function saveSettings() { if (!config || saving) return; setSaving(true); try { const v = await logService.configure(config); if (lifecycle.alive) { setConfig(v); showSettings(false); setNotice('已保存'); refresh(v => v + 1); } } catch { if (lifecycle.alive) setNotice('保存失败'); } finally { if (lifecycle.alive) setSaving(false); } }
+  return { tab, setTab, filters, filter, resetFilters, level, setLevel, paused, setPaused, selected, select, loading, error, notice, copy, exportLogs,
+    exporting, saving, settings, showSettings, config, setConfig, saveSettings, visible: (page?.requests ?? []).map(requestLog), systems: (page?.events ?? []).map(systemLog), health: page?.health,
+    pageNumber: cursors.length, hasMore: page?.has_more ?? false, refresh: () => { setCursors([0]); setSnapshot(0); refresh(v => v + 1); },
+    next: () => { if (page?.has_more) { setSnapshot(v => v || page.latest); setCursors(v => [...v, page.next_cursor]); setPage(null); } },
+    previous: () => { setCursors(v => v.slice(0, -1)); setPage(null); },
+    findRequest: async (id: string) => { try { const row = await logService.detail(id); if (lifecycle.alive) setSelected(row); } catch { if (lifecycle.alive) setNotice('关联请求不存在'); } },
   };
 }
 export type LogController = ReturnType<typeof useLogController>;

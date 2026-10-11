@@ -1,7 +1,10 @@
 // Package desktop is the platform-independent, typed desktop boundary.
 package desktop
 
-import "github.com/candyflosssss/Anchor/internal/catalog"
+import (
+	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/logbook"
+)
 
 const Contract = "anchor-desktop-v1"
 const MaxSafeRevision int64 = 9007199254740991
@@ -108,3 +111,28 @@ type WorkspaceResult struct {
 
 type Price = catalog.Price
 type Estimate = catalog.Estimate
+
+// Logging DTOs use the canonical body-free core contract.
+type LogMetrics = logbook.Metrics
+type LogAttempt = logbook.Attempt
+type RequestLog = logbook.Request
+type SystemLog = logbook.Event
+type LogQuery = logbook.Query
+type LogPage = logbook.Page
+type LogHealth = logbook.Health
+type LogSettings = logbook.Settings
+type LogsResult struct {
+	Contract string   `json:"contract"`
+	Data     *LogPage `json:"data"`
+	Problem  *Problem `json:"problem"`
+}
+type LogDetailResult struct {
+	Contract string      `json:"contract"`
+	Data     *RequestLog `json:"data"`
+	Problem  *Problem    `json:"problem"`
+}
+type LogSettingsResult struct {
+	Contract string       `json:"contract"`
+	Data     *LogSettings `json:"data"`
+	Problem  *Problem     `json:"problem"`
+}
