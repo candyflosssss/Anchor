@@ -21,14 +21,30 @@ async function delay(signal: AbortSignal) {
     signal.addEventListener('abort', abort, { once: true });
   });
 }
+/** Synthetic first-read state so overview, attention and model pages have something to show. */
+function seed(id: string, w: Workspace) {
+  const now = Math.floor(Date.now() / 1000);
+  const mapping = (upstream: string) => ({ id: 'coding-main', display_name: 'coding-main', upstream, tools: true, streaming: true, revision: 1, candidate_count: 2 });
+  if (id === '摸鱼AI') w.models = [mapping('demo-model-mini')];
+  if (id === '备用供应商') {
+    w.keys = [
+      { id: 'backup', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: { revision: w.revision, key_id: 'backup', model: 'backup-model', at: now - 7200, http_status: 200, elapsed_ms: 860, failure: '' } },
+      { id: 'primary', enabled: true, state: 'cooling', failures: 3, retry_at: now + 600, test: null },
+    ];
+    w.models = [mapping('backup-model')];
+    w.usage = [{ provider_id: id, model: 'coding-main', requests: 42, failures: 1, elapsed_ms: 50400, known: 40, input_tokens: 120000, output_tokens: 30000, cache_read: 20000, cache_write: 0 }];
+    w.estimates = [{ model: 'coding-main', usd: 0.0123 }];
+  }
+}
 /** Simulates revision/secret semantics only. Secrets are discarded, never stored. */
 export class MockProviderTransport implements ProviderTransport {
   private rows = examples().map(copy);
   private workspaces = new Map<string, Workspace>();
+  private seeded = new Set<string>();
   private scenario: Scenario = 'normal';
   reset(scenario: Scenario) {
     this.scenario = scenario;
-    this.workspaces.clear();
+    this.workspaces.clear(); this.seeded.clear();
     this.rows = scenario === 'empty' ? fixture.empty.map(checkedProvider) : examples().map(copy);
   }
   async list(signal: AbortSignal): Promise<Provider[]> {
@@ -45,7 +61,11 @@ export class MockProviderTransport implements ProviderTransport {
   }
   private detail(p: Provider): Workspace {
     let w = this.workspaces.get(p.id);
-    if (!w) { w = checkedWorkspace({ ...structuredClone(workspaceFixture), provider_id: p.id, revision: p.revision, keys: p.has_secret ? structuredClone(workspaceFixture.keys) : [] }); this.workspaces.set(p.id, w); }
+    if (!w) {
+      w = checkedWorkspace({ ...structuredClone(workspaceFixture), provider_id: p.id, revision: p.revision, keys: p.has_secret ? structuredClone(workspaceFixture.keys) : [] });
+      if (!this.seeded.has(p.id)) { this.seeded.add(p.id); seed(p.id, w); }
+      this.workspaces.set(p.id, w);
+    }
     w.revision = p.revision; return w;
   }
   async workspace(id: string, signal: AbortSignal): Promise<Workspace> {
@@ -78,7 +98,7 @@ export class MockProviderTransport implements ProviderTransport {
       case 'strategy': w.strategy = a.strategy; p.revision++; break;
       case 'model-put': { const old = w.models.find(m => m.id === a.target); if (!a.target || !a.model || (old?.revision ?? 0) !== a.model_revision) throw fixtureError('conflict'); w.models = w.models.filter(m => m.id !== a.target); w.models.push({ id: a.target, display_name: a.target, upstream: a.model, tools: a.tools, streaming: a.streaming, revision: a.model_revision + 1, candidate_count: 1 }); break; }
       case 'model-delete': if (!a.approved) throw fixtureError('invalid'); w.models = w.models.filter(m => m.id !== a.target); break;
-      case 'test': if (!a.approved) throw fixtureError('invalid'); w.probe = { revision: p.revision, key_id: a.target, model: a.model, at: 1791648000, http_status: 200, elapsed_ms: 120, failure: '' }; break;
+      case 'test': if (!a.approved) throw fixtureError('invalid'); w.probe = { revision: p.revision, key_id: a.target, model: a.model, at: Math.floor(Date.now() / 1000), http_status: 200, elapsed_ms: 120, failure: '' }; { const k = w.keys.find(k => k.id === a.target); if (k) k.test = { ...w.probe }; } break;
       case 'price-import': w.imported_price = { model: a.target, input_usd: 1, output_usd: 3, cache_read_usd: null, cache_write_usd: null, source: 'prototype/synthetic', updated_at: 1791648000 }; break;
       case 'price-put': if (!a.price) throw fixtureError('invalid'); w.prices = [...w.prices.filter(p => p.model !== a.target), { ...a.price, model: a.target }]; w.imported_price = null; p.revision++; break;
       default: throw fixtureError('invalid');

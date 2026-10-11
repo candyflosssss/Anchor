@@ -19,6 +19,7 @@ test('list, selection, search, filters and scope are truthful', async ({ page })
   await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
   await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('revision 3');
   await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('模型推理尚未测试');
+  await page.getByRole('button', { name: '返回供应商列表', exact: true }).click();
   await page.getByLabel('搜索供应商名称或地址').fill('127.0.0.1');
   await expect(page.getByRole('button', { name: '本地调试', exact: true })).toBeVisible();
   await expect(page.getByLabel('摸鱼AI 的详情')).toHaveCount(0);
@@ -42,8 +43,7 @@ test('new provider validates fields, handles Chinese ID and never persists secre
   await page.getByLabel('API 密钥（可选）').fill('browser-test-only');
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).dblclick();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole('status')).toContainText('revision 1');
-  await page.getByRole('button', { name: '中文供应商', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '中文供应商 的配置已保存' })).toContainText('revision 1');
   await expect(page.getByLabel('中文供应商 的详情')).toContainText('已配置');
   const storage = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }));
   expect(JSON.stringify(storage)).not.toContain('browser-test-only');
@@ -95,7 +95,7 @@ test('secret replacement is only-input and clearing requires explicit acknowledg
   await page.getByLabel('新的 API 密钥').fill('replace-test-only');
   await page.getByRole('button', { name: '保存配置', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
-  await edit(page); await page.getByRole('button', { name: '清除密钥', exact: true }).click();
+  await edit(page); await page.getByRole('button', { name: '清除默认密钥', exact: true }).click();
   await page.getByRole('button', { name: '保存配置', exact: true }).click();
   await expect(page.getByText('请确认清除密钥的影响。', { exact: true })).toBeVisible();
   await page.getByLabel('我确认清除 摸鱼AI 的密钥').check();
@@ -225,7 +225,7 @@ test('mobile navigation is a closable sheet with keyboard focus restoration', as
   await trigger.click();
   const sheet = page.getByRole('dialog', { name: '工作台导航' });
   await expect(sheet).toBeVisible();
-  await expect(sheet.getByRole('button', { name: '概览', exact: true })).toBeDisabled();
+  await expect(sheet.getByRole('button', { name: '概览', exact: true })).toBeEnabled();
   await sheet.getByRole('button', { name: '深色', exact: true }).click();
   await expect(page.locator('html')).toHaveClass('dark');
   await page.keyboard.press('Escape');
@@ -247,7 +247,6 @@ test('long Chinese IDs and root URLs stay readable without widening the window',
   await page.getByLabel('API 根地址', { exact: true }).fill(url);
   await page.getByRole('dialog').getByRole('button', { name: '添加供应商', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
-  await page.getByRole('button', { name: id, exact: true }).click();
   const detail = page.getByLabel(`${id} 的详情`);
   await expect(detail).toContainText(url);
   for (const width of [960, 720, 480]) {
@@ -261,6 +260,7 @@ test('mock directory shares synthetic model IDs without importing or incrementin
   await page.goto('/');
   await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
   const detail = page.getByLabel('摸鱼AI 的详情');
+  await detail.getByRole('tab', { name: /^模型/ }).click();
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   await expect(detail.getByText('demo-model', { exact: true })).toBeVisible();
   await expect(detail).toContainText('已获取 2 个模型');

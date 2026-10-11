@@ -4,7 +4,9 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupConte
 import { prototype } from '../../desktop/environment';
 import type { Appearance } from '../../app/use-appearance';
 
-export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }: { page: 'providers' | 'settings'; onNavigate: (page: 'providers' | 'settings') => void; busy: boolean; appearance: Appearance; setAppearance: (value: Appearance) => void }) {
+export type Page = 'overview' | 'providers' | 'models' | 'settings';
+
+export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }: { page: Page; onNavigate: (page: Page) => void; busy: boolean; appearance: Appearance; setAppearance: (value: Appearance) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
   return <Sidebar collapsible="icon" variant="inset" aria-label="工作台导航">
     <SidebarHeader><SidebarMenu><SidebarMenuItem>
@@ -15,10 +17,10 @@ export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }
     </SidebarMenuItem></SidebarMenu></SidebarHeader>
     <SidebarContent><SidebarGroup><SidebarGroupLabel>工作空间</SidebarGroupLabel><SidebarGroupContent><SidebarMenu>
       {([
-        [LayoutDashboard, '概览', false], [PlugZap, '供应商', true], [ArrowLeftRight, '模型映射', false], [Bot, 'Agent 托管', false], [FileText, '日志', false],
-      ] as const).map(([Icon, title, current]) => <SidebarMenuItem key={title}>
-        <SidebarMenuButton tooltip={current ? title : `${title}：不在本版范围`} disabled={!current || busy} isActive={current && page === 'providers'} aria-current={current && page === 'providers' ? 'page' : undefined} aria-label={title} onClick={() => { onNavigate('providers'); if (isMobile) setOpenMobile(false); }}>
-          <Icon /><span>{title}</span>{!current && <span className="ml-auto text-xs text-muted-foreground">后续</span>}
+        [LayoutDashboard, '概览', 'overview'], [PlugZap, '供应商', 'providers'], [ArrowLeftRight, '模型映射', 'models'], [Bot, 'Agent 托管', null], [FileText, '日志', null],
+      ] as const).map(([Icon, title, target]) => <SidebarMenuItem key={title}>
+        <SidebarMenuButton tooltip={target ? title : `${title}：不在本版范围`} disabled={!target || busy} isActive={!!target && page === target} aria-current={target && page === target ? 'page' : undefined} aria-label={title} onClick={() => { if (!target) return; onNavigate(target); if (isMobile) setOpenMobile(false); }}>
+          <Icon /><span>{title}</span>{!target && <span className="ml-auto text-xs text-muted-foreground">后续</span>}
         </SidebarMenuButton>
       </SidebarMenuItem>)}
     </SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent>
