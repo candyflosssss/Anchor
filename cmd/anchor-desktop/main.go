@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/candyflosssss/Anchor/desktop/branding"
@@ -18,6 +17,7 @@ import (
 	"github.com/candyflosssss/Anchor/internal/cli"
 	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/desktop"
+	"github.com/candyflosssss/Anchor/internal/desktoptray"
 	"github.com/candyflosssss/Anchor/internal/state"
 	"github.com/candyflosssss/Anchor/internal/updater"
 	"github.com/wailsapp/wails/v2"
@@ -91,7 +91,8 @@ func run() int {
 	}
 	var hostContext context.Context
 	var contextMu sync.RWMutex
-	var allowExit atomic.Bool
+	var window desktop.WindowLifecycle
+	var tray desktoptray.Tray
 	session := desktop.NewSession(desktop.Options{Dir: *dir, Executable: executable, Quit: func() {
 		go func() {
 			time.Sleep(250 * time.Millisecond)
@@ -99,29 +100,39 @@ func run() int {
 			ctx := hostContext
 			contextMu.RUnlock()
 			if ctx != nil {
-				allowExit.Store(true)
+				window.RequestExit()
 				wailsruntime.Quit(ctx)
 			}
 		}()
 	}})
 	defer session.Close()
+	defer tray.Stop()
+	bridge := desktop.NewBridge(session)
 	assets, err := fs.Sub(frontend.Assets, "dist")
 	if err != nil {
 		return 1
 	}
 	err = wails.Run(&options.App{Title: "Anchor", Width: 1200, Height: 800, MinWidth: 720, MinHeight: 540,
 		Frameless:   true,
-		AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{desktop.NewBridge(session)},
-		OnStartup:  func(ctx context.Context) { contextMu.Lock(); hostContext = ctx; contextMu.Unlock() },
-		OnShutdown: func(context.Context) { session.Close() },
+		AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{bridge},
+		OnStartup: func(ctx context.Context) {
+			contextMu.Lock()
+			hostContext = ctx
+			contextMu.Unlock()
+			tray.Start(func() {
+				if !window.Exiting() {
+					if wailsruntime.WindowIsMinimised(ctx) {
+						wailsruntime.WindowUnminimise(ctx)
+					}
+					wailsruntime.WindowShow(ctx)
+				}
+			}, func() { bridge.ExitDesktop() })
+		},
+		OnShutdown: func(context.Context) { window.RequestExit(); tray.Stop(); session.Close() },
 		OnBeforeClose: func(ctx context.Context) bool {
-			// Ordinary close requests keep a restorable taskbar window. Explicit
-			// ExitDesktop and confirmed update installation use the Quit callback.
-			if allowExit.Load() {
-				return false
-			}
-			wailsruntime.WindowMinimise(ctx)
-			return true
+			// Hide only while the tray offers a way back. Explicit exit and update
+			// installation must still terminate the host and its tray.
+			return window.BeforeClose(tray.Available(), func() { wailsruntime.WindowHide(ctx) })
 		},
 		Linux: &linux.Options{Icon: branding.Icon, ProgramName: "anchor-desktop", WebviewGpuPolicy: linux.WebviewGpuPolicyNever},
 	})

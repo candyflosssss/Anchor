@@ -5,3 +5,6 @@ import _ "embed"
 
 //go:embed anchor.png
 var Icon []byte
+
+//go:embed anchor.ico
+var WindowsIcon []byte

@@ -15,7 +15,7 @@ func NewBridge(s *Session) *Bridge     { return &Bridge{session: s} }
 func (b *Bridge) Start() SessionResult { return b.session.start() }
 
 // ExitDesktop exits only this GUI host; the detached core keeps running.
-// The host callback also bypasses close-to-minimise for update installation.
+// The host callback also bypasses close-to-tray for update installation.
 func (b *Bridge) ExitDesktop() StopResult {
 	s := b.session
 	s.mu.Lock()

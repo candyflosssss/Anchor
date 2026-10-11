@@ -8,7 +8,7 @@ export const windowMessages = {
   restore: '还原窗口',
   toggle: '最大化或还原窗口',
   close: '关闭窗口',
-  closeHint: '收起到任务栏（窗口和核心继续运行）',
+  closeHint: '关闭到系统托盘（后台核心继续运行）',
 };
 
 export const windowModel = {

@@ -26,7 +26,7 @@ export const windowRuntime = {
   minimise: () => requireRuntime().WindowMinimise(),
   toggleMaximise: () => requireRuntime().WindowToggleMaximise(),
   isMaximised: () => requireRuntime().WindowIsMaximised(),
-  // The host intercepts ordinary close requests and minimises to the taskbar.
+  // The host intercepts ordinary close requests and hides the window in the system tray.
   close: () => requireRuntime().Quit(),
   exit: async () => {
     const result = await call(() => bridge().ExitDesktop(), true);

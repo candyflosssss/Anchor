@@ -30,7 +30,11 @@ Windows / Linux 统一启用 Wails `Frameless`，以现有工作区 header 承�
 
 拖动使用 `--wails-draggable: drag`；交互元素及窗口按钮明确为 `no-drag`。双击仅处理拖动区域。状态查询有超时并在 resize / focus / 恢复可见时更新，组件卸载移除监听和计时器；缺失 runtime 显示失败而不回退模拟。浏览器 prototype 隐藏原生控件。
 
-`Quit` 普通关闭请求由 OnBeforeClose 拦截并最小化到任务栏，不调用 StopCore。ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置原子退出标记，再调用 Quit，绕过最小化，确保更新 helper 不会卡在等待窗口退出。ExitDesktop 不要求核心在线，更新交接中返回 conflict；未绑定宿主退出回调时返回 unsupported。任务栏收起不是系统托盘，此版本未新增托盘图标。最小化 / 最大化 / 还原是本机窗口展示行为，不增加 CLI 管理指令。本轮只修改源码与编译打包，原生 Windows / Linux 拖动、缩放及按钮行为不声明已验收。
+desktop.14 起，`Quit` 普通关闭请求由 OnBeforeClose 拦截：只有系统托盘已就绪时才调用 `WindowHide`，窗口从任务栏消失、Anchor 图标保留在通知区域；不调用 StopCore。单击托盘图标或菜单「打开 Anchor」恢复窗口；菜单「退出界面（核心继续运行）」复用 Bridge.ExitDesktop。最小化按钮仍调用 WindowMinimise，保留标准任务栏最小化行为。
+
+托盘由 Go 宿主的 `internal/desktoptray` 管理：Windows 使用原生通知图标和独立锁定线程的消息循环；Linux 使用 D-Bus StatusNotifierItem，并在隐藏前确认当前进程已注册到可用的 StatusNotifierHost。没有可用托盘时允许宿主真正退出，后台核心继续服务，用户从应用入口重新打开，不留下无法恢复的隐藏窗口。托盘只在 GUI 模式启动，`--core` 和安装 helper 不创建托盘。
+
+ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置原子退出标记，再调用 Quit，绕过隐藏，确保更新 helper 不会卡在等待窗口退出。ExitDesktop 不要求核心在线，更新交接中返回 conflict；未绑定宿主退出回调时返回 unsupported。宿主退出会清理托盘。最小化 / 最大化 / 还原 / 托盘是本机窗口展示行为，不增加 CLI 管理指令。定向 Go 测试覆盖关闭隐藏、无托盘退出、显式退出及更新交接保护；Windows / Linux 原生托盘、拖动、缩放及按钮行为仍需原生验收。
 
 ## 4. 验收
 
