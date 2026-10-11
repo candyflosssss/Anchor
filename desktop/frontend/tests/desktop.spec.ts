@@ -232,3 +232,17 @@ test('an unsupported directory does not label the provider unusable or show upst
   expect(await page.evaluate(() => ({ saves: window.desktopTest.saves, directories: window.desktopTest.directories }))).toEqual({ saves: 0, directories: 1 });
   await expect(detail.getByRole('button', { name: '获取模型目录', exact: true })).toBeEnabled();
 });
+
+
+test('logs preview is explicitly synthetic when desktop bridge is unavailable', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '本机核心暂不可用' })).toBeVisible();
+  await page.getByRole('button', { name: '日志', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '日志', exact: true })).toBeVisible();
+  await expect(page.getByText('所有记录均为虚拟数据，用于预览页面与排障交互。')).toBeVisible();
+  await page.getByRole('button', { name: '查看请求 req_demo_8f2c91' }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '供应商', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '本机核心暂不可用' })).toBeVisible();
+});

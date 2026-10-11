@@ -33,3 +33,5 @@
 - 业务编辑 Dialog 保留既有 Radix 受控关闭 / 未保存确认逻辑，采用与官方相同的 overlay / rounded border / shadow 视觉结构；不是完整官方 Dialog 文件复制。
 - 未复制无用的账户或团队菜单，未加入假的请求图表、健康监测或实例切换。
 - 桌面窗口控制是 Anchor 自行添加的宿主适配，不是官方 Block 自带能力：在原 header 中加入拖动区域和最小化 / 最大化 / 关闭按钮，图标复用现有 lucide-react，样式沿用 neutral 语义变量；浏览器原型隐藏窗口按钮。
+
+- 2026-10-12 日志设计预览复用既有 Button / Input / Table / Sheet / Dialog 和 neutral 主题，未新增 registry 获取或依赖。Sheet 新增可选 `closeLabel`，日志使用“关闭请求详情”，侧栏保持“关闭导航”；请求详情扩展到 620px，并恢复打开按钮的键盘焦点。

@@ -19,7 +19,7 @@ import { useProviderSummaries } from '../features/providers/use-provider-summari
 
 /** Overview, providers and models share one controller so navigating between them keeps state and data. */
 export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivity }: {
-  environment: ProviderEnvironment; page: Exclude<Page, 'settings'>; navSeq: number; onNavigate: (page: Page) => void; onActivity: (busy: boolean) => void;
+  environment: ProviderEnvironment; page: Exclude<Page, 'settings' | 'logs'>; navSeq: number; onNavigate: (page: Page) => void; onActivity: (busy: boolean) => void;
 }) {
   const c = useProviderController(environment);
   const summaries = useProviderSummaries(c.providers, c.phase === 'ready', environment.transport, c.features.data);

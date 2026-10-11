@@ -22,7 +22,7 @@ Node 22.22.1、npm 9.2.0 精确锁定；完整依赖见 package.json / package-l
 - [供应商界面设计](../../docs/design/providers-v1.md)
 - [供应商接口语义](../../docs/design/provider-interface.md)、[桌面运行契约](../../docs/design/desktop-runtime.md)
 - Go 桌面 DTO 为 `internal/desktop/contract.go`，TS 生成文件不手改；在仓库根目录运行 `go run ./cmd/desktop-contract > desktop/frontend/src/desktop/contract.generated.ts`。构建检查漂移，不偷偷重新生成。
-- Go 与 Mock 共同读取合成样例 `desktop/contract/providers.json`。生产静态资源构建拒绝夹带 Mock 样例／原型场景入口。
+- Go 与 Mock 共同读取合成样例 `desktop/contract/providers.json`。生产静态资源构建拒绝夹带供应商 Mock 样例／原型场景入口。2026-10-12 按用户要求新增独立且持续标注的日志 UI 设计预览，暂时在两种模式下均可打开；其合成日志不参与核心管理，不是连接失败回退。真实日志接入完成后移除该预览。
 
 ## 本机设计预览
 
@@ -37,6 +37,8 @@ Node 22.22.1、npm 9.2.0 精确锁定；完整依赖见 package.json / package-l
 ```
 
 浏览器打开 `http://127.0.0.1:14201`。仅监听回环，20 分钟自动结束，也可 Ctrl+C；端口占用直接失败，不复用其他服务。预览支持供应商搜索／筛选、详情、增改、启停确认、密钥三态、主题、窄窗口和错误／冲突／未知结果场景。刷新重置内存，只保存 `anchor.ui.appearance` 外观偏好；没有删除、余额或上游连通性测试。
+
+2026-10-12 日志预览：点击侧栏“日志”，可体验请求/系统页签、搜索筛选、右侧详情和尝试时间线、摘要复制、示例 JSON 导出、保留设置及缺口/空/离线场景。全部为虚拟记录，不发起真实上游请求，不持久保存日志或保留设置；设计基线见[日志设计](../../docs/design/logging.md)。
 
 桌面开发可执行文件的两平台构建方法、产物及缺失门禁见[桌面开发版构建](../../docs/release/desktop.md)，不是上述 Vite 开发服务器。
 
