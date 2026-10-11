@@ -1,10 +1,10 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-11。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.13`，2026-10-11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放，新增概览、供应商健康列表、四页签整页详情和模型映射聚合页。
-- 范围：供应商删除／复制／改名、多 Key 与独立冷却熔断、模型目录／映射／显式测试、三种协议转换，以及用量／价格工作台；沿用 shadcn Blocks sidebar-07 / neutral 界面。详见[第一优先设计与实现](../design/provider-priority-one.md)。
-- 已有 `.9`～`.12`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源现已提供 `.13`；未配置渠道时仍为 alpha，需要手动选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新与测试渠道投放](../design/online-updates.md)。
-- 本轮复用 UI 提交已通过的类型、lint、81 个单元测试及 16 个原型／12 个模拟宿主浏览器用例，完成两平台编译打包、发布附件哈希核对及真实更新下载；**未安装或启动真实应用，未做原生窗口／安装验收**。这是 dev 预发行，未签名；此前 alpha.6 CLI 下载未被替换。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.15`，2026-10-11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放，当前用户单 GUI／托盘，重复启动恢复已有窗口。
+- 范围：新增宿主单实例协调、启动中恢复排队及异常退出后重开；沿用 `.14` 关闭到系统托盘、供应商工作台与后台核心生命周期。本版无数据库迁移。
+- 已有 `.9`～`.14`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源现已提供 `.15`；未配置渠道时仍为 alpha，需要手动选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新与测试渠道投放](../design/online-updates.md)。
+- 本轮完成定向单实例／窗口生命周期／核心复用／更新交接测试、两平台编译打包、六项发布附件哈希核对及真实更新下载；**未安装或启动真实应用，未做原生窗口／安装验收**。这是 dev 预发行，未签名；此前 alpha.6 CLI 下载未被替换。
 
 ## 1. 安装与使用行为
 
@@ -27,14 +27,14 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.13_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.15_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
 
 ### 两平台共同行为与数据保留
 
-打开窗口后，Go 宿主安全初始化缺失状态、启动独立后台核心或核验复用已运行实例，连接就绪后进入供应商页。供应商列表、新增／编辑、删除／复制／改名、模型映射、多 Key、显式测试和用量工作台均复用核心管理能力。从 `.12` 起，点击关闭或系统关闭会收起到任务栏，点击任务栏可恢复；独立「退出界面」才退出当前宿主。两者都保留后台核心；停止核心必须在界面单独确认（或用兼容 CLI `stop --approve`）。从 `.13` 起，「退出界面」「停止核心」位于顶栏「本机实例」弹层。停服请求被接受不等于恢复完成。
+打开窗口后，Go 宿主安全初始化缺失状态、启动独立后台核心或核验复用已运行实例，连接就绪后进入供应商页。供应商列表、新增／编辑、删除／复制／改名、模型映射、多 Key、显式测试和用量工作台均复用核心管理能力。从 `.14` 起，点击关闭或系统关闭会隐藏到系统托盘，点击托盘图标可恢复；无可用托盘时退出宿主。从 `.15` 起当前用户只保留一个 GUI／托盘，重复启动恢复已有窗口；「退出界面」真正退出宿主，以上操作均保留后台核心；停止核心必须在界面单独确认（或用兼容 CLI `stop --approve`）。从 `.13` 起，「退出界面」「停止核心」位于顶栏「本机实例」弹层。停服请求被接受不等于恢复完成。
 
 **手动安装或卸载前，先明确停止核心并等待退出，再退出全部窗口（`.12` 起使用「退出界面」）。** 应用内确认安装会正常停止核心并真正退出当前宿主，其余窗口需要先手动退出。 Windows 安装器／卸载器拒绝替换或删除正在使用的程序，不强杀、不安排重启强删。Linux 由包管理器替换文件，不会自动升级或停止旧运行进程；跳过停服可能留下旧核心。卸载不是停服操作。
 
@@ -83,7 +83,29 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.14`
+### 当前在线 dev 版 `.15`
+
+`0.1.0-dev.desktop.15` 于北京时间 2026-10-11 23:10:43 公开为 dev prerelease（非 latest），构建元数据渠道为 `desktop-dev`。源码为干净提交 `e9d12cab19d8c8a99d43efccc4a8bca4024253ce`，从独立 worktree 构建，后续文档提交不进入二进制，也未包含同时进行的供应商功能改动。
+
+当前用户只运行一个 GUI 与托盘；再次启动还原最小化并显示／聚焦已有窗口，藏到托盘同样恢复。启动未就绪时合并恢复请求，已有宿主无法响应时最多等待5秒后退出而不多开；异常退出不留下持有的内核锁。GUI 锁独立于 `--data-dir`，第二次启动不切换已有窗口目录或写更新配置。后台核心与安装 helper 不参与 GUI 锁，原生命周期保留；本版没有数据库迁移。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.15-windows-amd64-setup.exe` | 7,634,694 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.15_amd64.deb` | 5,449,636 |
+
+```text
+8cbf94bc497c5a7668130e5419c703ad6474ffea6862d312cd5bed5bc7657fdc  Anchor-Desktop-0.1.0-dev.desktop.15-windows-amd64-setup.exe
+d92647567e672a4e2ea1e80d79c68b0b62e12ba9caf956248e1531a4515e9466  anchor-desktop_0.1.0-dev.desktop.15_amd64.deb
+```
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.15/`。六个公开附件为两平台安装包、flat `update-desktop.json`、对应提交与 vendored Go 依赖源码、许可／构建元数据和 `SHA256SUMS`；发布后所有远端大小／digest 与本地一致，版本标签指向上述真实源码。源码归档含 `vendor/modules.txt`、托盘依赖许可证和新的宿主代码；元数据 ZIP CRC 通过。保留 `BUILD.json` 的 `public_release=false` 构建快照；实际发布、真实下载证据在 `publication/PUBLISHED.json` 和 `ONLINE_DOWNLOAD.json`。
+
+定向 Go 测试通过（在工作区及独立干净源码分别执行），覆盖八个并发启动、跨进程重复启动、启动中恢复、退出拒绝、异常退出后重开、通知鉴权、核心复用和更新交接；打包包含 Go→TS 契约比对、TypeScript/Vite、Windows Go 与 Ubuntu24.04 Linux 编译、NSIS/deb。隔离目录用本轮源码 CLI `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.14 --json` 发现并真实下载 `.15` Linux 包，大小／SHA256 校验通过；Windows GitHub digest 与本地一致。未调用 apply、安装器、真实 Agent 配置或付费模型上游；全量／race／浏览器和双平台原生窗口、安装验收未运行，`native_gui_verified`、`installation_verified`、`signed` 仍为 false。
+
+本轮只有一次完整打包。打包前后 MemAvailable 7487→7444 MiB，SwapUsed 4073 MiB、/tmp 42 MiB、PSI 0.00；真实下载及清理后 MemAvailable 7342 MiB，Swap／/tmp 无增长。独立 worktree、容器、源码导出及隔离下载目录均已清理，只保留产物和日志；其他任务的工作区改动与既有 `scripts/__pycache__/` 保留。
+
+### 历史在线 dev 版 `.14`
 
 `0.1.0-dev.desktop.14` 于北京时间 2026-10-11 21:44:37 公开为 dev prerelease（非 latest），构建元数据渠道为 `desktop-dev`。源码为干净提交 `fc9f1c2339e33f080779fad1be3dac652acecd6b`，从独立 worktree 构建，后续文档提交不进入二进制。
 
