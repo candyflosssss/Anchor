@@ -17,7 +17,7 @@
 | 凭据保护 | Linux 当前用户目录 0700 / 文件 0600；Windows 当前用户受保护 DACL | **不是静态加密**。供应商秘密暂存在受保护的 SQLite 中；本机拥有者令牌在 owner.token 中；普通 access 授权只保存 SHA-256 摘要；Binding helper 凭据另在受保护 SQLite 中保存秘密与摘要 |
 | 运行方式 | CLI 前台 `serve`；新增开发桌面宿主协调独立核心 | serve 仍不自动后台化；GUI 关窗不停止其独立核心；不注册系统服务／自启动；见[桌面运行契约](desktop-runtime.md) |
 | CLI 输出 | 正常输出 JSON（agent token 除外）；日志 / 诊断 stderr | `access grant --show-once` 和本机 `agent token` 是含秘密 stdout 例外；供应商秘密只从 stdin 输入 |
-| 协议支持 | Responses / Chat Completions / Anthropic Messages | 三入口及文本/函数/SSE/用量转换；不支持的内容明确报错，不宣称 CC / DSH 或所有 Codex 能力已兼容 |
+| 协议支持 | Responses / Chat Completions / Anthropic Messages | 三入口及文本/函数/SSE/用量转换；上游协议按 Key 的实际模型覆盖 → Key 默认值解析；不支持的内容明确报错，不宣称 CC / DSH 或所有 Codex 能力已兼容 |
 
 Linux / Windows 分别使用内核文件锁；进程退出释放锁，不根据残留锁文件猜测是否运行。
 数据库使用 WAL、FULL 同步、busy timeout 和 IMMEDIATE 写事务；写配置要求当前 revision，旧版本拒绝覆盖。

@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 3 {
+	if version > 4 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -112,6 +112,22 @@ COMMIT;`)
 			return fail(err)
 		}
 	}
+	if version < 4 {
+		_, err = db.Exec(`BEGIN IMMEDIATE;
+ALTER TABLE provider_keys ADD COLUMN protocol TEXT NOT NULL DEFAULT 'responses';
+UPDATE provider_keys SET protocol=(SELECT json_extract(document,'$.protocol') FROM providers WHERE providers.id=provider_keys.provider_id);
+CREATE TABLE key_model_protocols (
+ provider_id TEXT NOT NULL, key_id TEXT NOT NULL, model TEXT NOT NULL, protocol TEXT NOT NULL,
+ PRIMARY KEY(provider_id,key_id,model),
+ FOREIGN KEY(provider_id,key_id) REFERENCES provider_keys(provider_id,id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+PRAGMA user_version=4;
+COMMIT;`)
+		if err != nil {
+			return fail(err)
+		}
+	}
+
 	return s, nil
 }
 func (s *Store) Close() error { return s.db.Close() }
@@ -371,7 +387,7 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 		if *secret == "" {
 			_, err = tx.Exec(`DELETE FROM provider_keys WHERE provider_id=? AND id='default'`, p.ID)
 		} else {
-			_, err = tx.Exec(`INSERT INTO provider_keys VALUES(?,'default',?,1) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=1`, p.ID, *secret)
+			_, err = tx.Exec(`INSERT INTO provider_keys(provider_id,id,secret,enabled,protocol) VALUES(?,'default',?,1,?) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=1`, p.ID, *secret, p.Protocol)
 		}
 		if err != nil {
 			return Provider{}, err

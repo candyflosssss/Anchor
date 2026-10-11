@@ -89,7 +89,7 @@ export const catalogFailureText: Record<string, string> = {
   invalid_response: '上游目录格式不符合要求，未返回部分列表。',
 };
 export function checkedCatalog(value: ProviderModels, input: DiscoverProviderModels): ProviderModels {
-  if (!value || value.provider_id !== input.provider_id || value.revision !== input.expected_revision ||
+  if (!value || value.provider_id !== input.provider_id || value.revision !== input.expected_revision || typeof value.key_id !== 'string' || (!value.key_id && !value.failure) || (input.key_id !== '' && value.key_id !== input.key_id) ||
     !Number.isSafeInteger(value.revision) || value.revision < 1 ||
     !Number.isInteger(value.http_status) || (value.http_status !== 0 && (value.http_status < 100 || value.http_status > 599)) ||
     !Number.isSafeInteger(value.elapsed_ms) || value.elapsed_ms < 0 || typeof value.failure !== 'string' ||
@@ -99,7 +99,7 @@ export function checkedCatalog(value: ProviderModels, input: DiscoverProviderMod
     (value.failure !== '' && value.models.length !== 0) ||
     value.models.some(id => typeof id !== 'string' || !id || id.trim() !== id || new TextEncoder().encode(id).length > 256 || /[\p{Cc}\p{Cf}]/u.test(id)) ||
     new Set(value.models).size !== value.models.length) throw new ProviderProblem('read_error');
-  return { provider_id: value.provider_id, revision: value.revision, http_status: value.http_status,
+  return { provider_id: value.provider_id, key_id: value.key_id, revision: value.revision, http_status: value.http_status,
     elapsed_ms: value.elapsed_ms, failure: value.failure, models: [...value.models] };
 }
 export function catalogProblemText(code: ProblemCode): string {

@@ -49,23 +49,30 @@ Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_secon
 
 ## 4. 上游模型目录小步（desktop.10）
 
-规范 DTO `DiscoverProviderModels` / `ProviderModels` 定义于 `internal/catalog/models.go`，经 `internal/desktop/contract.go` 别名纳入 Go → TS 单一生成源；桌面 envelope 为 `ProviderModelsResult`，继续使用 `anchor-desktop-v1`，增量新增方法，不改变既有方法。共享合成样例为 `desktop/contract/provider-models.json`，Mock 与 Go / TS 测试共用。
+规范 DTO `DiscoverProviderModels` / `ProviderModels` 定义于 `internal/catalog/models.go`，经 `internal/desktop/contract.go` 别名纳入 Go → TS 单一生成源；桌面 envelope 为 `ProviderModelsResult`，继续使用 `anchor-desktop-v1`。本次 Key 协议增量扩展查询字段及工作台动作，客户端与核心须同步升级。共享合成样例为 `desktop/contract/provider-models.json`，Mock 与 Go / TS 测试共用。
 
-- 输入仅 `provider_id` 与 `expected_revision`（桌面 1..MAX_SAFE_INTEGER）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
+- 输入为 `provider_id`、`expected_revision`（桌面 1..MAX_SAFE_INTEGER）和 `key_id`（空字符串选择首个启用 Key）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
 - 后端从已存快照取地址／密钥，仅发一次 `GET <base_url 去尾斜杠>/models`，不自动追加 `/v1`。停用供应商也允许显式查询。复用无环境代理、禁止重定向的上游客户端与全局16／供应商并发上限；总耗时上限 `min(timeout_seconds, 8)` 秒，无重试、后台轮询或缓存持久化。
-- 输出固定六字段：`provider_id`, `revision`（本次使用的快照版本）, `http_status`（未收到状态为0）, `elapsed_ms`（整数毫秒）, `models`（字符串数组，始终非null）, `failure`（成功为空字符串）。只接受 OpenAI 风格 `data` 数组中的非空 `id`，去重排序、丢弃元数据；最多512 KiB、1000条原始记录、每 ID 256字节，无控制／格式字符。异常目录整体失败，不返回部分列表。
+- 输出固定七字段：`provider_id`, `key_id`（实际查询 Key；无 Key 为 anonymous；所有 Key 停用且未指定时为空）, `revision`（本次使用的快照版本）, `http_status`（未收到状态为0）, `elapsed_ms`（整数毫秒）, `models`（字符串数组，始终非null）, `failure`（成功为空字符串）。只接受 OpenAI 风格 `data` 数组中的非空 `id`，去重排序、丢弃元数据；最多512 KiB、1000条原始记录、每 ID 256字节，无控制／格式字符。异常目录整体失败，不返回部分列表。
 - 请求受理后目录失败仍返回 HTTP200 与固定分类：`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
 - 不写配置、revision、模型映射或健康状态。一次目录成功仅说明此接口返回有效目录，不代表推理、工具、流式、余额或持续健康；404/405 不等于供应商推理不可用。
-- UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和只读限高列表。查询中阻止供应商切换、编辑和页面离开；选择、重读或保存后清空结果，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
-- CLI 等价入口为 `provider models --id ID --revision N`；与 `model list`（Anchor 已存公开映射）及网关 `/v1/models` 区分。测试分层沿 §3，原生两平台仍未验收。
-
+- UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和限高模型列表；Key / 模型协议编辑见 §6。查询中阻止供应商切换、编辑和页面离开；选择、重读或保存后清空结果，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
+- CLI 等价入口为 `provider models --id ID --revision N [--key KEY]`；与 `model list`（Anchor 已存公开映射）及网关 `/v1/models` 区分。测试分层沿 §3，原生两平台仍未验收。
 
 ## 5. 第一优先工作台（desktop.11）
 
 新增 `Bridge.ProviderWorkspace({provider_id})` 与 `Bridge.ProviderAction(Action)`，对应 GET `/control/v1/providers/{id}/workspace` 与 POST `/control/v1/providers/{id}/action`。动作白名单、默认值和 CLI 等价入口见[指令大全 §5](../cli/commands.md#5-供应商)及[实现契约](provider-priority-one.md)。`internal/catalog/workspace.go` 是核心 DTO 源，桌面规范以别名纳入生成器，共用 `desktop/contract/provider-workspace.json`。
 
-Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、连续失败次数、冷却结束时间和最近测试，绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
+Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、连续失败次数、冷却结束时间和最近测试，以及 protocol 与 model_protocols（[{model,protocol}]，始终数组），绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
 
-每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。模型映射修改只增加模型 revision；配置/Key/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
+每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。模型映射修改只增加模型 revision；配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
 
-目录查询使用第一个启用的已存 Key，采用对应协议认证。存在 Key 但全部停用时返回 authentication，不退回匿名。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
+目录查询可指定已存 Key（允许停用），不存在的 Key 返回 not_found 且不请求上游；省略时使用第一个启用 Key。认证使用 Key 默认协议，模型覆盖不影响目录认证。存在 Key 但全部停用时返回 authentication，不退回匿名。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
+
+## 6. Key / 模型协议（2026-10-11，本轮仅修改源码）
+
+协议归属 Key，Action.protocol 使用 responses / chat-completions / anthropic。key-put 省略或空 protocol 保留已有 Key 默认值，新 Key 默认 responses；secret 可空以保留凭据，因此支持纯协议编辑。key-model-protocol 使用 target=Key ID、model=实际模型名、protocol=独立覆盖；空值或 inherit 删除覆盖。两种写入均要求当前供应商 revision，成功加一，失败事务回滚；不改变公开模型映射。
+
+转发先选 Key，然后按该 Key 和候选中的实际模型名解析覆盖 → Key 默认值，JSON、SSE、认证与推理测试均使用此结果。模型未设置覆盖时动态继承，以后修改 Key 默认值自动生效。供应商 protocol 保留用于历史兼容、新 default Key 初始化与匿名请求，不再控制已有 Key。schema3→4 把每个供应商旧协议复制到它的全部 Key；复制凭据时一并复制覆盖，改名/删除按外键级联。升级须同步客户端与核心；旧程序无法打开 schema4，不提供降级。
+
+UI 的 Key 编辑支持默认协议与留空保留凭据；模型页按 Key 获取目录，为实际模型逐项选择继承/独立协议，已存覆盖在目录尚未查询或不再返回该模型时仍可查看和恢复继承。切换供应商/Key，修改 Key 凭据或删除 Key 时清理目录结果；模型协议写入保留当前目录，方便连续编辑。查询结果包含实际 Key，前端拒绝与显式请求不符的响应。验证层次和限制沿用 §3。本轮仅修改源码，未打包发布；安装包能力以各发行记录为准。

@@ -134,8 +134,8 @@ func TestPriorityProtocolGatewayAndProbe(t *testing.T) {
 			defer up.Close()
 			f.add(t, "p", up.URL+"/v1", "synthetic")
 			provider, _ := f.store.Provider("p")
-			provider.Protocol = p
-			provider, err := f.store.PutProvider(provider, 1, nil)
+			err := f.store.MutateProvider(provider.ID, provider.Revision, "key-put", "default", "", "", true, false, p)
+			provider, _ = f.store.Provider(provider.ID)
 			if err != nil {
 				t.Fatal(err)
 			}

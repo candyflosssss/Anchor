@@ -267,3 +267,45 @@ test('mock directory shares synthetic model IDs without importing or incrementin
   await expect(detail).toContainText('revision 3');
   await expect(page.getByText('所有数据均为模拟 · 刷新页面将重置')).toBeVisible();
 });
+
+test('key defaults and actual model overrides stay independent and inherit dynamically', async ({ page }) => {
+  await ready(page);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByLabel('摸鱼AI 的详情');
+  await detail.getByRole('tab', { name: /^Key/ }).click();
+  await detail.getByRole('button', { name: '添加 Key', exact: true }).click();
+  await page.getByLabel('Key 名称', { exact: true }).fill('second');
+  await page.getByLabel('API Key', { exact: true }).fill('synthetic-browser-key');
+  await page.getByLabel('Key 默认协议').selectOption('anthropic');
+  await page.getByRole('button', { name: '保存 Key', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await detail.getByRole('button', { name: '配置 Key second 的模型协议', exact: true }).click();
+  await expect(page.getByLabel('查询 Key', { exact: true })).toHaveValue('second');
+  await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  const model = page.getByLabel('demo-model 的协议', { exact: true });
+  await expect(model).toHaveValue('inherit');
+  await model.selectOption('chat-completions');
+  await expect(model).toHaveValue('chat-completions');
+  await expect(detail).toContainText('已获取 2 个模型');
+  await page.getByLabel('查询 Key', { exact: true }).selectOption('default');
+  await expect(model).toBeHidden();
+  await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  await expect(model).toHaveValue('inherit');
+  await page.getByLabel('查询 Key', { exact: true }).selectOption('second');
+  // A saved override remains editable even before fetching this key's directory again.
+  await expect(model).toHaveValue('chat-completions');
+  await detail.getByRole('tab', { name: /^Key/ }).click();
+  await detail.getByRole('button', { name: '编辑 Key second', exact: true }).click();
+  await expect(page.getByLabel('新的 API Key')).toHaveValue('');
+  await page.getByLabel('Key 默认协议').selectOption('responses');
+  await page.getByRole('button', { name: '保存 Key', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await detail.getByRole('button', { name: '配置 Key second 的模型协议', exact: true }).click();
+  await expect(model).toHaveValue('chat-completions');
+  await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  await expect(detail).toContainText('已获取 2 个模型');
+  await model.selectOption('inherit');
+  await expect(model).toHaveValue('inherit');
+  await expect(model.locator('option:checked')).toContainText('Responses');
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('synthetic-browser-key');
+});

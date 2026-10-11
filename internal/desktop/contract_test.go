@@ -116,7 +116,7 @@ func TestSharedProviderModelsContract(t *testing.T) {
 		encoded, _ := json.Marshal(result)
 		var fields map[string]any
 		_ = json.Unmarshal(encoded, &fields)
-		if len(fields) != 6 {
+		if len(fields) != 7 {
 			t.Fatal("unexpected catalog public fields")
 		}
 	}

@@ -62,6 +62,10 @@ func ValidateURL(s string) error {
 	return nil
 }
 
+func ValidProtocol(p string) bool {
+	return p == "responses" || p == "chat-completions" || p == "anthropic"
+}
+
 type Provider struct {
 	ID             string `json:"id"`
 	BaseURL        string `json:"base_url"`
@@ -81,7 +85,7 @@ func (p Provider) Validate() error {
 	if err := ValidateURL(p.BaseURL); err != nil {
 		return err
 	}
-	if p.Protocol != "responses" && p.Protocol != "chat-completions" && p.Protocol != "anthropic" {
+	if !ValidProtocol(p.Protocol) {
 		return errors.New("unsupported protocol")
 	}
 	if p.TimeoutSeconds < 1 || p.TimeoutSeconds > 3600 || p.MaxConcurrent < 1 || p.MaxConcurrent > 64 {

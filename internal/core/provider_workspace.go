@@ -135,7 +135,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 	case "price-import":
 		imported, err = s.importPrice(r.Context(), in.Target, in.CatalogProvider, in.Model)
 	case "delete", "copy", "rename", "key-put", "key-delete", "strategy":
-		err = s.Store.MutateProvider(p.ID, p.Revision, in.Action, in.Target, in.Secret, in.Strategy, in.Enabled, in.CopyKeys)
+		err = s.Store.MutateProvider(p.ID, p.Revision, in.Action, in.Target, in.Secret, in.Strategy, in.Enabled, in.CopyKeys, in.Protocol)
 		if in.Action == "rename" || in.Action == "copy" {
 			target = in.Target
 		}
@@ -143,6 +143,8 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, catalog.Workspace{Prices: []catalog.Price{}, Estimates: []catalog.Estimate{}, ProviderID: p.ID, Deleted: true, Keys: []catalog.KeyStatus{}, Models: []catalog.ModelMapping{}, Usage: []catalog.UsageRow{}})
 			return
 		}
+	case "key-model-protocol":
+		err = s.Store.PutKeyModelProtocol(p.ID, p.Revision, in.Target, in.Model, in.Protocol)
 	case "key-reset":
 		if !in.Approved {
 			err = state.ErrInvalid
@@ -239,7 +241,7 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	if err != nil {
 		return nil, err
 	}
-	key := state.ProviderKey{ID: "anonymous", Enabled: true}
+	key := state.ProviderKey{ID: "anonymous", Enabled: true, Protocol: p.Protocol}
 	if len(keys) > 0 {
 		found := false
 		for _, k := range keys {
@@ -255,6 +257,7 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	} else if keyID != "" && keyID != "anonymous" {
 		return nil, state.ErrInvalid
 	}
+	p.Protocol = key.EffectiveProtocol(model)
 	out := &catalog.Probe{Revision: p.Revision, KeyID: key.ID, Model: model, At: time.Now().Unix()}
 	start := time.Now()
 	attempted := false

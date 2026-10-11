@@ -229,6 +229,8 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 	}
 }
 func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool) bool {
+	// Resolve after key selection: the upstream model override wins over this key's default.
+	p.Protocol = key.EffectiveProtocol(c.Model)
 	started := time.Now()
 	status := 0
 	success := false
@@ -263,7 +265,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		if err := s.Store.RecordUsage(u); err != nil {
 			s.Log.Error("usage persistence failed")
 		}
-		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "status", status, "success", success, "elapsed_ms", u.ElapsedMS)
+		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "upstream_model", c.Model, "protocol", p.Protocol, "status", status, "success", success, "elapsed_ms", u.ElapsedMS)
 	}()
 	request["model"], _ = json.Marshal(c.Model)
 	raw, _ := json.Marshal(request)

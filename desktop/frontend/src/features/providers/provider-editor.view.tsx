@@ -25,7 +25,7 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
       onInteractOutside={event => { event.preventDefault(); c.closeEditor(); }} onEscapeKeyDown={event => { event.preventDefault(); c.closeEditor(); }}>
       <header className="editor-header"><span className="eyebrow">供应商配置{c.mock ? " · 演示" : ""}</span>
         <DialogTitle className="text-xl font-semibold">{source ? `编辑 ${source.id}` : '添加供应商'}</DialogTitle>
-        <DialogDescription className="mt-2 text-sm text-muted-foreground">{source ? `当前 revision ${source.revision} · 改名请使用详情中的改名操作` : '选择上游协议，填写 API 根地址和访问凭据。'}</DialogDescription>
+        <DialogDescription className="mt-2 text-sm text-muted-foreground">{source ? `当前 revision ${source.revision} · 改名请使用详情中的改名操作` : '填写 API 根地址，设置初始 Key 的协议和访问凭据。'}</DialogDescription>
       </header>
       <form onSubmit={event => { event.preventDefault(); if (!c.discard) c.submit(); }} onKeyDown={event => { if (event.key === 'Enter' && event.nativeEvent.isComposing) event.preventDefault(); }} noValidate>
         <fieldset className="editor-fields" disabled={c.busy || c.problem === 'conflict'}>
@@ -35,7 +35,7 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
           <Field name="base_url" title="API 根地址" hint="可包含 /v1；Anchor 按协议追加接口路径，不要填写完整接口地址。" errors={c.errors}>
             <Input {...errorProps('base_url')} value={draft.base_url} onChange={event => c.changeDraft('base_url', event.target.value)} placeholder="https://api.example.com/v1" autoComplete="off" spellCheck={false} />
           </Field>
-          <div className="field"><label htmlFor="protocol">上游协议</label><select className="protocol-field" id="protocol" value={draft.protocol} onChange={event => c.changeDraft("protocol", event.target.value as typeof draft.protocol)}>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
+          {!source && <div className="field"><label htmlFor="protocol">初始 Key 默认协议</label><select className="protocol-field" id="protocol" value={draft.protocol} onChange={event => c.changeDraft("protocol", event.target.value as typeof draft.protocol)}>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><p className="field-hint">模型默认继承 Key 协议，可在 Key 的模型目录中单独覆盖。</p></div>}
           <section className="credential-section"><div className="section-label"><KeyRound size={15} /><h3>默认 API 密钥</h3><span>{source?.has_secret ? '已配置 · 不可回显' : '尚未配置'}</span></div>
             {source && <div className="secret-options" role="group" aria-label="密钥操作">{([['keep', '保留现有'], ['replace', '替换密钥'], ['clear', '清除默认密钥']] as const).map(([value, title]) => <button type="button" key={value} className={draft.secretMode === value ? 'selected' : ''} aria-pressed={draft.secretMode === value} onClick={() => { setShowSecret(false); c.changeDraft('secretMode', value); }}>{title}</button>)}</div>}
             {draft.secretMode === 'replace' && <Field name="secret" title={source ? '新的 API 密钥' : 'API 密钥（可选）'} hint="只入不出，不保存在浏览器。提交后输入即清空；失败时需重新输入。" errors={c.errors}>

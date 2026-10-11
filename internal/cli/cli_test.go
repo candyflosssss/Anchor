@@ -235,7 +235,7 @@ func TestProviderModelsCLI(t *testing.T) {
 	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.URL.Path != "/models" || r.Method != "GET" {
+		if r.URL.Path != "/models" || r.Method != "GET" || (calls.Load() > 1 && r.Header.Get("Authorization") != "Bearer synthetic-selected") {
 			t.Error("unexpected request")
 		}
 		io.WriteString(w, `{"data":[{"id":"cli-model"}]}`)
@@ -270,5 +270,72 @@ func TestProviderModelsCLI(t *testing.T) {
 	saved, _ := st.Provider("中文目录")
 	if saved.Revision != 1 || saved.Enabled {
 		t.Fatal("query changed config")
+	}
+	if err = st.MutateProvider(saved.ID, 1, "key-put", "selected", "synthetic-selected", "", true, false, "chat-completions"); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = run("provider", "models", "--id", saved.ID, "--revision", "2", "--key", "selected")
+	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "selected" || result.Failure != "" {
+		t.Fatal(raw, err)
+	}
+	if _, err = run("provider", "models", "--id", saved.ID, "--revision", "2", "--key", "missing"); err == nil || calls.Load() != 2 {
+		t.Fatal("missing key was queried", err)
+	}
+}
+
+func TestKeyProtocolCLI(t *testing.T) {
+	dir := t.TempDir()
+	st, err := state.Open(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	server := core.New(st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	defer server.Close()
+	control := httptest.NewServer(server.Control())
+	defer control.Close()
+	if _, err = st.Initialize(strings.TrimPrefix(control.URL, "http://"), "127.0.0.1:17860"); err != nil {
+		t.Fatal(err)
+	}
+	run := func(input string, args ...string) (string, error) {
+		var out, diagnostics bytes.Buffer
+		err := (App{In: strings.NewReader(input), Out: &out, Err: &diagnostics}).Run(context.Background(), append([]string{"--data-dir", dir}, args...))
+		return out.String(), err
+	}
+	for _, args := range [][]string{{"context", "add", "local", "--local"}, {"context", "use", "local"}, {"provider", "add", "--id", "p", "--base-url", "http://127.0.0.1:1"}} {
+		if _, err = run("", args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := run("synthetic-selected", "provider", "key-put", "--id", "p", "--revision", "1", "--target", "selected", "--secret-stdin", "--protocol", "anthropic")
+	var w catalog.Workspace
+	if err != nil || json.Unmarshal([]byte(raw), &w) != nil || len(w.Keys) != 1 || w.Keys[0].Protocol != "anthropic" || strings.Contains(raw, "synthetic-selected") {
+		t.Fatal(raw, err)
+	}
+	raw, err = run("", "provider", "key-model-protocol", "--id", "p", "--revision", "2", "--target", "selected", "--model", "actual/model", "--protocol", "chat-completions")
+	if err != nil || json.Unmarshal([]byte(raw), &w) != nil || len(w.Keys[0].ModelProtocols) != 1 || w.Keys[0].ModelProtocols[0].Model != "actual/model" {
+		t.Fatal(raw, err)
+	}
+	for _, args := range [][]string{
+		{"provider", "key-model-protocol", "--id", "p", "--revision", "2", "--target", "selected", "--model", "actual/model", "--protocol", "inherit"},
+		{"provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "selected", "--model", "actual/model", "--protocol", "bad"},
+		{"provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "missing", "--model", "actual/model"},
+	} {
+		if _, err = run("", args...); err == nil {
+			t.Fatal("invalid write succeeded", args)
+		}
+	}
+	raw, err = run("", "provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "selected", "--model", "actual/model", "--protocol", "inherit")
+	if err != nil || json.Unmarshal([]byte(raw), &w) != nil || len(w.Keys[0].ModelProtocols) != 0 || w.Keys[0].Protocol != "anthropic" {
+		t.Fatal(raw, err)
+	}
+	var help bytes.Buffer
+	if err = (App{Out: &help, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{"key-model-protocol", "[--key KEY]", "[--protocol PROTOCOL]"} {
+		if !strings.Contains(help.String(), text) {
+			t.Fatal("help missing", text)
+		}
 	}
 }

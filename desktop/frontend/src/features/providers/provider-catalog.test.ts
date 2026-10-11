@@ -7,7 +7,7 @@ describe('read-only catalog model', () => {
     expect(checkedCatalog(value, fixture.input)).toEqual(value);
   });
   it.each([
-    { revision: 4 }, { models: null }, { failure: 'raw-secret' }, { elapsed_ms: -1 },
+    { revision: 4 }, { key_id: 'other' }, { key_id: null }, { models: null }, { failure: 'raw-secret' }, { elapsed_ms: -1 },
     { http_status: 0 }, { models: ['duplicate', 'duplicate'] }, { models: ['bad\nname'] }, { models: ['bad\u202ename'] },
     { models: ['x'.repeat(257)] }, { failure: 'unsupported', models: ['partial'] },
   ])('fails closed on invalid result %#', patch => {
@@ -21,8 +21,8 @@ describe('read-only catalog model', () => {
     const transport = new MockProviderTransport(); const signal = new AbortController().signal;
     const before = await transport.list(signal);
     const selected = before[0];
-    expect(await transport.discover({ provider_id: selected.id, expected_revision: selected.revision }, signal)).toEqual({ ...fixture.success, provider_id: selected.id, revision: selected.revision });
+    expect(await transport.discover({ provider_id: selected.id, expected_revision: selected.revision, key_id: 'default' }, signal)).toEqual({ ...fixture.success, provider_id: selected.id, revision: selected.revision });
     expect(await transport.list(signal)).toEqual(before);
-    await expect(transport.discover({ provider_id: selected.id, expected_revision: selected.revision + 1 }, signal)).rejects.toMatchObject({ code: 'conflict' });
+    await expect(transport.discover({ provider_id: selected.id, expected_revision: selected.revision + 1, key_id: 'default' }, signal)).rejects.toMatchObject({ code: 'conflict' });
   });
 });

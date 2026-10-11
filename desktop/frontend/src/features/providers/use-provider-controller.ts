@@ -27,6 +27,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   const query = useRef<AbortController | null>(null);
   const write = useRef<AbortController | null>(null);
   const generation = useRef(0);
+  const [catalogKey, setCatalogKey] = useState('');
   const [models, setModels] = useState<ProviderModels | null>(null);
   const [modelsProblem, setModelsProblem] = useState<ProblemCode | null>(null);
   const [modelsBusy, setModelsBusy] = useState(false);
@@ -96,6 +97,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     try {
       const saved = await transport.save(input, abort.signal);
       if (abort.signal.aborted || epoch !== generation.current) return;
+      clearModels();
       setProviders(old => [...old.filter(p => p.id !== saved.id), saved]);
       if (!source) { setSelectedId(saved.id); setDetailTab('overview'); setDialog(null); }
       setEditor(null); setToggle(null); setDiscard(false);
@@ -112,8 +114,8 @@ export function useProviderController(environment: ProviderEnvironment) {
     }
   }
   async function discoverModels() {
-    if (!selected || blocked || locked.current || editor || toggle) return;
-    const target = { provider_id: selected.id, expected_revision: selected.revision };
+    if (!selected || blocked || locked.current || features.isBusy() || editor || toggle) return;
+    const target = { provider_id: selected.id, expected_revision: selected.revision, key_id: catalogKey };
     clearModels(); locked.current = true; setModelsBusy(true);
     const abort = new AbortController(); catalogQuery.current = abort;
     const epoch = catalogEpoch.current;
@@ -121,6 +123,7 @@ export function useProviderController(environment: ProviderEnvironment) {
       const result = await transport.discover(target, abort.signal);
       if (abort.signal.aborted || epoch !== catalogEpoch.current) return;
       setModels(result);
+      if (result.key_id && result.key_id !== 'anonymous') setCatalogKey(result.key_id);
     } catch (error) {
       if (abort.signal.aborted || epoch !== catalogEpoch.current) return;
       const code = error instanceof ProviderProblem ? error.code : 'read_error';
@@ -138,10 +141,12 @@ export function useProviderController(environment: ProviderEnvironment) {
   function changeScenario(value: Scenario) {
     if (!environment.reset || editor || busy || modelsBusy || features.isBusy() || toggle) return;
     clearModels(); query.current?.abort(); write.current?.abort(); generation.current++;
-    environment.reset(value); setScenario(value); setSelectedId(null); setDetailTab('overview'); setDialog(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
+    environment.reset(value); setScenario(value); setCatalogKey(''); setSelectedId(null); setDetailTab('overview'); setDialog(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
     void load();
   }
   const features = useProviderFeatures(selected, transport, async (id, action, from) => {
+    if (['key-put', 'key-delete', 'rename', 'copy', 'delete'].includes(action)) clearModels();
+    if (['key-delete', 'rename', 'copy', 'delete'].includes(action)) setCatalogKey('');
     if (action === 'rename' || action === 'copy' || action === 'delete') {
       await load(id);
       setDetailTab('overview'); setDialog(null);
@@ -150,7 +155,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   }, () => setNotice(''));
   function openProvider(id: string, tab: DetailTab = 'overview', next?: ProviderDialog) {
     if (locked.current || features.isBusy() || dialog || editor || toggle) return;
-    if (id !== selectedId) { clearModels(); setNotice(''); }
+    if (id !== selectedId) { setCatalogKey(''); clearModels(); setNotice(''); }
     setSelectedId(id); setDetailTab(tab); setDialog(next ?? null);
   }
   return {
@@ -158,11 +163,12 @@ export function useProviderController(environment: ProviderEnvironment) {
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
     notice, search, setSearch, filter, setFilter, editor, errors, discard, busy: busy || modelsBusy || features.busy, blocked: blocked || features.busy, toggle, scenario,
     models: models?.provider_id === selected?.id ? models : null,
-    modelsProblem, modelsBusy, discoverModels,
+    modelsProblem, modelsBusy, discoverModels, catalogKey,
+    selectCatalogKey: (id: string) => { if (!features.isBusy() && !locked.current) { clearModels(); setCatalogKey(id); } },
     detailTab, setDetailTab, dialog, openProvider,
     openDialog: (next: ProviderDialog) => { if (!features.isBusy() && !locked.current) setDialog(next); },
     closeDialog: () => { if (!features.isBusy()) setDialog(null); },
-    select: (id: string | null) => { if (!locked.current && !features.isBusy()) { clearModels(); setSelectedId(id); setDetailTab('overview'); setDialog(null); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
+    select: (id: string | null) => { if (!locked.current && !features.isBusy()) { clearModels(); setCatalogKey(''); setSelectedId(id); setDetailTab('overview'); setDialog(null); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
     continueEditing: () => setDiscard(false),
     submit: () => editor && void save(editor.source, editor.draft),
     requestToggle: (provider: Provider) => { if (!blocked && !features.isBusy()) { setNotice(''); setToggle(provider); } },

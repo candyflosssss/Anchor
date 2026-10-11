@@ -21,7 +21,7 @@ SQLite 供应商与模型配置、Responses / Chat Completions / Anthropic Messa
 
 支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.12 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，不执行浏览器、安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
 
-供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」三页签，CLI 同步提供。实现边界和 schema3 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。
+供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」三页签，CLI 同步提供。实现边界和 schema3→4 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。当前源码进一步把协议设置移至 Key，并支持按实际模型覆盖、默认动态继承 Key 协议；数据库升级到 schema4。本轮仅修改源码，未打包发布；安装包能力以各发行记录为准。
 
 **已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；desktop.14 关闭窗口隐藏到系统托盘，单击托盘图标恢复；无可用托盘时直接退出界面。「退出界面」退出宿主，均不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。桌面 dev 包已包含启动／复用与窗口生命周期实现；开机自启动设置未实现，原生安装与窗口行为未验收。
 

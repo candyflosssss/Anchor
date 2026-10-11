@@ -30,7 +30,7 @@ async function host(page: Page) {
         await new Promise(resolve => setTimeout(resolve, 300));
         const provider = providers.find(p => p.id === input.provider_id);
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
-        return { contract, data: { provider_id: provider.id, revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '' }, problem: null };
+        return { contract, data: { provider_id: provider.id, key_id: input.key_id || 'anonymous', revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '' }, problem: null };
       },
       ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: [], models: [], usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
@@ -205,8 +205,8 @@ test('directory discovery is explicit, read-only and scoped to the selected prov
   await expect(detail.getByText('demo-model', { exact: true })).toHaveCount(0);
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).dblclick();
   await expect(detail.getByText('demo-model', { exact: true })).toBeVisible();
-  await expect(detail).toContainText('已获取 1 个模型 · HTTP 200 · 42 ms');
-  await expect(detail).toContainText('目录成功不代表模型推理可用');
+  await expect(detail).toContainText('已获取 1 个模型 · Key anonymous · HTTP 200 · 42 ms');
+  await expect(detail).toContainText('目录成功不代表推理可用');
   expect(await page.evaluate(() => ({ saves: window.desktopTest.saves, directories: window.desktopTest.directories }))).toEqual({ saves: 0, directories: 1 });
   await detail.getByRole('button', { name: '返回供应商列表' }).click();
   await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
@@ -219,7 +219,7 @@ test('an unsupported directory does not label the provider unusable or show upst
   await page.evaluate(() => {
     window.go!.desktop!.Bridge!.DiscoverProviderModels = async input => {
       window.desktopTest.directories++;
-      return { contract: 'anchor-desktop-v1', data: { provider_id: input.provider_id, revision: input.expected_revision,
+      return { contract: 'anchor-desktop-v1', data: { provider_id: input.provider_id, key_id: input.key_id || 'anonymous', revision: input.expected_revision,
         http_status: 404, elapsed_ms: 12, models: [], failure: 'unsupported' }, problem: null };
     };
   });
@@ -227,7 +227,7 @@ test('an unsupported directory does not label the provider unusable or show upst
   const detail = page.getByLabel('摸鱼AI 的详情');
   await detail.getByRole('tab', { name: /^模型/ }).click();
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
-  await expect(detail).toContainText('目录获取失败 · HTTP 404 · 12 ms');
+  await expect(detail).toContainText('目录获取失败 · Key anonymous · HTTP 404 · 12 ms');
   await expect(detail).toContainText('不代表模型推理不可用');
   expect(await page.evaluate(() => ({ saves: window.desktopTest.saves, directories: window.desktopTest.directories }))).toEqual({ saves: 0, directories: 1 });
   await expect(detail.getByRole('button', { name: '获取模型目录', exact: true })).toBeEnabled();

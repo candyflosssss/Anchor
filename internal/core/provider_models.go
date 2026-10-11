@@ -33,7 +33,33 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		apiError(w, state.ErrConflict)
 		return
 	}
-	out := catalog.ProviderModels{ProviderID: p.ID, Revision: p.Revision, Models: []string{}}
+	keys, err := s.Store.ProviderKeys(p.ID)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	key := state.ProviderKey{ID: "anonymous", Enabled: true, Protocol: p.Protocol}
+	if in.KeyID != "" || len(keys) > 0 {
+		found := false
+		for _, k := range keys {
+			if k.ID == in.KeyID || (in.KeyID == "" && k.Enabled) {
+				key = k
+				found = true
+				break
+			}
+		}
+		if !found && in.KeyID != "" && !(len(keys) == 0 && in.KeyID == "anonymous") {
+			apiError(w, state.ErrNotFound)
+			return
+		}
+		if !found && len(keys) > 0 {
+			writeJSON(w, 200, catalog.ProviderModels{ProviderID: p.ID, Revision: p.Revision, Models: []string{}, Failure: "authentication"})
+			return
+		}
+	}
+	p.Protocol = key.Protocol
+	p.Secret = key.Secret
+	out := catalog.ProviderModels{ProviderID: p.ID, KeyID: key.ID, Revision: p.Revision, Models: []string{}}
 	start := time.Now()
 	defer func() { out.ElapsedMS = time.Since(start).Milliseconds(); writeJSON(w, 200, out) }()
 	// Explicit management reads may inspect disabled providers, but never bypass
@@ -59,22 +85,6 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	req.Header.Set("Accept", "application/json")
-	keys, e := s.Store.ProviderKeys(p.ID)
-	if e != nil {
-		out.Failure = "network"
-		return
-	}
-	p.Secret = ""
-	for _, k := range keys {
-		if k.Enabled {
-			p.Secret = k.Secret
-			break
-		}
-	}
-	if len(keys) > 0 && p.Secret == "" {
-		out.Failure = "authentication"
-		return
-	}
 	authorizeUpstream(req, p, p.Secret)
 	resp, err := s.upstream.Do(req)
 	if err != nil {

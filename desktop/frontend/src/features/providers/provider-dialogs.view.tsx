@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog';
 import { ProbeCard } from './provider-detail.view';
+import { protocolName } from './provider.model';
 import { isValidId, type ProviderDialog } from './provider-summary.model';
 import type { Probe } from './provider-features.model';
 import type { ProviderController } from './use-provider-controller';
@@ -37,7 +38,7 @@ function Shell({ c, d }: { c: ProviderController; d: ProviderDialog }) {
     <DialogContent className="action-dialog" closeLabel="关闭对话框" onRequestClose={close}
       onInteractOutside={e => { e.preventDefault(); close(); }} onEscapeKeyDown={e => { e.preventDefault(); close(); }}>
       <header className="editor-header"><span className="eyebrow">{c.selected?.id}{c.mock ? ' · 演示' : ''}</span>
-        <DialogTitle className="text-xl font-semibold">{d.kind === 'key' ? (d.keyId ? `替换 Key ${d.keyId}` : '添加 Key') : d.kind === 'mapping' ? (d.alias ? `编辑模型 ${d.alias}` : '添加模型映射') : titles[d.kind]}</DialogTitle>
+        <DialogTitle className="text-xl font-semibold">{d.kind === 'key' ? (d.keyId ? `编辑 Key ${d.keyId}` : '添加 Key') : d.kind === 'mapping' ? (d.alias ? `编辑模型 ${d.alias}` : '添加模型映射') : titles[d.kind]}</DialogTitle>
         <DialogDescription className="mt-2 text-sm text-muted-foreground">{descriptions[d.kind]}</DialogDescription>
       </header>
       {tried && f.error && <p className="dialog-error" role="alert"><CircleAlert size={15} />{f.error}</p>}
@@ -136,23 +137,25 @@ function KeyBody({ c, d, run }: { c: ProviderController; d: Extract<ProviderDial
   const [secret, setSecret] = useState('');
   const secretRef = useRef(''); secretRef.current = secret;
   useEffect(() => () => { secretRef.current = ''; }, []);
-  const idError = existing ? '' : !isValidId(id) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : w.keys.some(k => k.id === id) ? '已存在同名 Key；如需更换请使用「替换」。' : '';
+  const idError = existing ? '' : !isValidId(id) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : w.keys.some(k => k.id === id) ? '已存在同名 Key；如需更换请使用「编辑」。' : '';
+  const [protocol, setProtocol] = useState(existing?.protocol ?? 'responses');
   const trimmed = secret.trim();
   const secretError = /[\r\n]/.test(trimmed) ? '密钥不能包含换行。' : new TextEncoder().encode(trimmed).length > 8192 ? '密钥不能超过 8192 字节。' : '';
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (idError || secretError || !trimmed) return;
+    if (idError || secretError || (!existing && !trimmed)) return;
     const value = trimmed; setSecret('');
-    await run('key-put', { target: id, secret: value, enabled: existing?.enabled ?? true });
+    await run('key-put', { target: id, secret: value, protocol, enabled: existing?.enabled ?? true });
   }
   return <form onSubmit={submit} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
       <div className="field"><label htmlFor="key-id">Key 名称</label><Input id="key-id" value={id} readOnly={!!existing} onChange={e => setId(e.target.value.trim())} aria-invalid={!!idError} aria-describedby="key-id-hint" autoComplete="off" />
         <p id="key-id-hint" className={idError ? 'field-error' : 'field-hint'}>{idError || '仅用于区分和日志显示，不是密钥本身。'}</p></div>
       <div className="field"><label htmlFor="key-secret">{existing ? '新的 API Key' : 'API Key'}</label><Input id="key-secret" type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={e => setSecret(e.target.value)} aria-invalid={!!secretError} aria-describedby="key-secret-hint" />
-        <p id="key-secret-hint" className={secretError ? 'field-error' : 'field-hint'}>{secretError || '保存后无法回显；提交后输入框立即清空。'}</p></div>
+        <p id="key-secret-hint" className={secretError ? 'field-error' : 'field-hint'}>{secretError || (existing ? '留空保留现有密钥；提交后输入框立即清空。' : '保存后无法回显；提交后输入框立即清空。')}</p></div>
+      <div className="field"><label htmlFor="key-protocol">Key 默认协议</label><select id="key-protocol" className="select-field" value={protocol} onChange={e => setProtocol(e.target.value)}>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><p className="field-hint">此 Key 下未单独设置协议的模型继承这个值。</p></div>
     </fieldset>
-    <Footer c={c}><Button disabled={c.features.busy || !!idError || !!secretError || !trimmed}>{existing ? '替换 Key' : '保存 Key'}</Button></Footer>
+    <Footer c={c}><Button disabled={c.features.busy || !!idError || !!secretError || (!existing && !trimmed)}>保存 Key</Button></Footer>
   </form>;
 }
 

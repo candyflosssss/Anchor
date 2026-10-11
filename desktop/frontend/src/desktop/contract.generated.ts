@@ -73,10 +73,12 @@ export interface UpdateResult {
   problem: Problem | null;
 }
 export interface DiscoverProviderModels {
+  key_id: string;
   provider_id: string;
   expected_revision: number;
 }
 export interface ProviderModels {
+  key_id: string;
   provider_id: string;
   revision: number;
   http_status: number;
@@ -103,6 +105,7 @@ export interface Estimate {
   usd: number | null;
 }
 export interface Action {
+  protocol: string;
   price: Price | null;
   catalog_provider: string;
   provider_id: string;
@@ -119,7 +122,13 @@ export interface Action {
   tools: boolean;
   streaming: boolean;
 }
+export interface ModelProtocol {
+  model: string;
+  protocol: string;
+}
 export interface KeyStatus {
+  protocol: string;
+  model_protocols: ModelProtocol[];
   id: string;
   enabled: boolean;
   state: string;

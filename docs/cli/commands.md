@@ -7,7 +7,7 @@
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
 - 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.14 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；默认渠道为 alpha，桌面测试更新需选择 dev。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
-- 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。
+- 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；本轮仅修改源码，未打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -61,7 +61,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `provider put` | 条件更新供应商 | 核心在线；当前 revision |
 | `provider workspace` | 查询 Key 状态、映射、用量与价格 | 核心在线；已存供应商 |
 | `provider delete` / `rename` / `copy` | 删除、改名、复制供应商 | 核心在线；当前 revision；删除/改名须 approve |
-| `provider key-put` / `key-delete` / `key-reset` | 多 Key 管理与状态恢复 | 核心在线；当前 revision；删除/恢复须 approve |
+| `provider key-put` / `key-delete` / `key-reset` / `key-model-protocol` | 多 Key 管理、默认协议与模型覆盖、状态恢复 | 核心在线；当前 revision；删除/恢复须 approve |
 | `provider strategy` | 配置轮流或优先使用 Key | 核心在线；当前 revision |
 | `provider test` | 显式最小推理测试 | 核心在线；已存供应商/模型 ID；须 approve |
 | `provider model-put` / `model-delete` | 工作台模型映射写入/删除 | 核心在线；供应商与模型 revision；删除须 approve |
@@ -167,7 +167,7 @@ Context 目前仅支持本机 `--local`，没有 SSH、远程凭据或 Context �
 
 ```text
 anchor provider list
-anchor provider models --id ID --revision N
+anchor provider models --id ID --revision N [--key KEY]
 anchor provider add --id ID --base-url URL [OPTIONS]
 anchor provider put --id ID --base-url URL --revision N [OPTIONS]
 ```
@@ -178,7 +178,7 @@ anchor provider put --id ID --base-url URL --revision N [OPTIONS]
 | --- | --- | --- |
 | `--id` | 必填 | 供应商 ID，支持中文，例如 `摸鱼AI`；1..128 个 Unicode 码点，完整规则见公共约定 |
 | `--base-url` | 必填 | API 根地址，可含 `/v1` 前缀，不含 `/responses`、`/chat/completions` 或 `/messages`；HTTPS，仅数值回环测试地址允许 HTTP；禁止 userinfo/query/fragment |
-| `--protocol` | `responses` | `responses` / `chat-completions` / `anthropic` |
+| `--protocol` | `responses` | `responses` / `chat-completions` / `anthropic`；仅用于新建 default Key 的初始协议及无 Key 时的匿名协议，不批量改已有 Key |
 | `--timeout` | `120` | 单候选总超时，秒，1..3600；仍受上游响应头 30 秒等待上限限制 |
 | `--max-concurrent` | `4` | 单供应商并发 1..64；网关全局另有限制 16 |
 | `--disabled` | `false` | 设置后禁用此供应商 |
@@ -207,18 +207,20 @@ anchor model add --id public-model --candidate '摸鱼AI:upstream-model'
 ### `provider models`（desktop.10 小步）
 
 ```bash
-anchor provider models --id '摸鱼AI' --revision 3
+anchor provider models --id '摸鱼AI' --revision 3 --key default
 ```
 
-`--id` 必填已存供应商 ID；`--revision` 必填正整数，来自 `provider list`。使用所选 Context 的在线核心、管理鉴权与实例身份校验；不允许临时地址、密钥、协议或生成参数。revision 不匹配、未授权、实例不符或参数错误时非零退出，不发起目录请求。停用供应商也可显式查询。
+`--id` 必填已存供应商 ID；`--revision` 必填正整数，来自 `provider list`。使用所选 Context 的在线核心、管理鉴权与实例身份校验；不允许临时地址、密钥、协议或生成参数。revision 不匹配、未授权、实例不符或参数错误时非零退出，不发起目录请求。停用供应商也可显式查询。可用 `--key KEY` 指定已存 Key（包括停用 Key），不存在时在请求上游前失败；省略时选首个启用 Key，存在 Key 但全部停用时返回 authentication，无 Key 才匿名。目录认证由 Key 默认协议决定，不使用模型覆盖。
 
 只发一次 `GET <已存 base_url>/models`（保留已存 `/v1`，不自动补前缀），携带已存密钥，禁止重定向和环境代理，共用并发限额。总超时为供应商超时与8秒的较小值，无自动重试。仅解析 `data:[{id:...}]`，目录最多512 KiB、1000条记录、每 ID 256字节；去重排序，不返回部分列表或上游元数据。
 
-stdout 为 `{provider_id, revision, http_status, elapsed_ms, models, failure}`；成功 `failure=""`，空目录为 `models:[]`。目录层失败同样输出结构化结果并退出0，调用者必须检查 `failure`：`authentication`、`unsupported`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`；未取得 HTTP 状态为0。管理层失败仍非零退出。不会输出上游错误正文、密钥或原始网络异常。
+stdout 为 `{provider_id, key_id, revision, http_status, elapsed_ms, models, failure}`；key_id 为实际查询 Key，无 Key 时为 anonymous，所有 Key 停用且未指定时为空；成功 `failure=""`，空目录为 `models:[]`。目录层失败同样输出结构化结果并退出0，调用者必须检查 `failure`：`authentication`、`unsupported`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`；未取得 HTTP 状态为0。管理层失败仍非零退出。不会输出上游错误正文、密钥或原始网络异常。
 
 仅一次目录查询，不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。显式推理测试和映射写入使用下列独立命令，目录查询本身不自动导入。
 
 供应商可用下列 delete 删除；有模型引用时阻止。完整 `put ... --disabled` 仅暂停路由，不删除秘密。
+
+协议解析顺序为：选出 Key → 查该 Key 下实际候选模型名的覆盖 → 没有覆盖则用 Key 默认协议。覆盖随供应商改名/复制（copy-keys）保留，删除 Key 时清理；改变 Key 默认协议不会改动已有独立覆盖。旧供应商 protocol 自动复制给其所有既存 Key，后续 provider put 的 protocol 不改已有 Key。请求路径、认证、JSON 和 SSE 转换都使用本次解析结果；协议转换能力边界保持现有文本/函数子集。
 
 ### 第一优先工作台（desktop.11）
 
@@ -227,7 +229,8 @@ anchor provider workspace --id ID
 anchor provider delete --id ID --revision N --approve
 anchor provider rename --id ID --revision N --target NEW_ID --approve
 anchor provider copy --id ID --revision N --target NEW_ID [--copy-keys]
-anchor provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled]
+anchor provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--protocol PROTOCOL]
+anchor provider key-model-protocol --id ID --revision N --target KEY --model UPSTREAM [--protocol PROTOCOL|inherit]
 anchor provider key-delete --id ID --revision N --target KEY --approve
 anchor provider key-reset --id ID --revision N --target KEY --approve
 anchor provider strategy --id ID --revision N --strategy round-robin|priority
@@ -241,13 +244,14 @@ anchor provider price-import --id ID --revision N --target ALIAS --catalog-provi
 anchor usage
 ```
 
-上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商新 ID 沿用中文规则，Key ID/公开别名沿用 ASCII ID 规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
+上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace` 的 keys 额外返回 protocol 和 model_protocols（[{model,protocol}]，始终数组），不返回秘密。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商新 ID 沿用中文规则，Key ID/公开别名沿用 ASCII ID 规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
 
 | 动作 | 参数、默认值和语义 |
 | --- | --- |
 | delete / rename | `--approve` 必填；删除阻止模型引用，成功删除已存 Key/策略/价格；改名以事务迁移模型候选、Key、价格，模型和供应商 revision 增加，在途请求保留旧快照 |
-| copy | target 必填且不能已存在；默认不复制 Key，`--copy-keys` 才复制；新对象 revision=1、默认停用，复制配置/策略，不复制映射/价格/用量 |
-| key-put | target 必填，最多64个 Key；新 Key 必须有非空 stdin 秘密，已有 Key 省略或空 stdin 保留秘密；默认 enabled，`--disabled` 停用；替换秘密只经 stdin，删除用 key-delete |
+| copy | target 必填且不能已存在；默认不复制 Key，`--copy-keys` 才复制秘密、Key 默认协议和模型覆盖；新对象 revision=1、默认停用，复制配置/策略，不复制映射/价格/用量 |
+| key-put | target 必填，最多64个 Key；新 Key 必须有非空 stdin 秘密，已有 Key 省略或空 stdin 保留秘密；默认 enabled，`--disabled` 停用；替换秘密只经 stdin，删除用 key-delete；protocol 省略/空值保留已有 Key 协议，新 Key 默认 responses；可显式选 responses / chat-completions / anthropic |
+| key-model-protocol | target 必填已存 Key，model 为实际模型名（不是公开别名，1..256 UTF-8 字节，无首尾空白/控制/格式字符）；protocol 为上述三协议；省略、空值或 inherit 删除覆盖，恢复动态继承 Key 默认值；不修改模型映射 |
 | key-delete / key-reset | target 与 approve 必填；delete 删除秘密，reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
 | strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
@@ -258,11 +262,11 @@ anchor usage
 
 推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。此修复为源码未发布行为，命令语法和退出码不变。
 
-配置/Key/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
+配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
 usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
 
-GUI 在供应商详情的三个页签提供同等操作。数据库启动自动从 schema2 升至3并迁移旧 secret 为 default Key；安装前正常停止旧核心，升级后旧二进制不能再打开该数据库，无数据库降级入口。
+GUI 在供应商详情的三个页签提供同等操作。数据库启动自动从 schema2 升至3并迁移旧 secret 为 default Key，再升至4将供应商旧协议复制给全部既存 Key；安装前正常停止旧核心，升级后旧二进制不能再打开该数据库，无数据库降级入口。
 
 ## 6. 公开模型与候选路由
 

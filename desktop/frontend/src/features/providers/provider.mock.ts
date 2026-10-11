@@ -28,8 +28,8 @@ function seed(id: string, w: Workspace) {
   if (id === '摸鱼AI') w.models = [mapping('demo-model-mini')];
   if (id === '备用供应商') {
     w.keys = [
-      { id: 'backup', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: { revision: w.revision, key_id: 'backup', model: 'backup-model', at: now - 7200, http_status: 200, elapsed_ms: 860, failure: '' } },
-      { id: 'primary', enabled: true, state: 'cooling', failures: 3, retry_at: now + 600, test: null },
+      { id: 'backup', protocol: 'chat-completions', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: { revision: w.revision, key_id: 'backup', model: 'backup-model', at: now - 7200, http_status: 200, elapsed_ms: 860, failure: '' } },
+      { id: 'primary', protocol: 'responses', model_protocols: [], enabled: true, state: 'cooling', failures: 3, retry_at: now + 600, test: null },
     ];
     w.models = [mapping('backup-model')];
     w.usage = [{ provider_id: id, model: 'coding-main', requests: 42, failures: 1, elapsed_ms: 50400, known: 40, input_tokens: 120000, output_tokens: 30000, cache_read: 20000, cache_write: 0 }];
@@ -57,12 +57,17 @@ export class MockProviderTransport implements ProviderTransport {
     if (this.scenario === 'offline' || this.scenario === 'unauthorized') throw fixtureError(this.scenario);
     const current = this.rows.find(p => p.id === input.provider_id);
     if (current?.revision !== input.expected_revision) throw fixtureError('conflict');
-    return { ...catalogFixture.success, provider_id: current.id, revision: current.revision, models: [...catalogFixture.success.models] };
+    const w = this.detail(current);
+    const key = input.key_id ? w.keys.find(k => k.id === input.key_id) : w.keys.find(k => k.enabled);
+    if (input.key_id && !key) throw new ProviderProblem('invalid');
+    if (w.keys.length && !key) return { ...catalogFixture.success, provider_id: current.id, revision: current.revision, key_id: '', failure: 'authentication', http_status: 0, models: [] };
+    return { ...catalogFixture.success, key_id: key?.id ?? 'anonymous', provider_id: current.id, revision: current.revision, models: [...catalogFixture.success.models] };
   }
   private detail(p: Provider): Workspace {
     let w = this.workspaces.get(p.id);
     if (!w) {
       w = checkedWorkspace({ ...structuredClone(workspaceFixture), provider_id: p.id, revision: p.revision, keys: p.has_secret ? structuredClone(workspaceFixture.keys) : [] });
+      w.keys.forEach(k => { k.protocol = p.protocol; });
       if (!this.seeded.has(p.id)) { this.seeded.add(p.id); seed(p.id, w); }
       this.workspaces.set(p.id, w);
     }
@@ -90,8 +95,16 @@ export class MockProviderTransport implements ProviderTransport {
       }
       case 'key-put': {
         const k = w.keys.find(k => k.id === a.target); if (!a.target || (!k && !a.secret)) throw fixtureError('invalid');
-        if (k) { k.enabled = a.enabled; k.state = a.enabled ? 'ready' : 'disabled'; }
-        else w.keys.push({ id: a.target, enabled: a.enabled, state: a.enabled ? 'ready' : 'disabled', failures: 0, retry_at: 0, test: null }); p.has_secret = !!w.keys.length; p.revision++; break;
+        if (a.protocol && !['responses', 'chat-completions', 'anthropic'].includes(a.protocol)) throw fixtureError('invalid');
+        if (k) { k.protocol = a.protocol || k.protocol; k.enabled = a.enabled; k.state = a.enabled ? 'ready' : 'disabled'; }
+        else w.keys.push({ id: a.target, protocol: a.protocol || 'responses', model_protocols: [], enabled: a.enabled, state: a.enabled ? 'ready' : 'disabled', failures: 0, retry_at: 0, test: null }); p.has_secret = !!w.keys.length; p.revision++; break;
+      }
+      case 'key-model-protocol': {
+        const k = w.keys.find(k => k.id === a.target);
+        if (!k || !a.model || (a.protocol && a.protocol !== 'inherit' && !['responses', 'chat-completions', 'anthropic'].includes(a.protocol))) throw fixtureError('invalid');
+        k.model_protocols = k.model_protocols.filter(m => m.model !== a.model);
+        if (a.protocol && a.protocol !== 'inherit') k.model_protocols.push({ model: a.model, protocol: a.protocol });
+        p.revision++; break;
       }
       case 'key-delete': if (!a.approved) throw fixtureError('invalid'); w.keys = w.keys.filter(k => k.id !== a.target); p.has_secret = !!w.keys.length; p.revision++; break;
       case 'key-reset': { const k = w.keys.find(k => k.id === a.target); if (!a.approved || !k) throw fixtureError('invalid'); k.failures = 0; k.retry_at = 0; k.state = k.enabled ? 'ready' : 'disabled'; break; }
@@ -121,6 +134,16 @@ export class MockProviderTransport implements ProviderTransport {
     if (!['responses','chat-completions','anthropic'].includes(input.provider.protocol)) throw fixtureError('invalid');
     const saved: Provider = { ...input.provider, protocol: input.provider.protocol as Provider['protocol'], revision: input.expected_revision + 1,
       has_secret: input.secret === null ? current?.has_secret ?? false : !!input.secret };
+    if (current) {
+      const w = this.detail(current);
+      if (input.secret !== null) {
+        const k = w.keys.find(k => k.id === 'default');
+        if (!input.secret) w.keys = w.keys.filter(k => k.id !== 'default');
+        else if (k) { k.enabled = true; k.state = 'ready'; }
+        else w.keys.push({ id: 'default', protocol: saved.protocol, model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
+      }
+      saved.has_secret = w.keys.length > 0;
+    }
     this.rows = [...this.rows.filter(p => p.id !== saved.id), saved].sort((a, b) => a.id.localeCompare(b.id, 'zh-CN'));
     if (this.scenario === 'unknown') { this.scenario = 'normal'; throw fixtureError('unknown'); }
     return copy(saved);

@@ -14,9 +14,11 @@ var ErrReferenced = errors.New("resource is referenced")
 var ErrInvalid = errors.New("invalid operation")
 
 type ProviderKey struct {
-	ID      string `json:"id"`
-	Enabled bool   `json:"enabled"`
-	Secret  string `json:"-"`
+	Protocol       string                  `json:"protocol"`
+	ModelProtocols []catalog.ModelProtocol `json:"model_protocols"`
+	ID             string                  `json:"id"`
+	Enabled        bool                    `json:"enabled"`
+	Secret         string                  `json:"-"`
 }
 type Usage struct {
 	ProviderID   string `json:"provider_id"`
@@ -31,8 +33,19 @@ type Usage struct {
 	CacheWrite   int64  `json:"cache_write"`
 }
 
+func (k ProviderKey) EffectiveProtocol(model string) string {
+	for _, override := range k.ModelProtocols {
+		if override.Model == model {
+			return override.Protocol
+		}
+	}
+	return k.Protocol
+}
+
 func (s *Store) ProviderKeys(id string) ([]ProviderKey, error) {
-	rows, err := s.db.Query(`SELECT id,enabled,secret FROM provider_keys WHERE provider_id=? ORDER BY id`, id)
+	rows, err := s.db.Query(`SELECT k.id,k.enabled,k.secret,k.protocol,COALESCE(m.model,''),COALESCE(m.protocol,'')
+ FROM provider_keys k LEFT JOIN key_model_protocols m ON m.provider_id=k.provider_id AND m.key_id=k.id
+ WHERE k.provider_id=? ORDER BY k.id,m.model`, id)
 	if err != nil {
 		return nil, err
 	}
@@ -40,10 +53,17 @@ func (s *Store) ProviderKeys(id string) ([]ProviderKey, error) {
 	out := []ProviderKey{}
 	for rows.Next() {
 		var k ProviderKey
-		if err = rows.Scan(&k.ID, &k.Enabled, &k.Secret); err != nil {
+		var model, protocol string
+		if err = rows.Scan(&k.ID, &k.Enabled, &k.Secret, &k.Protocol, &model, &protocol); err != nil {
 			return nil, err
 		}
-		out = append(out, k)
+		if len(out) == 0 || out[len(out)-1].ID != k.ID {
+			k.ModelProtocols = []catalog.ModelProtocol{}
+			out = append(out, k)
+		}
+		if model != "" {
+			out[len(out)-1].ModelProtocols = append(out[len(out)-1].ModelProtocols, catalog.ModelProtocol{Model: model, Protocol: protocol})
+		}
 	}
 	return out, rows.Err()
 }
@@ -57,7 +77,7 @@ func (s *Store) KeyStrategy(id string) string {
 }
 
 // MutateProvider holds an IMMEDIATE transaction across revision and reference checks.
-func (s *Store) MutateProvider(id string, revision int64, action, target, secret, strategy string, enabled, copyKeys bool) error {
+func (s *Store) MutateProvider(id string, revision int64, action, target, secret, strategy string, enabled, copyKeys bool, keyProtocol ...string) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -163,7 +183,10 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 				return err
 			}
 			if copyKeys {
-				_, err = tx.Exec(`INSERT INTO provider_keys SELECT ?,id,secret,enabled FROM provider_keys WHERE provider_id=?`, target, id)
+				_, err = tx.Exec(`INSERT INTO provider_keys SELECT ?,id,secret,enabled,protocol FROM provider_keys WHERE provider_id=?`, target, id)
+			}
+			if err == nil && copyKeys {
+				_, err = tx.Exec(`INSERT INTO key_model_protocols SELECT ?,key_id,model,protocol FROM key_model_protocols WHERE provider_id=?`, target, id)
 			}
 			if err == nil {
 				_, err = tx.Exec(`INSERT INTO provider_strategy SELECT ?,strategy FROM provider_strategy WHERE provider_id=?`, target, id)
@@ -211,7 +234,22 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 						return ErrInvalid
 					}
 				}
-				_, err = tx.Exec(`INSERT INTO provider_keys VALUES(?,?,?,?) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=excluded.enabled`, id, target, secret, enabled)
+				protocol := ""
+				if len(keyProtocol) > 0 {
+					protocol = keyProtocol[0]
+				}
+				if protocol == "" {
+					e := tx.QueryRow(`SELECT protocol FROM provider_keys WHERE provider_id=? AND id=?`, id, target).Scan(&protocol)
+					if errors.Is(e, sql.ErrNoRows) {
+						protocol = "responses"
+					} else if e != nil {
+						return e
+					}
+				}
+				if !ValidProtocol(protocol) {
+					return ErrInvalid
+				}
+				_, err = tx.Exec(`INSERT INTO provider_keys(provider_id,id,secret,enabled,protocol) VALUES(?,?,?,?,?) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=excluded.enabled,protocol=excluded.protocol`, id, target, secret, enabled, protocol)
 			}
 		}
 		if err != nil {

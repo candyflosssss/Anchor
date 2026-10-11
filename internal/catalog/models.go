@@ -15,6 +15,7 @@ const MaxModels = 1000
 
 // DiscoverProviderModels pins the saved configuration used for this one request.
 type DiscoverProviderModels struct {
+	KeyID            string `json:"key_id"`
 	ProviderID       string `json:"provider_id"`
 	ExpectedRevision int64  `json:"expected_revision"`
 }
@@ -22,6 +23,7 @@ type DiscoverProviderModels struct {
 // ProviderModels describes a single directory request, not inference health.
 // Failure is empty on success. Models is always an array, including on failure.
 type ProviderModels struct {
+	KeyID      string   `json:"key_id"`
 	ProviderID string   `json:"provider_id"`
 	Revision   int64    `json:"revision"`
 	HTTPStatus int      `json:"http_status"`

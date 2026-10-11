@@ -91,6 +91,7 @@ type ProviderModelsResult struct {
 }
 
 type Action = catalog.Action
+type ModelProtocol = catalog.ModelProtocol
 type KeyStatus = catalog.KeyStatus
 type Probe = catalog.Probe
 type ModelMapping = catalog.ModelMapping

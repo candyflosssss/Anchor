@@ -354,3 +354,38 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 		t.Fatal(invalid)
 	}
 }
+
+func TestRealBridgeKeyProtocolSettings(t *testing.T) {
+	s := testSession(t)
+	b := NewBridge(s)
+	requireReady(t, b)
+	secret := "synthetic-protocol"
+	created := b.SaveProvider(SaveProvider{Provider: Provider{ID: "protocol", BaseURL: "http://127.0.0.1:1", Protocol: "responses", Enabled: false, TimeoutSeconds: 2, MaxConcurrent: 1}, Secret: &secret})
+	if created.Problem != nil {
+		t.Fatal(created)
+	}
+	written := b.ProviderAction(Action{ProviderID: "protocol", ExpectedRevision: 1, Action: "key-put", Target: "default", Protocol: "anthropic", Enabled: true})
+	if written.Problem != nil || written.Data.Keys[0].Protocol != "anthropic" || written.Data.Revision != 2 {
+		t.Fatal(written)
+	}
+	written = b.ProviderAction(Action{ProviderID: "protocol", ExpectedRevision: 2, Action: "key-model-protocol", Target: "default", Model: "actual/model", Protocol: "chat-completions"})
+	if written.Problem != nil || written.Data.Revision != 3 || len(written.Data.Keys[0].ModelProtocols) != 1 {
+		t.Fatal(written)
+	}
+	conflict := b.ProviderAction(Action{ProviderID: "protocol", ExpectedRevision: 2, Action: "key-model-protocol", Target: "default", Model: "actual/model", Protocol: "inherit"})
+	if conflict.Problem == nil || conflict.Problem.Code != "conflict" {
+		t.Fatal(conflict)
+	}
+	read := b.ProviderWorkspace(WorkspaceQuery{ProviderID: "protocol"})
+	if read.Problem != nil || read.Data.Revision != 3 || read.Data.Keys[0].ModelProtocols[0].Protocol != "chat-completions" {
+		t.Fatal(read)
+	}
+	raw, _ := json.Marshal(read)
+	if strings.Contains(string(raw), secret) {
+		t.Fatal("credential leaked")
+	}
+	written = b.ProviderAction(Action{ProviderID: "protocol", ExpectedRevision: 3, Action: "key-model-protocol", Target: "default", Model: "actual/model", Protocol: "inherit"})
+	if written.Problem != nil || len(written.Data.Keys[0].ModelProtocols) != 0 || written.Data.Keys[0].Protocol != "anthropic" {
+		t.Fatal(written)
+	}
+}

@@ -89,7 +89,7 @@ func TestPriorityV2KeyMigration(t *testing.T) {
 	if _, err := s.PutProvider(provider("p"), 0, &secret); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.db.Exec(`DROP TABLE provider_keys; DROP TABLE provider_strategy; DROP TABLE provider_prices; DROP TABLE usage_totals; PRAGMA user_version=2;`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE key_model_protocols; DROP TABLE provider_keys; DROP TABLE provider_strategy; DROP TABLE provider_prices; DROP TABLE usage_totals; PRAGMA user_version=2;`); err != nil {
 		t.Fatal(err)
 	}
 	dir := s.Dir

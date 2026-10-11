@@ -18,3 +18,31 @@ describe('provider first priority contract', () => {
     await expect(transport.action(actionFor(p, 'strategy', { strategy: 'priority' }), signal)).rejects.toMatchObject({ code: 'conflict' });
   });
 });
+
+describe('key model protocol settings', () => {
+  it('validates and sanitizes protocols belonging to each key', () => {
+    const w: Workspace = structuredClone(fixture);
+    w.keys[0].model_protocols = [Object.assign({ model: 'actual/model', protocol: 'anthropic' }, { secret: 'hidden' })];
+    const result = checkedWorkspace(w);
+    expect(result.keys[0].model_protocols).toEqual([{ model: 'actual/model', protocol: 'anthropic' }]);
+    expect(() => checkedWorkspace({ ...w, keys: [{ ...w.keys[0], protocol: 'invalid' }] })).toThrow();
+    expect(() => checkedWorkspace({ ...w, keys: [{ ...w.keys[0], model_protocols: [{ model: 'actual/model', protocol: 'invalid' }] }] })).toThrow();
+  });
+  it('keeps model overrides scoped to the selected key and clears them on inherit', async () => {
+    const transport = new MockProviderTransport(); const signal = new AbortController().signal;
+    let p = (await transport.list(signal))[0];
+    let w = await transport.action(actionFor(p, 'key-put', { target: 'second', secret: 'synthetic', protocol: 'anthropic' }), signal);
+    expect(w.keys.find(k => k.id === 'second')?.protocol).toBe('anthropic');
+    p = { ...p, revision: w.revision };
+    w = await transport.action(actionFor(p, 'key-model-protocol', { target: 'second', model: 'actual/model', protocol: 'chat-completions' }), signal);
+    expect(w.keys.find(k => k.id === 'second')?.model_protocols).toEqual([{ model: 'actual/model', protocol: 'chat-completions' }]);
+    expect(w.keys.find(k => k.id === 'default')?.model_protocols).toEqual([]);
+    const catalog = await transport.discover({ provider_id: p.id, expected_revision: w.revision, key_id: 'second' }, signal);
+    expect(catalog.key_id).toBe('second');
+    p = { ...p, revision: w.revision };
+    w = await transport.action(actionFor(p, 'key-model-protocol', { target: 'second', model: 'actual/model', protocol: 'inherit' }), signal);
+    expect(w.keys.find(k => k.id === 'second')?.model_protocols).toEqual([]);
+    expect(w.keys.find(k => k.id === 'second')?.protocol).toBe('anthropic');
+    await expect(transport.discover({ provider_id: p.id, expected_revision: w.revision, key_id: 'missing' }, signal)).rejects.toMatchObject({ code: 'invalid' });
+  });
+});

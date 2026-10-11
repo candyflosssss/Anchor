@@ -28,10 +28,12 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   status                             Query selected context
   stop --approve                     Request graceful shutdown of selected context
   provider list
-  provider models --id ID --revision N  Fetch upstream directory
+  provider models --id ID --revision N [--key KEY]  Fetch upstream directory
   provider workspace --id ID           Keys, health, mappings and usage
   provider delete|rename|copy --id ID --revision N [--target ID] [--approve] [--copy-keys]
-  provider key-put|key-delete|key-reset --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--approve]
+  provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--protocol PROTOCOL]
+  provider key-model-protocol --id ID --revision N --target KEY --model MODEL [--protocol PROTOCOL|inherit]
+  provider key-delete|key-reset --id ID --revision N --target KEY --approve
   provider strategy --id ID --revision N --strategy round-robin|priority
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
   provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--tools] [--streaming] [--approve]
@@ -426,6 +428,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	}
 	if args[0] == "models" {
 		f := a.flags("provider models")
+		key := f.String("key", "", "saved key ID; omission uses the first enabled key")
 		id := f.String("id", "", "saved provider ID")
 		revision := f.Int64("revision", 0, "expected current provider revision (required)")
 		if err := parse(f, args[1:]); err != nil {
@@ -434,7 +437,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 		if !state.ValidProviderID(*id) || *revision < 1 {
 			return errors.New("provider models requires a valid --id and current --revision")
 		}
-		result, err := c.DiscoverProviderModels(ctx, catalog.DiscoverProviderModels{ProviderID: *id, ExpectedRevision: *revision})
+		result, err := c.DiscoverProviderModels(ctx, catalog.DiscoverProviderModels{ProviderID: *id, ExpectedRevision: *revision, KeyID: *key})
 		if err != nil {
 			return err
 		}
@@ -584,11 +587,12 @@ func Main(ctx context.Context, args []string) int {
 
 func (a App) providerFeature(ctx context.Context, c *client.Client, args []string) error {
 	switch args[0] {
-	case "delete", "rename", "copy", "key-put", "key-delete", "key-reset", "strategy", "test", "model-put", "model-delete", "price-put", "price-import":
+	case "delete", "rename", "copy", "key-put", "key-delete", "key-reset", "key-model-protocol", "strategy", "test", "model-put", "model-delete", "price-put", "price-import":
 	default:
 		return errors.New("unknown provider command")
 	}
 	f := a.flags("provider " + args[0])
+	protocol := f.String("protocol", "", "key default protocol, or model override (inherit clears it)")
 	inputPrice := f.Float64("input-price", -1, "USD per million input tokens")
 	outputPrice := f.Float64("output-price", -1, "USD per million output tokens")
 	readPrice := f.Float64("cache-read-price", -1, "USD per million cached input tokens; omitted means unknown")
@@ -612,7 +616,7 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	if !state.ValidProviderID(*id) || *revision < 1 {
 		return errors.New("saved --id and current --revision are required")
 	}
-	in := catalog.Action{ProviderID: *id, ExpectedRevision: *revision, Action: args[0], Target: *target, Approved: *approve, CopyKeys: *copyKeys, Enabled: !*disabled, Strategy: *strategy, Model: *model, ModelRevision: *mr, Tools: *tools, Streaming: *stream}
+	in := catalog.Action{Protocol: *protocol, ProviderID: *id, ExpectedRevision: *revision, Action: args[0], Target: *target, Approved: *approve, CopyKeys: *copyKeys, Enabled: !*disabled, Strategy: *strategy, Model: *model, ModelRevision: *mr, Tools: *tools, Streaming: *stream}
 	if *stdin {
 		v, err := a.secret()
 		if err != nil {

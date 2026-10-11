@@ -40,7 +40,7 @@ func (s *Server) chooseKey(p state.Provider, tried map[string]bool) (state.Provi
 		return state.ProviderKey{}, false
 	}
 	if len(keys) == 0 {
-		keys = []state.ProviderKey{{ID: "anonymous", Enabled: true}}
+		keys = []state.ProviderKey{{ID: "anonymous", Enabled: true, Protocol: p.Protocol}}
 	}
 	strategy := s.Store.KeyStrategy(p.ID)
 	s.mu.Lock()
@@ -114,7 +114,7 @@ func (s *Server) finishKey(p state.Provider, k string, status int, after string,
 func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeyStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := catalog.KeyStatus{ID: k.ID, Enabled: k.Enabled, State: "ready"}
+	out := catalog.KeyStatus{ID: k.ID, Enabled: k.Enabled, State: "ready", Protocol: k.Protocol, ModelProtocols: k.ModelProtocols}
 	if !k.Enabled {
 		out.State = "disabled"
 	}

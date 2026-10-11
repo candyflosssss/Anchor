@@ -2,6 +2,7 @@ package catalog
 
 // Explicit DTOs shared by management, CLI and desktop. Secrets appear only in Action.
 type Action struct {
+	Protocol         string `json:"protocol"`
 	Price            *Price `json:"price"`
 	CatalogProvider  string `json:"catalog_provider"`
 	ProviderID       string `json:"provider_id"`
@@ -18,13 +19,20 @@ type Action struct {
 	Tools            bool   `json:"tools"`
 	Streaming        bool   `json:"streaming"`
 }
+type ModelProtocol struct {
+	Model    string `json:"model"`
+	Protocol string `json:"protocol"`
+}
+
 type KeyStatus struct {
-	ID       string `json:"id"`
-	Enabled  bool   `json:"enabled"`
-	State    string `json:"state"`
-	Failures int    `json:"failures"`
-	RetryAt  int64  `json:"retry_at"`
-	Test     *Probe `json:"test"`
+	Protocol       string          `json:"protocol"`
+	ModelProtocols []ModelProtocol `json:"model_protocols"`
+	ID             string          `json:"id"`
+	Enabled        bool            `json:"enabled"`
+	State          string          `json:"state"`
+	Failures       int             `json:"failures"`
+	RetryAt        int64           `json:"retry_at"`
+	Test           *Probe          `json:"test"`
 }
 type Probe struct {
 	Revision   int64  `json:"revision"`

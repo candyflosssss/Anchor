@@ -45,7 +45,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
       <span className="provider-avatar large" aria-hidden="true">{Array.from(p.id)[0]}</span>
       <div className="detail-title">
         <h1>{p.id}</h1>
-        <div className="detail-meta"><StatusBadge enabled={p.enabled} />{summary && <HealthPill tone={summary.tone} label={summary.label} />}<span className="protocol-tag">{protocolName[p.protocol]}</span></div>
+        <div className="detail-meta"><StatusBadge enabled={p.enabled} />{summary && <HealthPill tone={summary.tone} label={summary.label} />}<span className="protocol-tag">按 Key / 模型设置</span></div>
         <span className="provider-url mono" title={p.base_url}>{p.base_url}</span>
       </div>
       <div className="detail-actions">
@@ -93,7 +93,7 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
     <section className="detail-card"><h2>接入检查</h2><p className="card-hint">按顺序完成后即可被 Agent 调用。</p>
       <ul className="checklist">
         {!p.enabled && <Check ok={false} title="供应商已停用" detail="不参与新的路由选择；配置和密钥均保留。" action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.requestToggle(p)}>重新启用</Button>} />}
-        <Check ok title="API 地址" detail={`${protocolName[p.protocol]} · ${p.base_url}`} />
+        <Check ok title="API 地址" detail={p.base_url} />
         <Check ok={ready.length > 0} warn={!w.keys.length} title="访问 Key" detail={w.keys.length ? `${ready.length} 个可调度 / 共 ${w.keys.length} 个` : '未配置，将以匿名方式请求上游'}
           action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => w.keys.length ? c.setDetailTab('keys') : c.openDialog({ kind: 'key' })}>{w.keys.length ? '管理 Key' : '添加 Key'}</Button>} />
         <Check ok={w.models.length > 0} title="模型映射" detail={w.models.length ? `已映射 ${w.models.length} 个公开模型` : 'Agent 还不能通过此供应商使用任何模型'}
@@ -105,7 +105,7 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
     <section className="detail-card"><h2>配置</h2>
       <dl className="detail-properties">
         <dt>API 根地址</dt><dd className="mono break-all">{p.base_url}</dd>
-        <dt>协议</dt><dd>{protocolName[p.protocol]}</dd>
+        <dt>协议</dt><dd>{w.keys.length ? '按 Key 默认值，可由实际模型覆盖' : `匿名请求：${protocolName[p.protocol]}`}</dd>
         <dt>凭据</dt><dd className="flex items-center gap-2"><KeyRound size={14} />{p.has_secret ? '已配置 · 密钥不可回显' : '未配置密钥'}</dd>
         <dt>请求超时</dt><dd>{p.timeout_seconds} 秒</dd>
         <dt>最大并发</dt><dd>{p.max_concurrent} 个请求</dd>
@@ -131,14 +131,15 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
         <Button disabled={disabled || w.keys.length >= 64} onClick={() => c.openDialog({ kind: 'key' })}><Plus />添加 Key</Button>
       </div>
     </div>
-    {w.keys.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">Key</th><th scope="col">状态</th><th scope="col">最近测试</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
+    {w.keys.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">Key</th><th scope="col">默认协议 / 模型覆盖</th><th scope="col">状态</th><th scope="col">最近测试</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
       {w.keys.map(k => <tr key={k.id}>
-        <td className="mono">{k.id}</td>
+        <td className="mono">{k.id}</td><td>{protocolName[k.protocol as keyof typeof protocolName]}<span className="cell-hint"> · {k.model_protocols.length} 个覆盖</span></td>
         <td><span className={`health-label ${k.state}`}>{healthText[k.state] ?? k.state}</span>{k.failures > 0 && <span className="cell-hint">连续失败 {k.failures} 次</span>}</td>
         <td>{k.test ? <span className={k.test.failure ? 'text-destructive' : ''}>{k.test.failure ? '失败' : '成功'} · {k.test.elapsed_ms} ms · {formatAgo(k.test.at)}</span> : <span className="cell-hint">未测试</span>}</td>
         <td className="row-actions">
+          <Button size="sm" variant="ghost" disabled={disabled} aria-label={`配置 Key ${k.id} 的模型协议`} onClick={() => { c.selectCatalogKey(k.id); c.setDetailTab('models'); }}>模型协议</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'test', keyId: k.id })}><Play />测试</Button>
-          <Button size="sm" variant="ghost" disabled={disabled} aria-label={`替换 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'key', keyId: k.id })}>替换</Button>
+          <Button size="sm" variant="ghost" disabled={disabled} aria-label={`编辑 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'key', keyId: k.id })}>编辑</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${k.enabled ? '停用' : '启用'} Key ${k.id}`} onClick={() => void f.run('key-put', { target: k.id, enabled: !k.enabled })}>{k.enabled ? '停用' : '启用'}</Button>
           {(k.failures > 0 || k.state === 'invalid' || k.state === 'cooling' || k.state === 'half-open') && <Button size="sm" variant="ghost" disabled={disabled} aria-label={`恢复 Key ${k.id}`} onClick={() => ask({ action: 'key-reset', title: `恢复 ${k.id} 的调度？`, body: '清除认证失效、失败计数及冷却；不会改变已保存密钥。', fields: { target: k.id } })}><RotateCcw />恢复</Button>}
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`删除 Key ${k.id}`} onClick={() => ask({ action: 'key-delete', title: `删除 Key ${k.id}？`, body: '删除后无法回显或恢复此密钥。最后一个 Key 被删除后会使用匿名请求。', fields: { target: k.id } })}><Trash2 /></Button>
@@ -151,6 +152,8 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
 
 function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace; disabled: boolean; ask: (a: Ask) => void }) {
   const models = c.models;
+  const key = w.keys.find(k => k.id === c.catalogKey) ?? (!c.catalogKey ? w.keys.find(k => k.enabled) : undefined);
+  const modelIDs = [...new Set([...(models?.models ?? []), ...(key?.model_protocols.map(m => m.model) ?? [])])];
   const mapped = new Map(w.models.map(m => [m.upstream, m.id]));
   return <div className="stack">
     <section className="detail-card">
@@ -169,15 +172,21 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
       </tbody></table></div> : <div className="empty-state compact"><List size={24} /><p>还没有映射模型。先从上游目录导入，或手动添加。</p></div>}
     </section>
     <section className="detail-card model-directory" aria-label="上游模型目录" aria-busy={c.modelsBusy}>
-      <div className="card-toolbar"><div><h2>上游模型目录</h2><p className="card-hint">手动读取已存地址的 /models；不生成内容。停用供应商也可查询。</p></div>
-        <Button variant="outline" disabled={disabled} onClick={() => void c.discoverModels()}>{c.modelsBusy ? <LoaderCircle className="loading-icon" /> : <Download />}{c.modelsBusy ? '正在获取目录…' : '获取模型目录'}</Button></div>
+      <div className="card-toolbar"><div><h2>Key 的模型与协议</h2><p className="card-hint">使用所选 Key 读取 /models；每个实际模型默认继承该 Key 的协议。</p></div>
+        <div className="toolbar-actions"><label htmlFor="catalog-key">查询 Key</label><select id="catalog-key" className="select-field" value={c.catalogKey} disabled={disabled} onChange={e => c.selectCatalogKey(e.target.value)}>
+          <option value="">{w.keys.length ? '首个启用的 Key' : '匿名请求'}</option>{w.keys.map(k => <option key={k.id} value={k.id}>{k.id}{k.enabled ? '' : '（已停用）'}</option>)}
+        </select><Button variant="outline" disabled={disabled || (!!c.catalogKey && !key)} onClick={() => void c.discoverModels()}>{c.modelsBusy ? <LoaderCircle className="loading-icon" /> : <Download />}{c.modelsBusy ? '正在获取目录…' : '获取模型目录'}</Button></div></div>
+      {key && <p className="card-hint">Key {key.id} · 默认协议 {protocolName[key.protocol as keyof typeof protocolName]}；更改默认协议会影响所有继承的模型。</p>}
       {c.modelsProblem && <p className="catalog-feedback" role="alert">{catalogProblemText(c.modelsProblem)}</p>}
-      <p className="catalog-feedback" aria-live="polite">{models ? `${models.failure ? '目录获取失败' : `已获取 ${models.models.length} 个模型`} · HTTP ${models.http_status || '—'} · ${models.elapsed_ms} ms · revision ${models.revision}` : ''}</p>
-      {models && (models.failure ? <p className="catalog-feedback" role="alert">{catalogFailureText[models.failure]}</p>
-        : models.models.length === 0 ? <p className="catalog-feedback">上游返回空目录；未推断其推理能力。</p>
-        : <><p className="detail-footnote">目录成功不代表模型推理可用；导入后建议测试一次。</p>
-          <ul className="catalog-list" tabIndex={0} aria-label="上游模型 ID">{models.models.map(id => <li key={id}><span className="mono break-all">{id}</span>
-            {mapped.has(id) ? <span className="cell-hint">已映射为 {mapped.get(id)}</span> : <Button size="sm" variant="ghost" disabled={disabled} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}><Plus />导入</Button>}</li>)}</ul></>)}
+      <p className="catalog-feedback" aria-live="polite">{models ? `${models.failure ? '目录获取失败' : `已获取 ${models.models.length} 个模型`} · Key ${models.key_id || '—'} · HTTP ${models.http_status || '—'} · ${models.elapsed_ms} ms · revision ${models.revision}` : ''}</p>
+      {models?.failure && <p className="catalog-feedback" role="alert">{catalogFailureText[models.failure]}</p>}
+      {models && !models.failure && models.models.length === 0 && <p className="catalog-feedback">上游返回空目录；未推断其推理能力。</p>}
+      {modelIDs.length > 0 && <><p className="detail-footnote">协议覆盖仅作用于此 Key 和实际上游模型名。目录成功不代表推理可用；已保存的覆盖始终保留在列表中。</p>
+        <ul className="catalog-list" tabIndex={0} aria-label="上游模型 ID">{modelIDs.map(id => <li key={id}><span className="mono break-all">{id}</span>
+          {key && <select className="select-field" aria-label={`${id} 的协议`} value={key.model_protocols.find(m => m.model === id)?.protocol ?? 'inherit'} disabled={disabled || c.features.needsRead} onChange={e => void c.features.run('key-model-protocol', { target: key.id, model: id, protocol: e.target.value })}>
+            <option value="inherit">继承 Key（{protocolName[key.protocol as keyof typeof protocolName]}）</option>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>}
+          {mapped.has(id) ? <span className="cell-hint">已映射为 {mapped.get(id)}</span> : <Button size="sm" variant="ghost" disabled={disabled} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}><Plus />导入</Button>}</li>)}</ul></>}
     </section>
   </div>;
 }

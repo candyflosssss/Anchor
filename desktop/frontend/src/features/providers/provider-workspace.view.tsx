@@ -6,7 +6,7 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 import { StatusBadge } from '../../components/shared/status-badge';
 import { MenuItem, Popover } from '../../components/shared/popover-menu';
 import { HealthPill } from './provider-detail.view';
-import { protocolName, type Provider } from './provider.model';
+import { type Provider } from './provider.model';
 import { formatAgo, type ProviderSummary } from './provider-summary.model';
 import type { ProviderController } from './use-provider-controller';
 
@@ -27,7 +27,7 @@ export function ProviderList({ c, summaries, onEdit, onCreate, children }: { c: 
       </TableRow></TableHeader><TableBody>
         {c.phase === 'ready' && c.visible.map(p => { const s = byId.get(p.id); const loaded = !!s?.workspace; return <TableRow key={p.id} className="clickable-row" onClick={e => rowClick(e, p.id)}>
           <TableCell><div className="provider-cell"><span className="provider-avatar" aria-hidden="true">{Array.from(p.id)[0]}</span><div><button className="provider-name" disabled={c.blocked} onClick={() => c.openProvider(p.id)}>{p.id}</button><span className="provider-url mono" title={p.base_url}>{p.base_url}</span></div></div></TableCell>
-          <TableCell className="col-wide"><span className="protocol-tag">{protocolName[p.protocol]}</span></TableCell>
+          <TableCell className="col-wide"><span className="protocol-tag">按 Key / 模型设置</span></TableCell>
           <TableCell>{!p.enabled ? <StatusBadge enabled={false} /> : s ? <span title={s.hint}><HealthPill tone={s.tone} label={s.label} /></span> : '—'}</TableCell>
           <TableCell><span className="secret-status"><KeyRound size={14} />{!loaded ? (p.has_secret ? '已配置' : '—') : s!.keyCount ? `${s!.enabledKeys} / ${s!.keyCount}` : '匿名'}</span></TableCell>
           <TableCell className="text-sm">{loaded ? s!.modelCount || <span className="cell-hint">未映射</span> : '—'}</TableCell>
