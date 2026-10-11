@@ -34,12 +34,12 @@ func run() int {
 		return 1
 	}
 	flags := flag.NewFlagSet("anchor-desktop", flag.ContinueOnError)
-	dir := flags.String("data-dir", defaults, "local instance directory")
+	dir := flags.String("data-dir", defaults, "local instance directory (does not allow multiple GUI windows)")
 	finish := flags.Int("finish-update", 0, "internal installer handoff mode")
 	installVersion := flags.String("install-version", "", "internal confirmed installer version")
 	installHash := flags.String("install-sha256", "", "internal confirmed installer checksum")
-	manifest := flags.String("update-manifest", "", "host-only update manifest URL")
-	channel := flags.String("update-channel", "", "host-only update channel")
+	manifest := flags.String("update-manifest", "", "host-only update manifest URL (first GUI launch only)")
+	channel := flags.String("update-channel", "", "host-only update channel (first GUI launch only)")
 	coreMode := flags.Bool("core", false, "internal detached core mode")
 	if flags.Parse(os.Args[1:]) != nil || flags.NArg() != 0 {
 		return 2
@@ -61,6 +61,18 @@ func run() int {
 		defer cancel()
 		return cli.Main(ctx, []string{"--data-dir", *dir, "serve"})
 	}
+	var window desktop.WindowLifecycle
+	activationContext, cancelActivation := context.WithTimeout(context.Background(), 5*time.Second)
+	host, err := desktop.AcquireHost(activationContext, defaults, window.Show)
+	cancelActivation()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Anchor is already starting or its desktop could not be opened; try again shortly.")
+		return 1
+	}
+	if host == nil {
+		return 0
+	}
+	defer host.Close()
 	var updateConfigProvided bool
 	flags.Visit(func(f *flag.Flag) {
 		if f.Name == "update-manifest" || f.Name == "update-channel" {
@@ -91,16 +103,15 @@ func run() int {
 	}
 	var hostContext context.Context
 	var contextMu sync.RWMutex
-	var window desktop.WindowLifecycle
 	var tray desktoptray.Tray
 	session := desktop.NewSession(desktop.Options{Dir: *dir, Executable: executable, Quit: func() {
+		window.RequestExit()
 		go func() {
 			time.Sleep(250 * time.Millisecond)
 			contextMu.RLock()
 			ctx := hostContext
 			contextMu.RUnlock()
 			if ctx != nil {
-				window.RequestExit()
 				wailsruntime.Quit(ctx)
 			}
 		}()
@@ -119,14 +130,18 @@ func run() int {
 			contextMu.Lock()
 			hostContext = ctx
 			contextMu.Unlock()
-			tray.Start(func() {
-				if !window.Exiting() {
-					if wailsruntime.WindowIsMinimised(ctx) {
-						wailsruntime.WindowUnminimise(ctx)
-					}
-					wailsruntime.WindowShow(ctx)
+			tray.Start(func() { window.Show() }, func() { bridge.ExitDesktop() })
+		},
+		OnDomReady: func(ctx context.Context) {
+			window.Ready(func() {
+				if window.Exiting() {
+					return
 				}
-			}, func() { bridge.ExitDesktop() })
+				if wailsruntime.WindowIsMinimised(ctx) {
+					wailsruntime.WindowUnminimise(ctx)
+				}
+				wailsruntime.WindowShow(ctx)
+			})
 		},
 		OnShutdown: func(context.Context) { window.RequestExit(); tray.Stop(); session.Close() },
 		OnBeforeClose: func(ctx context.Context) bool {

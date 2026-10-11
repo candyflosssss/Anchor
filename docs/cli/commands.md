@@ -430,6 +430,7 @@ anchor recover [--id ID]
 | 初始化、启动、停服、版本/帮助 | init / serve / stop --approve / version / help | CLI 已提供；serve 仍为前台；无后台服务管理 |
 | 桌面自动后台启动／复用 | 开发宿主已实现；原生两平台待验收 | 自动启动协调属于宿主机制，不要求单独命令；详见[桌面运行契约](../design/desktop-runtime.md) |
 | 桌面窗口最小化／最大化／还原／关闭／托盘／退出界面 | 桌面自定义顶栏、系统托盘及「本机实例」弹层中的「退出界面」；原生行为未验收 | 本机窗口展示行为，不新增 CLI 命令；desktop.14 起普通关闭隐藏到托盘，单击图标恢复，菜单可退出界面；最小化按钮保留任务栏行为，无可用托盘时关闭直接退出宿主，均不停止核心 |
+| 桌面单实例／重复启动恢复 | 桌面宿主已实现；原生两平台待验收 | 当前用户只运行一个 GUI 与托盘；重复打开恢复已有窗口，不新增管理命令。宿主锁独立于 `--data-dir`；后台核心和安装 helper 沿用原生命周期 |
 | 开机自启动设置 | 未实现；无 GUI 开关或 CLI | 独立、默认不启用；未来实现需同步提供 CLI，安装和启动宿主不自动注册服务 |
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
@@ -472,4 +473,4 @@ anchor [--data-dir DIR] update apply --approve
 - apply 成功输出 `{installed:true,backup:ABS_PATH,restart_required:true,core_restarted:false}`；installed 仅表示本次 CLI 文件替换完成，当前命令仍是旧进程，用户下一次运行／重新启动核心才使用新版本。需要回退时，正常停服后人工恢复备份；不承诺数据库回滚或所有数据目录中的进程都已退出。请先停止使用同一程序的其他核心。
 - 当前平台包最多256 MiB、清单2 MiB；check/download 整个操作最多5分钟。更新清单格式、签名限制及 dev 投放步骤见 [在线更新](../design/online-updates.md)。SHA256 仅是完整性校验，不能替代独立发布签名。
 
-桌面宿主配置入口为 `anchor-desktop [--data-dir DIR] [--update-channel CHANNEL] [--update-manifest HTTPS_URL]`，只在指定时保存配置；窗口启动和供应商功能仍走原会话规则。桌面 GUI 只接收受控渠道和已检查版本，不提供任意 URL/路径/命令执行。Linux 安装权限交由系统安装器，不能等同于 CLI apply 原位替换 `/usr/bin`。
+桌面宿主配置入口为 `anchor-desktop [--data-dir DIR] [--update-channel CHANNEL] [--update-manifest HTTPS_URL]`，首次 GUI 启动时只在指定参数后保存配置；当前用户已有 GUI 时再次启动只恢复已有窗口，不切换其 `--data-dir` 或保存新更新参数。已有宿主未响应时有界等待后退出1，不再开第二个 GUI。核心 `--core` 和内部安装 helper 不受 GUI 锁限制。窗口连接和供应商功能仍走原会话规则。桌面 GUI 只接收受控渠道和已检查版本，不提供任意 URL/路径/命令执行。Linux 安装权限交由系统安装器，不能等同于 CLI apply 原位替换 `/usr/bin`。

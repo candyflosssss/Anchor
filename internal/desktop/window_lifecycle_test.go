@@ -49,3 +49,30 @@ func TestExitDesktopCannotInterruptUpdateHandoff(t *testing.T) {
 		t.Fatalf("expected conflict during update handoff: %#v", out)
 	}
 }
+
+func TestWindowActivationLifecycle(t *testing.T) {
+	var window WindowLifecycle
+	if !window.Show() || !window.Show() {
+		t.Fatal("startup launches must queue activation")
+	}
+	shows := 0
+	window.Ready(func() { shows++ })
+	if shows != 1 {
+		t.Fatalf("pending launches must coalesce: shows=%d", shows)
+	}
+	window.BeforeClose(true, func() {})
+	if !window.Show() || shows != 2 {
+		t.Fatal("hidden tray window did not accept activation")
+	}
+	window.RequestExit()
+	if window.Show() || shows != 2 {
+		t.Fatal("exiting window accepted activation")
+	}
+}
+
+func TestWindowExitDiscardsPendingActivation(t *testing.T) {
+	var window WindowLifecycle
+	window.Show()
+	window.RequestExit()
+	window.Ready(func() { t.Fatal("exit must discard early activation") })
+}
