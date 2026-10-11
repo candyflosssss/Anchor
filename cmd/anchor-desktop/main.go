@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/candyflosssss/Anchor/desktop/branding"
@@ -90,6 +91,7 @@ func run() int {
 	}
 	var hostContext context.Context
 	var contextMu sync.RWMutex
+	var allowExit atomic.Bool
 	session := desktop.NewSession(desktop.Options{Dir: *dir, Executable: executable, Quit: func() {
 		go func() {
 			time.Sleep(250 * time.Millisecond)
@@ -97,6 +99,7 @@ func run() int {
 			ctx := hostContext
 			contextMu.RUnlock()
 			if ctx != nil {
+				allowExit.Store(true)
 				wailsruntime.Quit(ctx)
 			}
 		}()
@@ -111,7 +114,16 @@ func run() int {
 		AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{desktop.NewBridge(session)},
 		OnStartup:  func(ctx context.Context) { contextMu.Lock(); hostContext = ctx; contextMu.Unlock() },
 		OnShutdown: func(context.Context) { session.Close() },
-		Linux:      &linux.Options{Icon: branding.Icon, ProgramName: "anchor-desktop", WebviewGpuPolicy: linux.WebviewGpuPolicyNever},
+		OnBeforeClose: func(ctx context.Context) bool {
+			// Ordinary close requests keep a restorable taskbar window. Explicit
+			// ExitDesktop and confirmed update installation use the Quit callback.
+			if allowExit.Load() {
+				return false
+			}
+			wailsruntime.WindowMinimise(ctx)
+			return true
+		},
+		Linux: &linux.Options{Icon: branding.Icon, ProgramName: "anchor-desktop", WebviewGpuPolicy: linux.WebviewGpuPolicyNever},
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Anchor desktop failed to start; check the platform runtime.")

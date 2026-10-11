@@ -13,6 +13,27 @@ type Bridge struct{ session *Session }
 
 func NewBridge(s *Session) *Bridge     { return &Bridge{session: s} }
 func (b *Bridge) Start() SessionResult { return b.session.start() }
+
+// ExitDesktop exits only this GUI host; the detached core keeps running.
+// The host callback also bypasses close-to-minimise for update installation.
+func (b *Bridge) ExitDesktop() StopResult {
+	s := b.session
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := StopResult{Contract: Contract}
+	if s.updating {
+		out.Problem = &Problem{"conflict"}
+		return out
+	}
+	if s.options.Quit == nil {
+		out.Problem = &Problem{"unsupported"}
+		return out
+	}
+	s.options.Quit()
+	out.Data = &StopInfo{Accepted: true}
+	return out
+}
+
 func (b *Bridge) Status() SessionResult {
 	s := b.session
 	s.mu.Lock()

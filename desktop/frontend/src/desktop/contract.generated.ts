@@ -182,6 +182,7 @@ export interface DesktopBridge {
   CheckUpdate(input1: string): Promise<UpdateResult>;
   DiscoverProviderModels(input1: DiscoverProviderModels): Promise<ProviderModelsResult>;
   DownloadUpdate(input1: string): Promise<UpdateResult>;
+  ExitDesktop(): Promise<StopResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;

@@ -6,7 +6,7 @@
 
 ## 1. 宿主接口
 
-规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Providers、SaveProvider、StopCore，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
+规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Providers、SaveProvider、StopCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
 
 每个结果带 `contract=anchor-desktop-v1`、data 与 problem；problem 仅含白名单 code，不返回原始错误、路径、管理令牌或供应商秘密。列表始终为数组。返回 Provider revision 为 1..Number.MAX_SAFE_INTEGER；写入 expected_revision 为 0..MAX_SAFE_INTEGER-1，且等于输入 provider.revision，超范围拒绝。SaveProvider 的 secret=null 保留、空字符串清除、非空替换；只入不出。写入发生网络/响应异常时返回 unknown，不自动重试；409 为 conflict、认证失败为 unauthorized。
 
@@ -14,7 +14,7 @@
 
 桌面二进制以默认用户状态目录或显式 `--data-dir` 运行；JS 不接受目录参数。Start 在有界超时内取得桌面启动协调锁：安全初始化缺失状态，核验本机身份/API/授权，就绪则复用；否则依据实例锁启动同一二进制的受限 `--core` 模式。两个监听面与托管协调就绪后才开放供应商页；核心 starting/stopping 时拒绝新写入／网关请求（starting 时仍可正常请求停服）。重复打开不重复启动核心；未知端口占用、身份不符与无效状态不得覆盖、强杀或回退 Mock。
 
-子进程不使用窗口 context、标准输入输出管道或父进程死亡信号；Windows 隐藏控制台并创建独立进程组，Linux 使用独立 session。宿主关闭只取消本次查询并释放客户端，不停止核心。已有正常核心可以复用，不接管其外部服务管理器。连接来源对照已认证 instance 响应的 process_id 与本次子进程 PID，CLI 并发赢得实例锁时标为复用；旧核心无该字段同样保守复用。PID 仅用于来源标记，绝不替代身份／授权或用于强杀；Status 轮询刷新来源与停服能力。
+子进程不使用窗口 context、标准输入输出管道或父进程死亡信号；Windows 隐藏控制台并创建独立进程组，Linux 使用独立 session。从 desktop.12 起，普通关闭请求（自定义关闭按钮或系统关闭）最小化到任务栏，宿主与窗口保留，点击任务栏可还原；「退出界面」经 ExitDesktop 才真正退出宿主，只取消本次查询并释放客户端，不停止核心。已有正常核心可以复用，不接管其外部服务管理器。连接来源对照已认证 instance 响应的 process_id 与本次子进程 PID，CLI 并发赢得实例锁时标为复用；旧核心无该字段同样保守复用。PID 仅用于来源标记，绝不替代身份／授权或用于强杀；Status 轮询刷新来源与停服能力。
 
 Status 只查询，不启动／重启；核心退出后 UI 禁写，用户明确重新连接时才再次 Start。StopCore 须明确确认当前实例身份，通过带管理鉴权和 X-Anchor-Instance 的 POST /control/v1/shutdown 请求核心正常停服。返回 accepted 仅代表请求接受，不等于退出或恢复成功；UI 随后转为断开，不显示“恢复成功”。CLI 对应 `stop --approve`，无强杀和自动重试。
 
@@ -26,11 +26,11 @@ Vite `prototype` 模式明确使用内存 Mock，仍可测试已有设计场景�
 
 ### 3.1 自定义桌面顶栏（2026-10-11）
 
-Windows / Linux 统一启用 Wails `Frameless`，以现有工作区 header 承担拖动和窗口控制，不改变五个业务 Bridge 方法或 DTO 契约。窗口 View → hook Controller → Model → `desktop/window-runtime.ts`，适配器只允许 `WindowMinimise`、`WindowToggleMaximise`、`WindowIsMaximised`、`Quit`；接口依据仓库锁定的 Wails v2.15.0 runtime 源码，不向页面暴露通用 runtime 或系统执行入口。
+Windows / Linux 统一启用 Wails `Frameless`，以现有工作区 header 承担拖动和窗口控制，不改变核心业务规则；desktop.12 增加窗口生命周期方法 ExitDesktop，复用 StopResult envelope（accepted 仅指已接受退出请求）。窗口 View → hook Controller → Model → `desktop/window-runtime.ts`，适配器只允许 `WindowMinimise`、`WindowToggleMaximise`、`WindowIsMaximised`、`Quit`；接口依据仓库锁定的 Wails v2.15.0 runtime 源码，不向页面暴露通用 runtime 或系统执行入口。
 
 拖动使用 `--wails-draggable: drag`；交互元素及窗口按钮明确为 `no-drag`。双击仅处理拖动区域。状态查询有超时并在 resize / focus / 恢复可见时更新，组件卸载移除监听和计时器；缺失 runtime 显示失败而不回退模拟。浏览器 prototype 隐藏原生控件。
 
-`Quit` 仅请求桌面宿主退出，仍遵守 §2 关窗不停服，不调用 StopCore 或强杀进程。最小化 / 最大化 / 还原是本机窗口展示行为，不增加 CLI 管理指令。本轮只修改源码与编译打包，原生 Windows / Linux 拖动、缩放及按钮行为不声明已验收。
+`Quit` 普通关闭请求由 OnBeforeClose 拦截并最小化到任务栏，不调用 StopCore。ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置原子退出标记，再调用 Quit，绕过最小化，确保更新 helper 不会卡在等待窗口退出。ExitDesktop 不要求核心在线，更新交接中返回 conflict；未绑定宿主退出回调时返回 unsupported。任务栏收起不是系统托盘，此版本未新增托盘图标。最小化 / 最大化 / 还原是本机窗口展示行为，不增加 CLI 管理指令。本轮只修改源码与编译打包，原生 Windows / Linux 拖动、缩放及按钮行为不声明已验收。
 
 ## 4. 验收
 

@@ -46,10 +46,9 @@ export function useWindowController(enabled: boolean) {
     };
   }, [enabled]);
 
-  function invoke(action: () => void) {
+  function invoke(action: () => void | Promise<void>) {
     if (!enabled) return;
-    try { action(); scheduleRefresh.current(); }
-    catch { setError(windowMessages.failed); }
+    void Promise.resolve().then(action).then(() => scheduleRefresh.current()).catch(() => setError(windowMessages.failed));
   }
   function toggleMaximise() { invoke(windowModel.toggleMaximise); }
   function onDragDoubleClick(event: MouseEvent<HTMLElement>) {
@@ -65,6 +64,7 @@ export function useWindowController(enabled: boolean) {
     minimise: () => invoke(windowModel.minimise),
     toggleMaximise,
     close: () => invoke(windowModel.close),
+    exit: () => invoke(windowModel.exit),
     onDragDoubleClick,
   };
 }

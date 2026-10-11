@@ -1,3 +1,5 @@
+import { bridge, call, DesktopProblem } from './transport';
+
 // Narrow adapter for the window-only API injected by Wails v2.15.0.
 // Business views must not access window.runtime directly.
 interface WindowRuntime {
@@ -24,6 +26,10 @@ export const windowRuntime = {
   minimise: () => requireRuntime().WindowMinimise(),
   toggleMaximise: () => requireRuntime().WindowToggleMaximise(),
   isMaximised: () => requireRuntime().WindowIsMaximised(),
-  // Quit the GUI host only. Never call the core's shutdown endpoint here.
+  // The host intercepts ordinary close requests and minimises to the taskbar.
   close: () => requireRuntime().Quit(),
+  exit: async () => {
+    const result = await call(() => bridge().ExitDesktop(), true);
+    if (result.accepted !== true) throw new DesktopProblem('unknown');
+  },
 };

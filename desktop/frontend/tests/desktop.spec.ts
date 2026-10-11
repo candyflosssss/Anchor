@@ -42,6 +42,7 @@ async function host(page: Page) {
         providers = [...providers.filter(p => p.id !== saved.id), saved];
         return { contract, data: saved, problem: null };
       },
+      ExitDesktop: async () => ({ contract: CONTRACT, data: { accepted: true }, problem: null }),
       StopCore: async input => {
         if (!input.approved || input.instance_id !== data.instance_id) return { contract, data: null, problem: { code: 'invalid' } };
         counters.stops++; return { contract, data: { accepted: true }, problem: null };

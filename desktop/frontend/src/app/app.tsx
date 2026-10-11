@@ -43,8 +43,11 @@ export function App() {
       </header>
       {windowController.error && <p role="status" className="border-b px-4 py-2 text-xs text-destructive">{windowController.error}</p>}
       {!prototype && <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3 text-xs text-muted-foreground">
-        <span>{session.info ? `${session.info.source === 'started' ? '本次启动' : '复用已有核心'} · ` : ''}关闭窗口不会停止核心 · 不自动设置开机自启动</span>
-        {session.info?.can_stop && <Button variant="outline" size="sm" disabled={busy || session.stopping} onClick={() => setConfirmStop(true)}>停止核心</Button>}
+        <span>{session.info ? `${session.info.source === 'started' ? '本次启动' : '复用已有核心'} · ` : ''}关闭窗口收起到任务栏 · 核心持续运行</span>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" title="退出界面进程，后台核心继续运行" disabled={busy || session.stopping} onClick={windowController.exit}>退出界面</Button>
+          {session.info?.can_stop && <Button variant="outline" size="sm" disabled={busy || session.stopping} onClick={() => setConfirmStop(true)}>停止核心</Button>}
+        </div>
       </div>}
       {page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <ProvidersPage environment={environment} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
         <h1 className="text-xl font-semibold">{session.phase === 'starting' ? '正在连接本机核心…' : session.phase === 'stopped' ? '停服请求已接受' : '本机核心暂不可用'}</h1>
