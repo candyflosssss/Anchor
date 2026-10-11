@@ -1,6 +1,6 @@
 # 在线更新 v1
 
-- 日期：2026-10-11；**`0.1.0-dev.desktop.13` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.12 可在应用内选择 dev 升级；默认渠道仍为 alpha。旧 CLI alpha.6 和 desktop.8 不含更新入口，首次须人工安装。真实更新下载已通过，原生安装未验收，详见[桌面开发版](../release/desktop.md)。
+- 日期：2026-10-11；**`0.1.0-dev.desktop.14` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.13 可在应用内选择 dev 升级；默认渠道仍为 alpha。旧 CLI alpha.6 和 desktop.8 不含更新入口，首次须人工安装。真实更新下载已通过，原生安装未验收，详见[桌面开发版](../release/desktop.md)。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 
@@ -18,7 +18,7 @@
 - Windows：运行已有当前用户 NSIS 安装器，继续遵循其文件占用拒绝与运行时授权规则；不静默安装。其他窗口须先点击「退出界面」，安装完重新打开程序。
 - Linux：`xdg-open` 将 `.deb` 交给系统关联的包安装器，提权由系统处理，Anchor 不调用 sudo 或写 `/usr/bin`。没有关联安装器时，用户在全部窗口点击「退出界面」后用 `sudo apt install <已校验的绝对路径>` 安装，再启动。交接成功不等于包管理器安装完成。
 - helper 结果留在 `updates/install.log`；当前可执行文件已退出，因此失败不会伪报“已更新”。Linux helper 结束删除自身，Windows 执行中的 helper 可能无法自删；可在确认退出后删除下载缓存及 `anchor-update-helper-*`，不得删除主状态目录。
-- desktop.12 起普通关闭收起到任务栏，独立「退出界面」只退出宿主；desktop.13 将「退出界面」「停止核心」收进顶栏「本机实例」弹层；确认“安装并停服”才停止核心，安装回调绕过关闭最小化并真正退出，以便 helper 继续。
+- desktop.14 起普通关闭隐藏到系统托盘，无可用托盘时直接退出宿主；托盘菜单支持打开与退出界面。「退出界面」「停止核心」仍位于顶栏「本机实例」弹层。退出界面不停止核心；确认“安装并停服”才停止核心，安装回调绕过关闭隐藏并真正退出，以便 helper 继续。
 
 ### CLI
 
@@ -40,13 +40,13 @@ CLI 的 apply 只更新正在调用的 CLI 程序，不替换桌面程序、不�
 {
   "schema_version": 1,
   "product": "desktop",
-  "version": "0.1.0-dev.desktop.13",
+  "version": "0.1.0-dev.desktop.14",
   "channel": "dev",
   "artifacts": [{
-    "file": "anchor-desktop_0.1.0-dev.desktop.13_amd64.deb",
+    "file": "anchor-desktop_0.1.0-dev.desktop.14_amd64.deb",
     "target": "linux-amd64",
     "kind": "deb",
-    "url": "https://example.invalid/anchor/0.1.0-dev.desktop.13/linux-amd64/anchor-desktop_0.1.0-dev.desktop.13_amd64.deb",
+    "url": "https://example.invalid/anchor/0.1.0-dev.desktop.14/linux-amd64/anchor-desktop_0.1.0-dev.desktop.14_amd64.deb",
     "sha256": "<64个小写十六进制字符>",
     "bytes": 123456
   }]
@@ -66,15 +66,15 @@ SHA256 是完整性检查，不是独立签名认证。Manifest 和包来自同�
 已有 `.9`～`.12` 选择 dev 即可发现并下载 `.13`，无需填写源地址；desktop.8 首次须人工安装包含更新入口的新版本。`.13` 已于北京时间 2026-10-11 21:08:33 发布为 GitHub prerelease，非 latest；Linux 已通过默认源真实下载和大小／SHA256 校验，Windows 已核对 GitHub 附件 digest。手动安装前须停止旧核心并退出全部窗口；应用内确认安装会执行正常停服与宿主退出。本版没有新增 schema 迁移；从旧版 schema 2 升级仍会迁移到3，旧程序不能打开升级后的数据库。之后每次递增 `dev.desktop.N`，保留旧版包。
 
 ```bash
-# 自建 HTTPS 测试站点示例使用下一版 .14；此命令只打包，不上传。
-./scripts/package-desktop.sh --version 0.1.0-dev.desktop.14 \
-  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.14
+# 自建 HTTPS 测试站点示例使用下一版 .15；此命令只打包，不上传。
+./scripts/package-desktop.sh --version 0.1.0-dev.desktop.15 \
+  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.15
 # 输出根目录额外生成 update-desktop.json，URL 对应 target/文件名。
 
 # 默认 GitHub Release 源：已有最终产物后生成 flat 清单，输出必须是新文件。
 python3 scripts/update_manifest.py --product desktop \
-  --version 0.1.0-dev.desktop.14 --channel dev \
-  --base-url https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.14 --layout flat \
+  --version 0.1.0-dev.desktop.15 --channel dev \
+  --base-url https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.15 --layout flat \
   --artifact linux-amd64=/absolute/path/linux-amd64/package.deb \
   --artifact windows-amd64=/absolute/path/windows-amd64/setup.exe \
   --output /absolute/path/update-desktop.json

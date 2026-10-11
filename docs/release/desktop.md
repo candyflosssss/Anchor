@@ -51,9 +51,9 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.13_amd64.deb
 构建机要求：Linux AMD64、可用的 Linux AMD64 Docker daemon、Go ≥1.25、Python ≥3.11、Node22.22.1、npm9.2.0，以及按锁文件安装的前端依赖。图标已纳入源码；只有重生成图标时需要 Pillow。宿主无需 GTK / WebKit 开发头文件或 NSIS。
 
 ```bash
-# 示例使用下一版，避免覆盖已存在的 .12：
+# 示例使用下一版，避免覆盖已存在的 .14：
 env NODE_OPTIONS=--max-old-space-size=768 \
-  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.14
+  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.15
 ```
 
 每次重建使用新的 `X.Y.Z-dev.desktop.N`，脚本拒绝覆盖已有版本目录。此入口不接受 stable / alpha 发行，不运行测试、程序、安装器或上传动作。
@@ -76,14 +76,36 @@ env NODE_OPTIONS=--max-old-space-size=768 \
 ./scripts/build-desktop.sh --target windows-amd64 --check
 ./scripts/build-desktop.sh --target linux-amd64 --check
 # 使用尚不存在的版本号：
-./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.14
+./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.15
 ```
 
 Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主高版本发行版编译的文件不能声称具有 Ubuntu24.04 最低兼容性。双平台安装包入口用容器解决开发库缺失与 glibc 基线问题，不绕过资源保护。
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.13`
+### 当前在线 dev 版 `.14`
+
+`0.1.0-dev.desktop.14` 于北京时间 2026-10-11 21:44:37 公开为 dev prerelease（非 latest），构建元数据渠道为 `desktop-dev`。源码为干净提交 `fc9f1c2339e33f080779fad1be3dac652acecd6b`，从独立 worktree 构建，后续文档提交不进入二进制。
+
+修正关闭行为：普通关闭隐藏到系统托盘／通知区域，单击托盘图标或「打开 Anchor」恢复；托盘菜单「退出界面（核心继续运行）」真正结束宿主。最小化按钮仍缩到任务栏。Linux 没有可用 StatusNotifierHost 或托盘尚未注册时允许界面退出，核心继续服务，避免留下不可恢复的隐藏窗口。显式退出和已批准的更新安装绕过关闭隐藏；本版没有数据库迁移。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.14-windows-amd64-setup.exe` | 7,625,489 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.14_amd64.deb` | 5,445,600 |
+
+```text
+80060ee70b00e215adee830f0b436f034e08d193e9b02166005ceddbec068a0d  Anchor-Desktop-0.1.0-dev.desktop.14-windows-amd64-setup.exe
+fda0c36f04c85913d7bef70524758018126690fac8c42652a028a19eca9b3e93  anchor-desktop_0.1.0-dev.desktop.14_amd64.deb
+```
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.14/`。六个公开附件包含两安装包、flat `update-desktop.json`、对应构建提交及 vendored Go 依赖源码、许可／构建元数据和 `SHA256SUMS`；全部远端大小／digest 与本地一致，清单地址与公开附件一致。源码归档包含新增 `fyne.io/systray` 源码及许可证，元数据 ZIP CRC 通过。保留原始 `BUILD.json` 的 `public_release=false` 快照；实际发布与下载证据另存 `publication/PUBLISHED.json`、`ONLINE_DOWNLOAD.json`。
+
+验证通过：关闭／退出／更新交接定向 Go 测试，Linux 和 Windows 托盘包编译，前端 lint，构建时 Go→TS 比对、TypeScript/Vite、Windows Go 和 Ubuntu24.04 Linux 编译、NSIS 及 `.deb` 打包。在隔离磁盘目录执行源码 CLI `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.13 --json`，从默认源发现 `.14` 并真实下载 Linux 包，大小／SHA256 通过；Windows 附件 digest 与本地一致。未调用 apply 或安装器，未使用真实配置或模型上游。全量／浏览器测试及原生托盘、安装验收未运行，`native_gui_verified`、`installation_verified`、`signed` 仍为 false。
+
+首次打包在两平台编译成功后因隔离依赖链接在容器内不可见而停止，未生成安装器；已保留 `0.1.0-dev.desktop.14-failed-packaging/` 和 `0.1.0-dev.desktop.14-build-attempt1.log`。改为完整依赖副本后，使用同一提交、同一版本重新运行原打包流程成功，没有覆盖任何已发布附件。最终打包前后 MemAvailable 7538→7521 MiB，SwapUsed 4088→4087 MiB，/tmp 42 MiB，PSI 0.00；首次构建 swap 增加13 MiB 后稳定，无持续异常增长。任务临时 worktree、容器、源码归档和下载目录均已清理。
+
+### 历史在线 dev 版 `.13`
 
 `0.1.0-dev.desktop.13` 于 2026-10-11 构建并发布，更新渠道为 `dev`，构建元数据渠道为 `desktop-dev`。源码为干净提交 `fdad0ac8762219e86508a1f3c9df87ed928f0a47`，本次续接已完成的构建和草稿上传；后续发行文档提交不进入本版二进制。
 
