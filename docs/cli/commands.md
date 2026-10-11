@@ -5,9 +5,9 @@
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.14 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；默认渠道为 alpha，桌面测试更新需选择 dev。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.16 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；默认渠道为 alpha，桌面测试更新需选择 dev。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
-- 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；本轮仅修改源码，未打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
+- 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -266,7 +266,7 @@ anchor usage
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；固定公开目录最多8秒/16MiB，无凭据/重定向/环境代理。只返回 imported_price **预览**，不保存；核对后另行 price-put |
 
-推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。此修复为源码未发布行为，命令语法和退出码不变。
+推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。此修复已随 desktop.16 dev 发布，命令语法和退出码不变。
 
 配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
@@ -457,12 +457,12 @@ anchor recover [--id ID]
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider add/put --protocol；桌面协议选择 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
-| 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；desktop.15 dev 已投放且真实下载通过，原生安装未验收，见 [在线更新](../design/online-updates.md) |
-| 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.15 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
+| 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；desktop.16 dev 已投放且真实下载通过，原生安装未验收，见 [在线更新](../design/online-updates.md) |
+| 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
-发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；stop、update 与第一优先供应商命令已在当前 CLI 源码中；对应桌面能力已随 desktop.15 dev 发布，不反写 alpha.6 CLI 的能力。
+发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；stop、update 与第一优先供应商命令已在当前 CLI 源码中；对应桌面能力已随 desktop.16 dev 发布，不反写 alpha.6 CLI 的能力。
 
 
 ## 11. 本机在线更新
@@ -489,7 +489,7 @@ anchor [--data-dir DIR] update apply --approve
 桌面宿主配置入口为 `anchor-desktop [--data-dir DIR] [--update-channel CHANNEL] [--update-manifest HTTPS_URL]`，首次 GUI 启动时只在指定参数后保存配置；当前用户已有 GUI 时再次启动只恢复已有窗口，不切换其 `--data-dir` 或保存新更新参数。已有宿主未响应时有界等待后退出1，不再开第二个 GUI。核心 `--core` 和内部安装 helper 不受 GUI 锁限制。窗口连接和供应商功能仍走原会话规则。桌面 GUI 只接收受控渠道和已检查版本，不提供任意 URL/路径/命令执行。Linux 安装权限交由系统安装器，不能等同于 CLI apply 原位替换 `/usr/bin`。
 
 
-## 12. 请求与系统日志（当前源码）
+## 12. 请求与系统日志（当前源码／desktop.16 dev）
 
 需要升级并正常重启到支持日志的核心；旧版不会补采历史。使用所选 Context、owner 管理授权及实例身份核验。日志独立于累计 usage，配置日志保留不删除累计用量。
 

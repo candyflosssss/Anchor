@@ -69,10 +69,10 @@ Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/es
 
 目录查询可指定已存 Key（允许停用），不存在的 Key 返回 not_found 且不请求上游；省略时使用第一个启用 Key。认证使用 Key 默认协议，模型覆盖不影响目录认证。存在 Key 但全部停用时返回 authentication，不退回匿名。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
 
-## 6. Key / 模型协议（2026-10-11，本轮仅修改源码）
+## 6. Key / 模型协议（2026-10-11，desktop.16 dev 已发布）
 
 协议归属 Key，Action.protocol 使用 responses / chat-completions / anthropic。key-put 省略或空 protocol 保留已有 Key 默认值，新 Key 默认 responses；secret 可空以保留凭据，因此支持纯协议编辑。key-model-protocol 使用 target=Key ID、model=实际模型名、protocol=独立覆盖；空值或 inherit 删除覆盖。两种写入均要求当前供应商 revision，成功加一，失败事务回滚；不改变公开模型映射。
 
 转发先选 Key，然后按该 Key 和候选中的实际模型名解析覆盖 → Key 默认值，JSON、SSE、认证与推理测试均使用此结果。模型未设置覆盖时动态继承，以后修改 Key 默认值自动生效。供应商 protocol 保留用于历史兼容、新 default Key 初始化与匿名请求，不再控制已有 Key。schema3→4 把每个供应商旧协议复制到它的全部 Key；复制凭据时一并复制覆盖，改名/删除按外键级联。升级须同步客户端与核心；旧程序无法打开 schema4，不提供降级。
 
-UI 的 Key 编辑支持默认协议与留空保留凭据；模型页按 Key 获取目录，为实际模型逐项选择继承/独立协议，已存覆盖在目录尚未查询或不再返回该模型时仍可查看和恢复继承。切换供应商/Key，修改 Key 凭据或删除 Key 时清理目录结果；模型协议写入保留当前目录，方便连续编辑。查询结果包含实际 Key，前端拒绝与显式请求不符的响应。验证层次和限制沿用 §3。本轮仅修改源码，未打包发布；安装包能力以各发行记录为准。
+UI 的 Key 编辑支持默认协议与留空保留凭据；模型页按 Key 获取目录，为实际模型逐项选择继承/独立协议，已存覆盖在目录尚未查询或不再返回该模型时仍可查看和恢复继承。切换供应商/Key，修改 Key 凭据或删除 Key 时清理目录结果；模型协议写入保留当前目录，方便连续编辑。查询结果包含实际 Key，前端拒绝与显式请求不符的响应。验证层次和限制沿用 §3。已随 desktop.16 dev 打包发布；原生安装未验收，安装包能力以[发行记录](../release/desktop.md)为准。

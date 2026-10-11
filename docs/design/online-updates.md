@@ -1,6 +1,6 @@
 # 在线更新 v1
 
-- 日期：2026-10-11；**`0.1.0-dev.desktop.15` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.14 可在应用内选择 dev 升级；默认渠道仍为 alpha。旧 CLI alpha.6 和 desktop.8 不含更新入口，首次须人工安装。真实更新下载已通过，原生安装未验收，详见[桌面开发版](../release/desktop.md)。
+- 日期：2026-10-12；**`0.1.0-dev.desktop.16` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.15 可在应用内选择 dev 升级；默认渠道仍为 alpha。真实更新下载通过，原生安装未验收。state.db schema3→4 自动迁移，旧二进制不能打开升级后的状态；详见[桌面开发版](../release/desktop.md)。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 
@@ -40,13 +40,13 @@ CLI 的 apply 只更新正在调用的 CLI 程序，不替换桌面程序、不�
 {
   "schema_version": 1,
   "product": "desktop",
-  "version": "0.1.0-dev.desktop.15",
+  "version": "0.1.0-dev.desktop.16",
   "channel": "dev",
   "artifacts": [{
-    "file": "anchor-desktop_0.1.0-dev.desktop.15_amd64.deb",
+    "file": "anchor-desktop_0.1.0-dev.desktop.16_amd64.deb",
     "target": "linux-amd64",
     "kind": "deb",
-    "url": "https://example.invalid/anchor/0.1.0-dev.desktop.15/linux-amd64/anchor-desktop_0.1.0-dev.desktop.15_amd64.deb",
+    "url": "https://example.invalid/anchor/0.1.0-dev.desktop.16/linux-amd64/anchor-desktop_0.1.0-dev.desktop.16_amd64.deb",
     "sha256": "<64个小写十六进制字符>",
     "bytes": 123456
   }]
@@ -63,12 +63,12 @@ SHA256 是完整性检查，不是独立签名认证。Manifest 和包来自同�
 
 执行本节的桌面迭代交付时使用项目 [anchor-desktop-release skill](../../.agents/skills/anchor-desktop-release/SKILL.md)，沿用已授权的投放范围，只做必要检查。
 
-已有 `.9`～`.14` 选择 dev 即可发现并下载 `.15`，无需填写源地址；desktop.8 首次须人工安装包含更新入口的新版本。`.15` 已于北京时间 2026-10-11 23:10:43 发布为 GitHub prerelease，非 latest；新增当前用户单 GUI／托盘与重复启动恢复，后台核心和更新交接生命周期保留。Linux 已通过默认源真实下载和大小／SHA256 校验，Windows 已核对 GitHub 附件 digest。手动安装前须停止旧核心并退出全部窗口；应用内确认安装会执行正常停服与宿主退出。本版没有新增 schema 迁移；从旧版 schema 2 升级仍会迁移到3，旧程序不能打开升级后的数据库。之后每次递增 `dev.desktop.N`，保留旧版包。
+已有 `.9`～`.15` 选择 dev 即可发现并下载 `.16`，无需填写源地址；desktop.8 首次须人工安装包含更新入口的新版本。`.16` 已于北京时间 2026-10-12 01:43:37 发布为 GitHub prerelease，非 latest；新增真实请求／系统日志和可选显示内容，保留单 GUI／托盘与后台核心生命周期。Linux 已通过默认源真实下载和大小／SHA256校验，Windows GitHub digest 与本地一致。手动安装前须停止旧核心并退出全部窗口；应用内确认安装执行正常停服与宿主退出。首次启动将 state.db schema3→4（更旧状态先2→3），旧二进制不能打开迁移后的数据库，不提供数据库降级；日志独立 logs.db schema1，不补采升级前请求。之后递增 `dev.desktop.N`，保留旧版包。
 
 ```bash
-# 自建 HTTPS 测试站点示例使用下一版 .16；此命令只打包，不上传。
-./scripts/package-desktop.sh --version 0.1.0-dev.desktop.16 \
-  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.16
+# 自建 HTTPS 测试站点示例使用下一版 .17；此命令只打包，不上传。
+./scripts/package-desktop.sh --version 0.1.0-dev.desktop.17 \
+  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.17
 # 输出根目录额外生成 update-desktop.json，URL 对应 target/文件名。
 
 # 默认 GitHub Release 源：已有最终产物后生成 flat 清单，输出必须是新文件。
@@ -89,7 +89,7 @@ python3 scripts/update_manifest.py --product desktop \
 3. 确认附件上传完成后公开该 prerelease，保持非 latest。`dev.desktop.N` 不触发现有 alpha/beta/rc 标签工作流。
 4. 使用隔离临时目录调用现有 `update download --channel dev --product desktop --current-version <上一版>`，确认默认源发现新版并完成真实下载校验；不安装、不改用户配置。记录发布与验证结果。
 
-`.12` 已完成这四步；Linux 真实下载与 SHA256／大小检查通过，Windows 附件的 GitHub digest 与本地一致。安装器交接和原生窗口行为未实机验收。
+`.16` 已完成这四步；Linux 真实下载与 SHA256／大小检查通过，Windows 附件的 GitHub digest 与本地一致。安装器交接和原生窗口行为未实机验收。
 
 ## 4. 共享边界与验证范围
 

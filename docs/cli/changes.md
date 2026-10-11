@@ -105,28 +105,28 @@
 - 兼容与迁移：参数语法不变；需要切换 GUI 目录或通过启动参数设置更新源时先「退出界面」再打开。CLI `anchor serve` 的数据目录／端口和核心实例锁行为保持原语义。
 - 验证：定向 Go 隔离测试通过，覆盖并发与跨进程重复启动、启动中恢复、退出拒绝、崩溃后重开及通知鉴权；双平台编译打包与默认源真实更新下载通过，原生窗口验收未执行。
 
-## 2026-10-11 — 修复推理测试误拒绝 Responses 推理项（源码未发布）
+## 2026-10-11 — 修复推理测试误拒绝 Responses 推理项（desktop.16 dev 已发布）
 
 - 类型：兼容性修复；无命令、参数或退出码变更。
 - 指令与参数：`anchor provider test --id ID --revision N --model UPSTREAM [--target KEY] --approve`，桌面测试共享同一核心逻辑。
 - 旧 → 新：HTTP 200 的 Responses 输出包含 `reasoning` 时，旧测试因复用跨协议转换校验而返回 `invalid_response`；现在测试接受此推理项，并保留用量和 Key 健康记录。固定16 token可能在生成可见答案前耗尽，只有推理内容的 `incomplete` 响应也可通过最小连通测试。
 - 兼容与迁移：无需修改配置，需升级核心后重新测试；请求额度和次数保持不变。成功不保证完整答案或跨协议推理兼容；网关跨协议转换仍拒绝推理项，无效 JSON、缺 ID、上游失败及其他不支持输出仍失败。
-- 验证：修复前模拟上游复现 completed / token-limited 两种 HTTP 200 误判；修复后 protocol/core 定向测试通过，覆盖 Key/用量记录、失败保留及转换限制。未调用真实付费上游，未打包或发布桌面版本。
+- 验证：修复前模拟上游复现 completed / token-limited 两种 HTTP 200 误判；修复后 protocol/core 定向测试通过，覆盖 Key/用量记录、失败保留及转换限制。未调用真实付费上游；修复时未打包，后随 desktop.16 dev 发布，附件与下载验证见桌面发行记录。
 
 
-## 2026-10-11 — Key 默认协议与实际模型覆盖（0.1.0-dev，本轮仅修改源码）
+## 2026-10-11 — Key 默认协议与实际模型覆盖（desktop.16 dev 已发布）
 
 - 类型：新增 / 修改。
 - 指令与参数：`provider key-put` 新增 `--protocol responses|chat-completions|anthropic`；新增 `provider key-model-protocol --id ID --revision N --target KEY --model UPSTREAM [--protocol PROTOCOL|inherit]`；`provider models` 新增 `--key KEY`，查询结果增加 `key_id`；`provider workspace` 的 Key 状态增加 `protocol`、`model_protocols`。
 - 旧 → 新：协议原先由供应商统一设置；现在先选 Key，再以该 Key 下实际模型名的覆盖为准，无覆盖时动态继承 Key 默认值。已有 Key 的 key-put 省略/空协议保留默认值，新命名 Key 默认 responses；已有 Key 可省略秘密仅改协议。key-model-protocol 省略/空协议或 inherit 删除覆盖，恢复继承。默认协议与模型覆盖写入均增加供应商 revision，不改变公开模型映射。目录查询可明确指定停用 Key，认证采用该 Key 默认协议；省略 Key 仍选首个启用 Key，无 Key 才匿名，不影响健康状态。
-- 兼容与迁移：schema3→4 自动将供应商旧协议复制给全部既存 Key，保留原配置与凭据。provider add/put 的 protocol 只初始化新 default Key 或控制匿名请求，不改变已有 Key；复制凭据一并复制协议及覆盖，改名/删除按外键级联。客户端与核心须同步升级；旧二进制不能打开 schema4，无数据库降级入口。本轮未打包发布，安装包能力以发行记录为准。
+- 兼容与迁移：schema3→4 自动将供应商旧协议复制给全部既存 Key，保留原配置与凭据。provider add/put 的 protocol 只初始化新 default Key 或控制匿名请求，不改变已有 Key；复制凭据一并复制协议及覆盖，改名/删除按外键级联。客户端与核心须同步升级；旧二进制不能打开 schema4，无数据库降级入口。已随 desktop.16 dev 打包发布，安装包能力以发行记录为准。
 - 验证：隔离状态与回环模拟上游的 state/core/client/cli/desktop/protocol 定向 Go 测试通过，覆盖三协议 3×3 转换、换 Key 重试、目录认证、SSE、迁移与 revision 冲突；前端85项单元测试通过，类型检查与 lint 通过；缓存 Chromium 下原型4项及模拟桌面目录2项交互测试通过。系统 Chrome 首次启动 SIGTRAP，未进入页面；目录旧文案断言同步后复验通过。未请求真实付费上游，未改真实 Agent 配置，未验收原生安装与窗口行为。
 
 
-## 2026-10-12 — 真实请求与系统日志（当前源码）
+## 2026-10-12 — 真实请求与系统日志（desktop.16 dev 已发布）
 
 - 类型：新增管理入口和受控日志行为。
 - 指令与参数：新增 logs list/detail/follow/export/settings/configure；完整过滤/游标/保留参数见最新大全 §12。help 同步 JSONL 导出与页快照输出例外。
 - 旧 → 新：之前只有虚拟 UI；现在核心非阻塞采集、安全独立持久化，GUI/CLI 共用查询、详情、JSONL 导出和保留配置。列偏好只改变显示。follow 每2秒输出重复页快照，不是事件订阅；无清空命令。
-- 兼容与迁移：独立 logs.db，不改变 state schema；旧核心需正常停服并升级，不补采升级前历史。缺失 HTTP/usage/指标保持 null，未知不补零；任一尝试缺失 usage 时根总量未知。默认7天/50,000条/请求256MiB/系统32MiB，清理渐进收敛。alpha.6 和 desktop.15 没有日志接口。
-- 验证：隔离 Go 核心/client/CLI/desktop 定向测试通过；真实桥接到隔离子核心及共享日志样例通过。10万条持久历史/索引查询/收紧保留验证通过；最终浏览器、并发流式及发行结果见本次任务记录。
+- 兼容与迁移：日志本身独立 logs.db，不改变 state schema；同版供应商协议配置会迁移 state schema3→4，旧二进制不兼容；旧核心需正常停服并升级，不补采升级前历史。缺失 HTTP/usage/指标保持 null，未知不补零；任一尝试缺失 usage 时根总量未知。默认7天/50,000条/请求256MiB/系统32MiB，清理渐进收敛。alpha.6 和 desktop.15 没有日志接口。
+- 验证：隔离 Go 核心/client/CLI/desktop 定向测试通过；真实桥接到隔离子核心及共享日志样例通过。10万条持久历史/索引查询/收紧保留验证通过；浏览器日志3项及桌面13项分别通过，800次／8客户端流式无日志丢弃；两平台打包、六项附件校验与真实 dev 更新下载通过；原生安装未验收，完整结果见本次 release 记录。

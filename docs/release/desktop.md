@@ -1,10 +1,11 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-11。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.15`，2026-10-11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放，当前用户单 GUI／托盘，重复启动恢复已有窗口。
-- 范围：新增宿主单实例协调、启动中恢复排队及异常退出后重开；沿用 `.14` 关闭到系统托盘、供应商工作台与后台核心生命周期。本版无数据库迁移。
-- 已有 `.9`～`.14`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源现已提供 `.15`；未配置渠道时仍为 alpha，需要手动选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新与测试渠道投放](../design/online-updates.md)。
-- 本轮完成定向单实例／窗口生命周期／核心复用／更新交接测试、两平台编译打包、六项发布附件哈希核对及真实更新下载；**未安装或启动真实应用，未做原生窗口／安装验收**。这是 dev 预发行，未签名；此前 alpha.6 CLI 下载未被替换。
+- 更新：2026-10-12。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.16`，2026-10-12 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：真实请求／系统日志，27 项可选列、排序与预设、详情与尝试时间线、筛选分页、JSONL 导出与保留管理。隐藏列不影响后台采集保存；缺失指标显示未知，HTTP 与 Anchor 结果独立。包含已提交的 Key／实际模型协议配置和供应商详情同步修复。
+- 已有 `.9`～`.15`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已提供 `.16`；未配置渠道时仍为 alpha，需选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新](../design/online-updates.md)。
+- 首次启动将 state.db schema3→4，旧程序不能打开迁移后的数据库，没有数据库降级入口；日志另用 logs.db schema1。正常停止旧核心再安装，不补采升级前请求。
+- 定向 Go／真实隔离核心、CLI、Bridge 联调、前端单元／浏览器交互／性能验证、两平台打包、六项附件校验与真实更新下载通过。**双平台原生窗口与安装未验收**；dev 预发行未签名，alpha.6 CLI 下载未替换。
 
 ## 1. 安装与使用行为
 
@@ -27,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.15_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.16_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -38,7 +39,7 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.15_amd64.deb
 
 **手动安装或卸载前，先明确停止核心并等待退出，再退出全部窗口（`.12` 起使用「退出界面」）。** 应用内确认安装会正常停止核心并真正退出当前宿主，其余窗口需要先手动退出。 Windows 安装器／卸载器拒绝替换或删除正在使用的程序，不强杀、不安排重启强删。Linux 由包管理器替换文件，不会自动升级或停止旧运行进程；跳过停服可能留下旧核心。卸载不是停服操作。
 
-**从旧版升级到 `.11` 或更新版本，首次启动核心会将 SQLite schema 2 自动迁移到3，旧密钥保留为 default Key。旧二进制无法重新打开升级后的数据库，本版不提供数据库降级。**
+**从旧版升级，首次启动核心将 SQLite schema2 自动迁移到3，旧密钥保留为 default Key；`.16` 再从3迁移到4，保留 Key 的协议继承设置。旧二进制无法打开升级后的数据库，本版不提供数据库降级。**
 
 卸载仅移除程序和快捷入口，保留用户的状态目录、数据库、秘密和恢复材料。安装不新增 Agent 授权；打开应用后仍可能执行此前已批准的托管策略。开机自启动为独立默认关闭的需求，当前没有可用设置开关，本轮不实现。
 
@@ -53,7 +54,7 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.15_amd64.deb
 ```bash
 # 示例使用下一版，避免覆盖已存在的 .14：
 env NODE_OPTIONS=--max-old-space-size=768 \
-  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.15
+  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.16
 ```
 
 每次重建使用新的 `X.Y.Z-dev.desktop.N`，脚本拒绝覆盖已有版本目录。此入口不接受 stable / alpha 发行，不运行测试、程序、安装器或上传动作。
@@ -76,14 +77,38 @@ env NODE_OPTIONS=--max-old-space-size=768 \
 ./scripts/build-desktop.sh --target windows-amd64 --check
 ./scripts/build-desktop.sh --target linux-amd64 --check
 # 使用尚不存在的版本号：
-./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.15
+./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.16
 ```
 
 Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主高版本发行版编译的文件不能声称具有 Ubuntu24.04 最低兼容性。双平台安装包入口用容器解决开发库缺失与 glibc 基线问题，不绕过资源保护。
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.15`
+### 当前在线 dev 版 `.16`
+
+`0.1.0-dev.desktop.16` 于北京时间 2026-10-12 01:43:37 公开为 dev prerelease（非 latest），构建元数据渠道 `desktop-dev`。从独立干净 worktree 的提交 `7bd0b47fcc80789ecf80e363827f564ada6e9f32` 构建；后续发行文档提交不进入安装包。
+
+请求与系统日志来自核心真实事件，GUI 与 CLI 共用查询、详情、JSONL 导出和保留配置。27 项列选择、顺序与三组预设保存在本机，隐藏列不影响采集。HTTP、Anchor 判定、生成状态与客户端交付分别显示；正文首字与 TPS 有明确观测条件，未知不补零。指标／隐私／有界队列与磁盘规则见[日志设计](../design/logging.md)和[字段清单](../design/log-columns.md)。本版另含已提交的供应商 Key／实际模型协议设置及列表详情同步修复，state schema3→4 自动迁移，旧二进制不能打开升级后的状态；日志独立 logs.db schema1，不补采旧请求。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.16-windows-amd64-setup.exe` | 7,682,939 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.16_amd64.deb` | 5,499,456 |
+
+```text
+34ace8eec3f0ab53a99a43f4b7948e26833f082f02f6a831902ffb4365e2040d  Anchor-Desktop-0.1.0-dev.desktop.16-windows-amd64-setup.exe
+f93a44ac28862410575bfb7e2e73c443d8d65ce54b33beb56a3295b56b66757b  anchor-desktop_0.1.0-dev.desktop.16_amd64.deb
+```
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.16/`。六项公开附件包含两安装包、flat 清单、对应构建提交及 vendored Go 依赖源码、许可／构建元数据、SHA256SUMS，远端大小与 digest 均与本地一致。源码归档核验 vendor/modules.txt 和托盘许可证，元数据 ZIP CRC 通过。原始 BUILD.json 的 public_release=false、native_gui_verified=false、installation_verified=false、signed=false 保留，真实发布／下载证据另存 publication/PUBLISHED.json 与 ONLINE_DOWNLOAD.json。
+
+定向 `go test -p=2 ./internal/logbook ./internal/protocol ./internal/core ./internal/client ./internal/cli ./internal/desktop` 在工作区及干净源码通过，覆盖真实隔离核心／CLI／Bridge、HTTP200校验失败、重试用量、流式取消、指标、身份校验、存储故障与保留。前端类型、lint及91项单元测试通过；浏览器分别完成13项桌面和3项日志交互，日志修正焦点后复验通过，包含列偏好、筛选、窄屏、深色、分页、系统关联、导出、保留和离线。浏览器使用模拟绑定，真实 Go Bridge 单独联调；不宣称单次16项全通过。10万条历史及800次／8客户端流式性能测试通过，无日志丢弃；实际测量与限制见日志文档。
+
+打包包含 Go→TS 契约比对、TypeScript/Vite、Windows Go 与 Ubuntu24.04 Linux 编译及 NSIS/deb。隔离目录使用本轮源码 CLI `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.15 --json` 发现并真实下载 `.16` Linux 包，大小／SHA256校验通过；Windows GitHub digest 与本地一致。未调用 apply 或安装器，未修改真实 Agent 配置，未请求付费上游；双平台原生窗口和安装、全量／race测试未执行。
+
+本轮一次完整打包，按 resource-guard 串行限内存运行；任务自有 worktree、容器、源导出与隔离下载目录清理结果见本次 release 记录。既有 scripts/__pycache__/ 保留。
+
+### 历史在线 dev 版 `.15`
 
 `0.1.0-dev.desktop.15` 于北京时间 2026-10-11 23:10:43 公开为 dev prerelease（非 latest），构建元数据渠道为 `desktop-dev`。源码为干净提交 `e9d12cab19d8c8a99d43efccc4a8bca4024253ce`，从独立 worktree 构建，后续文档提交不进入二进制，也未包含同时进行的供应商功能改动。
 
