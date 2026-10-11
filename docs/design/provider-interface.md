@@ -1,6 +1,6 @@
 # 供应商桌面接口语义
 
-- 更新：2026-10-11；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
+- 更新：2026-10-12；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
 - 状态：真实 Go 桥接、桌面传输和共享契约已实现；隔离核心读写已测试，**不等于 Wails 原生窗口或安装验收通过**。
 - 桌面 DTO 权威：`internal/desktop/contract.go`；TypeScript 由 `go run ./cmd/desktop-contract` 生成，漂移由 Go 测试检查。核心业务规则仍归 `internal/state` / `internal/core`，不复制到宿主。
 - 受限方法、窗口／核心生命周期与构建边界见[桌面运行契约](desktop-runtime.md)。
@@ -36,7 +36,7 @@ Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_secon
 
 `internal/client.RequestError` 提供 HTTP 状态、受限错误码与 Unknown 标记；桥接按结构映射，保留实例身份校验。查询／保存最多 15 秒（包含身份握手），Status 为 3 秒，启动最多 20 秒。Wails 调用不能通过浏览器 AbortSignal 保证取消 Go 操作：AbortSignal 与 generation 只阻止发起已取消的请求或消费过期响应，**取消不等于回滚**。
 
-供应商 Controller 的同步 latch 防双击重复写；冲突与未知结果先重读。核心断开后供应商页面卸载、缓存与秘密草稿丢弃，Status 不自动重启；用户明确重新连接才再次 Start。当前只连接本机目录，不提供远程／多实例切换 UI。
+供应商 Controller 的同步 latch 防双击重复写。新建成功后自动读取权威列表、选中新供应商并读取详情；工作台动作发生版本冲突时自动同步列表和详情，完成后提示原操作未保存，用户核对后重新操作。配置编辑冲突与写入结果未知仍需读取核对。每次成功重读供应商列表都触发当前工作台刷新，不以 revision 变化作为唯一条件：模型冲突、Key 调度状态重置或部分未知结果不会改变供应商 revision。工作台读取期间暂停提交；读取成功后清除错误和待重读锁定，失败时保留锁定并可再次读取。重读只查询，不自动重放之前的动作。核心断开后供应商页面卸载、缓存与秘密草稿丢弃，Status 不自动重启；用户明确重新连接才再次 Start。当前只连接本机目录，不提供远程／多实例切换 UI。
 
 ## 3. 共享样例与两种模式
 

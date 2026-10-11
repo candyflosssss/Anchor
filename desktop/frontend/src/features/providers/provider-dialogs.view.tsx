@@ -42,6 +42,7 @@ function Shell({ c, d }: { c: ProviderController; d: ProviderDialog }) {
         <DialogDescription className="mt-2 text-sm text-muted-foreground">{descriptions[d.kind]}</DialogDescription>
       </header>
       {tried && f.error && <p className="dialog-error" role="alert"><CircleAlert size={15} />{f.error}</p>}
+      {tried && f.notice && <p className="feedback notice-feedback" role="status">{f.notice}</p>}
       {body}
     </DialogContent>
   </Dialog>;

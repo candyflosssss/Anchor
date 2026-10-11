@@ -9,6 +9,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   const { transport, mock } = environment;
   const [providers, setProviders] = useState<Provider[]>([]);
   const [phase, setPhase] = useState<Phase>('loading');
+  const [readVersion, setReadVersion] = useState(0);
   const [problem, setProblem] = useState<ProblemCode | null>(null);
   const [notice, setNotice] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -52,7 +53,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     try {
       const result = await transport.list(abort.signal);
       if (abort.signal.aborted || epoch !== generation.current) return;
-      setProviders(result); setPhase('ready'); setProblem(null);
+      setProviders(result); setReadVersion(value => value + 1); setPhase('ready'); setProblem(null);
       setSelectedId(old => { const want = prefer !== undefined ? prefer : old; return result.some(p => p.id === want) ? want : null; });
     } catch (error) {
       if (abort.signal.aborted || epoch !== generation.current) return;
@@ -101,6 +102,9 @@ export function useProviderController(environment: ProviderEnvironment) {
       setProviders(old => [...old.filter(p => p.id !== saved.id), saved]);
       if (!source) { setSelectedId(saved.id); setDetailTab('overview'); setDialog(null); }
       setEditor(null); setToggle(null); setDiscard(false);
+      // Reconcile newly created providers with the authoritative list automatically.
+      if (!source) await load(saved.id);
+      if (abort.signal.aborted || epoch !== generation.current) return;
       setNotice(`${mock ? '演示：' : ''}${saved.id} 的配置已${toggling ? saved.enabled ? '启用' : '停用' : '保存'}（revision ${saved.revision}）。未测试上游连通性。`);
     } catch (error) {
       if (abort.signal.aborted || epoch !== generation.current) return;
@@ -152,7 +156,7 @@ export function useProviderController(environment: ProviderEnvironment) {
       setDetailTab('overview'); setDialog(null);
       setNotice(action === 'rename' ? `已改名为 ${id}` : action === 'copy' ? `已复制为 ${id}（默认停用）` : `已删除 ${from}`);
     } else await load();
-  }, () => setNotice(''));
+  }, () => setNotice(''), readVersion);
   function openProvider(id: string, tab: DetailTab = 'overview', next?: ProviderDialog) {
     if (locked.current || features.isBusy() || dialog || editor || toggle) return;
     if (id !== selectedId) { setCatalogKey(''); clearModels(); setNotice(''); }
