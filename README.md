@@ -92,8 +92,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.12 已投放 dev 渠道）
+### 在线更新（desktop.13 已投放 dev 渠道）
 
-已有 desktop.9～.11：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.12` 的 Windows / Ubuntu24.04 安装包及更新清单；未配置时渠道仍为 alpha，需要选择 dev。已通过真实更新下载及大小／SHA256 校验，未执行原生安装验收。旧 desktop.8 无入口，首次须手动安装。
+已有 desktop.9～.12：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.13` 的 Windows / Ubuntu24.04 安装包及更新清单，包含概览、供应商健康列表、四页签整页详情和模型映射聚合页；未配置时渠道仍为 alpha，需要选择 dev。已通过真实更新下载及大小／SHA256 校验，未执行原生安装验收。旧 desktop.8 无入口，首次须手动安装。
 
-桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.12 普通关闭收起到任务栏，其他窗口需要用「退出界面」退出。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、schema3 迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。
+桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.12 起普通关闭收起到任务栏，其他窗口需要用「退出界面」退出；desktop.13 的「退出界面」「停止核心」位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、schema3 迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。

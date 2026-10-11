@@ -1,10 +1,10 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-11。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.12`，2026-10-11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放，包含第一优先供应商功能和关闭窗口收起到任务栏。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.13`，2026-10-11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放，新增概览、供应商健康列表、四页签整页详情和模型映射聚合页。
 - 范围：供应商删除／复制／改名、多 Key 与独立冷却熔断、模型目录／映射／显式测试、三种协议转换，以及用量／价格工作台；沿用 shadcn Blocks sidebar-07 / neutral 界面。详见[第一优先设计与实现](../design/provider-priority-one.md)。
-- 已有 `.9`～`.11`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源现已提供 `.12`；未配置渠道时仍为 alpha，需要手动选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新与测试渠道投放](../design/online-updates.md)。
-- 本轮只做契约／类型检查、两平台编译打包、发布附件哈希核对及真实更新下载，**未安装、启动真实应用或运行浏览器／原生验收**。这是 dev 预发行，未签名；此前 alpha.6 CLI 下载未被替换。
+- 已有 `.9`～`.12`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源现已提供 `.13`；未配置渠道时仍为 alpha，需要手动选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新与测试渠道投放](../design/online-updates.md)。
+- 本轮复用 UI 提交已通过的类型、lint、81 个单元测试及 16 个原型／12 个模拟宿主浏览器用例，完成两平台编译打包、发布附件哈希核对及真实更新下载；**未安装或启动真实应用，未做原生窗口／安装验收**。这是 dev 预发行，未签名；此前 alpha.6 CLI 下载未被替换。
 
 ## 1. 安装与使用行为
 
@@ -27,14 +27,14 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.12_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.13_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
 
 ### 两平台共同行为与数据保留
 
-打开窗口后，Go 宿主安全初始化缺失状态、启动独立后台核心或核验复用已运行实例，连接就绪后进入供应商页。供应商列表、新增／编辑、删除／复制／改名、模型映射、多 Key、显式测试和用量工作台均复用核心管理能力。从 `.12` 起，点击关闭或系统关闭会收起到任务栏，点击任务栏可恢复；独立「退出界面」才退出当前宿主。两者都保留后台核心；停止核心必须在界面单独确认（或用兼容 CLI `stop --approve`）。停服请求被接受不等于恢复完成。
+打开窗口后，Go 宿主安全初始化缺失状态、启动独立后台核心或核验复用已运行实例，连接就绪后进入供应商页。供应商列表、新增／编辑、删除／复制／改名、模型映射、多 Key、显式测试和用量工作台均复用核心管理能力。从 `.12` 起，点击关闭或系统关闭会收起到任务栏，点击任务栏可恢复；独立「退出界面」才退出当前宿主。两者都保留后台核心；停止核心必须在界面单独确认（或用兼容 CLI `stop --approve`）。从 `.13` 起，「退出界面」「停止核心」位于顶栏「本机实例」弹层。停服请求被接受不等于恢复完成。
 
 **手动安装或卸载前，先明确停止核心并等待退出，再退出全部窗口（`.12` 起使用「退出界面」）。** 应用内确认安装会正常停止核心并真正退出当前宿主，其余窗口需要先手动退出。 Windows 安装器／卸载器拒绝替换或删除正在使用的程序，不强杀、不安排重启强删。Linux 由包管理器替换文件，不会自动升级或停止旧运行进程；跳过停服可能留下旧核心。卸载不是停服操作。
 
@@ -53,7 +53,7 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.12_amd64.deb
 ```bash
 # 示例使用下一版，避免覆盖已存在的 .12：
 env NODE_OPTIONS=--max-old-space-size=768 \
-  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.13
+  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.14
 ```
 
 每次重建使用新的 `X.Y.Z-dev.desktop.N`，脚本拒绝覆盖已有版本目录。此入口不接受 stable / alpha 发行，不运行测试、程序、安装器或上传动作。
@@ -76,14 +76,38 @@ env NODE_OPTIONS=--max-old-space-size=768 \
 ./scripts/build-desktop.sh --target windows-amd64 --check
 ./scripts/build-desktop.sh --target linux-amd64 --check
 # 使用尚不存在的版本号：
-./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.13
+./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.14
 ```
 
 Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主高版本发行版编译的文件不能声称具有 Ubuntu24.04 最低兼容性。双平台安装包入口用容器解决开发库缺失与 glibc 基线问题，不绕过资源保护。
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.12`
+### 当前在线 dev 版 `.13`
+
+`0.1.0-dev.desktop.13` 于 2026-10-11 构建并发布，更新渠道为 `dev`，构建元数据渠道为 `desktop-dev`。源码为干净提交 `fdad0ac8762219e86508a1f3c9df87ed928f0a47`，本次续接已完成的构建和草稿上传；后续发行文档提交不进入本版二进制。
+
+新增概览页和模型映射聚合页；供应商列表直接显示健康、Key／模型数量及最近测试，并提供行内测试、编辑和更多操作。供应商详情改为「概况／Key／模型／用量」四页签整页视图，模型目录位于「模型」页签；「退出界面」「停止核心」收进顶栏「本机实例」弹层。本版没有新增数据库 schema 迁移。
+
+已有构建完成 Go→TS 契约比对、TypeScript/Vite、Windows Go 交叉编译、Ubuntu24.04 Linux 编译、NSIS 与 `.deb` 打包。产物保存在 `dist/desktop/0.1.0-dev.desktop.13/`：
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.13-windows-amd64-setup.exe` | 7,517,672 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.13_amd64.deb` | 5,356,968 |
+
+```text
+e1f1e86f94a74505873967da90a8a6b4ca045d78be763481c93f04e869edfb37  Anchor-Desktop-0.1.0-dev.desktop.13-windows-amd64-setup.exe
+39e13868430a571d9748c8fb190b9ddb1cc2289a9e735168e79e0f5c2a87e5e6  anchor-desktop_0.1.0-dev.desktop.13_amd64.deb
+```
+
+GitHub Release `v0.1.0-dev.desktop.13` 于北京时间 2026-10-11 21:08:33 公开为 prerelease（非 latest），tag 指向实际构建提交。六个附件包括两安装包、flat 布局 `update-desktop.json`、含 vendored Go 依赖的对应源码归档、构建／许可元数据包和 `SHA256SUMS`。全部远端附件大小／digest 与本地一致；清单 URL 与正式附件地址一致，源码归档含 `vendor/modules.txt`，元数据 ZIP 的 CRC 检查通过。`BUILD.json` 保留构建时 `public_release=false` 的事实快照，实际发布与下载凭据另存于本版 `publication/PUBLISHED.json` 和 `ONLINE_DOWNLOAD.json`。
+
+使用本轮源码 CLI，在 guard 自动创建的隔离磁盘目录执行 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.12 --json`，从默认源发现 `.13` 并真实下载 Linux 安装包，大小／SHA256 校验通过。命令经 guard 限制内存，`GOMAXPROCS=2`、`go run -p=2`；未调用 apply、安装器、真实数据目录或模型上游。Windows 通过远端附件 digest 核对。
+
+复用源码提交的类型、lint、Vitest 81/81、Playwright 原型 16/16 与模拟宿主 12/12 结果，本轮未重复运行浏览器或全量测试。`native_gui_verified`、`installation_verified`、`signed` 仍为 false；真实核心弹层视觉及原生窗口／安装尚未验收。下载前后 MemAvailable 7630→7611 MiB、SwapUsed 4076 MiB、/tmp 42 MiB、PSI 0.00，无异常资源增长。下载临时目录和上个会话中断遗留的本版源码归档临时目录已清理。
+
+### 历史在线 dev 版 `.12`
 
 `0.1.0-dev.desktop.12` 于 2026-10-11 构建并发布，更新渠道为 `dev`，构建元数据渠道为 `desktop-dev`。源码为干净提交 `9b3d4fabd2fb5e5bfe536104a9dc86721cac0f2e`；文档和发行记录后续提交，不改已发布安装包。
 
