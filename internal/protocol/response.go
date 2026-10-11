@@ -65,7 +65,19 @@ type Result struct {
 	Usage             Usage
 }
 
+// ValidateProbeResponse checks a minimal inference result without requiring that
+// its reasoning items can be represented in another protocol. A token-limited
+// response may contain reasoning only; it still proves the upstream executed.
+func ValidateProbeResponse(raw []byte, p string) (Usage, error) {
+	r, err := parseResponse(raw, p, true)
+	return r.Usage, err
+}
+
 func ParseResponse(raw []byte, p string) (Result, error) {
+	return parseResponse(raw, p, false)
+}
+
+func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 	m, e := Decode(raw)
 	if e != nil {
 		return Result{}, e
@@ -82,6 +94,10 @@ func ParseResponse(raw []byte, p string) (Result, error) {
 		for _, v := range arr(m["output"]) {
 			x := obj(v)
 			switch x["type"] {
+			case "reasoning":
+				if !probe {
+					return r, ErrUnsupported
+				}
 			case "message":
 				t, e := text(x["content"])
 				if e != nil {

@@ -335,11 +335,11 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 		out.Failure = "network"
 		return out, nil
 	}
-	parsed, err := protocol.ParseResponse(data, p.Protocol)
+	usage, err := protocol.ValidateProbeResponse(data, p.Protocol)
 	if err != nil {
 		out.Failure = "invalid_response"
 	} else {
-		u = parsed.Usage
+		u = usage
 	}
 	return out, nil
 }

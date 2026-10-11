@@ -256,6 +256,8 @@ anchor usage
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；固定公开目录最多8秒/16MiB，无凭据/重定向/环境代理。只返回 imported_price **预览**，不保存；核对后另行 price-put |
 
+推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。此修复为源码未发布行为，命令语法和退出码不变。
+
 配置/Key/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
 usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
