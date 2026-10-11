@@ -1,10 +1,10 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-11。
-- 当前本地候选：`0.1.0-dev.desktop.11` 供应商第一优先功能版，已完成 Windows / Linux 双平台编译、安装包打包与新产物哈希核对；未公开发布或部署更新源。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.12`，2026-10-11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放，包含第一优先供应商功能和关闭窗口收起到任务栏。
 - 范围：供应商删除／复制／改名、多 Key 与独立冷却熔断、模型目录／映射／显式测试、三种协议转换，以及用量／价格工作台；沿用 shadcn Blocks sidebar-07 / neutral 界面。详见[第一优先设计与实现](../design/provider-priority-one.md)。
-- 在线更新入口从 `.9` 开始提供，旧 `.8` 不含此功能；历史包及日志保留，不覆盖。当前 `.11` 未提供更新源地址，未生成发布清单或投放线上桌面更新；见[在线更新与测试渠道投放](../design/online-updates.md)。
-- 本轮只做新增能力相关的定向测试、编译及新包静态核对，**未安装、启动真实应用或运行浏览器／原生验收**。本地打包不代表公开发行或原生验证通过；此前公开 alpha.6 CLI 下载未被替换。
+- 已有 `.9`～`.11`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源现已提供 `.12`；未配置渠道时仍为 alpha，需要手动选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新与测试渠道投放](../design/online-updates.md)。
+- 本轮只做契约／类型检查、两平台编译打包、发布附件哈希核对及真实更新下载，**未安装、启动真实应用或运行浏览器／原生验收**。这是 dev 预发行，未签名；此前 alpha.6 CLI 下载未被替换。
 
 ## 1. 安装与使用行为
 
@@ -27,18 +27,18 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.11_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.12_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
 
 ### 两平台共同行为与数据保留
 
-打开窗口后，Go 宿主安全初始化缺失状态、启动独立后台核心或核验复用已运行实例，连接就绪后进入供应商页。供应商列表、新增／编辑、删除／复制／改名、模型映射、多 Key、显式测试和用量工作台均复用核心管理能力。关窗只退出界面，核心继续运行；停止核心必须在界面单独确认（或用兼容 CLI `stop --approve`）。停服请求被接受不等于恢复完成。
+打开窗口后，Go 宿主安全初始化缺失状态、启动独立后台核心或核验复用已运行实例，连接就绪后进入供应商页。供应商列表、新增／编辑、删除／复制／改名、模型映射、多 Key、显式测试和用量工作台均复用核心管理能力。从 `.12` 起，点击关闭或系统关闭会收起到任务栏，点击任务栏可恢复；独立「退出界面」才退出当前宿主。两者都保留后台核心；停止核心必须在界面单独确认（或用兼容 CLI `stop --approve`）。停服请求被接受不等于恢复完成。
 
-**更新或卸载前，先明确停止核心，等待退出，再关闭全部窗口。** Windows 安装器／卸载器拒绝替换或删除正在使用的程序，不强杀、不安排重启强删。Linux 由包管理器替换文件，不会自动升级或停止旧运行进程；跳过停服可能留下旧核心。卸载不是停服操作。
+**手动安装或卸载前，先明确停止核心并等待退出，再退出全部窗口（`.12` 起使用「退出界面」）。** 应用内确认安装会正常停止核心并真正退出当前宿主，其余窗口需要先手动退出。 Windows 安装器／卸载器拒绝替换或删除正在使用的程序，不强杀、不安排重启强删。Linux 由包管理器替换文件，不会自动升级或停止旧运行进程；跳过停服可能留下旧核心。卸载不是停服操作。
 
-**`.11` 首次启动核心会将 SQLite schema 2 自动迁移到3，旧密钥保留为 default Key。旧二进制无法重新打开升级后的数据库，本版不提供数据库降级。**
+**从旧版升级到 `.11` 或更新版本，首次启动核心会将 SQLite schema 2 自动迁移到3，旧密钥保留为 default Key。旧二进制无法重新打开升级后的数据库，本版不提供数据库降级。**
 
 卸载仅移除程序和快捷入口，保留用户的状态目录、数据库、秘密和恢复材料。安装不新增 Agent 授权；打开应用后仍可能执行此前已批准的托管策略。开机自启动为独立默认关闭的需求，当前没有可用设置开关，本轮不实现。
 
@@ -49,9 +49,9 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.11_amd64.deb
 构建机要求：Linux AMD64、可用的 Linux AMD64 Docker daemon、Go ≥1.25、Python ≥3.11、Node22.22.1、npm9.2.0，以及按锁文件安装的前端依赖。图标已纳入源码；只有重生成图标时需要 Pillow。宿主无需 GTK / WebKit 开发头文件或 NSIS。
 
 ```bash
-# 示例使用下一版，避免覆盖已存在的 .11：
+# 示例使用下一版，避免覆盖已存在的 .12：
 env NODE_OPTIONS=--max-old-space-size=768 \
-  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.12
+  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.13
 ```
 
 每次重建使用新的 `X.Y.Z-dev.desktop.N`，脚本拒绝覆盖已有版本目录。此入口不接受 stable / alpha 发行，不运行测试、程序、安装器或上传动作。
@@ -74,14 +74,45 @@ env NODE_OPTIONS=--max-old-space-size=768 \
 ./scripts/build-desktop.sh --target windows-amd64 --check
 ./scripts/build-desktop.sh --target linux-amd64 --check
 # 使用尚不存在的版本号：
-./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.12
+./scripts/build-desktop.sh --target windows-amd64 --version 0.1.0-dev.desktop.13
 ```
 
 Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主高版本发行版编译的文件不能声称具有 Ubuntu24.04 最低兼容性。双平台安装包入口用容器解决开发库缺失与 glibc 基线问题，不绕过资源保护。
 
-## 3. 本地产物与实际构建状态
+## 3. 产物、在线投放与实际构建状态
 
-### 当前供应商第一优先功能版 `.11`
+### 当前在线 dev 版 `.12`
+
+`0.1.0-dev.desktop.12` 于 2026-10-11 构建并发布，更新渠道为 `dev`，构建元数据渠道为 `desktop-dev`。源码为干净提交 `9b3d4fabd2fb5e5bfe536104a9dc86721cac0f2e`；文档和发行记录后续提交，不改已发布安装包。
+
+普通关闭由 Wails 宿主收起到任务栏。新增 `ExitDesktop` 桥接供「退出界面」使用；显式退出和已批准的更新安装绕过关闭最小化，保证更新 helper 可以等待宿主真正退出。两种窗口操作都不自行停止核心。
+
+```bash
+env NODE_OPTIONS=--max-old-space-size=768 \
+  ./scripts/package-desktop.sh --version 0.1.0-dev.desktop.12
+```
+
+命令返回0，完成 Go→TS 契约比对、TypeScript/Vite、Windows Go 交叉编译、Ubuntu24.04 Linux 编译、NSIS 与 `.deb` 打包。产物保存在 `dist/desktop/0.1.0-dev.desktop.12/`：
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.12-windows-amd64-setup.exe` | 7,508,388 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.12_amd64.deb` | 5,349,392 |
+
+```text
+6e0e3ad702dddb1d17b6f78173f08419a1b7430a7ea0471358ee4e06f1d06e4f  Anchor-Desktop-0.1.0-dev.desktop.12-windows-amd64-setup.exe
+38d29bf3b905faaace3991e91288604dc4365d68a3a1ed0f1e431c32bebe6244  anchor-desktop_0.1.0-dev.desktop.12_amd64.deb
+```
+
+GitHub Release `v0.1.0-dev.desktop.12` 于北京时间 2026-10-11 08:09:22 公开为 prerelease（非 latest）。附件包含两安装包、flat 布局 `update-desktop.json`、含 vendored Go 依赖的对应源码归档、构建／许可元数据包和 `SHA256SUMS`。构建时 `BUILD.json` 保留 `public_release=false` 的原始快照；实际投放状态记录在 Release 和本次任务记录中，不改写已产出的文件。
+
+实际检查：`TestTypeScriptContractDrift` 与前端 `typecheck` 通过；新包文件哈希与构建清单一致；GitHub 已上传附件 digest 与本地一致。在 guard 磁盘临时数据目录运行现有 CLI 的 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.11`，成功从默认公开源发现 `.12`，真实下载 Linux 安装包并通过大小／SHA256 校验。未调用 apply 或安装器，未使用真实数据目录或模型上游。
+
+`native_gui_verified`、`installation_verified`、`signed` 仍为 false。未运行全量测试、浏览器或原生验收，不把下载成功写成系统安装完成。构建日志的容器 man 链接与 `dpkg-shlibdeps` 暂存目录提示未阻止打包。构建结束 MemAvailable 8672 MiB、SwapUsed 4122 MiB、/tmp 30 MiB、PSI 0.00；在线下载后为 8522 / 4094 / 30 MiB、PSI 0.00，无异常增长，任务临时目录和构建容器已清理。
+
+后续迭代应递增 `dev.desktop.N`，按[在线投放流程](../design/online-updates.md#3-快速测试投放)上传安装包和同版清单，再发布 dev Release；仅本地打包不会出现在应用的在线更新中。
+
+### 历史供应商第一优先功能版 `.11`（本地产物保留）
 
 候选 `0.1.0-dev.desktop.11`，`desktop-dev`，2026-10-11 本地构建。源码提交 `a35ecb6a584c0b01480c5011cf7dabd1c776ac3e`，构建开始时 `SOURCE.json` 的 `dirty=false`；后续发行文档提交不进入本版二进制。
 
@@ -141,7 +172,7 @@ b1e97b4deff0f790bb5eafaa3ffd687906e96eb2f7f5fad06bcbe603aa4a0513  Anchor-Desktop
 
 资源保护串行执行；构建前 MemAvailable 8749 MiB、SwapUsed 4311 MiB、/tmp 28 MiB、PSI 0.00，静态核验时 MemAvailable 8780 MiB、SwapUsed 4307 MiB、/tmp 28 MiB、PSI 0.00，无异常增长；本轮容器已删除。
 
-**首次安装 `.9` 前，先在旧版明确停止核心并等待退出，再关闭全部窗口后覆盖安装。** `.9` 只是在线更新启动包，本轮没有传入 `--update-base-url`，没有生成 `update-desktop.json`、部署更新源或创建 Release；安装后是否能发现更新取决于所选渠道是否已实际发布兼容清单和更高版本安装包，不能承诺现在即可线上升级。
+**首次安装 `.9` 前，先在旧版明确停止核心并等待退出，再关闭全部窗口后覆盖安装。** `.9` 只是在线更新启动包，本轮没有传入 `--update-base-url`，没有生成 `update-desktop.json`、部署更新源或创建 Release；当时仅本地交付；现已有 `.12` dev Release，`.9` 用户可选择 dev 渠道在线升级。
 
 ### 历史标题栏修正版 `.8`（本地产物保留）
 

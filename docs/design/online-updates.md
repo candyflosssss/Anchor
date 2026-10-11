@@ -1,6 +1,6 @@
 # 在线更新 v1
 
-- 日期：2026-10-11；在线更新已实现，**在线更新首次随 `0.1.0-dev.desktop.9` 打包；当前本地功能包为 `0.1.0-dev.desktop.11`，尚未公开发行或部署更新源**。旧 CLI alpha.6 和 desktop.8 不含更新入口；新包未做原生安装验收，构建结果见[桌面开发版](../release/desktop.md)。
+- 日期：2026-10-11；**`0.1.0-dev.desktop.12` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.11 可在应用内选择 dev 升级；默认渠道仍为 alpha。旧 CLI alpha.6 和 desktop.8 不含更新入口，首次须人工安装。真实更新下载已通过，原生安装未验收，详见[桌面开发版](../release/desktop.md)。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 
@@ -8,7 +8,7 @@
 
 ### 桌面
 
-设置 → 在线更新 → 选择渠道 → 检查更新 → 下载更新 → 安装更新 → 明确确认。
+设置 → 在线更新 → **dev · 快速测试** → 检查更新 → 下载更新 → 安装更新 → 明确确认。
 
 - 更新页不要求核心在线，检查／下载不会停服，不请求模型上游；正在下载或提交时锁定操作与导航。
 - 配置的渠道／源发生变化时不恢复其他来源的旧下载候选；切换渠道也清空前端安装候选。手动检查将选择的渠道写入本机 `updates/config.json`；未配置时为 `alpha`。支持 `dev`、`alpha`、`beta`、`rc`、`stable`，只查指定渠道，不跨渠道静默回退。
@@ -33,8 +33,8 @@ CLI 的 apply 只更新正在调用的 CLI 程序，不替换桌面程序、不�
 默认来源是 `candyflosssss/Anchor` 的 GitHub Releases API，按 SemVer 选择指定渠道的最高已发布版本，跳过 draft；不使用排除 prerelease 的 `/latest`。API 最多读5页，每页100项，无 GitHub token（可能受匿名限流）。无可兼容发行时返回 available=false，而不是假装找到了桌面版本。默认源要求安装包 URL 与同一 Release 的附件 URL 一致。
 
 - 新 feed 附件：`update-cli.json`／`update-desktop.json`。
-- 兼容已有 CLI `release.json` 的 standalone_artifacts，哈希与大小来自原发行清单、URL 来自相同 Release；**现有发行没有 desktop feed，不能用 CLI 冒充桌面包**。
-- 自定义 feed 与包目录可由可信 HTTPS 静态站点托管。需要先上传不可变版本包并验证，再原子切换渠道清单；清单生成器只写文件，不部署或上传；当前 `.11` 打包未提供真实更新源地址，因此未生成发布清单。
+- 兼容已有 CLI `release.json` 的 standalone_artifacts，哈希与大小来自原发行清单、URL 来自相同 Release；alpha.6 只有 CLI 附件；desktop.12 已附独立 desktop feed，不混用产品。
+- 自定义 feed 与包目录可由可信 HTTPS 静态站点托管。需要先上传不可变版本包并验证，再原子切换渠道清单；清单生成器只写文件，不部署或上传；`.9`／`.11` 当时只本地打包，`.12` 才完成默认 GitHub 源投放。
 
 ```json
 {
@@ -61,24 +61,33 @@ SHA256 是完整性检查，不是独立签名认证。Manifest 和包来自同�
 
 ## 3. 快速测试投放
 
-首次需要人工安装包含更新入口的版本（从 `.9` 开始，当前为 `.11`）；已有 desktop.8 无法自动获得本功能。`.11` 仅在本地打包，未上传安装包或更新清单；有更新入口不等于当前渠道已存在可安装版本。安装 `.11` 前须停止旧核心并关闭窗口，schema 2 会迁移到3，旧程序不能打开升级后的数据库。之后每次递增 `dev.desktop.N`，保留旧版包，上传新版与 feed 即可在线安装，无需每次人工寻找下载链接。
+已有 `.9`～`.11` 选择 dev 即可发现并下载 `.12`，无需填写源地址；desktop.8 首次须人工安装包含更新入口的新版本。`.12` 已于 2026-10-11 发布为 GitHub prerelease，非 latest。手动安装前须停止旧核心并退出全部窗口；应用内确认安装会执行正常停服与宿主退出。schema 2 会迁移到3，旧程序不能打开升级后的数据库。之后每次递增 `dev.desktop.N`，保留旧版包。
 
 ```bash
-# 示例使用尚不存在的 .12；只打包，不上传。base URL 应指向未来实际发布的版本目录。
-./scripts/package-desktop.sh --version 0.1.0-dev.desktop.12 \
-  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.12
+# 自建 HTTPS 测试站点示例使用下一版 .13；此命令只打包，不上传。
+./scripts/package-desktop.sh --version 0.1.0-dev.desktop.13 \
+  --update-base-url https://example.invalid/anchor/0.1.0-dev.desktop.13
 # 输出根目录额外生成 update-desktop.json，URL 对应 target/文件名。
 
-# 已有最终产物也可单独生成清单，输出必须是新文件。
+# 默认 GitHub Release 源：已有最终产物后生成 flat 清单，输出必须是新文件。
 python3 scripts/update_manifest.py --product desktop \
-  --version 0.1.0-dev.desktop.12 --channel dev \
-  --base-url https://example.invalid/anchor/0.1.0-dev.desktop.12 --layout target \
+  --version 0.1.0-dev.desktop.13 --channel dev \
+  --base-url https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.13 --layout flat \
   --artifact linux-amd64=/absolute/path/linux-amd64/package.deb \
   --artifact windows-amd64=/absolute/path/windows-amd64/setup.exe \
   --output /absolute/path/update-desktop.json
 ```
 
 脚本流式计算最终文件 SHA256／大小，拒绝重复目标、空文件、链接、版本／渠道不符与非 TLS 源；不执行安装，不触发 GitHub 工作流。GitHub 上使用准确的附件名；通过默认 Release 源时清单 URL 应与该 Release 的实际附件一致（通常使用生成器的 flat 布局）。自建测试站点可采用 target 布局。
+
+默认 dev 投放必须完成以下步骤，不能停在本地安装包：
+
+1. 从干净提交生成新版本两平台安装包，保留源码 revision 与最终哈希；按实际附件名生成 flat 清单。
+2. 给相同版本的 GitHub draft prerelease 上传两安装包、`update-desktop.json`、对应源码（含 Go vendor）、许可／构建元数据与校验清单；tag 指向实际构建提交。
+3. 确认附件上传完成后公开该 prerelease，保持非 latest。`dev.desktop.N` 不触发现有 alpha/beta/rc 标签工作流。
+4. 使用隔离临时目录调用现有 `update download --channel dev --product desktop --current-version <上一版>`，确认默认源发现新版并完成真实下载校验；不安装、不改用户配置。记录发布与验证结果。
+
+`.12` 已完成这四步；Linux 真实下载与 SHA256／大小检查通过，Windows 附件的 GitHub digest 与本地一致。安装器交接和原生窗口行为未实机验收。
 
 ## 4. 共享边界与验证范围
 

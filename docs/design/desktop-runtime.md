@@ -49,7 +49,7 @@ Windows / Linux 统一启用 Wails `Frameless`，以现有工作区 header 承�
 
 ## 6. 在线更新增量（2026-10-11）
 
-新增 UpdateInfo/ConfirmUpdate/UpdateResult DTO 和 integrity/permission 错误码，保留既有 anchor-desktop-v1 供应商与生命周期方法语义。更新读取／下载与核心业务分别用锁，长下载不占用供应商／Status 的会话锁。安装必须明确批准版本，重新校验磁盘文件，认证本机核心并等待正常退出，再交给独立 helper 等待窗口退出；核心抢占、身份变化、文件被修改或不兼容均拒绝，不强杀或自行提权。普通关窗仍不停服。本轮仅实现源码和隔离验证，安装器交接及双平台原生更新验收不是单元／模拟浏览器测试可替代的结果。
+新增 UpdateInfo/ConfirmUpdate/UpdateResult DTO 和 integrity/permission 错误码，保留既有 anchor-desktop-v1 供应商与生命周期方法语义。更新读取／下载与核心业务分别用锁，长下载不占用供应商／Status 的会话锁。安装必须明确批准版本，重新校验磁盘文件，认证本机核心并等待正常退出，再交给独立 helper 等待窗口退出；核心抢占、身份变化、文件被修改或不兼容均拒绝，不强杀或自行提权。普通关窗仍不停服。最初增量仅实现源码和隔离验证；desktop.12 已发布到默认 dev 源且完成真实下载校验，安装器交接及双平台原生更新验收未执行。
 
 ## 上游模型目录增量边界（desktop.10）
 

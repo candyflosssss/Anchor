@@ -5,7 +5,7 @@
 
 ## 公开下载
 
-当前公开预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.12**，可在已有 `.9`～`.11` 的在线更新中选择 dev 获取：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
@@ -19,11 +19,11 @@
 SQLite 供应商与模型配置、Responses / Chat Completions / Anthropic Messages 无状态文本及函数工具转换，以及托管层/条件恢复、Codex 基础配置与模型目录、多模型绑定授权。当前版本为 `0.1.0-dev`，
 不等于整体初版已完成；SSH、其他 Agent 适配器、Codex profile 和完整协议能力仍待实现。
 
-支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。现有公开包仍是 CLI；当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，不执行浏览器、安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
+支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.12 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，不执行浏览器、安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
 
-供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」三页签，CLI 同步提供。实现边界和 schema3 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力尚未包含于公开 alpha.6，桌面更新源仍未投放。
+供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」三页签，CLI 同步提供。实现边界和 schema3 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。
 
-**已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；关闭窗口／退出界面默认不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。这不是当前下载包已具备的能力。
+**已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；desktop.12 关闭窗口收起到任务栏，「退出界面」退出宿主，两者均不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。桌面 dev 包已包含启动／复用与窗口生命周期实现；开机自启动设置未实现，原生安装与窗口行为未验收。
 
 ## 开发运行
 
@@ -44,7 +44,7 @@ SQLite 供应商与模型配置、Responses / Chat Completions / Anthropic Messa
 ./scripts/anchor-dev.sh status --json
 ```
 
-服务前台运行，不由管理命令退出触发停服；关闭 serve 终端可能停止服务。本轮源码新增 Context 作用域 `stop --approve` 请求正常退出（尚未公开发布），只报告接受、不保证恢复完成；桌面关窗不会调用它。
+服务前台运行，不由管理命令退出触发停服；关闭 serve 终端可能停止服务。本轮源码新增 Context 作用域 `stop --approve` 请求正常退出（alpha.6 CLI 尚不包含），只报告接受、不保证恢复完成；桌面关窗不会调用它。
 Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后先审核计划再接管。操作契约见 [最新 CLI 指令大全](docs/cli/commands.md#8-agent-托管与独立恢复)。已公开的 Linux `0.1.0-alpha.3` 包含上述能力；验收结果见任务记录，旧测试包不包含它。
 
 桌面端通过 SSH 使用远端 Codex 的主路径：在远端批准 CODEX_HOME 基础配置 → Anchor provider + 默认模型 + 版本匹配模型目录 → 用户手动选择其他授权模型 → Anchor 路由实际供应商。新 CLI 绑定默认 `all-compatible`，旧绑定保留单模型权限；无需额外 profile。目录元数据需操作者显式导入并核对真实上游能力，修改目录后重启远端 app-server。Anchor 自己的 SSH Connector 和桌面 UI 验收不在本轮范围。
@@ -55,7 +55,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-以下公开分发仍是 CLI。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 的本地开发产物、构建结果与使用方式见[桌面安装说明](docs/release/desktop.md)，未对外发布，未做本轮安装／运行验收。
+以下一键安装入口用于 CLI alpha.6。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 已随 desktop.12 发布到 dev 在线更新渠道，使用方式与构建结果见[桌面安装说明](docs/release/desktop.md)；本轮未做原生安装／运行验收。
 
 已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux / Windows AMD64 `0.1.0-alpha.6` 已公开发布；两平台附件匿名下载与校验通过，Linux 远程一键安装已验证**。不从 Actions artifact 或草稿偷偷安装。
 
@@ -92,6 +92,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（已本地打包，尚未公开发行）
+### 在线更新（desktop.12 已投放 dev 渠道）
 
-新增 CLI 本机更新命令与桌面“设置 → 在线更新”，支持 dev/alpha/beta/rc/stable 渠道、可信 HTTPS 自定义清单、SHA256/大小校验与明确批准安装。CLI 原位替换保留上一版；桌面正常停服／退出后交给 Windows 安装器或 Linux 系统包安装器，不静默升级或自动提权。旧 alpha.6 / desktop.8 无该入口，首次需要人工安装新启动版本。已本地生成含更新入口的 Windows / Ubuntu24.04 安装包 `0.1.0-dev.desktop.9`，见[桌面安装与构建状态](docs/release/desktop.md)；尚未公开发行、部署更新源或完成原生安装验收，不能承诺安装后立即发现线上更新。语法见[最新指令大全](docs/cli/commands.md)，测试投放与安全边界见[在线更新](docs/design/online-updates.md)。
+已有 desktop.9～.11：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.12` 的 Windows / Ubuntu24.04 安装包及更新清单；未配置时渠道仍为 alpha，需要选择 dev。已通过真实更新下载及大小／SHA256 校验，未执行原生安装验收。旧 desktop.8 无入口，首次须手动安装。
+
+桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.12 普通关闭收起到任务栏，其他窗口需要用「退出界面」退出。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、schema3 迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。
