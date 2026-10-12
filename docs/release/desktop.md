@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-12。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.16`，2026-10-12 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：真实请求／系统日志，27 项可选列、排序与预设、详情与尝试时间线、筛选分页、JSONL 导出与保留管理。隐藏列不影响后台采集保存；缺失指标显示未知，HTTP 与 Anchor 结果独立。包含已提交的 Key／实际模型协议配置和供应商详情同步修复。
-- 已有 `.9`～`.15`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已提供 `.16`；未配置渠道时仍为 alpha，需选择 dev。旧 `.8` 无更新入口，首次须手动安装；历史包及日志保留。见[在线更新](../design/online-updates.md)。
-- 首次启动将 state.db schema3→4，旧程序不能打开迁移后的数据库，没有数据库降级入口；日志另用 logs.db schema1。正常停止旧核心再安装，不补采升级前请求。
-- 定向 Go／真实隔离核心、CLI、Bridge 联调、前端单元／浏览器交互／性能验证、两平台打包、六项附件校验与真实更新下载通过。**双平台原生窗口与安装未验收**；dev 预发行未签名，alpha.6 CLI 下载未替换。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.17`，2026-10-12 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：供应商主页与 1–16 个轮询请求地址，供应商级不再设置协议，新增不填 Key，取消／关闭直接丢弃；在线更新在无代理环境变量时读取 Windows 系统代理（不执行 PAC）；Windows 安装器检测到界面或核心仍运行时可停止后点「重试」。日志等功能同 `.16`。
+- 已有 `.9`～`.16`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。`.16` 及更早更新器不读系统代理，只靠系统代理联网时须手动安装一次 `.17`（先停止核心并退出界面），或启动前设置 `HTTPS_PROXY`。旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 无新 schema 迁移；从 `.15` 及更早升级仍会将 state.db schema3→4，不提供降级。
+- updater／desktop 定向 Go 测试、Windows 交叉 vet、前端类型与更新模块单元测试、两平台打包、六项附件 digest 校验与真实更新下载通过。**双平台原生窗口与安装未验收**；dev 预发行未签名。
 
 ## 1. 安装与使用行为
 
@@ -84,7 +84,25 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.16`
+### 当前在线 dev 版 `.17`
+
+`0.1.0-dev.desktop.17` 于 2026-10-12 公开为 dev prerelease（非 latest），从独立干净 worktree 的提交 `29cc97325a90a9025a0621df42bf4c18822e138c` 构建。
+
+包含供应商主页／多请求地址（轮询）、移除供应商级协议、新增不填 Key、取消与关闭直接丢弃草稿；更新器在无代理环境变量时使用 Windows 当前用户系统代理及绕过列表（不执行 PAC）；NSIS 安装器检测到运行中的界面或核心时提供「重试」，提示「停止核心」→「退出界面」或 `anchor stop --approve`，不强杀进程。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.17-windows-amd64-setup.exe` | 7,689,842 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.17_amd64.deb` | 5,504,156 |
+
+```text
+2cc5cc23b98a7db85031fab773ae65d9caee629d9fe73125ee178b5d1561753d  Anchor-Desktop-0.1.0-dev.desktop.17-windows-amd64-setup.exe
+978b7d777385345f5de544dd399ebd6d75d7a4a74bb74e5b95656eca69dfa4f0  anchor-desktop_0.1.0-dev.desktop.17_amd64.deb
+```
+
+六项公开附件远端 digest 与本地 SHA256 一致，证据存 `publication/PUBLISHED.json` 与 `ONLINE_DOWNLOAD.log`。隔离目录使用源码 CLI `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.16` 发现并下载 `.17` Linux 包，校验通过；Windows 安装包直接下载 SHA256 一致。未调用安装器，未改真实 Agent 配置，未请求付费上游；原生窗口与安装、全量测试未执行。
+
+### 历史在线 dev 版 `.16`
 
 `0.1.0-dev.desktop.16` 于北京时间 2026-10-12 01:43:37 公开为 dev prerelease（非 latest），构建元数据渠道 `desktop-dev`。从独立干净 worktree 的提交 `7bd0b47fcc80789ecf80e363827f564ada6e9f32` 构建；后续发行文档提交不进入安装包。
 

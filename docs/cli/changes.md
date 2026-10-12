@@ -131,7 +131,7 @@
 - 兼容与迁移：日志本身独立 logs.db，不改变 state schema；同版供应商协议配置会迁移 state schema3→4，旧二进制不兼容；旧核心需正常停服并升级，不补采升级前历史。缺失 HTTP/usage/指标保持 null，未知不补零；任一尝试缺失 usage 时根总量未知。默认7天/50,000条/请求256MiB/系统32MiB，清理渐进收敛。alpha.6 和 desktop.15 没有日志接口。
 - 验证：隔离 Go 核心/client/CLI/desktop 定向测试通过；真实桥接到隔离子核心及共享日志样例通过。10万条持久历史/索引查询/收紧保留验证通过；浏览器日志3项及桌面13项分别通过，800次／8客户端流式无日志丢弃；两平台打包、六项附件校验与真实 dev 更新下载通过；原生安装未验收，完整结果见本次 release 记录。
 
-## 2026-10-12 — 供应商主页与多请求地址（未发布）
+## 2026-10-12 — 供应商主页与多请求地址（0.1.0-dev.desktop.17 已发布）
 
 - 类型：新增 / 修改。
 - 指令与参数：`provider add/put` 的 `--base-url` 改为可重复（1..16 个，不可重复）；新增可选 `--homepage-url`；`--protocol` 默认值由 `responses` 改为空。
@@ -139,7 +139,7 @@
 - 兼容与迁移：无 schema 变更；只有 `base_url` 的旧数据照常读取，`base_url` 继续镜像第一个地址。桌面 DTO 移除 `protocol`、`base_url`，新增 `homepage_url`、`base_urls`，属于不兼容变更，桌面与核心须同步升级。
 - 验证：state/core/desktop/client/cli 定向 Go 测试与 go vet 通过；前端 tsc、eslint、vitest 通过；缓存 headless Chromium 下供应商／恢复23项与桌面／日志16项 Playwright 通过。未打包，未验收原生安装，未请求真实付费上游。
 
-## 2026-10-12 — 更新检查与下载支持 Windows 系统代理（未发布）
+## 2026-10-12 — 更新检查与下载支持 Windows 系统代理（0.1.0-dev.desktop.17 已发布）
 
 - 类型：兼容性修复；命令、参数、输出和退出码不变。
 - 指令与参数：`anchor update check|download`，以及桌面「在线更新」共享的同一更新器。

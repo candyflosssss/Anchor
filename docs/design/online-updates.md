@@ -1,6 +1,6 @@
 # 在线更新 v1
 
-- 日期：2026-10-12；**`0.1.0-dev.desktop.16` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.15 可在应用内选择 dev 升级；默认渠道仍为 alpha。真实更新下载通过，原生安装未验收。state.db schema3→4 自动迁移，旧二进制不能打开升级后的状态；详见[桌面开发版](../release/desktop.md)。
+- 日期：2026-10-12；**`0.1.0-dev.desktop.17` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.16 可在应用内选择 dev 升级；默认渠道仍为 alpha。更新器在无代理环境变量时读取 Windows 系统代理（不执行 PAC），`.16` 及更早版本只靠系统代理时须手动安装一次。真实更新下载通过，原生安装未验收；详见[桌面开发版](../release/desktop.md)。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 
