@@ -166,11 +166,15 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
   const [upstream, setUpstream] = useState(d.upstream ?? '');
   const [alias, setAlias] = useState(d.alias ?? d.upstream ?? '');
   const [touched, setTouched] = useState(!!d.alias);
+  const [multiplier, setMultiplier] = useState(String(editing?.multiplier ?? 1));
+  const [strategy, setStrategy] = useState(editing?.strategy ?? 'round-robin');
+  const multiplierValue = Number(multiplier);
+  const multiplierError = !multiplier.trim() || !Number.isFinite(multiplierValue) || multiplierValue < 0.01 || multiplierValue > 1000 ? '倍率须为 0.01–1000。' : '';
   const [tools, setTools] = useState(d.tools ?? false);
   const [streaming, setStreaming] = useState(d.streaming ?? false);
   const aliasError = !alias ? '' : !isValidId(alias) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
   const options = c.models?.models ?? [];
-  return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError) void run('model-put', { target: alias, model: upstream.trim(), tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
+  return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError && !multiplierError) void run('model-put', { target: alias, model: upstream.trim(), multiplier: multiplierValue, strategy, tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
       <div className="field"><label htmlFor="mapping-upstream">上游模型 ID</label>
         <Input id="mapping-upstream" list="mapping-upstream-options" value={upstream} autoComplete="off" onChange={e => { setUpstream(e.target.value); if (!touched) setAlias(e.target.value.trim()); }} />
@@ -178,9 +182,16 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
       <div className="field"><label htmlFor="mapping-alias">Anchor 公开别名</label>
         <Input id="mapping-alias" value={alias} readOnly={!!editing} placeholder="例如 coding-main" autoComplete="off" aria-invalid={!!aliasError} aria-describedby="mapping-alias-hint" onChange={e => { setAlias(e.target.value.trim()); setTouched(true); }} />
         <p id="mapping-alias-hint" className={aliasError ? 'field-error' : 'field-hint'}>{aliasError || 'Agent 请求时填写的模型名；多个供应商可映射同一别名互为候选。'}</p></div>
+      <div className="field"><label htmlFor="mapping-multiplier">此供应商的相对倍率</label>
+        <Input id="mapping-multiplier" type="number" min="0.01" max="1000" step="any" value={multiplier} onChange={e => setMultiplier(e.target.value)} aria-invalid={!!multiplierError} />
+        <p className={multiplierError ? 'field-error' : 'field-hint'}>{multiplierError || '默认 1；加权轮询按倍率倒数分配请求，倍率越低占比越高。'}</p></div>
+      {editing && <div className="field"><label htmlFor="mapping-strategy">公开模型调度策略</label>
+        <select id="mapping-strategy" className="select-field" value={strategy} onChange={e => setStrategy(e.target.value)}><option value="round-robin">按倍率加权轮询</option><option value="priority">按候选顺序优先</option></select>
+        <p className="field-hint">对这个公开模型的所有供应商生效。停用、冷却或并发已满的上游会跳过。</p></div>}
+      <p className="field-hint">新公开模型默认加权轮询；加入已有别名时保留它的调度策略和能力声明。编辑能力声明对所有供应商生效。</p>
       <label className="checkbox-row"><input type="checkbox" checked={tools} onChange={e => setTools(e.target.checked)} />函数工具</label>
       <label className="checkbox-row"><input type="checkbox" checked={streaming} onChange={e => setStreaming(e.target.checked)} />流式输出</label>
     </fieldset>
-    <Footer c={c}><Button disabled={c.features.busy || !alias || !upstream.trim() || !!aliasError}>{editing ? '保存映射' : '添加映射'}</Button></Footer>
+    <Footer c={c}><Button disabled={c.features.busy || !alias || !upstream.trim() || !!aliasError || !!multiplierError}>{editing ? '保存映射' : '添加映射'}</Button></Footer>
   </form>;
 }

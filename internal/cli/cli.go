@@ -36,7 +36,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   provider key-delete|key-reset --id ID --revision N --target KEY --approve
   provider strategy --id ID --revision N --strategy round-robin|priority
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
-  provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--tools] [--streaming] [--approve]
+  provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy round-robin|priority] [--tools] [--streaming] [--approve]
   provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
   provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
   logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
@@ -619,7 +619,8 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	stdin := f.Bool("secret-stdin", false, "read secret from stdin; omission retains existing key")
 	strategy := f.String("strategy", "round-robin", "round-robin or priority")
 	model := f.String("model", "", "upstream model")
-	mr := f.Int64("model-revision", 0, "current model revision; zero creates")
+	mr := f.Int64("model-revision", 0, "current model revision; zero creates or attaches a new provider")
+	multiplier := f.Float64("multiplier", 0, "relative cost multiplier 0.01..1000; omitted preserves existing or defaults to 1")
 	tools := f.Bool("tools", false, "advertise function tools")
 	stream := f.Bool("streaming", false, "advertise streaming")
 	if err := parse(f, args[1:]); err != nil {
@@ -628,7 +629,18 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	if !state.ValidProviderID(*id) || *revision < 1 {
 		return errors.New("saved --id and current --revision are required")
 	}
-	in := catalog.Action{Protocol: *protocol, ProviderID: *id, ExpectedRevision: *revision, Action: args[0], Target: *target, Approved: *approve, CopyKeys: *copyKeys, Enabled: !*disabled, Strategy: *strategy, Model: *model, ModelRevision: *mr, Tools: *tools, Streaming: *stream}
+	in := catalog.Action{Protocol: *protocol, ProviderID: *id, ExpectedRevision: *revision, Action: args[0], Target: *target, Approved: *approve, CopyKeys: *copyKeys, Enabled: !*disabled, Strategy: *strategy, Model: *model, ModelRevision: *mr, Multiplier: *multiplier, Tools: *tools, Streaming: *stream}
+	if args[0] == "model-put" {
+		explicitStrategy := false
+		f.Visit(func(flag *flag.Flag) {
+			if flag.Name == "strategy" {
+				explicitStrategy = true
+			}
+		})
+		if !explicitStrategy {
+			in.Strategy = ""
+		}
+	}
 	if *stdin {
 		v, err := a.secret()
 		if err != nil {

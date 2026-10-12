@@ -293,7 +293,8 @@ func (s *Store) DeleteProviderModel(id string, revision int64, providerID string
 		}
 	}
 	var rev int64
-	err = tx.QueryRow(`SELECT revision FROM models WHERE id=?`, id).Scan(&rev)
+	var document string
+	err = tx.QueryRow(`SELECT revision,document FROM models WHERE id=?`, id).Scan(&rev, &document)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -302,6 +303,35 @@ func (s *Store) DeleteProviderModel(id string, revision int64, providerID string
 	}
 	if rev != revision {
 		return ErrConflict
+	}
+	if providerID != "" {
+		var m Model
+		if err = json.Unmarshal([]byte(document), &m); err != nil {
+			return err
+		}
+		remaining := make([]Candidate, 0, len(m.Candidates))
+		for _, c := range m.Candidates {
+			if c.ProviderID != providerID {
+				remaining = append(remaining, c)
+			}
+		}
+		if len(remaining) == len(m.Candidates) {
+			return ErrInvalid
+		}
+		if len(remaining) > 0 {
+			m.Candidates, m.Revision = remaining, rev+1
+			b, e := json.Marshal(m)
+			if e != nil {
+				return e
+			}
+			if _, err = tx.Exec(`UPDATE models SET document=?,revision=? WHERE id=? AND revision=?`, string(b), m.Revision, id, rev); err != nil {
+				return err
+			}
+			if _, err = tx.Exec(`DELETE FROM provider_prices WHERE provider_id=? AND model=?`, providerID, id); err != nil {
+				return err
+			}
+			return tx.Commit()
+		}
 	}
 	rows, err := tx.Query(`SELECT document FROM bindings`)
 	if err != nil {

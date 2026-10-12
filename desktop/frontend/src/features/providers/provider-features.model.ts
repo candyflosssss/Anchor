@@ -2,7 +2,7 @@ import type { Action, Price, Probe, Workspace } from '../../desktop/contract.gen
 import { protocolName, ProviderProblem, type Provider } from './provider.model';
 export type { Action, Price, Probe, Workspace };
 export function actionFor(p: Provider, action: string, fields: Partial<Action> = {}): Action {
-  return { provider_id: p.id, expected_revision: p.revision, action, price: null, catalog_provider: '', target: '', secret: '', enabled: true, approved: false, copy_keys: false, strategy: 'round-robin', model: '', protocol: '', model_revision: 0, tools: false, streaming: false, ...fields };
+  return { provider_id: p.id, expected_revision: p.revision, action, price: null, catalog_provider: '', target: '', secret: '', enabled: true, approved: false, copy_keys: false, strategy: 'round-robin', model: '', multiplier: 0, protocol: '', model_revision: 0, tools: false, streaming: false, ...fields };
 }
 const count = (v: number) => Number.isSafeInteger(v) && v >= 0;
 export function checkedPrice(p: Price): Price {
@@ -24,8 +24,8 @@ export function checkedWorkspace(w: Workspace): Workspace {
     if (!Object.hasOwn(protocolName, k.protocol) || !Array.isArray(k.model_protocols) || k.model_protocols.some(m => typeof m.model !== 'string' || !m.model || !Object.hasOwn(protocolName, m.protocol)) || new Set(k.model_protocols.map(m => m.model)).size !== k.model_protocols.length || typeof k.id !== 'string' || typeof k.enabled !== 'boolean' || !count(k.failures) || !count(k.retry_at) || !['ready', 'disabled', 'cooling', 'invalid', 'half-open'].includes(k.state)) throw new ProviderProblem('read_error');
     return { id: k.id, protocol: k.protocol, model_protocols: k.model_protocols.map(m => ({ model: m.model, protocol: m.protocol })), enabled: k.enabled, state: k.state, failures: k.failures, retry_at: k.retry_at, test: checkedProbe(k.test) };
   }), models: w.models.map(m => {
-    if (![m.revision, m.candidate_count].every(count) || typeof m.id !== 'string' || typeof m.upstream !== 'string' || typeof m.display_name !== 'string' || typeof m.tools !== 'boolean' || typeof m.streaming !== 'boolean') throw new ProviderProblem('read_error');
-    return { id: m.id, display_name: m.display_name, upstream: m.upstream, tools: m.tools, streaming: m.streaming, revision: m.revision, candidate_count: m.candidate_count };
+    if (![m.revision, m.candidate_count].every(count) || typeof m.id !== 'string' || typeof m.upstream !== 'string' || typeof m.display_name !== 'string' || typeof m.tools !== 'boolean' || typeof m.streaming !== 'boolean' || !Number.isFinite(m.multiplier) || m.multiplier < 0.01 || m.multiplier > 1000 || !['priority', 'round-robin'].includes(m.strategy)) throw new ProviderProblem('read_error');
+    return { id: m.id, display_name: m.display_name, upstream: m.upstream, tools: m.tools, streaming: m.streaming, revision: m.revision, candidate_count: m.candidate_count, multiplier: m.multiplier, strategy: m.strategy };
   }), usage: w.usage.map(u => {
     const { provider_id, model, requests, failures, elapsed_ms, known, input_tokens, output_tokens, cache_read, cache_write } = u;
     if (typeof provider_id !== 'string' || typeof model !== 'string' || ![requests, failures, elapsed_ms, known, input_tokens, output_tokens, cache_read, cache_write].every(count) || failures > requests || known > requests) throw new ProviderProblem('read_error');

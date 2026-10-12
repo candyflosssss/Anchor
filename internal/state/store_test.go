@@ -128,7 +128,7 @@ func TestModelValidationAndCandidateOrder(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	m := Model{ID: "public", Tools: true, Streaming: true, Candidates: []Candidate{{"b", "model-b"}, {"a", "model-a"}}}
+	m := Model{ID: "public", Tools: true, Streaming: true, Candidates: []Candidate{{ProviderID: "b", Model: "model-b"}, {ProviderID: "a", Model: "model-a"}}}
 	if _, e := s.PutModel(m, 0); e != nil {
 		t.Fatal(e)
 	}
@@ -140,7 +140,7 @@ func TestModelValidationAndCandidateOrder(t *testing.T) {
 		t.Fatalf("stale model create accepted: %v", e)
 	}
 	m.ID = "missing"
-	m.Candidates = []Candidate{{"absent", "model"}}
+	m.Candidates = []Candidate{{ProviderID: "absent", Model: "model"}}
 	if _, e = s.PutModel(m, 0); e == nil {
 		t.Fatal("missing provider accepted")
 	}

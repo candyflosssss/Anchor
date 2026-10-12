@@ -105,6 +105,7 @@ export interface Estimate {
   usd: number | null;
 }
 export interface Action {
+  multiplier: number;
   protocol: string;
   price: Price | null;
   catalog_provider: string;
@@ -146,6 +147,8 @@ export interface Probe {
   failure: string;
 }
 export interface ModelMapping {
+  multiplier: number;
+  strategy: string;
   id: string;
   display_name: string;
   upstream: string;

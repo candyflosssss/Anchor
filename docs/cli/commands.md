@@ -245,7 +245,7 @@ anchor provider key-reset --id ID --revision N --target KEY --approve
 anchor provider strategy --id ID --revision N --strategy round-robin|priority
 anchor provider test --id ID --revision N --model UPSTREAM [--target KEY] --approve
 anchor provider model-put --id ID --revision N --target ALIAS --model UPSTREAM
-                          [--model-revision M] [--tools] [--streaming]
+                          [--model-revision M] [--multiplier N] [--strategy round-robin|priority] [--tools] [--streaming]
 anchor provider model-delete --id ID --revision N --target ALIAS --model-revision M --approve
 anchor provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD
                           [--cache-read-price USD] [--cache-write-price USD]
@@ -253,7 +253,7 @@ anchor provider price-import --id ID --revision N --target ALIAS --catalog-provi
 anchor usage
 ```
 
-上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace` 的 keys 额外返回 protocol 和 model_protocols（[{model,protocol}]，始终数组），不返回秘密。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商新 ID 沿用中文规则，Key ID/公开别名沿用 ASCII ID 规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
+上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace.models` 返回当前供应商的 `multiplier`（相对倍率）、`strategy`（公开模型策略）及 `candidate_count`（总候选数）。`workspace` 的 keys 额外返回 protocol 和 model_protocols（[{model,protocol}]，始终数组），不返回秘密。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商新 ID 沿用中文规则，Key ID/公开别名沿用 ASCII ID 规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
 
 | 动作 | 参数、默认值和语义 |
 | --- | --- |
@@ -264,8 +264,8 @@ anchor usage
 | key-delete / key-reset | target 与 approve 必填；delete 删除秘密，reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
 | strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
-| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建，编辑必须提供当前正整数。tools/streaming 默认 false，不从目录推断；保留其他供应商候选，更新该供应商候选和该模型能力 |
-| model-delete | target、model-revision、approve 必填；删除整个公开模型及全部候选，不仅解除当前供应商映射；Binding 默认模型引用时409 referenced，成功清理价格 |
+| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1。新模型 strategy 默认 round-robin（按倍率倒数加权轮询），可选 priority（候选顺序）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；编辑 tools/streaming 默认 false，能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
+| model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，Binding 默认模型引用时409 referenced，事务回滚 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；固定公开目录最多8秒/16MiB，无凭据/重定向/环境代理。只返回 imported_price **预览**，不保存；核对后另行 price-put |
 
@@ -299,7 +299,7 @@ anchor model put --id ID --candidate PROVIDER:MODEL --revision N [OPTIONS]
 | `--codex-model` | 未提供 | 源目录中唯一精确匹配的 slug；复制其完整元数据 |
 | `--codex-version` | 未提供 | 源目录/目标 Codex 的精确 `X.Y.Z` 版本；由操作者核对，不自动探测 |
 
-上游模型 ID 非空、最多 256 字节且不得含换行。put 完整替换候选、展示名、能力和 Codex 元数据，省略能力开关会设为 false，省略元数据三项会清除旧元数据；revision 加一，旧值冲突失败。只按显式候选顺序路由，结果未知的超时/传输失败和已开始输出的请求不重放。详细重试和协议边界见实施说明。
+上游模型 ID 非空、最多 256 字节且不得含换行。put 完整替换候选、展示名、能力和 Codex 元数据，省略能力开关会设为 false，省略元数据三项会清除旧元数据；revision 加一，旧值冲突失败。此入口完整替换时策略恢复 priority、倍率恢复1；可用 provider model-put 编辑当前候选倍率及共享策略。priority 按显式候选顺序路由，round-robin 按倍率倒数分配可调度请求；倍率1和2的上游约分配2:1请求。跳过停用、Key 不可用和并发已满的供应商。结果未知的超时/传输失败和已开始输出的请求不重放。详细重试和协议边界见实施说明。
 
 ```bash
 anchor model add --id anchor-code --candidate primary:upstream-model --tools --streaming
@@ -313,7 +313,7 @@ anchor model add --id anchor-code --candidate primary:upstream-model --tools --s
   --codex-model SOURCE_SLUG --codex-version X.Y.Z
 ```
 
-删除使用 `provider model-delete`（见 §5），会核对供应商和模型 revision，并阻止删除 Binding 默认模型。这里的示例不会证明真实供应商或 Codex 已兼容。
+删除使用 `provider model-delete`（见 §5），核对供应商和模型 revision，只移除该供应商候选；删除最后一个候选时阻止删除 Binding 默认模型。这里的示例不会证明真实供应商或 Codex 已兼容。
 
 ## 7. 本机授权
 

@@ -170,7 +170,12 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	for _, c := range model.Candidates {
+	candidates, err := s.routeCandidates(model)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	for _, c := range candidates {
 		provider, err := s.Store.Provider(c.ProviderID)
 		if err != nil {
 			apiError(w, err)

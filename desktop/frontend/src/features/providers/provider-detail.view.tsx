@@ -159,14 +159,15 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
     <section className="detail-card">
       <div className="card-toolbar"><div><h2>模型映射</h2><p className="card-hint">Agent 通过公开别名调用，Anchor 转发到此供应商的上游模型。</p></div>
         <Button variant="outline" disabled={disabled} onClick={() => c.openDialog({ kind: 'mapping' })}><Plus />手动添加映射</Button></div>
-      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
+      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col">调度 / 倍率</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
         {w.models.map(m => <tr key={m.id}>
           <td className="mono">{m.id}</td><td className="mono break-all">{m.upstream}</td>
           <td className="cell-hint">{[m.tools && '函数工具', m.streaming && '流式输出'].filter(Boolean).join(' · ') || '基础'}</td>
+          <td className="cell-hint">{m.strategy === 'round-robin' ? '加权轮询' : '顺序优先'} · {m.multiplier}× · {m.candidate_count} 个候选</td>
           <td className="row-actions">
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试模型 ${m.id}`} onClick={() => c.openDialog({ kind: 'test', model: m.upstream })}><Play />测试</Button>
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={`编辑模型 ${m.id}`} onClick={() => c.openDialog({ kind: 'mapping', alias: m.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming })}>编辑</Button>
-            <Button size="sm" variant="ghost" disabled={disabled} aria-label={`删除模型 ${m.id}`} onClick={() => ask({ action: 'model-delete', title: `删除模型 ${m.id}？`, body: '删除此公共模型及全部候选；若 Binding 引用它则阻止删除。', fields: { target: m.id, model_revision: m.revision } })}><Trash2 /></Button>
+            <Button size="sm" variant="ghost" disabled={disabled} aria-label={`删除模型 ${m.id}`} onClick={() => ask({ action: 'model-delete', title: `删除模型 ${m.id}？`, body: '仅移除此供应商的映射，保留其他供应商。最后一个候选被移除时删除公开模型；若 Binding 引用它则阻止删除。', fields: { target: m.id, model_revision: m.revision } })}><Trash2 /></Button>
           </td>
         </tr>)}
       </tbody></table></div> : <div className="empty-state compact"><List size={24} /><p>还没有映射模型。先从上游目录导入，或手动添加。</p></div>}

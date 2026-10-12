@@ -76,3 +76,12 @@ Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/es
 转发先选 Key，然后按该 Key 和候选中的实际模型名解析覆盖 → Key 默认值，JSON、SSE、认证与推理测试均使用此结果。模型未设置覆盖时动态继承，以后修改 Key 默认值自动生效。供应商 protocol 仅保留为核心内部值，用于历史兼容、新 default Key 初始化与匿名请求，不再控制已有 Key，桌面不显示也不设置。schema3→4 把每个供应商旧协议复制到它的全部 Key；复制凭据时一并复制覆盖，改名/删除按外键级联。升级须同步客户端与核心；旧程序无法打开 schema4，不提供降级。
 
 UI 的 Key 编辑支持默认协议与留空保留凭据；模型页按 Key 获取目录，为实际模型逐项选择继承/独立协议，已存覆盖在目录尚未查询或不再返回该模型时仍可查看和恢复继承。切换供应商/Key，修改 Key 凭据或删除 Key 时清理目录结果；模型协议写入保留当前目录，方便连续编辑。查询结果包含实际 Key，前端拒绝与显式请求不符的响应。验证层次和限制沿用 §3。已随 desktop.16 dev 打包发布；原生安装未验收，安装包能力以[发行记录](../release/desktop.md)为准。
+
+
+## 7. 共享公开模型映射与调度（2026-10-12）
+
+Action 新增 multiplier；model-put 使用 strategy=round-robin|priority 设置公开模型调度，和 key strategy 动作分属两个层级。ModelMapping 新增 multiplier（始终有效正数，旧值0回读为1）及 strategy（旧模型空值回读为priority）。Go/TS 和 `desktop/contract/provider-model-mapping.json` 为共享契约。
+
+model_revision=0 表示当前供应商加入别名，不覆盖它已有的映射；别名不存在则创建并默认round-robin，已存在则追加并保留其他候选、能力、策略及Codex元数据。正 revision 编辑须匹配共享模型 revision，只改当前供应商上游/倍率；tools/streaming/strategy 为共享模型字段。追加写入仍以读取的最新模型 revision 进行CAS及供应商 revision 事务校验，不自动重放并发冲突。model-delete 事务内只删当前供应商候选与价格，剩余模型 revision+1；最后一个候选才删除公开模型、清理模型价格并检查 Binding 默认模型引用。
+
+round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍率1，范围0.01..1000；只在当前可调度候选中分配首选上游，不预占半开Key。真正转发时再次核对并发及Key状态；失败转移仍遵循原有禁止未知结果/流式重放规则。倍率不从外部站点拉取，目录成功不表示可推理。

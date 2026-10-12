@@ -38,7 +38,7 @@ func (s *Server) workspace(id string) (catalog.Workspace, error) {
 	for _, m := range models {
 		for _, c := range m.Candidates {
 			if c.ProviderID == id {
-				out.Models = append(out.Models, catalog.ModelMapping{ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates)})
+				out.Models = append(out.Models, catalog.ModelMapping{ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates), Multiplier: c.EffectiveMultiplier(), Strategy: m.RoutingStrategy()})
 			}
 		}
 	}
@@ -174,37 +174,65 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		}
 		probe, err = s.probe(r.Context(), p, in.Target, in.Model)
 	case "model-put":
-		if !state.ValidID(in.Target) || in.Model == "" {
+		if !state.ValidID(in.Target) || in.Model == "" || (in.Strategy != "" && in.Strategy != "priority" && in.Strategy != "round-robin") {
 			err = state.ErrInvalid
 			break
 		}
-		m := state.Model{ID: in.Target, DisplayName: in.Target, Tools: in.Tools, Streaming: in.Streaming, Candidates: []state.Candidate{{ProviderID: p.ID, Model: in.Model}}}
-		if in.ModelRevision > 0 {
-			old, e := s.Store.Model(in.Target)
-			if e != nil {
-				err = e
+		expected := in.ModelRevision
+		m, e := s.Store.Model(in.Target)
+		if errors.Is(e, state.ErrNotFound) && expected == 0 {
+			m = state.Model{ID: in.Target, DisplayName: in.Target, Tools: in.Tools, Streaming: in.Streaming, Strategy: "round-robin"}
+		} else if e != nil {
+			err = e
+			break
+		}
+		index := -1
+		for i, c := range m.Candidates {
+			if c.ProviderID == p.ID {
+				// A provider-scoped editor cannot safely edit multiple legacy entries.
+				if index >= 0 {
+					err = state.ErrInvalid
+					break
+				}
+				index = i
+			}
+		}
+		if err != nil {
+			break
+		}
+		if expected == 0 {
+			if index >= 0 {
+				err = state.ErrConflict
 				break
 			}
-			m = old
-			m.Tools = in.Tools
-			m.Streaming = in.Streaming
-			found := false
-			for i := range m.Candidates {
-				if m.Candidates[i].ProviderID == p.ID {
-					m.Candidates[i].Model = in.Model
-					found = true
-				}
+			// Attach to the latest snapshot, preserving all existing candidates and metadata.
+			expected = m.Revision
+			m.Candidates = append(m.Candidates, state.Candidate{ProviderID: p.ID, Model: in.Model, Multiplier: in.Multiplier})
+		} else {
+			if m.Revision != expected {
+				err = state.ErrConflict
+				break
 			}
-			if !found {
+			if index < 0 {
 				err = state.ErrInvalid
 				break
 			}
+			m.Candidates[index].Model = in.Model
+			if in.Multiplier != 0 {
+				m.Candidates[index].Multiplier = in.Multiplier
+			}
+			m.Tools, m.Streaming = in.Tools, in.Streaming
+		}
+		// Joining an existing public model preserves its shared strategy/capabilities.
+		// Editing an existing mapping can explicitly change the shared strategy.
+		if in.Strategy != "" && (m.Revision == 0 || in.ModelRevision > 0) {
+			m.Strategy = in.Strategy
 		}
 		if m.Validate() != nil {
 			err = state.ErrInvalid
 			break
 		}
-		_, err = s.Store.PutProviderModel(m, in.ModelRevision, p.ID, p.Revision)
+		_, err = s.Store.PutProviderModel(m, expected, p.ID, p.Revision)
 	case "model-delete":
 		m, e := s.Store.Model(in.Target)
 		if e != nil {

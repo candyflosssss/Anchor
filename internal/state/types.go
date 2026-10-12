@@ -3,6 +3,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"regexp"
@@ -154,10 +155,20 @@ func (p Provider) Validate() error {
 }
 
 type Candidate struct {
-	ProviderID string `json:"provider_id"`
-	Model      string `json:"model"`
+	ProviderID string  `json:"provider_id"`
+	Model      string  `json:"model"`
+	Multiplier float64 `json:"multiplier,omitempty"`
 }
+
+func (c Candidate) EffectiveMultiplier() float64 {
+	if c.Multiplier == 0 {
+		return 1
+	}
+	return c.Multiplier
+}
+
 type Model struct {
+	Strategy    string         `json:"strategy,omitempty"` // Empty preserves legacy ordered priority.
 	ID          string         `json:"id"`
 	DisplayName string         `json:"display_name"`
 	Tools       bool           `json:"tools"`
@@ -167,7 +178,17 @@ type Model struct {
 	Codex       *CodexMetadata `json:"codex,omitempty"`
 }
 
+func (m Model) RoutingStrategy() string {
+	if m.Strategy == "" {
+		return "priority"
+	}
+	return m.Strategy
+}
+
 func (m Model) Validate() error {
+	if m.Strategy != "" && m.Strategy != "priority" && m.Strategy != "round-robin" {
+		return errors.New("invalid model strategy")
+	}
 	if m.Codex != nil {
 		if err := m.Codex.Validate(); err != nil {
 			return err
@@ -181,6 +202,10 @@ func (m Model) Validate() error {
 	}
 	seen := map[string]bool{}
 	for _, c := range m.Candidates {
+		v := c.EffectiveMultiplier()
+		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0.01 || v > 1000 {
+			return errors.New("candidate multiplier must be 0.01..1000")
+		}
 		if !ValidProviderID(c.ProviderID) || c.Model == "" || len(c.Model) > 256 || strings.ContainsAny(c.Model, "\r\n") {
 			return errors.New("invalid model candidate")
 		}

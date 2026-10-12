@@ -1,3 +1,4 @@
+import mappingFixture from '../../../../contract/provider-model-mapping.json';
 import workspaceFixture from '../../../../contract/provider-workspace.json';
 import { checkedWorkspace, type Action, type Workspace } from './provider-features.model';
 import catalogFixture from '../../../../contract/provider-models.json';
@@ -24,7 +25,7 @@ async function delay(signal: AbortSignal) {
 /** Synthetic first-read state so overview, attention and model pages have something to show. */
 function seed(id: string, w: Workspace) {
   const now = Math.floor(Date.now() / 1000);
-  const mapping = (upstream: string) => ({ id: 'coding-main', display_name: 'coding-main', upstream, tools: true, streaming: true, revision: 1, candidate_count: 2 });
+  const mapping = (upstream: string) => ({ ...mappingFixture, upstream });
   if (id === '摸鱼AI') w.models = [mapping('demo-model-mini')];
   if (id === '备用供应商') {
     w.keys = [
@@ -108,8 +109,37 @@ export class MockProviderTransport implements ProviderTransport {
       case 'key-delete': if (!a.approved) throw fixtureError('invalid'); w.keys = w.keys.filter(k => k.id !== a.target); p.has_secret = !!w.keys.length; p.revision++; break;
       case 'key-reset': { const k = w.keys.find(k => k.id === a.target); if (!a.approved || !k) throw fixtureError('invalid'); k.failures = 0; k.retry_at = 0; k.state = k.enabled ? 'ready' : 'disabled'; break; }
       case 'strategy': w.strategy = a.strategy; p.revision++; break;
-      case 'model-put': { const old = w.models.find(m => m.id === a.target); if (!a.target || !a.model || (old?.revision ?? 0) !== a.model_revision) throw fixtureError('conflict'); w.models = w.models.filter(m => m.id !== a.target); w.models.push({ id: a.target, display_name: a.target, upstream: a.model, tools: a.tools, streaming: a.streaming, revision: a.model_revision + 1, candidate_count: 1 }); break; }
-      case 'model-delete': if (!a.approved) throw fixtureError('invalid'); w.models = w.models.filter(m => m.id !== a.target); break;
+      case 'model-put': {
+        const all = this.rows.map(p => this.detail(p));
+        const mappings = all.flatMap(w => w.models.filter(m => m.id === a.target));
+        const local = w.models.find(m => m.id === a.target);
+        const shared = mappings[0];
+        if (!a.target || !a.model) throw fixtureError('invalid');
+        if (a.model_revision === 0 ? !!local : !local || local.revision !== a.model_revision) throw fixtureError('conflict');
+        const multiplier = a.multiplier || local?.multiplier || 1;
+        if (!Number.isFinite(multiplier) || multiplier < 0.01 || multiplier > 1000) throw fixtureError('invalid');
+        const strategy = a.model_revision > 0 || !shared ? a.strategy || shared?.strategy || 'round-robin' : shared.strategy;
+        if (!['priority', 'round-robin'].includes(strategy)) throw fixtureError('invalid');
+        const revision = (shared?.revision ?? 0) + 1;
+        const candidate_count = mappings.length + (local ? 0 : 1);
+        const tools = a.model_revision > 0 || !shared ? a.tools : shared.tools;
+        const streaming = a.model_revision > 0 || !shared ? a.streaming : shared.streaming;
+        for (const m of mappings) Object.assign(m, { revision, candidate_count, strategy, tools, streaming });
+        if (local) Object.assign(local, { upstream: a.model, multiplier });
+        else w.models.push({ id: a.target, display_name: shared?.display_name ?? a.target, upstream: a.model, multiplier, revision, candidate_count, strategy, tools, streaming });
+        break;
+      }
+      case 'model-delete': {
+        if (!a.approved) throw fixtureError('invalid');
+        const all = this.rows.map(p => this.detail(p));
+        const local = w.models.find(m => m.id === a.target);
+        if (!local || local.revision !== a.model_revision) throw fixtureError('conflict');
+        w.models = w.models.filter(m => m !== local);
+        w.prices = w.prices.filter(p => p.model !== a.target);
+        const remaining = all.flatMap(w => w.models.filter(m => m.id === a.target));
+        for (const m of remaining) { m.revision++; m.candidate_count = remaining.length; }
+        break;
+      }
       case 'test': if (!a.approved) throw fixtureError('invalid'); w.probe = { revision: p.revision, key_id: a.target, model: a.model, at: Math.floor(Date.now() / 1000), http_status: 200, elapsed_ms: 120, failure: '' }; { const k = w.keys.find(k => k.id === a.target); if (k) k.test = { ...w.probe }; } break;
       case 'price-import': w.imported_price = { model: a.target, input_usd: 1, output_usd: 3, cache_read_usd: null, cache_write_usd: null, source: 'prototype/synthetic', updated_at: 1791648000 }; break;
       case 'price-put': if (!a.price) throw fixtureError('invalid'); w.prices = [...w.prices.filter(p => p.model !== a.target), { ...a.price, model: a.target }]; w.imported_price = null; p.revision++; break;

@@ -121,6 +121,18 @@ func TestCLIManagementWorkflow(t *testing.T) {
 	if stored, err := s.Provider("multi"); err != nil || stored.Protocol != "anthropic" || !reflect.DeepEqual(stored.URLs(), []string{"https://c.example.invalid/v1"}) || stored.HomepageURL != "" {
 		t.Fatal("put without --protocol must keep the stored protocol", err, out)
 	}
+	shared := run("", "provider", "model-put", "--id", "p", "--revision", "1", "--target", "shared", "--model", "up-p", "--multiplier", "0.5", "--strategy", "round-robin")
+	if !strings.Contains(shared, `"multiplier":0.5`) {
+		t.Fatal(shared)
+	}
+	run("", "provider", "model-put", "--id", "multi", "--revision", "2", "--target", "shared", "--model", "up-multi", "--multiplier", "2")
+	if m, err := s.Model("shared"); err != nil || len(m.Candidates) != 2 || m.Strategy != "round-robin" {
+		t.Fatal(m, err)
+	}
+	run("", "provider", "model-delete", "--id", "p", "--revision", "1", "--target", "shared", "--model-revision", "2", "--approve")
+	if m, err := s.Model("shared"); err != nil || len(m.Candidates) != 1 || m.Candidates[0].ProviderID != "multi" {
+		t.Fatal(m, err)
+	}
 	run("", "model", "add", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:actual", "--tools", "--streaming")
 	run("", "model", "put", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:updated-model", "--revision", "1", "--tools", "--streaming")
 	listed := run("", "provider", "list")

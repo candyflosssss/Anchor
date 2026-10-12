@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"os"
 	"strings"
 	"testing"
 )
@@ -102,5 +103,46 @@ func TestPriorityV2KeyMigration(t *testing.T) {
 	keys, err := next.ProviderKeys("p")
 	if err != nil || len(keys) != 1 || keys[0].Secret != secret || !keys[0].Enabled {
 		t.Fatal(keys, err)
+	}
+}
+
+func TestSharedMappingRemovalPreservesBindingAndOtherPrices(t *testing.T) {
+	s := newStore(t)
+	for _, id := range []string{"a", "b"} {
+		if _, err := s.PutProvider(provider(id), 0, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := s.PutModel(Model{ID: "alias", Tools: true, Strategy: "round-robin", Candidates: []Candidate{{ProviderID: "a", Model: "up-a"}, {ProviderID: "b", Model: "up-b", Multiplier: 2}}}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Register an isolated synthetic binding to exercise the deletion reference guard.
+	exe, _ := os.Executable()
+	if _, err = s.AddBinding(Binding{ID: "synthetic", AdapterID: "codex", AdapterVersion: "1", ConfigRoot: t.TempDir(), Model: "alias", Executable: exe, Enabled: true}); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"a", "b"} {
+		if err = s.PutPrice(id, 1, catalog.Price{Model: "alias", InputUSD: 1, OutputUSD: 2}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = s.DeleteProviderModel("alias", m.Revision, "a", 2); err != nil {
+		t.Fatal(err)
+	}
+	remaining, err := s.Model("alias")
+	if err != nil || remaining.Revision != 2 || len(remaining.Candidates) != 1 || remaining.Candidates[0].ProviderID != "b" || !remaining.Tools || remaining.Strategy != "round-robin" {
+		t.Fatal(remaining, err)
+	}
+	a, _ := s.Prices("a")
+	b, _ := s.Prices("b")
+	if len(a) != 0 || len(b) != 1 {
+		t.Fatal(a, b)
+	}
+	if err = s.DeleteProviderModel("alias", 2, "b", 2); !errors.Is(err, ErrReferenced) {
+		t.Fatal(err)
+	}
+	if _, err = s.Model("alias"); err != nil {
+		t.Fatal("last candidate lost despite binding", err)
 	}
 }

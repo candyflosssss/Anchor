@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import mapping from '../../../../contract/provider-model-mapping.json';
 import fixture from '../../../../contract/provider-workspace.json';
 import { actionFor, checkedWorkspace, type Workspace } from './provider-features.model';
 import { MockProviderTransport } from './provider.mock';
@@ -44,5 +45,32 @@ describe('key model protocol settings', () => {
     expect(w.keys.find(k => k.id === 'second')?.model_protocols).toEqual([]);
     expect(w.keys.find(k => k.id === 'second')?.protocol).toBe('anthropic');
     await expect(transport.discover({ provider_id: p.id, expected_revision: w.revision, key_id: 'missing' }, signal)).rejects.toMatchObject({ code: 'invalid' });
+  });
+});
+
+
+describe('shared public model mappings', () => {
+  it('validates shared routing fields from the Go/TS fixture', () => {
+    const w = { ...structuredClone(fixture), models: [mapping] };
+    expect(checkedWorkspace(w).models).toEqual([mapping]);
+    for (const multiplier of [-1, 0, NaN, Infinity, 1001]) {
+      expect(() => checkedWorkspace({ ...w, models: [{ ...mapping, multiplier }] })).toThrow();
+    }
+    expect(() => checkedWorkspace({ ...w, models: [{ ...mapping, strategy: 'invalid' }] })).toThrow();
+  });
+  it('attaches, edits and removes one provider while preserving the shared model', async () => {
+    const transport = new MockProviderTransport();
+    const signal = new AbortController().signal;
+    const [a, b] = await transport.list(signal);
+    await transport.action(actionFor(a, 'model-put', { target: 'shared', model: 'up-a', tools: true, streaming: true, multiplier: 0.5 }), signal);
+    const joined = await transport.action(actionFor(b, 'model-put', { target: 'shared', model: 'up-b', multiplier: 2 }), signal);
+    expect(joined.models.find(m => m.id === 'shared')).toMatchObject({ revision: 2, candidate_count: 2, tools: true, streaming: true, multiplier: 2 });
+    await expect(transport.action(actionFor(b, 'model-put', { target: 'shared', model: 'overwrite' }), signal)).rejects.toMatchObject({ code: 'conflict' });
+    await expect(transport.action(actionFor(a, 'model-put', { target: 'shared', model: 'stale', model_revision: 1 }), signal)).rejects.toMatchObject({ code: 'conflict' });
+    await transport.action(actionFor(a, 'model-put', { target: 'shared', model: 'new-a', model_revision: 2, multiplier: 1, strategy: 'priority', tools: true, streaming: true }), signal);
+    const other = await transport.workspace(b.id, signal);
+    expect(other.models.find(m => m.id === 'shared')).toMatchObject({ revision: 3, strategy: 'priority', upstream: 'up-b', multiplier: 2 });
+    await transport.action(actionFor(a, 'model-delete', { target: 'shared', model_revision: 3, approved: true }), signal);
+    expect((await transport.workspace(b.id, signal)).models.find(m => m.id === 'shared')).toMatchObject({ revision: 4, candidate_count: 1, upstream: 'up-b' });
   });
 });

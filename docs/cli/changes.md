@@ -154,3 +154,13 @@
 - 旧 → 新：未带版本的自定义部署前缀原先只读取 `<base>/models`；现在仅404/405或200 HTML网页时尝试同前缀 `<base>/v1/models`，兼容 NewAPI 反向代理子路径。`/v1`、`/v2`、`/v1beta1` 等显式版本及版本后的 `/openai` 不再追加 `/v1`。OpenAI、Anthropic、Kimi/Moonshot 与硅基流动的官方根地址直接读取 `/v1/models`，不先试 `/models`；保留 DeepSeek、OpenRouter、Gemini 既有目录规则。
 - 兼容与迁移：无需修改已存 Key 或映射；站点令牌只放请求头，目录认证继续采用所选 Key 默认协议。认证失败、429、5xx、重定向和损坏 JSON 均不触发路径切换。目录列表只代表站点对当前 Key 返回的模型，不证明推理可用。
 - 验证：先用隔离 NewAPI 模拟站复现部署前缀失败，再修复并通过 `go test -p 1 ./internal/catalog ./internal/core ./internal/client ./internal/desktop ./internal/cli`；供应商前端三个单元测试文件共57项与 `npm run typecheck` 通过。没有使用真实站点凭据或请求真实推理；原生桌面未验收。
+
+
+## 2026-10-12 — 同名公开模型跨供应商映射与倍率调度（源码，随下一桌面 dev 版交付）
+
+- 类型：新增参数 / 修改行为。
+- 指令与参数：`provider model-put` 新增 `--multiplier`（0.01..1000，省略/0保留旧值或新候选取1），支持 `--strategy round-robin|priority` 设置公开模型策略；`--model-revision 0` 从只创建改为创建或将新供应商加入已有别名。`workspace.models` 新增 multiplier/strategy。
+- 旧 → 新：跨供应商同名新增不再因模型已存在冲突；追加保留已有候选、能力和元数据。model-delete 从删除整个公开模型改为只移除当前供应商候选及价格；只有最后一个候选才触发 Binding 引用保护与公开模型删除。
+- 调度：新公开模型默认按倍率倒数加权轮询，旧模型未设 strategy 时仍按候选顺序。编辑时省略 strategy 保留原值；加入已有模型保留它的策略和能力。调度跳过停用、认证失效、冷却、半开已占用或并发已满的上游，失败切换及禁止重放边界沿用原规则。倍率是手动相对配置，不自动读取站点分组价格。
+- 兼容与迁移：模型 JSON 增量字段，无 schema 迁移。重复添加当前供应商或过期编辑仍409 conflict。`model put` 仍完整替换并恢复默认 priority/倍率1。旧核心不支持新 Workspace 字段，桌面与核心应一起升级。
+- 验证：state/core/desktop/CLI/client 定向 Go 测试通过；CLI 与真实管理接口、桌面 Bridge 隔离读写通过；前端类型检查、78项定向单元测试及 lint 通过。原生安装未验收。

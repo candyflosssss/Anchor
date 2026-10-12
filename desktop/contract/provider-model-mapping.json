@@ -1,0 +1,11 @@
+{
+  "id": "coding-main",
+  "display_name": "coding-main",
+  "upstream": "demo-model-mini",
+  "tools": true,
+  "streaming": true,
+  "revision": 1,
+  "candidate_count": 2,
+  "multiplier": 1,
+  "strategy": "round-robin"
+}
