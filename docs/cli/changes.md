@@ -147,7 +147,7 @@
 - 兼容与迁移：无配置变更；不执行 PAC 脚本，只用 PAC 时仍需设置 `HTTPS_PROXY`。已安装的旧版本不受影响，需要先手动安装含此修复的新包。
 - 验证：updater/desktop 定向 Go 测试通过，覆盖系统代理解析、绕过规则、回环直连及环境变量优先；Windows 交叉 `go vet` 通过。未在原生 Windows 上验证。
 
-## 2026-10-12 — 模型目录兼容 NewAPI 部署前缀与官方根地址（未发布）
+## 2026-10-12 — 模型目录兼容 NewAPI 部署前缀与官方根地址（desktop.18 dev 已发布，CLI 为当前源码）
 
 - 类型：修改。
 - 指令与参数：`provider models --id ID --revision N [--key KEY]`；参数、七字段输出、管理鉴权、revision 与只读语义不变。
