@@ -41,10 +41,11 @@ VIAddVersionKey /LANG=2052 "LegalCopyright" "Anchor contributors; AGPL-3.0-only"
 ; detached --core from this install. Never write through the handle or kill it.
 !macro STOPPED_CHECK PREFIX
 Function ${PREFIX}CheckStopped
+  retry:
   IfFileExists "$INSTDIR\anchor-desktop.exe" 0 done
   System::Call 'kernel32::CreateFileW(w "$INSTDIR\anchor-desktop.exe", i 0xC0000000, i 0, p 0, i 3, i 0x80, p 0) p .r0'
   ${If} $0 == -1
-    MessageBox MB_OK|MB_ICONSTOP "Anchor 程序正在使用中或安装文件不可写。请先在界面中明确停止后台核心，等待退出，再关闭所有 Anchor 窗口后重试。安装器不会强制停止进程。" /SD IDOK
+    MessageBox MB_RETRYCANCEL|MB_ICONEXCLAMATION "Anchor 仍在运行（界面或后台核心），暂时无法覆盖安装文件。$\r$\n$\r$\n请先在主窗口点击「停止核心」，再在系统托盘菜单选择「退出界面」；也可在终端执行 anchor stop --approve。$\r$\n$\r$\n完成后点击「重试」继续。安装器不会强制停止进程。" /SD IDCANCEL IDRETRY retry
     SetErrorLevel 2
     Abort
   ${EndIf}
