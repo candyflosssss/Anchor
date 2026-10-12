@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-12。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.18`，北京时间 2026-10-12 18:16:23 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：模型目录路径兼容（含 NewAPI）、Anthropic / Gemini 分页；首次未配置更新渠道时按安装版本选择，dev 包默认 dev，保留已有渠道及自定义源。供应商多地址、Windows 手动系统代理和安装重试沿用 `.17`。
-- 已有 `.9`～`.17`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。`.16` 及更早更新器不读 Windows 系统代理，只靠系统代理联网时须手动安装一次 `.18`（先停止核心并退出界面），或启动前设置 `HTTPS_PROXY`。旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.19`，北京时间 2026-10-12 19:44:21 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：多供应商共享公开模型名称、候选手动相对倍率与加权轮询，跳过不可用或满并发上游；编辑和删除保留其他候选。目录兼容和首次渠道选择沿用 `.18`，供应商多地址、Windows 系统手动代理和安装重试沿用 `.17`。
+- 已有 `.9`～`.18`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。`.16` 及更早更新器不读 Windows 系统代理，只靠系统代理联网时须手动安装一次当前 `.19`（先停止核心并退出界面），或启动前设置 `HTTPS_PROXY`。旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
 - 无新 schema 迁移；从 `.15` 及更早升级仍会将 state.db schema3→4，不提供降级。
-- 六个受影响 Go 包测试、前端 68 项单元测试与 lint、两平台打包、六项附件 digest 校验及真实更新下载通过。**双平台原生窗口与安装未验收**；dev 预发行未签名。
+- 五个受影响 Go 包测试、前端 78 项定向单元测试、类型检查与 lint、两平台打包、六项附件 digest 校验及真实更新下载通过。**双平台原生窗口与安装未验收**；dev 预发行未签名。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.16_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.19_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -84,7 +84,31 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.18`
+### 当前在线 dev 版 `.19`
+
+`0.1.0-dev.desktop.19` 于北京时间 2026-10-12 19:44:21 公开为 dev prerelease（非 latest），从独立干净 worktree 的提交 `54fa3c7b2e4d61ae26fb7ac37fdc9684769b5a58` 构建。
+
+跨供应商加入同名公开别名会追加当前候选，保留共享策略、能力、展示及 Codex 元数据；编辑只改当前候选，删除只移除当前供应商候选及其价格。最后一个候选仍受 Binding 引用保护，真实并发 revision 冲突仍要求重读核对。
+
+手动相对倍率范围 0.01..1000、默认1，权重为倍率倒数；倍率1与2约分配2:1请求。新模型默认加权轮询，旧模型保持顺序优先，可在供应商 → 模型 → 编辑映射切换。可用性筛选跳过停用、认证失效、冷却、半开已占用和满并发上游，保留原故障切换及流式／未知结果禁止重放边界。倍率尚不自动读取站点价格或分组。无新增数据库迁移。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.19-windows-amd64-setup.exe` | 7,699,390 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.19_amd64.deb` | 5,515,384 |
+
+```text
+67a586f15d883177b69fe6cd9634f0b4dbbc68e375e0472f14ef16ef93071136  Anchor-Desktop-0.1.0-dev.desktop.19-windows-amd64-setup.exe
+cbec13785a3afdf0e754e44f7dd4d8587eeb253f3a6ae4532a444645a15e7d13  anchor-desktop_0.1.0-dev.desktop.19_amd64.deb
+```
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.19/`。六个公开附件包括两端安装包、flat 清单、对应构建提交与 vendored Go 依赖源码、许可／构建元数据、SHA256SUMS；GitHub 附件大小和 digest 全部一致，公开清单 URL 与附件一致，标签指向实际构建提交。证据保存为 `publication/DRAFT_VERIFIED.json`、`PUBLISHED.json`、`TAG_VERIFIED.json`，原始 BUILD.json 的未验收和未签名事实保持不变。
+
+验证：`GOMAXPROCS=2 go test -p 1 ./internal/state ./internal/core ./internal/desktop ./internal/cli ./internal/client` 通过；前端四个文件78项测试、typecheck、lint 通过。隔离 HTTP 管理 API／CLI／Desktop Bridge 验证共享别名读写，网关模拟请求验证倍率1/2在12次请求中分配8/4，冷却跳过与恢复、并发跳过、权重更新、503切换、认证失败及全部Key不可用；删除保留其他候选价格和 Binding，最后候选删除受引用保护。打包执行 Go→TS 契约比对、TypeScript/Vite、Windows 与 Ubuntu24.04 Linux 编译和 NSIS/deb 安装包生成。
+
+隔离目录使用源码 CLI `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.18 --json` 从默认 GitHub 源发现 `.19` 并真实下载 Linux 包，大小与 SHA256 校验通过，证据为 `publication/ONLINE_DOWNLOAD.json`。Windows 远端 digest 与本地一致。未执行 apply、安装器、原生 GUI、race、全量或浏览器验收，未请求真实付费模型或改动用户配置。打包与下载后 SwapUsed 4010 MiB、/tmp 42 MiB 保持不变，无异常增长；交付后清理任务 worktree 和隔离下载目录。
+
+### 历史在线 dev 版 `.18`
 
 `0.1.0-dev.desktop.18` 于北京时间 2026-10-12 18:16:23 公开为 dev prerelease（非 latest），从独立干净 worktree 的提交 `c7397cfd78ff89703139e2080b635f1ed21a1ad5` 构建。
 

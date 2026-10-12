@@ -156,7 +156,7 @@
 - 验证：先用隔离 NewAPI 模拟站复现部署前缀失败，再修复并通过 `go test -p 1 ./internal/catalog ./internal/core ./internal/client ./internal/desktop ./internal/cli`；供应商前端三个单元测试文件共57项与 `npm run typecheck` 通过。没有使用真实站点凭据或请求真实推理；原生桌面未验收。
 
 
-## 2026-10-12 — 同名公开模型跨供应商映射与倍率调度（源码，随下一桌面 dev 版交付）
+## 2026-10-12 — 同名公开模型跨供应商映射与倍率调度（已随 desktop.19 dev 交付）
 
 - 类型：新增参数 / 修改行为。
 - 指令与参数：`provider model-put` 新增 `--multiplier`（0.01..1000，省略/0保留旧值或新候选取1），支持 `--strategy round-robin|priority` 设置公开模型策略；`--model-revision 0` 从只创建改为创建或将新供应商加入已有别名。`workspace.models` 新增 multiplier/strategy。
