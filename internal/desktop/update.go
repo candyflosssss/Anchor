@@ -41,7 +41,7 @@ func (b *Bridge) UpdateStatus() UpdateResult {
 	s.updateMu.Lock()
 	defer s.updateMu.Unlock()
 	r := UpdateResult{Contract: Contract}
-	cfg, err := updater.ReadConfig(s.options.Dir)
+	cfg, err := updater.ReadConfigForVersion(s.options.Dir, core.Version)
 	if err != nil {
 		r.Problem = updateProblem(err)
 		return r
@@ -71,7 +71,7 @@ func (b *Bridge) CheckUpdate(channel string) UpdateResult {
 	defer s.updateMu.Unlock()
 	r := UpdateResult{Contract: Contract}
 	s.updateCheck = nil
-	cfg, err := updater.ReadConfig(s.options.Dir)
+	cfg, err := updater.ReadConfigForVersion(s.options.Dir, core.Version)
 	if err != nil {
 		r.Problem = updateProblem(err)
 		return r

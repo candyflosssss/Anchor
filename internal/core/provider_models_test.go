@@ -115,7 +115,7 @@ func TestProviderDirectoryFailures(t *testing.T) {
 				io.WriteString(w, tc.body)
 			}))
 			defer upstream.Close()
-			f.add(t, "p", upstream.URL, "synthetic-catalog-secret")
+			f.add(t, "p", upstream.URL+"/v1", "synthetic-catalog-secret")
 			status, raw := discover(t, f, "p", `{"provider_id":"p","expected_revision":1}`, f.owner, cfg.InstanceID)
 			var result catalog.ProviderModels
 			if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != tc.failure || result.HTTPStatus != tc.status || result.Models == nil || len(result.Models) != 0 || calls.Load() != 1 {

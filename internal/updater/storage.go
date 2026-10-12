@@ -16,7 +16,20 @@ import (
 
 func DefaultConfig() Config { return Config{Channel: "alpha"} }
 func ReadConfig(dir string) (Config, error) {
+	return readConfig(dir, DefaultConfig())
+}
+
+// ReadConfigForVersion uses the installed release channel only when no update
+// configuration exists. A saved channel or source always keeps precedence.
+func ReadConfigForVersion(dir, version string) (Config, error) {
 	c := DefaultConfig()
+	if channel, err := versionChannel(version); err == nil {
+		c.Channel = channel
+	}
+	return readConfig(dir, c)
+}
+
+func readConfig(dir string, c Config) (Config, error) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return c, err

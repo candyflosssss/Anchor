@@ -52,11 +52,11 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 规范 DTO `DiscoverProviderModels` / `ProviderModels` 定义于 `internal/catalog/models.go`，经 `internal/desktop/contract.go` 别名纳入 Go → TS 单一生成源；桌面 envelope 为 `ProviderModelsResult`，继续使用 `anchor-desktop-v1`。本次 Key 协议增量扩展查询字段及工作台动作，客户端与核心须同步升级。共享合成样例为 `desktop/contract/provider-models.json`，Mock 与 Go / TS 测试共用。
 
 - 输入为 `provider_id`、`expected_revision`（桌面 1..MAX_SAFE_INTEGER）和 `key_id`（空字符串选择首个启用 Key）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
-- 后端从已存快照取地址／密钥，仅发一次 `GET <base_url 去尾斜杠>/models`，不自动追加 `/v1`。停用供应商也允许显式查询。复用无环境代理、禁止重定向的上游客户端与全局16／供应商并发上限；总耗时上限 `min(timeout_seconds, 8)` 秒，无重试、后台轮询或缓存持久化。
-- 输出固定七字段：`provider_id`, `key_id`（实际查询 Key；无 Key 为 anonymous；所有 Key 停用且未指定时为空）, `revision`（本次使用的快照版本）, `http_status`（未收到状态为0）, `elapsed_ms`（整数毫秒）, `models`（字符串数组，始终非null）, `failure`（成功为空字符串）。只接受 OpenAI 风格 `data` 数组中的非空 `id`，去重排序、丢弃元数据；最多512 KiB、1000条原始记录、每 ID 256字节，无控制／格式字符。异常目录整体失败，不返回部分列表。
+- 后端从已存快照取地址／密钥，使用 `<base_url 去尾斜杠>/models`，保留部署前缀；未带版本的根地址或自定义前缀，仅404/405或200 HTML网页时尝试同前缀 `/v1/models`，兼容 NewAPI 代理部署（例如 `/newapi/v1/models`）；已带版本路径或版本后的 `/openai` 不重复追加 `/v1`。官方 OpenAI、Anthropic、Kimi/Moonshot 和硅基流动根地址固定 `/v1/models`；DeepSeek 根地址固定 `/models`，OpenRouter 固定 `/api/v1/models`，Gemini 根地址及 `/v1beta/openai` 目录改用 `/v1beta/models`；`/v1beta` 前缀使用 `x-goog-api-key`，其他路径沿用 Key 默认协议鉴权。所有凭据只进请求头。停用供应商也允许显式查询。复用无环境代理、禁止重定向的客户端与全局16／供应商并发上限；全部路径/分页共用 `min(timeout_seconds, 8)` 秒。最多10次 HTTP请求、每页请求1000条，不重试失败请求、后台轮询或持久缓存；完整规则见[CLI 大全](../cli/commands.md#provider-modelsdesktop10-小步)。
+- 输出固定七字段：`provider_id`, `key_id`（实际查询 Key；无 Key 为 anonymous；所有 Key 停用且未指定时为空）, `revision`（本次使用的快照版本）, `http_status`（未收到状态为0）, `elapsed_ms`（整数毫秒）, `models`（字符串数组，始终非null）, `failure`（成功为空字符串）。接受 OpenAI/Anthropic `data[].id` 和 Gemini `models[].name`（去除 `models/` 前缀，兼容裸 ID）；按 `has_more/last_id → after_id` 或 `nextPageToken → pageToken` 读取全部页。去重排序、丢弃元数据；累计最多512 KiB、1000条原始记录、每 ID 256字节，无控制／格式字符。分页游标仅编码为固定参数，不当作 URL；循环、混用格式、缺失游标、后续页失败及超限时整体失败，不返回部分列表。
 - 请求受理后目录失败仍返回 HTTP200 与固定分类：`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
 - 不写配置、revision、模型映射或健康状态。一次目录成功仅说明此接口返回有效目录，不代表推理、工具、流式、余额或持续健康；404/405 不等于供应商推理不可用。
-- UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和限高模型列表；Key / 模型协议编辑见 §6。查询中阻止供应商切换、编辑和页面离开；选择、重读或保存后清空结果，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
+- UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和限高模型列表；区分“目录列出”与“仅已存协议”，避免把旧覆盖当成本次 Key 目录；Key / 模型协议编辑见 §6。查询中阻止供应商切换、编辑和页面离开；选择、重读或保存后清空结果，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
 - CLI 等价入口为 `provider models --id ID --revision N [--key KEY]`；与 `model list`（Anchor 已存公开映射）及网关 `/v1/models` 区分。测试分层沿 §3，原生两平台仍未验收。
 
 ## 5. 第一优先工作台（desktop.11）

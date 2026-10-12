@@ -378,3 +378,37 @@ func TestInstallerApprovalBoundToVersionAndBytes(t *testing.T) {
 		t.Fatal("same-version receipt bypassed hash confirmation", err)
 	}
 }
+
+func TestVersionChannelDefaultsPreserveSavedConfig(t *testing.T) {
+	for _, tc := range []struct{ version, channel string }{
+		{"0.1.0-dev.desktop.18", "dev"},
+		{"0.1.0-alpha.6", "alpha"},
+		{"0.1.0-beta.1", "beta"},
+		{"0.1.0", "stable"},
+		{"dev", "alpha"},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			dir := t.TempDir()
+			cfg, err := ReadConfigForVersion(dir, tc.version)
+			if err != nil || cfg.Channel != tc.channel || cfg.ManifestURL != "" {
+				t.Fatal(cfg, err)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "updates", "config.json")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("reading defaults must not persist configuration", err)
+			}
+			saved := Config{Channel: "rc", ManifestURL: "https://example.com/custom.json"}
+			if err := Configure(dir, saved); err != nil {
+				t.Fatal(err)
+			}
+			if cfg, err := ReadConfigForVersion(dir, tc.version); err != nil || cfg != saved {
+				t.Fatal("saved channel and source must survive upgrade", cfg, err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, "updates", "config.json"), []byte(`{"channel":"nightly"}`), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ReadConfigForVersion(dir, tc.version); !errors.Is(err, ErrInvalid) {
+				t.Fatal("invalid config must not silently fall back", err)
+			}
+		})
+	}
+}

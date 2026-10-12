@@ -28,7 +28,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   status                             Query selected context
   stop --approve                     Request graceful shutdown of selected context
   provider list
-  provider models --id ID --revision N [--key KEY]  Fetch upstream directory
+  provider models --id ID --revision N [--key KEY]  Fetch key model directory (paths + pagination)
   provider workspace --id ID           Keys, health, mappings and usage
   provider delete|rename|copy --id ID --revision N [--target ID] [--approve] [--copy-keys]
   provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--protocol PROTOCOL]

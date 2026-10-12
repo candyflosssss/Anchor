@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/updater"
 )
 
@@ -45,7 +46,7 @@ func TestUpdateStatusAndApproval(t *testing.T) {
 	defer s.Close()
 	b := NewBridge(s)
 	status := b.UpdateStatus()
-	if status.Problem != nil || status.Data.Phase != "idle" || status.Data.Channel != "alpha" {
+	if status.Problem != nil || status.Data.Phase != "idle" || status.Data.Channel != "dev" {
 		t.Fatal(status)
 	}
 	if r := b.DownloadUpdate("untrusted"); r.Problem == nil || r.Problem.Code != "invalid" {
@@ -186,5 +187,26 @@ func TestUpdateInstallShutdownAndFailedHandoff(t *testing.T) {
 	waitStopped(t, s.options.Dir)
 	if status := bridge.Status(); status.Problem == nil {
 		t.Fatal("core did not exit normally")
+	}
+}
+
+func TestDesktopDefaultsToInstalledChannel(t *testing.T) {
+	old := core.Version
+	core.Version = "0.1.0-dev.desktop.18"
+	t.Cleanup(func() { core.Version = old })
+	dir := t.TempDir()
+	s := NewSession(Options{Dir: dir})
+	defer s.Close()
+	b := NewBridge(s)
+	status := b.UpdateStatus()
+	if status.Problem != nil || status.Data == nil || status.Data.Channel != "dev" {
+		t.Fatal(status)
+	}
+	if err := updater.Configure(dir, updater.Config{Channel: "alpha"}); err != nil {
+		t.Fatal(err)
+	}
+	status = b.UpdateStatus()
+	if status.Problem != nil || status.Data == nil || status.Data.Channel != "alpha" {
+		t.Fatal("explicit channel must keep precedence", status)
 	}
 }

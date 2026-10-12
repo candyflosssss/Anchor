@@ -2,10 +2,7 @@ package core
 
 import (
 	"context"
-	"errors"
-	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
@@ -79,53 +76,5 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 	timeout := min(time.Duration(p.TimeoutSeconds)*time.Second, 8*time.Second)
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(p.BaseURL, "/")+"/models", nil)
-	if err != nil {
-		out.Failure = "network"
-		return
-	}
-	req.Header.Set("Accept", "application/json")
-	authorizeUpstream(req, p, p.Secret)
-	resp, err := s.upstream.Do(req)
-	if err != nil {
-		out.Failure = "network"
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			out.Failure = "timeout"
-		}
-		return
-	}
-	defer resp.Body.Close()
-	out.HTTPStatus = resp.StatusCode
-	if resp.StatusCode != http.StatusOK {
-		// Never read/reflect an upstream error body or follow its redirects.
-		switch resp.StatusCode {
-		case 401, 403:
-			out.Failure = "authentication"
-		case 404, 405:
-			out.Failure = "unsupported"
-		case 429:
-			out.Failure = "rate_limited"
-		default:
-			out.Failure = "http_error"
-		}
-		return
-	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, catalog.MaxBytes+1))
-	if err != nil {
-		out.Failure = "network"
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			out.Failure = "timeout"
-		}
-		return
-	}
-	if len(raw) > catalog.MaxBytes {
-		out.Failure = "too_large"
-		return
-	}
-	models, err := catalog.Parse(raw, p.Secret)
-	if err != nil {
-		out.Failure = "invalid_response"
-		return
-	}
-	out.Models = models
+	out.Models, out.HTTPStatus, out.Failure = s.readProviderCatalog(ctx, p)
 }

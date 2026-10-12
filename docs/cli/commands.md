@@ -219,11 +219,13 @@ anchor provider models --id '摸鱼AI' --revision 3 --key default
 
 `--id` 必填已存供应商 ID；`--revision` 必填正整数，来自 `provider list`。使用所选 Context 的在线核心、管理鉴权与实例身份校验；不允许临时地址、密钥、协议或生成参数。revision 不匹配、未授权、实例不符或参数错误时非零退出，不发起目录请求。停用供应商也可显式查询。可用 `--key KEY` 指定已存 Key（包括停用 Key），不存在时在请求上游前失败；省略时选首个启用 Key，存在 Key 但全部停用时返回 authentication，无 Key 才匿名。目录认证由 Key 默认协议决定，不使用模型覆盖。
 
-只发一次 `GET <已存 base_url>/models`（保留已存 `/v1`，不自动补前缀），携带已存密钥，禁止重定向和环境代理，共用并发限额。总超时为供应商超时与8秒的较小值，无自动重试。仅解析 `data:[{id:...}]`，目录最多512 KiB、1000条记录、每 ID 256字节；去重排序，不返回部分列表或上游元数据。
+读取已存 Base URL 和 Key，优先 `GET <base_url>/models`；保留站点部署前缀。未带版本的根地址或自定义前缀，在 `/models` 返回404/405或200 HTML网页时，尝试同前缀的 `/v1/models`（例如 NewAPI 的 `/newapi` → `/newapi/v1/models`）；已带 `/v1`、`/v2`、`/v1beta1` 等版本路径或版本后的 `/openai` 时不再追加 `/v1`。认证失败、429、5xx、重定向及损坏 JSON 不触发路径切换。OpenAI、Anthropic、Kimi/Moonshot 和硅基流动官方根地址固定 `/v1/models`；DeepSeek 官方根地址固定 `/models`，OpenRouter 官方根地址固定 `/api/v1/models`。Gemini 官方根地址或 `/v1beta/openai` 使用原生 `/v1beta/models`；`/v1beta`（含站点自定义前缀）采用 Google 目录认证 `x-goog-api-key`，其他目录沿用 Key 默认协议的 Bearer 或 Anthropic 请求头。Key 只放请求头，不写 URL。
+
+解析 OpenAI/Anthropic `data:[{id:...}]` 与 Gemini `models:[{name:...}]`；Gemini 名称去除 `models/` 前缀，也接受兼容站返回的裸 ID。Anthropic 使用 `has_more/last_id` 和 `after_id` 继续分页，Gemini 使用 `nextPageToken/pageToken`；每页请求1000条。最多10次 HTTP请求（含路径切换），所有请求共用供应商超时与8秒的较小值、并发限额、512 KiB累计响应和1000条原始记录上限。禁止重定向和环境代理，不自动重试失败请求。每 ID 最多256字节；最终去重排序，丢弃元数据。分页循环、格式变化、后续页失败或超限时整体失败，不返回第一页或其他部分列表。
 
 stdout 为 `{provider_id, key_id, revision, http_status, elapsed_ms, models, failure}`；key_id 为实际查询 Key，无 Key 时为 anonymous，所有 Key 停用且未指定时为空；成功 `failure=""`，空目录为 `models:[]`。目录层失败同样输出结构化结果并退出0，调用者必须检查 `failure`：`authentication`、`unsupported`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`；未取得 HTTP 状态为0。管理层失败仍非零退出。不会输出上游错误正文、密钥或原始网络异常。
 
-仅一次目录查询，不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。显式推理测试和映射写入使用下列独立命令，目录查询本身不自动导入。
+一次显式目录查询（可能包含路径切换和分页），不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。显式推理测试和映射写入使用下列独立命令，目录查询本身不自动导入。
 
 供应商可用下列 delete 删除；有模型引用时阻止。完整 `put ... --disabled` 仅暂停路由，不删除秘密。
 
@@ -467,6 +469,8 @@ anchor recover [--id ID]
 
 
 ## 11. 本机在线更新
+
+桌面首次未配置更新渠道时按安装版本选择（dev 包为 dev），已有配置保持不变；CLI 的未配置默认渠道仍为 alpha。通过 `anchor update configure --channel dev` 可显式选择桌面开发更新。
 
 ```text
 anchor [--data-dir DIR] update config

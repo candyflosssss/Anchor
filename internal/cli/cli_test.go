@@ -255,10 +255,15 @@ func TestProviderModelsCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	var calls atomic.Int32
+	var rootHTML atomic.Bool
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.URL.Path != "/models" || r.Method != "GET" || (calls.Load() > 1 && r.Header.Get("Authorization") != "Bearer synthetic-selected") {
+		if (r.URL.Path != "/models" && !(rootHTML.Load() && r.URL.Path == "/v1/models")) || r.Method != "GET" || (calls.Load() > 1 && r.Header.Get("Authorization") != "Bearer synthetic-selected") {
 			t.Error("unexpected request")
+		}
+		if rootHTML.Load() && r.URL.Path == "/models" {
+			io.WriteString(w, `<!doctype html><html>site frontend</html>`)
+			return
 		}
 		io.WriteString(w, `{"data":[{"id":"cli-model"}]}`)
 	}))
@@ -302,6 +307,11 @@ func TestProviderModelsCLI(t *testing.T) {
 	}
 	if _, err = run("provider", "models", "--id", saved.ID, "--revision", "2", "--key", "missing"); err == nil || calls.Load() != 2 {
 		t.Fatal("missing key was queried", err)
+	}
+	rootHTML.Store(true)
+	raw, err = run("provider", "models", "--id", saved.ID, "--revision", "2", "--key", "selected")
+	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "" || result.KeyID != "selected" || len(result.Models) != 1 || result.Models[0] != "cli-model" || calls.Load() != 4 {
+		t.Fatal("CLI did not resolve root HTML through /v1/models", raw, err)
 	}
 }
 

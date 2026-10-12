@@ -172,7 +172,7 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
       </tbody></table></div> : <div className="empty-state compact"><List size={24} /><p>还没有映射模型。先从上游目录导入，或手动添加。</p></div>}
     </section>
     <section className="detail-card model-directory" aria-label="上游模型目录" aria-busy={c.modelsBusy}>
-      <div className="card-toolbar"><div><h2>Key 的模型与协议</h2><p className="card-hint">使用所选 Key 读取 /models；每个实际模型默认继承该 Key 的协议。</p></div>
+      <div className="card-toolbar"><div><h2>Key 的模型与协议</h2><p className="card-hint">使用所选 Key 读取站点模型目录；每个实际模型默认继承该 Key 的协议。</p></div>
         <div className="toolbar-actions"><label htmlFor="catalog-key">查询 Key</label><select id="catalog-key" className="select-field" value={c.catalogKey} disabled={disabled} onChange={e => c.selectCatalogKey(e.target.value)}>
           <option value="">{w.keys.length ? '首个启用的 Key' : '匿名请求'}</option>{w.keys.map(k => <option key={k.id} value={k.id}>{k.id}{k.enabled ? '' : '（已停用）'}</option>)}
         </select><Button variant="outline" disabled={disabled || (!!c.catalogKey && !key)} onClick={() => void c.discoverModels()}>{c.modelsBusy ? <LoaderCircle className="loading-icon" /> : <Download />}{c.modelsBusy ? '正在获取目录…' : '获取模型目录'}</Button></div></div>
@@ -183,6 +183,7 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
       {models && !models.failure && models.models.length === 0 && <p className="catalog-feedback">上游返回空目录；未推断其推理能力。</p>}
       {modelIDs.length > 0 && <><p className="detail-footnote">协议覆盖仅作用于此 Key 和实际上游模型名。目录成功不代表推理可用；已保存的覆盖始终保留在列表中。</p>
         <ul className="catalog-list" tabIndex={0} aria-label="上游模型 ID">{modelIDs.map(id => <li key={id}><span className="mono break-all">{id}</span>
+          {models && !models.failure && <span className="cell-hint">{models.models.includes(id) ? '目录列出' : '仅已存协议'}</span>}
           {key && <select className="select-field" aria-label={`${id} 的协议`} value={key.model_protocols.find(m => m.model === id)?.protocol ?? 'inherit'} disabled={disabled || c.features.needsRead} onChange={e => void c.features.run('key-model-protocol', { target: key.id, model: id, protocol: e.target.value })}>
             <option value="inherit">继承 Key（{protocolName[key.protocol as keyof typeof protocolName]}）</option>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>}

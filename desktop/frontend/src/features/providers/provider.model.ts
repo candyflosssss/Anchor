@@ -104,8 +104,8 @@ export const catalogFailureText: Record<string, string> = {
   network: '目录请求未完成。请检查上游地址和网络；未自动重试。',
   timeout: '目录请求超时（最多 8 秒，受供应商超时限制）。',
   busy: '当前全局或供应商并发已满，未发送目录请求。请稍后重试。',
-  too_large: '目录超过 512 KiB 上限，未返回部分列表。',
-  invalid_response: '上游目录格式不符合要求，未返回部分列表。',
+  too_large: '目录超过大小、条数或分页上限，未返回部分列表。',
+  invalid_response: '上游目录格式或分页信息不符合要求，未返回部分列表。',
 };
 export function checkedCatalog(value: ProviderModels, input: DiscoverProviderModels): ProviderModels {
   if (!value || value.provider_id !== input.provider_id || value.revision !== input.expected_revision || typeof value.key_id !== 'string' || (!value.key_id && !value.failure) || (input.key_id !== '' && value.key_id !== input.key_id) ||
