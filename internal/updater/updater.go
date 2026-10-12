@@ -64,8 +64,16 @@ type Service struct {
 	Client   *http.Client
 }
 
+// newTransport honours proxy environment variables, then the Windows system
+// proxy, so the updater works where only the browser's system proxy is set.
+func newTransport() *http.Transport {
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	tr.Proxy = proxyFor
+	return tr
+}
+
 func New(product, version string) *Service {
-	return &Service{Product: product, Version: version, Target: runtime.GOOS + "-" + runtime.GOARCH, Endpoint: "https://api.github.com/repos/" + Repository + "/releases", Client: &http.Client{Timeout: 5 * time.Minute, CheckRedirect: func(r *http.Request, via []*http.Request) error {
+	return &Service{Product: product, Version: version, Target: runtime.GOOS + "-" + runtime.GOARCH, Endpoint: "https://api.github.com/repos/" + Repository + "/releases", Client: &http.Client{Timeout: 5 * time.Minute, Transport: newTransport(), CheckRedirect: func(r *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
 			return ErrInvalid
 		}

@@ -138,3 +138,11 @@
 - 旧 → 新：供应商原先只有单个 API 地址；现在区分主页（仅展示）与请求地址，多个请求地址按请求轮询，模型目录和测试使用第一个。`--protocol` 留空时保留已存值，新供应商按 `responses`，仍只初始化新 default Key 与匿名请求。put 为完整替换，省略主页会清除，地址列表整体替换。桌面供应商页不再显示或设置协议，新增供应商不填 Key，取消／关闭／Escape 直接丢弃草稿。
 - 兼容与迁移：无 schema 变更；只有 `base_url` 的旧数据照常读取，`base_url` 继续镜像第一个地址。桌面 DTO 移除 `protocol`、`base_url`，新增 `homepage_url`、`base_urls`，属于不兼容变更，桌面与核心须同步升级。
 - 验证：state/core/desktop/client/cli 定向 Go 测试与 go vet 通过；前端 tsc、eslint、vitest 通过；缓存 headless Chromium 下供应商／恢复23项与桌面／日志16项 Playwright 通过。未打包，未验收原生安装，未请求真实付费上游。
+
+## 2026-10-12 — 更新检查与下载支持 Windows 系统代理（未发布）
+
+- 类型：兼容性修复；命令、参数、输出和退出码不变。
+- 指令与参数：`anchor update check|download`，以及桌面「在线更新」共享的同一更新器。
+- 旧 → 新：原先只认代理环境变量，Windows 上只开了系统代理（如代理软件的系统代理模式）时，浏览器能访问 GitHub，更新却会失败。现在环境变量仍优先；都没设置时读取当前用户的 Windows 系统代理及绕过列表。
+- 兼容与迁移：无配置变更；不执行 PAC 脚本，只用 PAC 时仍需设置 `HTTPS_PROXY`。已安装的旧版本不受影响，需要先手动安装含此修复的新包。
+- 验证：updater/desktop 定向 Go 测试通过，覆盖系统代理解析、绕过规则、回环直连及环境变量优先；Windows 交叉 `go vet` 通过。未在原生 Windows 上验证。
