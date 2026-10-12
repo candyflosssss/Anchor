@@ -60,12 +60,12 @@ type Check struct {
 type Service struct {
 	Product, Version, Target string
 	// Endpoint/Client are host-only injection points for isolated tests, not JS.
-	Endpoint string
-	Client   *http.Client
+	Endpoint     string
+	FeedEndpoint string // host-only test seam; empty uses the official feed
+	Client       *http.Client
 }
 
-// newTransport honours proxy environment variables, then the Windows system
-// proxy, so the updater works where only the browser's system proxy is set.
+// newTransport reads current environment/system proxy settings for every host.
 func newTransport() *http.Transport {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.Proxy = proxyFor
@@ -112,11 +112,14 @@ func (s *Service) get(ctx context.Context, raw string) (*http.Response, error) {
 	req.Header.Set("User-Agent", "Anchor-Updater/"+s.Version)
 	resp, err := s.Client.Do(req)
 	if err != nil {
-		return nil, errors.New("update request failed (network, timeout, or redirect policy)")
+		if errors.Is(err, errProxy) {
+			return nil, errProxy
+		}
+		return nil, errors.Join(errors.New("update request failed (network, timeout, or redirect policy)"), safeRequestCause(err))
 	}
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close()
-		return nil, fmt.Errorf("update server HTTP %d", resp.StatusCode)
+		return nil, &httpStatusError{code: resp.StatusCode}
 	}
 	return resp, nil
 }
@@ -202,7 +205,7 @@ func (s *Service) Check(ctx context.Context, c Config) (Check, error) {
 		result.Source = "https://github.com/" + Repository + "/releases"
 		var err error
 		m, err = s.github(ctx, c)
-		if errors.Is(err, ErrUnavailable) {
+		if err == ErrUnavailable {
 			return result, nil
 		}
 		if err != nil {
@@ -231,6 +234,24 @@ type release struct {
 }
 
 func (s *Service) github(ctx context.Context, c Config) (Manifest, error) {
+	apiCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	m, err := s.githubAPI(apiCtx, c)
+	cancel()
+	if err == nil || errors.Is(err, ErrUnavailable) || errors.Is(err, ErrInvalid) || errors.Is(err, ErrIntegrity) || ctx.Err() != nil {
+		return m, err
+	}
+	// Custom test API endpoints cannot cause an unexpected real network fallback.
+	if s.Endpoint != "https://api.github.com/repos/"+Repository+"/releases" && s.FeedEndpoint == "" {
+		return m, err
+	}
+	feed, feedErr := s.githubFeed(ctx, c)
+	if feedErr != nil {
+		return Manifest{}, errors.Join(err, feedErr)
+	}
+	return feed, nil
+}
+
+func (s *Service) githubAPI(ctx context.Context, c Config) (Manifest, error) {
 	var chosen *release
 	var chosenURL string
 	// Do not use /latest: GitHub excludes prereleases there. Compare SemVer rather
@@ -324,4 +345,16 @@ func (s *Service) github(ctx context.Context, c Config) (Manifest, error) {
 		}
 	}
 	return m, nil
+}
+
+type httpStatusError struct{ code int }
+
+func (e *httpStatusError) Error() string { return fmt.Sprintf("update server HTTP %d", e.code) }
+func safeRequestCause(err error) error {
+	for _, cause := range []error{context.Canceled, context.DeadlineExceeded, ErrInvalid} {
+		if errors.Is(err, cause) {
+			return cause
+		}
+	}
+	return nil
 }

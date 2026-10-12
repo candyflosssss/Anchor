@@ -375,7 +375,7 @@ Windows 11 与 Ubuntu 24.04 是本设计建议的首轮测试基线，不是用�
 
 设置导航开放“在线更新”，不改变 sidebar-07/neutral 视觉。updates 功能目录包含 Model（类型验证／数据访问）、hook Controller（阶段／同步 latch／过期结果隔离）和 View（渠道、检查／下载、错误与停服安装确认）。Settings 在核心离线时仍可进入，不将不可用状态伪装为“最新版本”。忙碌时锁定导航与提交；下载没有真实百分比时只显示不定进度，不编造速率。
 
-来源 URL、文件路径和安装执行仅由 Go 宿主决定；JS 不能提交安装命令、下载源或目标文件。UpdateStatus/CheckUpdate/DownloadUpdate/InstallUpdate 的共享 DTO、样例、校验和错误说明见[在线更新契约](online-updates.md)。prototype 仅显示预览不可用提示，不能产生假检查／假安装；真实模式缺绑定失败关闭。installing 表示交接安装器，不表示已安装。只手动检查、不定时下载或后台停服；Linux 系统包安装授权不由前端代行。公开版本及旧开发安装包不含该入口，原生 Windows/Linux 验收需分别记录。
+来源 URL、文件路径和安装执行仅由 Go 宿主决定；JS 不能提交安装命令、下载源或目标文件。更新连接失败提示覆盖 HTTPS_PROXY / ALL_PROXY、Windows PAC 与官方发布订阅回退，提醒代理放行 github.com 和 release-assets.githubusercontent.com；不将失败显示为无更新。UpdateStatus/CheckUpdate/DownloadUpdate/InstallUpdate 的共享 DTO、样例、校验和错误说明见[在线更新契约](online-updates.md)。prototype 仅显示预览不可用提示，不能产生假检查／假安装；真实模式缺绑定失败关闭。installing 表示交接安装器，不表示已安装。只手动检查、不定时下载或后台停服；Linux 系统包安装授权不由前端代行。公开版本及旧开发安装包不含该入口，原生 Windows/Linux 验收需分别记录。
 
 ### Key / 实际模型协议设置（2026-10-11，desktop.16 dev 已发布）
 

@@ -55,5 +55,5 @@ function message(error: unknown): string {
     unauthorized: '无法取得本机核心管理授权，已取消安装。',
     unknown: '更新操作结果未能确认。请检查下载状态及 updates/install.log，不要反复安装。',
   };
-  return messages[code] ?? '读取更新源或下载失败。请检查网络、GitHub 限流及更新源配置后重试；应用会使用环境变量或 Windows 系统代理（不支持 PAC 自动配置脚本）。现有程序未被覆盖。';
+  return messages[code] ?? '连接更新源或下载失败。请确认代理允许 github.com 和 release-assets.githubusercontent.com，然后重试。应用会读取 HTTPS_PROXY / ALL_PROXY 或 Windows 系统代理（含 PAC）；GitHub API 连接失败或限流时会尝试官方发布订阅。现有程序未被覆盖。';
 }

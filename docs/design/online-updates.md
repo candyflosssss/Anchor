@@ -55,6 +55,10 @@ CLI 的 apply 只更新正在调用的 CLI 程序，不替换桌面程序、不�
 
 product 固定 cli/desktop；CLI kind=binary，桌面 Windows AMD64 kind=nsis/.exe、Linux AMD64 kind=deb/.deb。每平台只能出现一个附件；版本与渠道相符、不能重复目标、不能目录穿越。版本比较按数值处理 `.9`→`.10`，支持开发版 `X.Y.Z-dev.desktop.N`，当前不接受 `+build` 元数据。
 
+当前源码补齐更新代理：按每个请求及重定向实时读取对应协议的 HTTP_PROXY / HTTPS_PROXY（含小写），再读取 ALL_PROXY / all_proxy；NO_PROXY 对环境和系统代理均有效，回环始终直连。Windows 在未指定对应环境代理时通过 WinHTTP 读取当前用户配置，支持手动代理和 PAC（按 URL 解析），PAC 失败可回退手动代理；仅自动发现失败时按系统直连，单次解析等待最多8秒，后台最多保留一个原生解析，不自动发送 Windows 凭据。HTTP-only 环境变量不再抑制 HTTPS 系统代理。Linux 继续使用环境代理。
+
+默认源优先 GitHub Releases API，API 阶段最多10秒；连接失败、超时或HTTP限流等错误时尝试同一仓库的官方 releases.atom，从同渠道最近条目按SemVer取最多5个候选，读取正式同版清单。Atom不是完整历史，未找到兼容清单时报告失败，不误报“没有更新”。不在无候选、无效/不一致元数据、校验失败或主动取消时回退；自定义源不改走GitHub。回退清单版本、平台、字节/SHA256和附件URL仍校验，附件必须属于同一仓库同一版本Release，不使用第三方镜像。
+
 TLS 校验证书，最多5次重定向，不允许 HTTPS 降级到 HTTP；允许 HTTPS CDN 的签名查询参数，但用户配置 URL 不接受 userinfo/query/fragment。元数据最多2 MiB、安装包最多256 MiB；检查30秒（桌面）／整个命令5分钟（CLI）、下载5分钟。采用磁盘流式下载、临时文件、实际字节数与 SHA256 校验；未通过校验不保存 receipt，失败不覆盖完整旧包。文件路径由宿主生成，不使用服务器文件名定位本机目录，不自动解压或运行下载内容。
 
 SHA256 是完整性检查，不是独立签名认证。Manifest 和包来自同一个信任来源；测试安装器目前未签名，没有 Ed25519 或 Authenticode 发布门禁，务必只配置可信源。元数据与 receipt 不含凭据或模型密钥。

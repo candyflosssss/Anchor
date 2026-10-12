@@ -2,9 +2,10 @@
 
 package updater
 
-import "os"
+import (
+	"context"
+	"net/url"
+)
 
-var lookupEnv = os.Getenv
-
-// Non-Windows hosts use the standard proxy environment variables only.
-func readSystemProxy() (string, string, bool) { return "", "", false }
+// Non-Windows hosts use proxy environment variables.
+func readSystemProxy(context.Context, *url.URL) (*url.URL, error) { return nil, nil }
