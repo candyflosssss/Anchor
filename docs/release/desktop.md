@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-12。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.19`，北京时间 2026-10-12 19:44:21 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：多供应商共享公开模型名称、候选手动相对倍率与加权轮询，跳过不可用或满并发上游；编辑和删除保留其他候选。目录兼容和首次渠道选择沿用 `.18`，供应商多地址、Windows 系统手动代理和安装重试沿用 `.17`。
-- 已有 `.9`～`.18`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。`.16` 及更早更新器不读 Windows 系统代理，只靠系统代理联网时须手动安装一次当前 `.19`（先停止核心并退出界面），或启动前设置 `HTTPS_PROXY`。旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.20`，北京时间 2026-10-12 20:12:14 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：更新请求实时读取对应协议的环境代理与 ALL_PROXY；Windows 通过 WinHTTP 支持手动代理和 PAC，NO_PROXY 同时适用于系统代理。GitHub API 网络失败、限流或阶段超时后尝试同仓库官方发布订阅，保留版本／平台／大小／SHA256 检查。共享模型与倍率调度沿用 `.19`。
+- 已有 `.9`～`.19`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.20`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
 - 无新 schema 迁移；从 `.15` 及更早升级仍会将 state.db schema3→4，不提供降级。
-- 五个受影响 Go 包测试、前端 78 项定向单元测试、类型检查与 lint、两平台打包、六项附件 digest 校验及真实更新下载通过。**双平台原生窗口与安装未验收**；dev 预发行未签名。
+- updater／desktop／CLI 三个 Go 包、Windows updater 测试程序编译、前端 30 项定向测试、类型检查与 lint、两平台打包、六项附件 digest 校验及真实更新下载通过。**Windows PAC、双平台原生窗口与安装未实机验收**；dev 预发行未签名。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.19_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.20_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -84,7 +84,31 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.19`
+### 当前在线 dev 版 `.20`
+
+`0.1.0-dev.desktop.20` 于北京时间 2026-10-12 20:12:14 公开为 dev prerelease（非 latest），从独立干净 worktree 的提交 `c7bfd78844e1a94d8b73fa2df1cf6c4eeaf60c4a` 构建。
+
+每请求和重定向重新读取对应协议的 HTTP_PROXY / HTTPS_PROXY（含小写），再使用 ALL_PROXY / all_proxy；NO_PROXY 对环境和系统代理生效。HTTP-only 环境不再抑制 HTTPS 系统代理，非法明确配置报告失败。Windows 使用 WinHTTP 读取当前用户手动代理和 PAC，按 URL 解析、等待有界；PAC 失败可回退手动配置，仅自动发现失败可直连，不自动发送 Windows 凭据。
+
+默认 GitHub API 阶段限时10秒，网络失败或限流后读取同仓库官方 releases.atom，按渠道与 SemVer 选择正式清单；无效元数据不回退，近期 feed 无兼容版本时报告失败，不误报无更新。附件限定同仓库同版本，保留 TLS、字节数和 SHA256 校验，不使用第三方镜像。旧 CLI alpha.6 release.json 兼容保留。旧版无法接入代理时，请先手动安装本版一次；更新页同步连接失败提示。公开 DTO 和命令参数不变，无新数据库迁移。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.20-windows-amd64-setup.exe` | 7,738,189 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.20_amd64.deb` | 5,545,140 |
+
+```text
+f991ef18dc6e1db00bc4efb400a5d55f473e3e957ea0c424136e80960478dd23  Anchor-Desktop-0.1.0-dev.desktop.20-windows-amd64-setup.exe
+d32da0927c5ecce1123694130efdd352aa4df1eaa62aa4be97d464014a9746d5  anchor-desktop_0.1.0-dev.desktop.20_amd64.deb
+```
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.20/`。六个公开附件包含两安装包、flat 清单、对应提交与 vendored Go 依赖源码、许可／构建元数据、SHA256SUMS；远端大小／digest 与本地一致，清单 URL 与正式附件一致，标签指向实际源码提交。证据位于 `publication/DRAFT_VERIFIED.json`、`PUBLISHED.json` 和 `TAG_VERIFIED.json`，原始 BUILD.json 的未验收和未签名事实保持不变。
+
+验证：`GOMAXPROCS=2 go test -p 1 ./internal/updater ./internal/desktop ./internal/cli` 通过，Windows updater 测试程序交叉编译成功；前端更新与传输30项测试、typecheck、lint 通过。真实隔离 TLS/CONNECT 代理覆盖版本 API、清单、安装包与跨域签名重定向；环境实时变化／优先级／绕过和官方 feed 限流／网络失败／非法元数据定向测试通过。打包包含 Go→TS 契约比对、TypeScript/Vite、双平台编译、NSIS/deb。
+
+发布后在隔离目录用本轮源码 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.19 --json`，从默认源发现 `.20` 并真实下载 Linux 包，大小／SHA256 校验通过；Windows 远端 digest 与本地一致。强制 API 返回429时，另从真实官方 feed 发现 `.20` 清单。证据为 `publication/ONLINE_DOWNLOAD.json` 和 `LIVE_FEED_CHECK_PUBLISHED.json`。未执行 apply、安装器、原生 PAC／GUI、race、全量或浏览器验收；未修改用户配置或请求付费模型。重操作经 resource-guard 串行限制，Swap 与 /tmp 保持稳定，交付后清理任务 worktree 与隔离下载目录。
+
+### 历史在线 dev 版 `.19`
 
 `0.1.0-dev.desktop.19` 于北京时间 2026-10-12 19:44:21 公开为 dev prerelease（非 latest），从独立干净 worktree 的提交 `54fa3c7b2e4d61ae26fb7ac37fdc9684769b5a58` 构建。
 

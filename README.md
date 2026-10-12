@@ -5,13 +5,19 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.12**，可在已有 `.9`～`.11` 的在线更新中选择 dev 获取：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.20**，可在已有 `.9`～`.19` 的在线更新中选择 dev 获取：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
+桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
+
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.20/Anchor-Desktop-0.1.0-dev.desktop.20-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.20/anchor-desktop_0.1.0-dev.desktop.20_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.20)
+
+CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
 ## 当前阶段
 
@@ -19,7 +25,7 @@
 SQLite 供应商与模型配置、Responses / Chat Completions / Anthropic Messages 无状态文本及函数工具转换，以及托管层/条件恢复、Codex 基础配置与模型目录、多模型绑定授权。当前版本为 `0.1.0-dev`，
 不等于整体初版已完成；SSH、其他 Agent 适配器、Codex profile 和完整协议能力仍待实现。
 
-支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.12 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，不执行浏览器、安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
+支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.20 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，不执行浏览器、安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
 
 供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」三页签，CLI 同步提供。实现边界和 schema3→4 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。当前源码进一步把协议设置移至 Key，并支持按实际模型覆盖、默认动态继承 Key 协议；数据库升级到 schema4。本轮仅修改源码，未打包发布；安装包能力以各发行记录为准。
 
@@ -92,8 +98,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.19 已投放 dev 渠道）
+### 在线更新（desktop.20 已投放 dev 渠道）
 
-已有 desktop.9～.18：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.19` 的 Windows / Ubuntu24.04 安装包与同版清单，支持多供应商共享公开模型名称、手动相对倍率及按倍率加权轮询；旧模型可在编辑映射中切换策略。模型目录路径兼容、Anthropic / Gemini 分页和首次渠道修复沿用 `.18`。`.18` 未配置时按安装版本选择渠道，已有选择保留；开发更新请选择 dev。`.17` 起支持 Windows 手动系统代理，`.16` 及更早只靠系统代理联网时需在启动前设置 `HTTPS_PROXY`，或手动升级一次。真实更新下载及大小／SHA256 校验通过，原生安装未验收。旧 desktop.8 无入口，首次须手动安装。
+已有 desktop.9～.19：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.20` 的 Windows / Ubuntu24.04 安装包与同版清单。本版修复更新代理：支持对应协议的 HTTP_PROXY / HTTPS_PROXY、ALL_PROXY、Windows 手动系统代理与 PAC，GitHub API 网络失败或限流时尝试同仓库官方发布订阅。旧版无法接入代理时，请手动下载安装 `.20` 一次，才能使用修复后的更新器；安装前先停止核心并退出界面。多供应商共享公开模型、手动相对倍率与加权轮询沿用 `.19`，目录兼容与首次渠道选择沿用 `.18`；已保存渠道保持不变，开发更新请选择 dev。真实更新下载及大小／SHA256 校验通过，Windows PAC、原生窗口与安装未实机验收。旧 desktop.8 无入口，首次须手动安装。
 
 桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、schema3→4 迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。

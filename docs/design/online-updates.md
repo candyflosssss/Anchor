@@ -1,6 +1,6 @@
 # 在线更新 v1
 
-- 日期：2026-10-12；**`0.1.0-dev.desktop.19` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.18 可在应用内选择 dev 升级；`.18` 起首次未配置时按桌面版本选择渠道，已保存的渠道保持不变。更新器从 `.17` 起在无代理环境变量时读取 Windows 系统手动代理（不执行 PAC）；`.16` 及更早版本只靠系统代理时需设置 `HTTPS_PROXY` 后重启，或手动安装一次当前 `.19`。本版加入跨供应商同名映射与倍率调度；真实更新下载通过，原生安装未验收；详见[桌面开发版](../release/desktop.md)。
+- 日期：2026-10-12；**`0.1.0-dev.desktop.20` 已发布到默认 GitHub Releases 的 dev 渠道**，两平台安装包与清单同版投放。已有 desktop.9～.19 可在应用内选择 dev 升级；`.18` 起首次未配置时按桌面版本选择渠道，已保存渠道保持不变。`.20` 支持对应协议的环境代理、ALL_PROXY、Windows 手动代理与 PAC，并在 GitHub API 失败时回退同仓库官方发布订阅；`.17`～`.19` 只支持 Windows 手动代理，`.16` 及更早仅使用代理环境变量。旧版无法检查更新时，手动安装 `.20` 一次即可使用修复后的更新器。真实更新下载通过；Windows PAC、原生窗口与安装未实机验收；详见[桌面开发版](../release/desktop.md)。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 
@@ -55,7 +55,7 @@ CLI 的 apply 只更新正在调用的 CLI 程序，不替换桌面程序、不�
 
 product 固定 cli/desktop；CLI kind=binary，桌面 Windows AMD64 kind=nsis/.exe、Linux AMD64 kind=deb/.deb。每平台只能出现一个附件；版本与渠道相符、不能重复目标、不能目录穿越。版本比较按数值处理 `.9`→`.10`，支持开发版 `X.Y.Z-dev.desktop.N`，当前不接受 `+build` 元数据。
 
-当前源码补齐更新代理：按每个请求及重定向实时读取对应协议的 HTTP_PROXY / HTTPS_PROXY（含小写），再读取 ALL_PROXY / all_proxy；NO_PROXY 对环境和系统代理均有效，回环始终直连。Windows 在未指定对应环境代理时通过 WinHTTP 读取当前用户配置，支持手动代理和 PAC（按 URL 解析），PAC 失败可回退手动代理；仅自动发现失败时按系统直连，单次解析等待最多8秒，后台最多保留一个原生解析，不自动发送 Windows 凭据。HTTP-only 环境变量不再抑制 HTTPS 系统代理。Linux 继续使用环境代理。
+desktop.20 已交付更新代理修复：按每个请求及重定向实时读取对应协议的 HTTP_PROXY / HTTPS_PROXY（含小写），再读取 ALL_PROXY / all_proxy；NO_PROXY 对环境和系统代理均有效，回环始终直连。Windows 在未指定对应环境代理时通过 WinHTTP 读取当前用户配置，支持手动代理和 PAC（按 URL 解析），PAC 失败可回退手动代理；仅自动发现失败时按系统直连，单次解析等待最多8秒，后台最多保留一个原生解析，不自动发送 Windows 凭据。HTTP-only 环境变量不再抑制 HTTPS 系统代理。Linux 继续使用环境代理。
 
 默认源优先 GitHub Releases API，API 阶段最多10秒；连接失败、超时或HTTP限流等错误时尝试同一仓库的官方 releases.atom，从同渠道最近条目按SemVer取最多5个候选，读取正式同版清单。Atom不是完整历史，未找到兼容清单时报告失败，不误报“没有更新”。不在无候选、无效/不一致元数据、校验失败或主动取消时回退；自定义源不改走GitHub。回退清单版本、平台、字节/SHA256和附件URL仍校验，附件必须属于同一仓库同一版本Release，不使用第三方镜像。
 

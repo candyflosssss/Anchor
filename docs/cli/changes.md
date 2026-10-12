@@ -165,7 +165,7 @@
 - 兼容与迁移：模型 JSON 增量字段，无 schema 迁移。重复添加当前供应商或过期编辑仍409 conflict。`model put` 仍完整替换并恢复默认 priority/倍率1。旧核心不支持新 Workspace 字段，桌面与核心应一起升级。
 - 验证：state/core/desktop/CLI/client 定向 Go 测试通过；CLI 与真实管理接口、桌面 Bridge 隔离读写通过；前端类型检查、78项定向单元测试及 lint 通过。原生安装未验收。
 
-## 2026-10-12 — 更新网络代理与默认源回退（源码，随下一桌面 dev 版交付）
+## 2026-10-12 — 更新网络代理与默认源回退（desktop.20 dev 已交付；CLI 源码）
 
 - 类型：修改对外网络行为；命令、参数和输出字段不变。
 - 指令：update check/download，共享桌面检查和下载实现。
