@@ -2,6 +2,61 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface CatalogTemplate {
+  slug: string;
+  display_name: string;
+}
+export interface AgentTarget {
+  id: string;
+  agent: string;
+  config_root: string;
+  source: string;
+  supported: boolean;
+  status: string;
+  catalog_version: string;
+  templates: CatalogTemplate[];
+}
+export interface AgentModel {
+  id: string;
+  tools: boolean;
+  streaming: boolean;
+  upstream_models: string[];
+}
+export interface ManagedAgent {
+  id: string;
+  config_root: string;
+  model: string;
+  enabled: boolean;
+  revision: number;
+  model_scope: string;
+  catalog_version: string;
+  status: string;
+  available_models: string[];
+  catalog_path: string;
+  model_templates: Record<string, string>;
+}
+export interface AgentWorkspace {
+  targets: AgentTarget[];
+  bindings: ManagedAgent[];
+  models: AgentModel[];
+}
+export interface EnrollAgent {
+  target_id: string;
+  model: string;
+  expected_revision: number;
+  model_templates: Record<string, string>;
+  approved: boolean;
+}
+export interface ManageAgent {
+  binding_id: string;
+  expected_revision: number;
+  action: string;
+}
+export interface AgentWorkspaceResult {
+  contract: string;
+  data: AgentWorkspace | null;
+  problem: Problem | null;
+}
 export interface Problem {
   code: ProblemCode;
 }
@@ -308,16 +363,19 @@ export interface LogSettingsResult {
   problem: Problem | null;
 }
 export interface DesktopBridge {
+  AgentWorkspace(): Promise<AgentWorkspaceResult>;
   CheckUpdate(input1: string): Promise<UpdateResult>;
   ConfigureLogs(input1: Settings): Promise<LogSettingsResult>;
   DiscoverProviderModels(input1: DiscoverProviderModels): Promise<ProviderModelsResult>;
   DownloadUpdate(input1: string): Promise<UpdateResult>;
+  EnrollAgent(input1: EnrollAgent): Promise<AgentWorkspaceResult>;
   ExitDesktop(): Promise<StopResult>;
   ExportLogs(input1: Query): Promise<StopResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
   LogDetail(input1: string): Promise<LogDetailResult>;
   LogSettings(): Promise<LogSettingsResult>;
   Logs(input1: Query): Promise<LogsResult>;
+  ManageAgent(input1: ManageAgent): Promise<AgentWorkspaceResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;

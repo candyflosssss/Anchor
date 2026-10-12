@@ -32,6 +32,7 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 	if e != nil {
 		return GatewayBinding{}, e
 	}
+	model.Codex = state.BindingMetadata(b, model)
 	version := b.CodexVersion
 	if version == "" && model.Codex != nil {
 		version = model.Codex.Version
@@ -230,16 +231,41 @@ func (m *Manager) Start() ([]Result, error) {
 			continue
 		}
 		status, e := m.Engine.Status(b.ID)
-		if e == nil && status.Status == "prepared" {
-			status, e = m.Engine.Recover(b.ID)
-		}
 		if e != nil {
-			// A journal/config read or recovery error must not report the
-			// last durable "applied" state as healthy.
 			status = Result{BindingID: b.ID, OperationID: status.OperationID, Status: "recovery_pending"}
 		} else {
-			status, e = m.apply(b.ID, b.Revision, "")
-			if e != nil && (status.Status == "" || status.Status == "pending" || status.Status == "applied") {
+			if status.Status == "prepared" {
+				status, e = m.Engine.Recover(b.ID)
+				if e != nil {
+					status.Status = "recovery_pending"
+				}
+			} else if status.Status == "applied" {
+				// Validate current support and desired metadata before touching a
+				// healthy journal. Unsupported external changes remain repairable.
+				var g GatewayBinding
+				_, e = (Codex{}).Inspect(b)
+				if e == nil {
+					g, e = m.gateway(b)
+				}
+				if e == nil && len(g.Models) > 0 {
+					_, _, e = buildCatalog(g.Models, g.CatalogVersion)
+				}
+				if e == nil {
+					if _, stale := (Codex{}).Verify(b, g); stale != nil {
+						status, e = m.Engine.Recover(b.ID)
+						if e != nil {
+							status.Status = "recovery_pending"
+						}
+					}
+				}
+			}
+			if e == nil && status.Status == "conflict" {
+				e = ErrChanged
+			}
+			if e == nil {
+				status, e = m.apply(b.ID, b.Revision, "")
+			}
+			if e != nil && (status.Status == "" || status.Status == "pending" || status.Status == "applied" || status.Status == "restored") {
 				status = Result{BindingID: b.ID, OperationID: status.OperationID, Status: "apply_failed"}
 			}
 		}
@@ -286,12 +312,14 @@ func (m *Manager) SetModels(id string, revision int64, model, scope string) (sta
 	}
 	b.Model = model
 	b.ModelScope = scope
-	b.CodexVersion = ""
+	if len(b.CodexCatalog) == 0 {
+		b.CodexVersion = ""
+	}
 	configured, err := m.Store.Model(model)
 	if err != nil {
 		return b, Result{}, err
 	}
-	if configured.Codex != nil {
+	if len(b.CodexCatalog) == 0 && configured.Codex != nil {
 		b.CodexVersion = configured.Codex.Version
 	}
 	if err = b.Validate(); err != nil {

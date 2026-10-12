@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -166,7 +167,7 @@ func (c *Client) AgentQuery(ctx context.Context, id, action string) (map[string]
 	return v, e
 }
 func (c *Client) AgentAction(ctx context.Context, id, action string, revision int64, fp string) (map[string]any, error) {
-	if !state.ValidID(id) || (action != "apply" && action != "restore" && action != "enable" && action != "disable") {
+	if !state.ValidID(id) || (action != "apply" && action != "restore" && action != "enable" && action != "disable" && action != "sync") {
 		return nil, errors.New("invalid agent action")
 	}
 	var v map[string]any
@@ -217,4 +218,15 @@ func (c *Client) Usage(ctx context.Context) ([]state.Usage, error) {
 	var out []state.Usage
 	err := c.call(ctx, "GET", "/control/v1/usage", nil, &out)
 	return out, err
+}
+
+func (c *Client) AgentWorkspace(ctx context.Context) (managed.AgentWorkspace, error) {
+	var v managed.AgentWorkspace
+	err := c.call(ctx, "GET", "/control/v1/agents/workspace", nil, &v)
+	return v, err
+}
+func (c *Client) EnrollAgent(ctx context.Context, in managed.EnrollAgent) (managed.AgentWorkspace, error) {
+	var v managed.AgentWorkspace
+	err := c.call(ctx, "POST", "/control/v1/agents/enroll", in, &v)
+	return v, err
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/candyflosssss/Anchor/internal/client"
 	"github.com/candyflosssss/Anchor/internal/managed"
@@ -15,9 +16,49 @@ import (
 
 func (a App) agents(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("agent requires add/list/inspect/plan/apply/restore/enable/disable/set-models")
+		return errors.New("agent requires discover/enroll/add/list/inspect/plan/apply/sync/restore/enable/disable/set-models")
 	}
 	switch args[0] {
+	case "discover":
+		if len(args) != 1 {
+			return errors.New("agent discover takes no arguments")
+		}
+		v, err := c.AgentWorkspace(ctx)
+		if err != nil {
+			return err
+		}
+		return a.output(v)
+	case "enroll":
+		f := a.flags("agent enroll")
+		target := f.String("target", "", "discovered local target ID (required)")
+		model := f.String("model", "", "default public model (required)")
+		revision := f.Int64("revision", 0, "existing binding revision; 0 for new target")
+		approve := f.Bool("approve", false, "approve target-local catalog and configuration management")
+		var templates repeated
+		f.Var(&templates, "template", "public-model:local-catalog-model; empty source excludes alias; repeatable")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		choices := map[string]string{}
+		for _, item := range templates {
+			alias, source, ok := strings.Cut(item, ":")
+			if !ok || !state.ValidID(alias) {
+				return errors.New("--template requires public-model:local-catalog-model")
+			}
+			if _, duplicate := choices[alias]; duplicate {
+				return errors.New("duplicate template choice")
+			}
+			choices[alias] = source
+		}
+		if *target == "" || *model == "" || !*approve || *revision < 0 {
+			return errors.New("--target, --model and --approve are required; revision must be nonnegative")
+		}
+		v, err := c.EnrollAgent(ctx, managed.EnrollAgent{TargetID: *target, Model: *model, ExpectedRevision: *revision, ModelTemplates: choices, Approved: *approve})
+		if err != nil {
+			return err
+		}
+		return a.output(v)
+
 	case "list":
 		if len(args) != 1 {
 			return errors.New("agent list takes no arguments")
@@ -88,7 +129,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 			return e
 		}
 		return a.output(v)
-	case "apply", "restore", "enable", "disable":
+	case "apply", "sync", "restore", "enable", "disable":
 		if len(args) < 2 {
 			return errors.New("agent action requires binding ID")
 		}

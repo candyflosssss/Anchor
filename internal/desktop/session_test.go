@@ -23,6 +23,9 @@ import (
 )
 
 func TestMain(m *testing.M) {
+	if IsAgentTokenInvocation(os.Args[1:]) {
+		os.Exit(cli.Main(context.Background(), os.Args[1:]))
+	}
 	if len(os.Args) == 5 && os.Args[1] == "--desktop-test-host" {
 		exe, _ := os.Executable()
 		s := NewSession(Options{Dir: os.Args[2], Executable: exe, ControlAddress: os.Args[3], GatewayAddress: os.Args[4], StartTimeout: 5 * time.Second})

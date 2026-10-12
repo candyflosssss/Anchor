@@ -12,6 +12,9 @@ async function host(page: Page) {
     let providers: Provider[] = rows;
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
     const api: DesktopBridge = {
+      AgentWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      EnrollAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ManageAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Logs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogDetail: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogSettings: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),

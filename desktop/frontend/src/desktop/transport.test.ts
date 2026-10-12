@@ -13,6 +13,7 @@ function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
     Start: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
     Status: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
     Logs: vi.fn(), LogDetail: vi.fn(), LogSettings: vi.fn(), ConfigureLogs: vi.fn(), ExportLogs: vi.fn(),
+    AgentWorkspace: vi.fn(), EnrollAgent: vi.fn(), ManageAgent: vi.fn(),
     ProviderWorkspace: vi.fn(), ProviderAction: vi.fn(),
     Providers: vi.fn(async () => ({ contract: CONTRACT, data: fixture.providers, problem: null })),
     DiscoverProviderModels: vi.fn(async () => ({ contract: CONTRACT, data: catalogFixture.success, problem: null })),

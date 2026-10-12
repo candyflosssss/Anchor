@@ -150,7 +150,7 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 - 引擎先将原文件（可能含原有秘密）、字段前/后值、接管适配器版本和操作 ID 同步持久化到 `DATA_DIR/recovery/ID.json`，有目录时同时记录其精确内容/路径，先原子创建目录，再比较配置 fingerprint 并原子替换配置指针；公开计划 fingerprint 还覆盖目录和模型策略。Linux 保留原文件模式，Windows 保留原 DACL 并使用 MoveFileEx；新文件限制到当前用户。目录/配置拒绝链接与 reparse，Linux 另拒绝组/其他用户可写或硬链接文件。
 - 原值/第三方值的处理按字段比较：等于写入值才恢复，等于原值视为完成，第三值保留并报告冲突。恢复可先完成无冲突字段；provider/模型目录被基础配置或独立 `*.config.toml` 引用时保留并报告冲突；专有目录已被用户修改也保留，无法安全检查引用时中止删除。备份不用于无条件整文件覆盖。由 Anchor 创建的空配置可保留，而非冒险删除。
 - 根级字符串行和带标记的专有 provider 表局部编辑，保留无关字节；编辑后校验整个 TOML 语义。受管理键的行内注释/排版可能规范化，复杂/引用/多行等不可安全编辑的受管理表达形式拒绝，不重新序列化用户整文件。
-- 正常停止冻结托管写入并条件恢复，再排空两面。重新启动沿用原已接管日志，不把 Anchor 值重新当成原值；prepared 记录先按条件恢复再接管。独立 recover 取得实例锁，不依赖运行核心、Agent 或 HTTP。
+- 正常停止冻结托管写入并条件恢复，再排空两面。重新启动沿用原已接管日志，不把 Anchor 值重新当成原值；prepared 记录先按条件恢复再接管。applied 记录先核验当前配置支持范围及期望目录，过期且没有外部覆盖时条件恢复并重建；不支持配置和外部覆盖不自动重接管。独立 recover 取得实例锁，不依赖运行核心、Agent 或 HTTP。
 
 ### Codex v1 边界与证据
 
@@ -158,7 +158,7 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 
 仅全局 CODEX_HOME；用户选择的 profile 与显式 WebSocket 配置拒绝，未探测安装版本、系统策略、环境/命令行/项目覆盖，inspect 始终区分 configuration_only 与实际连接 unknown。Anchor 用操作者导入的、与精确 Codex 版本匹配的完整元数据生成 `anchor_ID.models.json`：复制指令/上下文/工具/reasoning，slug 改为公开别名、展示名可覆盖，visibility=list/supported_in_api=true、upgrade=null、prefer_websockets/use_responses_lite=false。不猜能力、不自动下载、不自动探测版本；操作者必须核对模板和真实供应商能力。自定义目录替代而非合并 Codex 自带目录。single 且无元数据的旧方式仍要求 Codex 自行识别别名；不更改登录状态、审批或沙箱策略。
 
-新 CLI 绑定默认 all-compatible；旧省略 scope 的记录仍为单模型。兼容范围动态要求 tools/streaming、精确版本有效元数据和至少一个 enabled 候选供应商；默认模型仅初始选择。网关 `/v1/models` 和请求授权复用规则，未知/非兼容模型拒绝，Binding token 不可访问管理 API。`agent set-models` 显式更新 default/scope/版本，先安全恢复、后递增 revision，凭据不旋转，留待重新 plan/apply。目录是接管快照，模型/供应商变更影响实时授权但不偷偷改目录；刷新需 restore → plan → apply 或正常停服/启动，然后重启 Codex app-server。
+新 CLI 绑定默认 all-compatible；旧省略 scope 的记录仍为单模型。兼容范围动态要求 tools/streaming、精确版本有效元数据和至少一个 enabled 候选供应商；默认模型仅初始选择。网关 `/v1/models` 和请求授权复用规则，未知/非兼容模型拒绝，Binding token 不可访问管理 API。`agent set-models` 显式更新 default/scope/版本，先安全恢复、后递增 revision，凭据不旋转，留待重新 plan/apply。目录是接管快照，模型/供应商变更影响实时授权但不偷偷改目录；运行中刷新可用 agent sync，或 restore → plan → apply、正常停服/启动，然后重启 Codex app-server。
 
 桌面 SSH 主路径在远端 CODEX_HOME 的**基础配置**设置 Anchor provider + 默认模型 + 目录，无需 profile。实际 Codex 的模型选择/显式 model 参数可切换目录内公开模型，经 Anchor 路由各供应商。它不等于 Anchor 自己实现了 SSH Connector，也不是拦截全部网络出口；独立 profile/更高优先级覆盖不会被冒充成受控。
 
@@ -190,3 +190,9 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 供应商工作台已接入删除/复制/改名、模型映射与删除、显式最小推理测试、独立 Key 健康与轮询/优先策略、三协议转换、持久用量及价格估算。详细支持边界见[实现契约](provider-priority-one.md)，入口见[CLI 大全](../cli/commands.md)。schema2 自动升级3，旧单 secret 迁移 default Key，命名 Key、策略、价格与用量独立存储。改名迁移配置引用但历史用量保持旧 ID；删除不抹掉统计。
 
 本轮仅定向检查和打包，不运行全量/race/浏览器或原生安装验收。当前价估算不包含未知用量；models.dev 只做解析样例验证，未请求线上目录；协议仅回环模拟上游，未调用真实付费服务。具体产物与提交见 release 任务记录。
+
+### 本地 Agent 发现与桌面托管（2026-10-12，源码未发布）
+
+`internal/managed` 提供有界只读发现和 workspace/enroll/sync 应用服务，`internal/core` 提供已鉴权的 `/control/v1/agents/workspace`、`/enroll` 和 action=sync。已知用户目录识别产品痕迹，仅 Codex 可托管；不执行客户端或自动推理。Codex 从本地完整 models_cache.json 提取 client_version 和 ModelInfo，操作者核对版本及能力后批准，模板及排除选择存 Binding，而非修改共享供应商模型。目标本地策略也用于网关鉴权，single 与 all-compatible 共用元数据解析。限制和完整操作见 CLI 大全 §8。
+
+桌面受限 Bridge 复用同一 client/core；前端 feature agents 按 Model、hook Controller、View 分层，不拥有文件写入或业务路由。唯一写入者仍是托管 Engine；GUI 支持识别、批准登记、同步、启停及失败后重读。宿主在 GUI 初始化前只放行精确的 `--data-dir DIR agent token ID` 内部 helper，复用已有 CLI stdout 凭据契约，不暴露任意命令执行。

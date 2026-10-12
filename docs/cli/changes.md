@@ -172,3 +172,13 @@
 - 旧 → 新：每请求实时读取对应协议的环境代理和 ALL_PROXY，NO_PROXY 同时适用于系统代理；HTTP-only 环境不抑制 HTTPS 系统代理。Windows 用 WinHTTP 支持手动/PAC，自动发现等待有界。默认源 API 错误或10秒超时后尝试同仓库官方 Atom feed，同渠道按SemVer选清单，不使用第三方源；无效元数据不回退。
 - 兼容：自定义源、渠道、TLS与字节/SHA256校验不变，旧配置不需要迁移。feed缺少当前平台或兼容候选时报告失败，不误报无更新。
 - 验证：隔离真实TLS/CONNECT覆盖版本API、清单、安装包及跨域签名重定向；环境即时修改、优先级、绕过、官方feed限流/网络失败与非法元数据定向测试；最终结果见本轮记录，Windows PAC原生运行未验收。
+
+
+## 2026-10-12 — 本机 Agent 发现与 Codex 目录托管（当前源码，未发布安装包）
+
+- 类型：新增命令 / 扩展托管行为与输出。
+- 指令与参数：新增 `agent discover`、`agent enroll --target ID --model MODEL [--revision N] [--template ALIAS:SOURCE ...] --approve`、`agent sync ID --revision N`。enroll 的 revision 默认0表示新目标，已有目标须提供当前 revision；重复 template 选择按公开别名关联本地目录模板，`ALIAS:` 明确排除该别名，重复别名被拒绝。
+- 旧 → 新：过去须手工指定目录，并在共享模型上配置 Codex 元数据；现在核心只读识别当前用户的已知 Agent 配置目录，Codex 可从本地 models_cache.json 导入完整且有版本的模板，由用户确认后登记并应用。模板快照和选择属于托管目标，不改供应商模型映射。启动核心时应用已授权目标并刷新过期目录；运行中映射变化用 sync 条件恢复并重新生成目录，外部配置修改会保留并报告冲突。
+- 输出：discover/enroll 返回目标、可选模型模板、公开映射及托管状态；目录存在只表示配置证据，不证明程序已安装或运行。已有 list/add/inspect/set-models/enable/disable 的 Binding 输出不返回完整模板快照，只保留选择策略；其他字段语义保留。
+- 兼容与迁移：保留原 agent add 及单模型托管，其他已知 Agent 目录只识别、不托管。桌面、CLI 和核心需升级到本轮源码；desktop.20 安装包不含新页面。Codex 缓存缺失、版本无效或元数据不完整时不猜测能力、不自动请求上游；先由 Codex 生成有效缓存。缓存版本或模板选择变化请重新 enroll，应用配置后完全退出并重启 Codex。
+- 验证：全量 `GOMAXPROCS=2 go test -p 1 ./...` 通过，覆盖隔离真实核心/CLI/桌面桥接、凭据助手、启动恢复和冲突保护；前端 typecheck、lint、103项单元测试通过；2项托管页面浏览器 Mock 边界测试通过。Windows desktop/managed/platform/desktop 包交叉编译通过（未执行 Windows 二进制）；未修改个人 Agent 配置、未请求真实付费上游、未生成安装包。

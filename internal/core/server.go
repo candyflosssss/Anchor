@@ -31,24 +31,25 @@ var Version = "0.1.0-dev"
 const MaxRequestBytes = 8 << 20
 
 type Server struct {
-	Agents    *managed.Manager
-	Store     *state.Store
-	Log       *slog.Logger
-	upstream  *http.Client
-	mu        sync.Mutex
-	active    map[string]int
-	health    map[string]*keyHealth
-	routing   map[string]*modelSchedule
-	cursor    map[string]int
-	slots     chan struct{}
-	shutdown  chan struct{}
-	stopOnce  sync.Once
-	stopping  atomic.Bool
-	running   atomic.Bool
-	ready     atomic.Bool
-	logOnce   sync.Once
-	closeOnce sync.Once
-	logs      *logbook.Store
+	AgentEnvironment func() (managed.Environment, error)
+	Agents           *managed.Manager
+	Store            *state.Store
+	Log              *slog.Logger
+	upstream         *http.Client
+	mu               sync.Mutex
+	active           map[string]int
+	health           map[string]*keyHealth
+	routing          map[string]*modelSchedule
+	cursor           map[string]int
+	slots            chan struct{}
+	shutdown         chan struct{}
+	stopOnce         sync.Once
+	stopping         atomic.Bool
+	running          atomic.Bool
+	ready            atomic.Bool
+	logOnce          sync.Once
+	closeOnce        sync.Once
+	logs             *logbook.Store
 }
 
 func New(store *state.Store, log *slog.Logger) *Server {

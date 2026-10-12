@@ -4,6 +4,7 @@ package desktop
 import (
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/logbook"
+	"github.com/candyflosssss/Anchor/internal/managed"
 )
 
 const Contract = "anchor-desktop-v1"
@@ -135,4 +136,19 @@ type LogSettingsResult struct {
 	Contract string       `json:"contract"`
 	Data     *LogSettings `json:"data"`
 	Problem  *Problem     `json:"problem"`
+}
+
+// Agent setup's core DTOs exclude credentials, full instruction templates and
+// arbitrary filesystem arguments; desktop adds only its standard envelope.
+type CatalogTemplate = managed.CatalogTemplate
+type AgentTarget = managed.AgentTarget
+type AgentModel = managed.AgentModel
+type ManagedAgent = managed.ManagedAgent
+type AgentWorkspace = managed.AgentWorkspace
+type EnrollAgent = managed.EnrollAgent
+type ManageAgent = managed.ManageAgent
+type AgentWorkspaceResult struct {
+	Contract string          `json:"contract"`
+	Data     *AgentWorkspace `json:"data"`
+	Problem  *Problem        `json:"problem"`
 }

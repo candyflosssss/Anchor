@@ -9,6 +9,7 @@
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
+- 本轮 Agent discover/enroll/sync 与桌面托管入口仅在当前源码（未发布），不包含于 desktop.20 安装包；需升级客户端和核心。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -80,6 +81,9 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `access grant` | 签发授权令牌 | 本机已初始化，无需核心在线 |
 | `access list` | 查看授权元数据 | 本机已初始化，无需核心在线 |
 | `access revoke` | 撤销授权 | 本机已初始化，无需核心在线 |
+| `agent discover` | 只读识别本地已知配置目录及托管状态 | 新版核心在线；不证明安装或运行 |
+| `agent enroll` | 批准本地 Codex 目录及目标模型模板 | 新版核心在线；完整本地缓存；更新须当前 revision |
+| `agent sync` | 条件恢复并同步当前模型目录 | 核心在线、Binding enabled、当前 revision |
 | `agent add` | 明确批准并登记 Codex 基础配置目标 | 核心在线；配置根存在；默认 all-compatible 需版本匹配元数据 |
 | `agent list` | 查询 Binding 元数据 | 所选 Context 的核心在线 |
 | `agent inspect` | 查看配置层检查与托管状态 | 核心在线；Binding 已登记 |
@@ -339,6 +343,23 @@ anchor access revoke ID
 
 ## 8. Agent 托管与独立恢复
 
+### `agent discover` / `agent enroll` / `agent sync`
+
+```text
+anchor agent discover
+anchor agent enroll --target ID --model MODEL --approve [--revision N]
+                    [--template PUBLIC_ALIAS:LOCAL_SOURCE ...]
+anchor agent sync ID --revision N
+```
+
+作用域为所选 Context 的核心所在机器，需要本轮新版核心在线；当前 Context 仅本机。`discover` 无参数，只读返回 `{targets, bindings, models}`：目标包含路径、来源、适配状态、缓存版本与模板摘要；托管行包含 revision、默认模型、当前兼容模型及状态，不返回令牌或完整模型指令。只查 `CODEX_HOME`、`~/.codex`、`~/.claude`、`~/.gemini`、`~/.config/opencode`，Windows 另查用户 `AppData/Roaming/opencode`；同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录存在仅表示配置痕迹，不能证明程序已安装或正在运行。其他产品暂时只识别、无适配器。
+
+`enroll` 的 target/model/approve 必填。target 取 discover 返回的 ID；默认模型必须声明 tools/streaming、至少有一个启用的供应商候选，且有版本匹配的完整模板。revision 默认0，仅新目标使用；已登记目标必须传当前值，包括先前由 add 自定义 ID 登记的同一目录。重复 `--template` 指定公开别名到本地源 slug 的选择，同一别名重复拒绝；空源如 `--template other:` 显式排除此模型。未指定选择时，优先有效的共享元数据，然后精确别名或唯一上游 slug 匹配；多个源命中不猜测，需明确指定。
+
+核心重新识别目标并读取其 `models_cache.json`（最多4 MiB、128个完整条目），缓存必须含有效的 `client_version=X.Y.Z`。没有完整缓存时请先正常启动 Codex，再识别。缓存报告的版本不是可执行程序版本探测；批准前仍需核对版本和上游能力，不凭名称伪造元数据。模板快照和显式选择保存在 Binding 中，不修改供应商映射。新建凭据；更新保留原凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需重新 discover 检查，不能盲目重复提交。成功返回更新后的 workspace。
+
+`sync` 必填 Binding ID 和当前 revision（≥1），仅 enabled 且网关就绪可操作；不增加 revision，也不旋转凭据。先校验新目录和配置支持范围，再条件恢复、重建当前模型快照；第三方冲突保留并报告，失败不重放。返回 `{binding_id, operation_id, status}`。模型/供应商变更立即影响网关授权，但运行中目录需显式 sync；核心重启会在核对既有日志后更新过期目录，外部覆盖和不支持配置保留并报告。模板或本地缓存升级需重新 enroll。配置更新后请完全退出并重启 Codex，包括其 app-server；配置成功不证明实际请求已经过 Anchor。
+
 ### `agent add`
 
 ```text
@@ -383,7 +404,7 @@ anchor agent disable ID --revision N
 - `restore` 仅恢复当前值仍等于 Anchor 写入值的字段；第三方值保留并报告 `conflict`。原值已恢复视为完成；被用户删除的配置不盲目重建；被基础配置或独立 `*.config.toml` profile 引用的 provider/目录不删除；目录只有仍等于 Anchor 写入内容且无引用时才删除，用户改过的目录保留并报告冲突。返回状态和冲突字段路径，冲突时 CLI 输出 JSON 后以 1 退出。
 - `restore` 不修改 enabled 或 Binding revision，因此下次启动仍会接管。配置本来不存在时恢复可留下空文件，不删除可能已被其他工具引用的配置文件。
 - `enable` / `disable` 返回 `{binding, management}` 并递增 revision；enable 只批准后续接管，不立即改配置。disable 先条件恢复再禁用凭据，即使出现已报告的第三方冲突也禁用授权，CLI 非零退出；真正的文件/日志 I/O 失败会中止禁用。已接受请求不承诺即时取消。
-- `model put` 不会自动刷新已写入的 Codex 目录；网关 all-compatible 授权按每次请求的当前模型/供应商配置判断，而 Codex 目录是接管时快照。新增模型/改元数据后须 `restore` → `plan` → `apply`（或正常停服再启动），再重启远端 Codex app-server。更新目录不等于让已有会话立即切换。
+- `model put` 不会自动刷新已写入的 Codex 目录；网关 all-compatible 授权按每次请求的当前模型/供应商配置判断，而 Codex 目录是接管时快照。新增模型/改元数据后可用 `agent sync ID --revision N`，或 `restore` → `plan` → `apply`（或正常停服再启动），再重启远端 Codex app-server。更新目录不等于让已有会话立即切换。
 - 当前没有 Binding 删除、改路径或改适配器版本入口；默认模型与授权范围用下面的 set-models 显式修改。
 
 ### `agent set-models`
@@ -459,7 +480,7 @@ anchor recover [--id ID]
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
-| Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
+| Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置、本地发现/登记/同步及桌面入口；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
 | 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；desktop.16 dev 已投放且真实下载通过，原生安装未验收，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |

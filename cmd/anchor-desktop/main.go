@@ -30,6 +30,12 @@ import (
 
 func main() { os.Exit(run()) }
 func run() int {
+	// The managed adapter's token helper uses the same exact invocation as CLI.
+	// Dispatch only this internal command before GUI flags/window initialization.
+	if desktop.IsAgentTokenInvocation(os.Args[1:]) {
+		return cli.Main(context.Background(), os.Args[1:])
+	}
+
 	defaults, err := state.DefaultDir()
 	if err != nil {
 		return 1

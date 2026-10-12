@@ -1,0 +1,65 @@
+{
+  "contract": "anchor-desktop-v1",
+  "workspace": {
+    "targets": [
+      {
+        "id": "codex-fixture",
+        "agent": "codex",
+        "config_root": "C:\\Users\\Fixture\\.codex",
+        "source": "home",
+        "supported": true,
+        "status": "ready",
+        "catalog_version": "0.159.3",
+        "templates": [
+          {
+            "slug": "fixture-source",
+            "display_name": "Synthetic fixture"
+          }
+        ]
+      }
+    ],
+    "models": [
+      {
+        "id": "public",
+        "tools": true,
+        "streaming": true,
+        "upstream_models": [
+          "fixture-source"
+        ]
+      }
+    ],
+    "bindings": [
+      {
+        "id": "codex-fixture",
+        "config_root": "C:\\Users\\Fixture\\.codex",
+        "model": "public",
+        "enabled": true,
+        "revision": 1,
+        "model_scope": "all-compatible",
+        "catalog_version": "0.159.3",
+        "status": "applied",
+        "available_models": [
+          "public"
+        ],
+        "catalog_path": "C:\\Users\\Fixture\\.codex\\anchor_codex-fixture.models.json",
+        "model_templates": {
+          "public": "fixture-source"
+        }
+      }
+    ]
+  },
+  "enroll": {
+    "target_id": "codex-fixture",
+    "model": "public",
+    "expected_revision": 0,
+    "model_templates": {
+      "public": "fixture-source"
+    },
+    "approved": true
+  },
+  "sync": {
+    "binding_id": "codex-fixture",
+    "expected_revision": 1,
+    "action": "sync"
+  }
+}

@@ -22,9 +22,40 @@ type Binding struct {
 	Executable     string `json:"anchor_executable"`
 	Enabled        bool   `json:"enabled"`
 	Revision       int64  `json:"revision"`
+	// Local catalog snapshots belong to this target/version, not provider routing.
+	CodexCatalog   map[string]CodexMetadata `json:"codex_catalog,omitempty"`
+	ModelTemplates map[string]string        `json:"model_templates,omitempty"`
 }
 
 func (b Binding) Validate() error {
+	if len(b.CodexCatalog) > 128 || len(b.ModelTemplates) > 256 {
+		return ErrInvalid
+	}
+	size := 0
+	for slug, meta := range b.CodexCatalog {
+		if slug == "" || len(slug) > 256 || meta.Version != b.CodexVersion || meta.Validate() != nil {
+			return ErrInvalid
+		}
+		var entry struct {
+			Slug string `json:"slug"`
+		}
+		if json.Unmarshal(meta.Entry, &entry) != nil || entry.Slug != slug {
+			return ErrInvalid
+		}
+		size += len(meta.Entry)
+	}
+	if size > 4<<20 {
+		return ErrInvalid
+	}
+	for alias, source := range b.ModelTemplates {
+		if !ValidID(alias) {
+			return ErrInvalid
+		}
+		if _, ok := b.CodexCatalog[source]; source != "" && !ok {
+			return ErrInvalid
+		}
+	}
+
 	if b.ModelScope != "" && b.ModelScope != "single" && b.ModelScope != "all-compatible" {
 		return errors.New("invalid model scope")
 	}
@@ -196,6 +227,7 @@ func (s *Store) BindingModels(b Binding) ([]Model, error) {
 		if err != nil {
 			return nil, err
 		}
+		m.Codex = BindingMetadata(b, m)
 		return []Model{m}, nil
 	}
 	models, err := s.Models()
@@ -212,6 +244,7 @@ func (s *Store) BindingModels(b Binding) ([]Model, error) {
 	}
 	out := []Model{}
 	for _, m := range models {
+		m.Codex = BindingMetadata(b, m)
 		if !m.Tools || !m.Streaming || m.Codex == nil || m.Codex.Version != b.CodexVersion || m.Codex.Validate() != nil {
 			continue
 		}
@@ -238,4 +271,71 @@ func (s *Store) BindingAllows(b Binding, id string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// BindingMetadata resolves explicit choices first, then exact catalog identities.
+// It never invents capabilities or changes the provider's shared model document.
+func BindingMetadata(b Binding, m Model) *CodexMetadata {
+	if source, ok := b.ModelTemplates[m.ID]; ok {
+		meta, found := b.CodexCatalog[source]
+		if !found {
+			return nil
+		}
+		return &meta
+	}
+	if m.Codex != nil && (m.Codex.Version == b.CodexVersion || (b.CodexVersion == "" && b.ModelScope != "all-compatible")) {
+		return m.Codex
+	}
+	if meta, ok := b.CodexCatalog[m.ID]; ok {
+		return &meta
+	}
+	source := ""
+	for _, c := range m.Candidates {
+		if _, ok := b.CodexCatalog[c.Model]; ok {
+			if source != "" && source != c.Model {
+				return nil
+			}
+			source = c.Model
+		}
+	}
+	if source == "" {
+		return nil
+	}
+	meta := b.CodexCatalog[source]
+	return &meta
+}
+
+// UpdateBindingCatalog preserves target ownership and credentials while updating
+// the approved target-local model policy and catalog snapshot.
+func (s *Store) UpdateBindingCatalog(b Binding, expected int64) (Binding, error) {
+	old, err := s.Binding(b.ID)
+	if err != nil {
+		return b, err
+	}
+	if old.Revision != expected {
+		return b, ErrConflict
+	}
+	if old.ConfigRoot != b.ConfigRoot || old.Executable != b.Executable || old.AdapterID != b.AdapterID || old.AdapterVersion != b.AdapterVersion {
+		return b, ErrInvalid
+	}
+	b.Revision = expected + 1
+	if err = b.Validate(); err != nil {
+		return b, err
+	}
+	raw, err := json.Marshal(b)
+	if err != nil {
+		return b, err
+	}
+	res, err := s.db.Exec(`UPDATE bindings SET document=?,enabled=?,revision=? WHERE id=? AND revision=?`, string(raw), b.Enabled, b.Revision, b.ID, expected)
+	if err != nil {
+		return b, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return b, err
+	}
+	if n != 1 {
+		return b, ErrConflict
+	}
+	return b, nil
 }

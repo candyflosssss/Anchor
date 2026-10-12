@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -72,7 +73,7 @@ func TestAgentTokenAndIndependentRecovery(t *testing.T) {
 	}
 }
 func TestAgentHelpMatchesLifecycle(t *testing.T) {
-	for _, s := range []string{"agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version"} {
+	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version"} {
 		if !strings.Contains(help, s) {
 			t.Fatal("missing help", s)
 		}
@@ -158,5 +159,75 @@ func TestCLICatalogImportAndModelScopes(t *testing.T) {
 	m, err := st.Model("default")
 	if err != nil || m.Codex != nil {
 		t.Fatal(m, err)
+	}
+}
+
+func TestCLIDiscoverEnrollSync(t *testing.T) {
+	st, err := state.Open(t.TempDir(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	srv := core.New(st, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+	defer srv.Close()
+	web := httptest.NewServer(srv.Control())
+	defer web.Close()
+	if _, err = st.Initialize(strings.TrimPrefix(web.URL, "http://"), "127.0.0.1:17860"); err != nil {
+		t.Fatal(err)
+	}
+	home := t.TempDir()
+	root := filepath.Join(home, ".codex")
+	os.Mkdir(root, 0700)
+	exe, _ := os.Executable()
+	srv.AgentEnvironment = func() (managed.Environment, error) {
+		return managed.Environment{Home: home, CodexHome: root, Executable: exe}, nil
+	}
+	raw, err := os.ReadFile("../state/testdata/codex-models.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cache map[string]any
+	json.Unmarshal(raw, &cache)
+	cache["client_version"] = "0.159.3"
+	raw, _ = json.Marshal(cache)
+	os.WriteFile(filepath.Join(root, "models_cache.json"), raw, 0600)
+	run := func(success bool, args ...string) string {
+		t.Helper()
+		var out, diag bytes.Buffer
+		err := (App{In: strings.NewReader(""), Out: &out, Err: &diag}).Run(context.Background(), append([]string{"--data-dir", st.Dir}, args...))
+		if success && err != nil {
+			t.Fatal(args, err, diag.String())
+		}
+		if !success && err == nil {
+			t.Fatal("invalid command accepted", args)
+		}
+		return out.String()
+	}
+	run(true, "context", "add", "local", "--local")
+	run(true, "context", "use", "local")
+	run(true, "provider", "add", "--id", "p", "--base-url", "http://127.0.0.1:1/v1")
+	run(true, "model", "add", "--id", "public", "--candidate", "p:fixture-source", "--tools", "--streaming")
+	var workspace managed.AgentWorkspace
+	output := run(true, "agent", "discover")
+	if json.Unmarshal([]byte(output), &workspace) != nil || len(workspace.Targets) != 1 {
+		t.Fatal(output)
+	}
+	id := workspace.Targets[0].ID
+	run(false, "agent", "enroll", "--target", id, "--model", "public")
+	run(false, "agent", "enroll", "--target", id, "--model", "public", "--approve", "--template", "public:missing")
+	output = run(true, "agent", "enroll", "--target", id, "--model", "public", "--approve", "--template", "public:fixture-source")
+	if json.Unmarshal([]byte(output), &workspace) != nil || workspace.Bindings[0].Status != "pending" {
+		t.Fatal(output)
+	}
+	if listed := run(true, "agent", "list"); strings.Contains(listed, "base_instructions") || strings.Contains(listed, "codex_catalog") {
+		t.Fatal("full catalog exposed in binding list")
+	}
+	srv.Agents.Start()
+	run(false, "agent", "sync", id, "--revision", "0")
+	run(true, "agent", "sync", id, "--revision", "1")
+	run(false, "agent", "enroll", "--target", id, "--model", "public", "--approve")
+	run(true, "agent", "disable", id, "--revision", "1")
+	if _, err = os.Stat(filepath.Join(root, "anchor_"+id+".models.json")); !os.IsNotExist(err) {
+		t.Fatal("catalog not restored", err)
 	}
 }

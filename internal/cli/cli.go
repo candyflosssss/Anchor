@@ -56,12 +56,15 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
                [--codex-catalog FILE --codex-model SOURCE --codex-version X.Y.Z]
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
   access list | access revoke ID      Local-owner authorization operations
+  agent discover                     Read local targets and managed workspace
+  agent enroll --target ID --model MODEL --approve [--revision N]
+               [--template ALIAS:LOCAL_SOURCE ...] (empty source excludes alias)
   agent add --id ID --adapter codex --codex-home ABS_DIR --model MODEL --approve
             [--model-scope all-compatible|single] [--anchor-executable ABS_PATH]
                                             Register; apply explicitly or on next serve
   agent list | agent inspect ID | agent plan ID
   agent apply ID --revision N --fingerprint SHA256
-  agent restore|enable|disable ID --revision N
+  agent sync|restore|enable|disable ID --revision N
   agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|single
   agent token ID                     Credential-helper stdout (local, raw secret)
   recover [--id ID]                   Conditional recovery with core stopped
@@ -79,6 +82,8 @@ init/serve/access/context/recover/update/agent token operate locally. Business c
 Codex base-config/model-catalog management is available; actual Agent connection remains unverified.
 New agent add defaults to all-compatible; --model is the default, not the permission boundary.
 Catalog metadata must match the exact Codex version and actual upstream capabilities.
+Enroll reads the selected local models_cache.json; no executable or network probing.
+Restart Codex after configuration changes. Other detected agents remain unsupported.
 Remote Codex app-server uses the remote base config; SSH connection management,
 other Agent adapters and named profiles are not implemented.
 Protocol conversion supports stateless text, function tools and streaming; unsupported content is rejected.
