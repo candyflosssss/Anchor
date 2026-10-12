@@ -31,7 +31,7 @@ func TestPriorityWorkspaceBridgeReadWrite(t *testing.T) {
 	b := NewBridge(s)
 	requireReady(t, b)
 	secret := "synthetic-workspace-key"
-	p := b.SaveProvider(SaveProvider{Provider: Provider{ID: "p", BaseURL: "http://127.0.0.1:1/v1", Protocol: "anthropic", Enabled: true, TimeoutSeconds: 10, MaxConcurrent: 1}, Secret: &secret})
+	p := b.SaveProvider(SaveProvider{Provider: Provider{ID: "p", BaseURLs: []string{"http://127.0.0.1:1/v1"}, Enabled: true, TimeoutSeconds: 10, MaxConcurrent: 1}, Secret: &secret})
 	if p.Problem != nil || p.Data == nil {
 		t.Fatal(p)
 	}

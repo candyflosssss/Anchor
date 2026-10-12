@@ -310,6 +310,7 @@ func (s *Store) Providers() ([]Provider, error) {
 		if err = json.Unmarshal([]byte(b), &p); err != nil {
 			return nil, err
 		}
+		p.Normalize()
 		p.Revision = rev
 		p.HasSecret = secret != ""
 		out = append(out, p)
@@ -330,6 +331,7 @@ func (s *Store) Provider(id string) (Provider, error) {
 	if err = json.Unmarshal([]byte(b), &p); err != nil {
 		return Provider{}, err
 	}
+	p.Normalize()
 	p.Secret = secret
 	p.HasSecret = secret != ""
 	p.Revision = rev
@@ -353,14 +355,24 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 		return Provider{}, err
 	}
 	defer tx.Rollback()
-	var oldSecret string
+	var oldSecret, oldDocument string
 	var current int64
-	err = tx.QueryRow(`SELECT secret,revision FROM providers WHERE id=?`, p.ID).Scan(&oldSecret, &current)
+	err = tx.QueryRow(`SELECT secret,revision,document FROM providers WHERE id=?`, p.ID).Scan(&oldSecret, &current, &oldDocument)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Provider{}, err
 	}
 	if current != expected {
 		return Provider{}, ErrConflict
+	}
+	p.Normalize()
+	if p.Protocol == "" {
+		// Provider-level protocol is no longer user-facing; keep the stored legacy value.
+		var old Provider
+		if oldDocument != "" && json.Unmarshal([]byte(oldDocument), &old) == nil && ValidProtocol(old.Protocol) {
+			p.Protocol = old.Protocol
+		} else {
+			p.Protocol = "responses"
+		}
 	}
 	if secret == nil {
 		p.Secret = oldSecret

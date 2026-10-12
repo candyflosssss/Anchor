@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -107,6 +108,18 @@ func TestCLIManagementWorkflow(t *testing.T) {
 		if err != nil || stored.Secret != "chinese-provider-secret" {
 			t.Fatal("Chinese provider update lost secret", err)
 		}
+	}
+	out = run("", "provider", "add", "--id", "multi", "--homepage-url", "https://www.example.invalid", "--base-url", "https://a.example.invalid/v1", "--base-url", "https://b.example.invalid/v1", "--protocol", "anthropic")
+	var multi state.Provider
+	if err := json.Unmarshal([]byte(out), &multi); err != nil || multi.HomepageURL != "https://www.example.invalid" || !reflect.DeepEqual(multi.BaseURLs, []string{"https://a.example.invalid/v1", "https://b.example.invalid/v1"}) || multi.BaseURL != multi.BaseURLs[0] || multi.HasSecret {
+		t.Fatal("multi-URL provider add failed", err, out)
+	}
+	if stored, err := s.Provider("multi"); err != nil || stored.Protocol != "anthropic" {
+		t.Fatal("provider protocol seed was not stored", err)
+	}
+	out = run("", "provider", "put", "--id", "multi", "--base-url", "https://c.example.invalid/v1", "--revision", "1")
+	if stored, err := s.Provider("multi"); err != nil || stored.Protocol != "anthropic" || !reflect.DeepEqual(stored.URLs(), []string{"https://c.example.invalid/v1"}) || stored.HomepageURL != "" {
+		t.Fatal("put without --protocol must keep the stored protocol", err, out)
 	}
 	run("", "model", "add", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:actual", "--tools", "--streaming")
 	run("", "model", "put", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:updated-model", "--revision", "1", "--tools", "--streaming")

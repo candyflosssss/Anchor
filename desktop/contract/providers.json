@@ -3,8 +3,11 @@
   "providers": [
     {
       "id": "摸鱼AI",
-      "base_url": "https://api.example.com/v1",
-      "protocol": "responses",
+      "homepage_url": "https://www.example.com",
+      "base_urls": [
+        "https://api.example.com/v1",
+        "https://api2.example.com/v1"
+      ],
       "enabled": true,
       "timeout_seconds": 120,
       "max_concurrent": 4,
@@ -13,8 +16,10 @@
     },
     {
       "id": "备用供应商",
-      "base_url": "https://backup.example.com/v1",
-      "protocol": "responses",
+      "homepage_url": "",
+      "base_urls": [
+        "https://backup.example.com/v1"
+      ],
       "enabled": true,
       "timeout_seconds": 90,
       "max_concurrent": 2,
@@ -23,8 +28,10 @@
     },
     {
       "id": "本地调试",
-      "base_url": "http://127.0.0.1:18080/v1",
-      "protocol": "responses",
+      "homepage_url": "",
+      "base_urls": [
+        "http://127.0.0.1:18080/v1"
+      ],
       "enabled": false,
       "timeout_seconds": 30,
       "max_concurrent": 1,

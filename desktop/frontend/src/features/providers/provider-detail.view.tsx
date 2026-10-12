@@ -45,8 +45,8 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
       <span className="provider-avatar large" aria-hidden="true">{Array.from(p.id)[0]}</span>
       <div className="detail-title">
         <h1>{p.id}</h1>
-        <div className="detail-meta"><StatusBadge enabled={p.enabled} />{summary && <HealthPill tone={summary.tone} label={summary.label} />}<span className="protocol-tag">按 Key / 模型设置</span></div>
-        <span className="provider-url mono" title={p.base_url}>{p.base_url}</span>
+        <div className="detail-meta"><StatusBadge enabled={p.enabled} />{summary && <HealthPill tone={summary.tone} label={summary.label} />}</div>
+        <span className="provider-url mono" title={p.base_urls.join('\n')}>{p.base_urls[0]}{p.base_urls.length > 1 ? ` +${p.base_urls.length - 1}` : ''}</span>
       </div>
       <div className="detail-actions">
         <Button disabled={blocked || !w} onClick={() => c.openDialog({ kind: 'test' })}><Play />测试连通</Button>
@@ -93,7 +93,7 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
     <section className="detail-card"><h2>接入检查</h2><p className="card-hint">按顺序完成后即可被 Agent 调用。</p>
       <ul className="checklist">
         {!p.enabled && <Check ok={false} title="供应商已停用" detail="不参与新的路由选择；配置和密钥均保留。" action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.requestToggle(p)}>重新启用</Button>} />}
-        <Check ok title="API 地址" detail={p.base_url} />
+        <Check ok title="请求地址" detail={p.base_urls.length > 1 ? `${p.base_urls.length} 个地址轮询 · ${p.base_urls[0]}` : p.base_urls[0]} />
         <Check ok={ready.length > 0} warn={!w.keys.length} title="访问 Key" detail={w.keys.length ? `${ready.length} 个可调度 / 共 ${w.keys.length} 个` : '未配置，将以匿名方式请求上游'}
           action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => w.keys.length ? c.setDetailTab('keys') : c.openDialog({ kind: 'key' })}>{w.keys.length ? '管理 Key' : '添加 Key'}</Button>} />
         <Check ok={w.models.length > 0} title="模型映射" detail={w.models.length ? `已映射 ${w.models.length} 个公开模型` : 'Agent 还不能通过此供应商使用任何模型'}
@@ -104,8 +104,8 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
     </section>
     <section className="detail-card"><h2>配置</h2>
       <dl className="detail-properties">
-        <dt>API 根地址</dt><dd className="mono break-all">{p.base_url}</dd>
-        <dt>协议</dt><dd>{w.keys.length ? '按 Key 默认值，可由实际模型覆盖' : `匿名请求：${protocolName[p.protocol]}`}</dd>
+        <dt>供应商主页</dt><dd className="break-all">{p.homepage_url ? <a className="text-link" href={p.homepage_url} target="_blank" rel="noopener noreferrer">{p.homepage_url}</a> : '未设置'}</dd>
+        <dt>请求地址</dt><dd className="mono break-all">{p.base_urls.map(u => <div key={u}>{u}</div>)}</dd>
         <dt>凭据</dt><dd className="flex items-center gap-2"><KeyRound size={14} />{p.has_secret ? '已配置 · 密钥不可回显' : '未配置密钥'}</dd>
         <dt>请求超时</dt><dd>{p.timeout_seconds} 秒</dd>
         <dt>最大并发</dt><dd>{p.max_concurrent} 个请求</dd>

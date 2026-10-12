@@ -7,8 +7,8 @@ export interface Problem {
 }
 export interface Provider {
   id: string;
-  base_url: string;
-  protocol: string;
+  homepage_url: string;
+  base_urls: string[];
   enabled: boolean;
   timeout_seconds: number;
   max_concurrent: number;

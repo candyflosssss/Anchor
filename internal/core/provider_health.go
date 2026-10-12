@@ -139,3 +139,21 @@ func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeySta
 	}
 	return out
 }
+
+// pickURL rotates across a provider's request base URLs for load balancing.
+// Discovery and connectivity tests keep using the first URL for determinism.
+func (s *Server) pickURL(p state.Provider) string {
+	urls := p.URLs()
+	if len(urls) == 0 {
+		return p.BaseURL
+	}
+	if len(urls) == 1 {
+		return urls[0]
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := "url\x00" + p.ID
+	i := s.cursor[key] % len(urls)
+	s.cursor[key] = (i + 1) % len(urls)
+	return urls[i]
+}

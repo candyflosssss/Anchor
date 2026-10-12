@@ -325,7 +325,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		fail(w, 400, "unsupported_conversion", "candidate protocol cannot represent a request field or content")
 		return false
 	}
-	target := strings.TrimRight(p.BaseURL, "/") + protocol.Endpoint(p.Protocol)
+	target := strings.TrimRight(s.pickURL(p), "/") + protocol.Endpoint(p.Protocol)
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.TimeoutSeconds)*time.Second)
 	defer cancel()
 	var connected atomic.Bool

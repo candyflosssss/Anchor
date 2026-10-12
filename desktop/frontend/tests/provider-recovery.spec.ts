@@ -100,18 +100,19 @@ test('a new provider automatically reconciles concurrent changes before its next
     MockProviderTransport.prototype.save = async function (input, signal) {
       MockProviderTransport.prototype.save = save;
       const saved = await save.call(this, input, signal);
-      await this.action(actionFor(saved, 'strategy', { strategy: 'priority' }), signal);
+      // New providers start without a Key; a concurrent writer adds one, then changes strategy.
+      const keyed = await this.action(actionFor(saved, 'key-put', { target: 'concurrent', secret: 'synthetic-concurrent-key', protocol: 'responses' }), signal);
+      await this.action(actionFor({ ...saved, revision: keyed.revision }, 'strategy', { strategy: 'priority' }), signal);
       return saved;
     };
   });
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
   await page.getByLabel('供应商名称 / ID').fill('新建供应商');
   await page.getByLabel('API 根地址', { exact: true }).fill('https://new.example.com/v1');
-  await page.getByLabel('API 密钥（可选）').fill('synthetic-new-provider-key');
   await page.getByRole('dialog').getByRole('button', { name: '添加供应商', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
   const detail = page.getByLabel('新建供应商 的详情');
-  await expect(detail).toContainText('revision 2');
+  await expect(detail).toContainText('revision 3');
   await detail.getByRole('tab', { name: /^Key/ }).click();
   await expect(page.getByLabel('Key 调度策略')).toBeEnabled();
   await expect(page.getByLabel('Key 调度策略')).toHaveValue('priority');
@@ -119,7 +120,7 @@ test('a new provider automatically reconciles concurrent changes before its next
   await expect(page.getByLabel('Key 调度策略')).toHaveValue('round-robin');
   await expect(page.getByRole('alert')).toHaveCount(0);
   await detail.getByRole('tab', { name: '概况', exact: true }).click();
-  await expect(detail).toContainText('revision 3');
+  await expect(detail).toContainText('revision 4');
 });
 
 test('a Key dialog shows automatic conflict recovery and waits for a deliberate resubmit', async ({ page }) => {

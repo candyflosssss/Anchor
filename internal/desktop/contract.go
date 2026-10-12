@@ -16,14 +16,14 @@ type Problem struct {
 	Code string `json:"code"`
 }
 type Provider struct {
-	ID             string `json:"id"`
-	BaseURL        string `json:"base_url"`
-	Protocol       string `json:"protocol"`
-	Enabled        bool   `json:"enabled"`
-	TimeoutSeconds int    `json:"timeout_seconds"`
-	MaxConcurrent  int    `json:"max_concurrent"`
-	Revision       int64  `json:"revision"`
-	HasSecret      bool   `json:"has_secret"`
+	ID             string   `json:"id"`
+	HomepageURL    string   `json:"homepage_url"`
+	BaseURLs       []string `json:"base_urls"`
+	Enabled        bool     `json:"enabled"`
+	TimeoutSeconds int      `json:"timeout_seconds"`
+	MaxConcurrent  int      `json:"max_concurrent"`
+	Revision       int64    `json:"revision"`
+	HasSecret      bool     `json:"has_secret"`
 }
 type SaveProvider struct {
 	Provider         Provider `json:"provider"`

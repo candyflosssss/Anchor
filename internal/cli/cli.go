@@ -47,9 +47,9 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   logs configure [--days 7] [--system-days 7] [--max-requests 50000]
       [--request-mib 256] [--system-mib 32]
   usage                                Persistent per-provider/model totals
-  provider add|put --id ID --base-url URL [--secret-stdin] [--revision N]
-                [--protocol responses|chat-completions|anthropic] [--timeout 120] [--max-concurrent 4]
-                [--disabled]
+  provider add|put --id ID --base-url URL [--base-url URL ...] [--homepage-url URL]
+                [--secret-stdin] [--revision N] [--protocol responses|chat-completions|anthropic]
+                [--timeout 120] [--max-concurrent 4] [--disabled]
   model list
   model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...]
                [--display-name NAME] [--tools] [--streaming] [--revision N]
@@ -470,8 +470,10 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	}
 	f := a.flags("provider " + args[0])
 	id := f.String("id", "", "provider ID: 1..128 Unicode letters (including Chinese), digits, or ._-; start with a letter or digit")
-	base := f.String("base-url", "", "API base including optional /v1, not /responses")
-	protocol := f.String("protocol", "responses", "upstream protocol")
+	var bases repeated
+	f.Var(&bases, "base-url", "request API base including optional /v1, not /responses; repeat for round-robin load balancing (max 16)")
+	homepage := f.String("homepage-url", "", "optional provider homepage, display only")
+	protocol := f.String("protocol", "", "default protocol for a newly created default Key; empty keeps the stored value or uses responses")
 	timeout := f.Int("timeout", 120, "total request timeout in seconds")
 	max := f.Int("max-concurrent", 4, "provider concurrency")
 	disabled := f.Bool("disabled", false, "disable provider")
@@ -486,7 +488,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	if args[0] == "put" && *rev < 1 {
 		return errors.New("put requires the current --revision")
 	}
-	p := state.Provider{ID: *id, BaseURL: *base, Protocol: *protocol, Enabled: !*disabled, TimeoutSeconds: *timeout, MaxConcurrent: *max}
+	p := state.Provider{ID: *id, HomepageURL: *homepage, BaseURLs: append([]string(nil), bases...), Protocol: *protocol, Enabled: !*disabled, TimeoutSeconds: *timeout, MaxConcurrent: *max}
 	if err := p.Validate(); err != nil {
 		return err
 	}

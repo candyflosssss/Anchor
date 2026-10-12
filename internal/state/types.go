@@ -62,14 +62,52 @@ func ValidateURL(s string) error {
 	return nil
 }
 
+const MaxProviderURLs = 16
+
+// ValidateHomepage accepts an optional, display-only HTTP(S) page address.
+func ValidateHomepage(s string) error {
+	if s == "" {
+		return nil
+	}
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Hostname() == "" || u.User != nil || len(s) > 2048 || strings.ContainsAny(s, " \t\r\n") {
+		return errors.New("invalid homepage URL; use http(s) without userinfo")
+	}
+	return nil
+}
+
+// URLs returns the request base URLs, falling back to the legacy single field.
+func (p Provider) URLs() []string {
+	if len(p.BaseURLs) > 0 {
+		return p.BaseURLs
+	}
+	if p.BaseURL != "" {
+		return []string{p.BaseURL}
+	}
+	return nil
+}
+
+// Normalize makes BaseURLs authoritative and BaseURL its first entry.
+func (p *Provider) Normalize() {
+	p.BaseURLs = append([]string(nil), p.URLs()...)
+	if len(p.BaseURLs) > 0 {
+		p.BaseURL = p.BaseURLs[0]
+	}
+}
+
 func ValidProtocol(p string) bool {
 	return p == "responses" || p == "chat-completions" || p == "anthropic"
 }
 
 type Provider struct {
-	ID             string `json:"id"`
-	BaseURL        string `json:"base_url"`
-	Protocol       string `json:"protocol"`
+	ID          string `json:"id"`
+	HomepageURL string `json:"homepage_url,omitempty"`
+	// BaseURL mirrors BaseURLs[0] for older readers; BaseURLs is authoritative.
+	BaseURL  string   `json:"base_url"`
+	BaseURLs []string `json:"base_urls,omitempty"`
+	// Protocol is legacy/internal: it only initializes a new default Key and
+	// anonymous requests. Empty means "keep the stored value" on writes.
+	Protocol       string `json:"protocol,omitempty"`
 	Enabled        bool   `json:"enabled"`
 	TimeoutSeconds int    `json:"timeout_seconds"`
 	MaxConcurrent  int    `json:"max_concurrent"`
@@ -82,10 +120,28 @@ func (p Provider) Validate() error {
 	if !ValidProviderID(p.ID) {
 		return errors.New("invalid provider ID: use 1..128 Unicode letters (including Chinese), decimal digits, or ._-; start with a letter or digit")
 	}
-	if err := ValidateURL(p.BaseURL); err != nil {
+	urls := p.URLs()
+	if len(urls) == 0 || len(urls) > MaxProviderURLs {
+		return fmt.Errorf("provide 1..%d request base URLs", MaxProviderURLs)
+	}
+	seen := map[string]bool{}
+	for _, u := range urls {
+		if err := ValidateURL(u); err != nil {
+			return err
+		}
+		key := strings.TrimRight(u, "/")
+		if seen[key] {
+			return errors.New("duplicate request base URL")
+		}
+		seen[key] = true
+	}
+	if p.BaseURL != "" && len(p.BaseURLs) > 0 && p.BaseURL != p.BaseURLs[0] {
+		return errors.New("base_url must equal the first base_urls entry")
+	}
+	if err := ValidateHomepage(p.HomepageURL); err != nil {
 		return err
 	}
-	if !ValidProtocol(p.Protocol) {
+	if p.Protocol != "" && !ValidProtocol(p.Protocol) {
 		return errors.New("unsupported protocol")
 	}
 	if p.TimeoutSeconds < 1 || p.TimeoutSeconds > 3600 || p.MaxConcurrent < 1 || p.MaxConcurrent > 64 {

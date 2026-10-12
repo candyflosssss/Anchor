@@ -1,6 +1,6 @@
 import { useProviderFeatures } from './use-provider-features';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { isDirty, newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
+import { newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
 import type { Scenario } from './provider.mock';
 import type { DetailTab, ProviderDialog } from './provider-summary.model';
 import type { ProviderEnvironment } from '../../desktop/environment';
@@ -17,7 +17,6 @@ export function useProviderController(environment: ProviderEnvironment) {
   const [filter, setFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
   const [editor, setEditor] = useState<{ source?: Provider; draft: ProviderDraft } | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [discard, setDiscard] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toggle, setToggle] = useState<Provider | null>(null);
   const [scenario, setScenario] = useState<Scenario>('normal');
@@ -65,27 +64,30 @@ export function useProviderController(environment: ProviderEnvironment) {
     void load();
     return () => { query.current?.abort(); write.current?.abort(); catalogQuery.current?.abort(); };
   }, [load]);
-  const visible = useMemo(() => providers.filter(p => (filter === 'all' || p.enabled === (filter === 'enabled')) && `${p.id} ${p.base_url}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [providers, filter, search]);
+  const visible = useMemo(() => providers.filter(p => (filter === 'all' || p.enabled === (filter === 'enabled')) && `${p.id} ${p.homepage_url} ${p.base_urls.join(' ')}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [providers, filter, search]);
   const selected = providers.find(p => p.id === selectedId) ?? null;
   const blocked = phase !== 'ready' || problem === 'unknown' || problem === 'conflict' || busy || modelsBusy;
   function openEditor(source?: Provider) {
     if (blocked || locked.current || features.isBusy()) return;
-    setNotice(''); setEditor({ source, draft: newDraft(source) }); setErrors({}); setDiscard(false);
+    setNotice(''); setEditor({ source, draft: newDraft(source) }); setErrors({});
   }
   function changeDraft<K extends keyof ProviderDraft>(key: K, value: ProviderDraft[K]) {
     setEditor(old => old && { ...old, draft: { ...old.draft, [key]: value,
       ...(key === 'secretMode' ? { secret: '', confirmClear: false } : {}) } });
-    setDiscard(false);
-    setErrors(old => { const next = { ...old }; delete next[key as keyof FieldErrors]; return next; });
+    setErrors(old => {
+      const next = { ...old }; delete next[key as keyof FieldErrors];
+      if (key === 'base_urls') for (const name of Object.keys(next)) if (name.startsWith('base_url_')) delete next[name as keyof FieldErrors];
+      return next;
+    });
   }
-  function closeEditor(force = false) {
+  function closeEditor() {
     if (locked.current) return;
-    if (!force && editor && isDirty(editor.draft, editor.source)) { setDiscard(true); return; }
-    setEditor(null); setErrors({}); setDiscard(false);
+    // Cancel / close / Escape always discard the draft directly, without a second prompt.
+    setEditor(null); setErrors({});
   }
   async function save(source: Provider | undefined, draft: ProviderDraft, toggling = false) {
     if (blocked || locked.current || features.isBusy()) return;
-    const nextErrors = validateDraft(draft, !source);
+    const nextErrors = validateDraft(draft);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
     clearModels();
@@ -101,7 +103,7 @@ export function useProviderController(environment: ProviderEnvironment) {
       clearModels();
       setProviders(old => [...old.filter(p => p.id !== saved.id), saved]);
       if (!source) { setSelectedId(saved.id); setDetailTab('overview'); setDialog(null); }
-      setEditor(null); setToggle(null); setDiscard(false);
+      setEditor(null); setToggle(null);
       // Reconcile newly created providers with the authoritative list automatically.
       if (!source) await load(saved.id);
       if (abort.signal.aborted || epoch !== generation.current) return;
@@ -139,7 +141,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   }
   async function reloadFromEditor() {
     // Deliberate, labeled discard action: user has already been told their draft is lost.
-    closeEditor(true); await load();
+    closeEditor(); await load();
     setNotice(`${mock ? '演示：' : ''}已重新读取。请核对最新配置，再打开编辑；原草稿已丢弃。`);
   }
   function changeScenario(value: Scenario) {
@@ -165,7 +167,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   return {
     features,
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
-    notice, search, setSearch, filter, setFilter, editor, errors, discard, busy: busy || modelsBusy || features.busy, blocked: blocked || features.busy, toggle, scenario,
+    notice, search, setSearch, filter, setFilter, editor, errors, busy: busy || modelsBusy || features.busy, blocked: blocked || features.busy, toggle, scenario,
     models: models?.provider_id === selected?.id ? models : null,
     modelsProblem, modelsBusy, discoverModels, catalogKey,
     selectCatalogKey: (id: string) => { if (!features.isBusy() && !locked.current) { clearModels(); setCatalogKey(id); } },
@@ -173,7 +175,6 @@ export function useProviderController(environment: ProviderEnvironment) {
     openDialog: (next: ProviderDialog) => { if (!features.isBusy() && !locked.current) setDialog(next); },
     closeDialog: () => { if (!features.isBusy()) setDialog(null); },
     select: (id: string | null) => { if (!locked.current && !features.isBusy()) { clearModels(); setCatalogKey(''); setSelectedId(id); setDetailTab('overview'); setDialog(null); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
-    continueEditing: () => setDiscard(false),
     submit: () => editor && void save(editor.source, editor.draft),
     requestToggle: (provider: Provider) => { if (!blocked && !features.isBusy()) { setNotice(''); setToggle(provider); } },
     cancelToggle: () => { if (!locked.current) setToggle(null); },

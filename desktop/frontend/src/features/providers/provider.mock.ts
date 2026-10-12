@@ -67,7 +67,6 @@ export class MockProviderTransport implements ProviderTransport {
     let w = this.workspaces.get(p.id);
     if (!w) {
       w = checkedWorkspace({ ...structuredClone(workspaceFixture), provider_id: p.id, revision: p.revision, keys: p.has_secret ? structuredClone(workspaceFixture.keys) : [] });
-      w.keys.forEach(k => { k.protocol = p.protocol; });
       if (!this.seeded.has(p.id)) { this.seeded.add(p.id); seed(p.id, w); }
       this.workspaces.set(p.id, w);
     }
@@ -131,8 +130,8 @@ export class MockProviderTransport implements ProviderTransport {
       throw fixtureError('conflict');
     }
     if ((input.expected_revision === 0 && current) || (input.expected_revision > 0 && current?.revision !== input.expected_revision)) throw fixtureError('conflict');
-    if (!['responses','chat-completions','anthropic'].includes(input.provider.protocol)) throw fixtureError('invalid');
-    const saved: Provider = { ...input.provider, protocol: input.provider.protocol as Provider['protocol'], revision: input.expected_revision + 1,
+    if (!input.provider.base_urls.length || input.provider.base_urls.length > 16) throw fixtureError('invalid');
+    const saved: Provider = { ...input.provider, base_urls: [...input.provider.base_urls], revision: input.expected_revision + 1,
       has_secret: input.secret === null ? current?.has_secret ?? false : !!input.secret };
     if (current) {
       const w = this.detail(current);
@@ -140,7 +139,7 @@ export class MockProviderTransport implements ProviderTransport {
         const k = w.keys.find(k => k.id === 'default');
         if (!input.secret) w.keys = w.keys.filter(k => k.id !== 'default');
         else if (k) { k.enabled = true; k.state = 'ready'; }
-        else w.keys.push({ id: 'default', protocol: saved.protocol, model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
+        else w.keys.push({ id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
       }
       saved.has_secret = w.keys.length > 0;
     }

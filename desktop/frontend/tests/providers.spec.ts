@@ -39,14 +39,19 @@ test('new provider validates fields, handles Chinese ID and never persists secre
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).click();
   await expect(page.getByLabel('供应商名称 / ID')).toBeFocused();
   await page.getByLabel('供应商名称 / ID').fill('中文供应商');
+  await page.getByLabel('供应商主页（可选）').fill('https://www.new.example.com');
   await page.getByLabel('API 根地址', { exact: true }).fill('https://new.example.com/v1');
-  await page.getByLabel('API 密钥（可选）').fill('browser-test-only');
+  await page.getByRole('button', { name: '添加请求地址' }).click();
+  await page.getByLabel('API 根地址 2', { exact: true }).fill('https://new2.example.com/v1');
+  await expect(dialog.getByText('默认 API 密钥')).toHaveCount(0);
+  await expect(dialog.getByText('初始 Key 默认协议')).toHaveCount(0);
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).dblclick();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('status').filter({ hasText: '中文供应商 的配置已保存' })).toContainText('revision 1');
-  await expect(page.getByLabel('中文供应商 的详情')).toContainText('已配置');
+  const created = page.getByLabel('中文供应商 的详情');
+  await expect(created).toContainText('未配置密钥'); await expect(created).toContainText('https://new2.example.com/v1');
+  await expect(created.getByRole('link', { name: 'https://www.new.example.com' })).toBeVisible();
   const storage = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }));
-  expect(JSON.stringify(storage)).not.toContain('browser-test-only');
   expect(Object.keys(storage.local)).toEqual(['anchor.ui.appearance']);
   expect(storage.session).toEqual({}); expect(outside).toEqual([]);
   await page.reload();
@@ -66,18 +71,19 @@ test('complete edit preserves disabled status, limits and keep-secret semantics'
   await expect(detail).toContainText('3 个请求'); await expect(detail).toContainText('revision 3');
   await expect(detail).toContainText('未配置密钥');
 });
-test('discard prompt, escape, keyboard trap and focus restoration', async ({ page }) => {
+test('cancel, close and escape discard directly; keyboard trap and focus restoration', async ({ page }) => {
   await ready(page); const trigger = page.getByRole('button', { name: '编辑 摸鱼AI', exact: true });
   await trigger.click(); await expect(page.getByLabel('供应商名称 / ID')).toBeFocused();
   await page.getByRole('button', { name: '替换密钥' }).click();
   await page.getByLabel('新的 API 密钥').fill('discard-test-only');
-  await page.keyboard.press('Escape'); await expect(page.getByText('有未保存的修改', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '继续编辑' }).click();
-  await expect(page.getByLabel('新的 API 密钥')).toHaveValue('discard-test-only');
   for (let i = 0; i < 18; i++) { await page.keyboard.press('Tab'); expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true); }
   await page.getByRole('button', { name: '取消', exact: true }).click();
-  await page.getByRole('button', { name: '丢弃并关闭' }).click();
+  await expect(page.getByRole('dialog')).toBeHidden(); await expect(page.getByText('有未保存的修改')).toHaveCount(0);
   await expect(trigger).toBeFocused();
+  await trigger.click(); await page.getByLabel('请求超时（秒）').fill('99');
+  await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toBeHidden();
+  await trigger.click(); await expect(page.getByLabel('请求超时（秒）')).not.toHaveValue('99');
+  await page.getByRole('dialog').getByRole('button', { name: '关闭编辑面板' }).click(); await expect(page.getByRole('dialog')).toBeHidden();
   await trigger.click(); await page.getByRole('button', { name: '替换密钥' }).click();
   await expect(page.getByLabel('新的 API 密钥')).toHaveValue('');
 });

@@ -13,11 +13,11 @@
 | `discover(input, signal)` / `Bridge.DiscoverProviderModels(input)` | `client.DiscoverProviderModels` → POST `/control/v1/providers/{id}/discover-models`；显式读取上游目录，不改配置 |
 | `save(input, signal)` / `Bridge.SaveProvider(input)` | `client.PutProvider` → PUT 指定 ID；revision=0 创建，>0 条件更新；普通字段完整替换 |
 
-Provider 字段固定为 `id`, `base_url`, `protocol`, `enabled`, `timeout_seconds`, `max_concurrent`, `revision`, `has_secret`。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。协议接受 `responses`、`chat-completions`、`anthropic`，未知协议拒绝。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
+Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_seconds`, `max_concurrent`, `revision`, `has_secret`。`homepage_url` 可空，仅展示；`base_urls` 为 1..16 个不重复请求地址，网关按请求轮询，目录与测试使用第一个。供应商不再在 DTO 暴露 protocol，协议由 Key 与模型决定；核心内部保留供应商 protocol 仅用于新 default Key 初始化与匿名请求，桌面保存时空值保留已存值、新建按 `responses`。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。协议接受 `responses`、`chat-completions`、`anthropic`，未知协议拒绝。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
 
 - 返回 revision 范围 1..Number.MAX_SAFE_INTEGER；请求 expected_revision 为 0..MAX_SAFE_INTEGER-1，且与输入 provider.revision 一致，防止更新后超出 JS 安全整数范围。
 - 超时单位为秒，1..3600；并发为 1..64。前端即时校验只帮助填写，核心仍做最终业务校验。
-- secret=null 保留 default Key、空字符串清除 default Key、非空替换 default Key；命名 Key 不受影响；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空表单，失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
+- 新增供应商不填 Key，创建时固定发送 secret=null；Key 在详情中添加。编辑时 secret=null 保留 default Key、空字符串清除 default Key、非空替换 default Key；命名 Key 不受影响；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空表单，失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
 - 保存成功返回新 revision，不表示供应商连通性已经验证。
 
 ## 2. 查询、写入与错误
@@ -73,6 +73,6 @@ Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/es
 
 协议归属 Key，Action.protocol 使用 responses / chat-completions / anthropic。key-put 省略或空 protocol 保留已有 Key 默认值，新 Key 默认 responses；secret 可空以保留凭据，因此支持纯协议编辑。key-model-protocol 使用 target=Key ID、model=实际模型名、protocol=独立覆盖；空值或 inherit 删除覆盖。两种写入均要求当前供应商 revision，成功加一，失败事务回滚；不改变公开模型映射。
 
-转发先选 Key，然后按该 Key 和候选中的实际模型名解析覆盖 → Key 默认值，JSON、SSE、认证与推理测试均使用此结果。模型未设置覆盖时动态继承，以后修改 Key 默认值自动生效。供应商 protocol 保留用于历史兼容、新 default Key 初始化与匿名请求，不再控制已有 Key。schema3→4 把每个供应商旧协议复制到它的全部 Key；复制凭据时一并复制覆盖，改名/删除按外键级联。升级须同步客户端与核心；旧程序无法打开 schema4，不提供降级。
+转发先选 Key，然后按该 Key 和候选中的实际模型名解析覆盖 → Key 默认值，JSON、SSE、认证与推理测试均使用此结果。模型未设置覆盖时动态继承，以后修改 Key 默认值自动生效。供应商 protocol 仅保留为核心内部值，用于历史兼容、新 default Key 初始化与匿名请求，不再控制已有 Key，桌面不显示也不设置。schema3→4 把每个供应商旧协议复制到它的全部 Key；复制凭据时一并复制覆盖，改名/删除按外键级联。升级须同步客户端与核心；旧程序无法打开 schema4，不提供降级。
 
 UI 的 Key 编辑支持默认协议与留空保留凭据；模型页按 Key 获取目录，为实际模型逐项选择继承/独立协议，已存覆盖在目录尚未查询或不再返回该模型时仍可查看和恢复继承。切换供应商/Key，修改 Key 凭据或删除 Key 时清理目录结果；模型协议写入保留当前目录，方便连续编辑。查询结果包含实际 Key，前端拒绝与显式请求不符的响应。验证层次和限制沿用 §3。已随 desktop.16 dev 打包发布；原生安装未验收，安装包能力以[发行记录](../release/desktop.md)为准。

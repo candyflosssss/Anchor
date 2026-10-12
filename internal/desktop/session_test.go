@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -102,7 +103,7 @@ func TestRealCoreLifecycleAndProviders(t *testing.T) {
 		t.Fatalf("empty list: %+v", r)
 	}
 	secret := "fixture-secret-not-real"
-	input := SaveProvider{Provider: Provider{ID: "供应商测试", BaseURL: "https://api.example.com/v1", Protocol: "responses", Enabled: true, TimeoutSeconds: 120, MaxConcurrent: 4}, Secret: &secret}
+	input := SaveProvider{Provider: Provider{ID: "供应商测试", BaseURLs: []string{"https://api.example.com/v1"}, Enabled: true, TimeoutSeconds: 120, MaxConcurrent: 4}, Secret: &secret}
 	created := b.SaveProvider(input)
 	if created.Problem != nil || created.Data == nil || !created.Data.HasSecret || created.Data.Revision != 1 {
 		t.Fatalf("create: %+v", created)
@@ -326,7 +327,7 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	b := NewBridge(s)
 	requireReady(t, b)
 	secret := "synthetic-catalog-secret"
-	created := b.SaveProvider(SaveProvider{Provider: Provider{ID: "目录供应商", BaseURL: upstream.URL + "/v1", Protocol: "responses", Enabled: false, TimeoutSeconds: 2, MaxConcurrent: 1}, Secret: &secret})
+	created := b.SaveProvider(SaveProvider{Provider: Provider{ID: "目录供应商", BaseURLs: []string{upstream.URL + "/v1"}, Enabled: false, TimeoutSeconds: 2, MaxConcurrent: 1}, Secret: &secret})
 	if created.Problem != nil || created.Data == nil {
 		t.Fatal(created)
 	}
@@ -341,7 +342,7 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	}
 	// Saved configuration and its revision remain unchanged after a real bridge call.
 	rows := b.Providers()
-	if rows.Problem != nil || len(rows.Data) != 1 || rows.Data[0] != *created.Data {
+	if rows.Problem != nil || len(rows.Data) != 1 || !reflect.DeepEqual(rows.Data[0], *created.Data) {
 		t.Fatal(rows)
 	}
 	in.ExpectedRevision++
@@ -360,7 +361,7 @@ func TestRealBridgeKeyProtocolSettings(t *testing.T) {
 	b := NewBridge(s)
 	requireReady(t, b)
 	secret := "synthetic-protocol"
-	created := b.SaveProvider(SaveProvider{Provider: Provider{ID: "protocol", BaseURL: "http://127.0.0.1:1", Protocol: "responses", Enabled: false, TimeoutSeconds: 2, MaxConcurrent: 1}, Secret: &secret})
+	created := b.SaveProvider(SaveProvider{Provider: Provider{ID: "protocol", BaseURLs: []string{"http://127.0.0.1:1"}, Enabled: false, TimeoutSeconds: 2, MaxConcurrent: 1}, Secret: &secret})
 	if created.Problem != nil {
 		t.Fatal(created)
 	}

@@ -76,7 +76,6 @@ test('desktop starts once, loads real-mode data and submits without persisting s
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
   await page.getByLabel('供应商名称 / ID').fill('桌面供应商');
   await page.getByLabel('API 根地址', { exact: true }).fill('https://desktop.example.com/v1');
-  await page.getByLabel('API 密钥（可选）').fill('desktop-synthetic-secret');
   await page.getByRole('dialog').getByRole('button', { name: '添加供应商', exact: true }).dblclick();
   await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByLabel('桌面供应商 的详情')).toBeVisible();

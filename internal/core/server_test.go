@@ -546,3 +546,30 @@ func TestGatewayGlobalConcurrencyLimit(t *testing.T) {
 		t.Fatal("global limit was not enforced", response.StatusCode)
 	}
 }
+func TestRequestURLsRoundRobin(t *testing.T) {
+	f := setup(t)
+	var hits [2]atomic.Int32
+	ups := make([]*httptest.Server, 2)
+	for i := range ups {
+		i := i
+		ups[i] = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hits[i].Add(1)
+			w.Header().Set("Content-Type", "application/json")
+			io.WriteString(w, `{"output":[]}`)
+		}))
+		defer ups[i].Close()
+	}
+	secret := ""
+	if _, e := f.store.PutProvider(state.Provider{ID: "lb", BaseURLs: []string{ups[0].URL, ups[1].URL}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 4}, 0, &secret); e != nil {
+		t.Fatal(e)
+	}
+	f.model(t, state.Candidate{ProviderID: "lb", Model: "one"})
+	for i := 0; i < 4; i++ {
+		if r := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hi"}`); r.StatusCode != 200 {
+			t.Fatal(r.StatusCode, text(t, r))
+		}
+	}
+	if hits[0].Load() != 2 || hits[1].Load() != 2 {
+		t.Fatal("not round-robin", hits[0].Load(), hits[1].Load())
+	}
+}

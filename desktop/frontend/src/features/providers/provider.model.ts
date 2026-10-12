@@ -1,12 +1,13 @@
 import type { Provider as DesktopProvider, SaveProvider, DiscoverProviderModels, ProviderModels } from "../../desktop/contract.generated";
 export type { SaveProvider, DiscoverProviderModels, ProviderModels };
-export type Provider = DesktopProvider & { protocol: "responses" | "chat-completions" | "anthropic" };
+export type Provider = DesktopProvider;
+export const MAX_PROVIDER_URLS = 16;
 export const protocolName: Record<string, string> = { responses: "Responses", "chat-completions": "Chat Completions", anthropic: "Anthropic Messages" };
 export type SecretMode = 'keep' | 'replace' | 'clear';
 export interface ProviderDraft {
   id: string;
-  protocol: Provider["protocol"];
-  base_url: string;
+  homepage_url: string;
+  base_urls: string[];
   enabled: boolean;
   timeout: string;
   concurrent: string;
@@ -14,7 +15,7 @@ export interface ProviderDraft {
   secret: string;
   confirmClear: boolean;
 }
-export type FieldErrors = Partial<Record<'id' | 'base_url' | 'timeout' | 'concurrent' | 'secret', string>>;
+export type FieldErrors = Partial<Record<'id' | 'homepage_url' | 'base_urls' | 'timeout' | 'concurrent' | 'secret' | `base_url_${number}`, string>>;
 export type ProblemCode = 'offline' | 'unauthorized' | 'read_error' | 'conflict' | 'unknown' | 'invalid' | 'referenced';
 export class ProviderProblem extends Error {
   constructor(readonly code: ProblemCode) { super(code); }
@@ -37,40 +38,58 @@ export interface ProviderTransport {
 }
 export function newDraft(provider?: Provider): ProviderDraft {
   return {
-    protocol: provider?.protocol ?? "responses",
-    id: provider?.id ?? '', base_url: provider?.base_url ?? '', enabled: provider?.enabled ?? true,
+    id: provider?.id ?? '', homepage_url: provider?.homepage_url ?? '', base_urls: provider?.base_urls.length ? [...provider.base_urls] : [''], enabled: provider?.enabled ?? true,
     timeout: String(provider?.timeout_seconds ?? 120), concurrent: String(provider?.max_concurrent ?? 4),
-    secretMode: provider ? 'keep' : 'replace', secret: '', confirmClear: false,
+    secretMode: 'keep', secret: '', confirmClear: false,
   };
 }
-export function validateDraft(draft: ProviderDraft, creating: boolean): FieldErrors {
+export function validateDraft(draft: ProviderDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!/^[\p{L}\p{Nd}][\p{L}\p{Nd}._-]{0,127}$/u.test(draft.id)) errors.id = '1–128 个中文／字母／数字或 ._-，以字母或数字开头。';
+  const urls = draft.base_urls.map(u => u.trim());
+  if (!urls.length || urls.length > MAX_PROVIDER_URLS) errors.base_urls = `请填写 1–${MAX_PROVIDER_URLS} 个请求地址。`;
+  const seen = new Set<string>();
+  urls.forEach((raw, i) => {
+    const message = requestURLError(raw);
+    const key = raw.replace(/\/+$/, '');
+    if (message) errors[`base_url_${i}`] = message;
+    else if (seen.has(key)) errors[`base_url_${i}`] = '请求地址重复。';
+    seen.add(key);
+  });
+  const homepage = draft.homepage_url.trim();
+  if (homepage) {
+    try {
+      const url = new URL(homepage);
+      if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password || /\s/.test(homepage) || homepage.length > 2048) throw new Error();
+    } catch { errors.homepage_url = '请输入 http(s) 主页地址，不含账号信息；可留空。'; }
+  }
+  if (!/^\d+$/.test(draft.timeout) || +draft.timeout < 1 || +draft.timeout > 3600) errors.timeout = '请输入 1–3600 的整数秒数。';
+  if (!/^\d+$/.test(draft.concurrent) || +draft.concurrent < 1 || +draft.concurrent > 64) errors.concurrent = '请输入 1–64 的整数。';
+  const secret = draft.secret.trim();
+  if (draft.secretMode === 'replace' && (!secret || /[\r\n]/.test(secret) || new TextEncoder().encode(secret).length > 8192)) errors.secret = '替换密钥须非空、无内部换行，且不超过 8192 字节。';
+  if (draft.secretMode === 'clear' && !draft.confirmClear) errors.secret = '请确认清除密钥的影响。';
+  return errors;
+}
+function requestURLError(raw: string): string | undefined {
   try {
-    const raw = draft.base_url.trim();
     const url = new URL(raw);
     const authority = raw.match(/^https?:\/\/([^/]+)/)?.[1] ?? '';
     const numericLoopback = /^127(?:\.\d{1,3}){3}(?::\d+)?$/.test(authority) || /^\[::1\](?::\d+)?$/.test(authority);
     if (!url.hostname || url.username || url.password || raw.includes('?') || raw.includes('#') || /\s/.test(raw) || raw.includes('\\')) throw new Error();
     if (url.protocol !== 'https:' && !(url.protocol === 'http:' && numericLoopback)) throw new Error();
-    if (/\/responses\/?$/.test(url.pathname)) errors.base_url = '填写 API 根地址（可含 /v1），不包含 /responses。';
-  } catch { errors.base_url = '请输入 HTTPS 根地址，不含账号、查询或片段；HTTP 仅限数值回环测试地址。'; }
-  if (!/^\d+$/.test(draft.timeout) || +draft.timeout < 1 || +draft.timeout > 3600) errors.timeout = '请输入 1–3600 的整数秒数。';
-  if (!/^\d+$/.test(draft.concurrent) || +draft.concurrent < 1 || +draft.concurrent > 64) errors.concurrent = '请输入 1–64 的整数。';
-  const secret = draft.secret.trim();
-  if (draft.secretMode === 'replace' && ((creating ? false : !secret) || /[\r\n]/.test(secret) || new TextEncoder().encode(secret).length > 8192)) errors.secret = '替换密钥须非空、无内部换行，且不超过 8192 字节。';
-  if (draft.secretMode === 'clear' && !draft.confirmClear) errors.secret = '请确认清除密钥的影响。';
-  return errors;
+    if (/\/responses\/?$/.test(url.pathname)) return '填写 API 根地址（可含 /v1），不包含 /responses。';
+  } catch { return '请输入 HTTPS 根地址，不含账号、查询或片段；HTTP 仅限数值回环测试地址。'; }
+  return undefined;
 }
 export function toSave(draft: ProviderDraft, source?: Provider): SaveProvider {
   const expected_revision = source?.revision ?? 0;
   if (!Number.isSafeInteger(expected_revision) || expected_revision < 0) throw new ProviderProblem('invalid');
   return {
-    provider: { id: draft.id, base_url: draft.base_url.trim(), protocol: draft.protocol, enabled: draft.enabled,
+    provider: { id: draft.id, homepage_url: draft.homepage_url.trim(), base_urls: draft.base_urls.map(u => u.trim()), enabled: draft.enabled,
       timeout_seconds: +draft.timeout, max_concurrent: +draft.concurrent,
       revision: expected_revision, has_secret: source?.has_secret ?? false },
     expected_revision,
-    secret: draft.secretMode === 'keep' ? null : draft.secretMode === 'clear' ? '' : draft.secret.trim(),
+    secret: !source || draft.secretMode === 'keep' ? null : draft.secretMode === 'clear' ? '' : draft.secret.trim(),
   };
 }
 export function isDirty(draft: ProviderDraft, source?: Provider): boolean {
