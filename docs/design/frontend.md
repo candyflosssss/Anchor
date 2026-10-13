@@ -444,8 +444,10 @@ rate Model 校验十进制字符串、公有字段和查询身份；账户／映
 
 新增共享样例为 `desktop/contract/provider-probe.json`；接口生命周期及有界输出见 [供应商接口契约](provider-interface.md#实时推理测试生命周期2026-10-13当前源码)。浏览器合成上游与 Go 隔离上游验证分别记录，不能代替双平台原生窗口验收。
 
-### NewAPI API Key 余额查询（2026-10-13，当前源码）
+### NewAPI API Key 余额查询（2026-10-13，desktop.26 dev）
 
 供应商列表优先显示旧 billing 返回的剩余值，账户详情「余额」刷新在未配置用户授权时也可使用所选推理 Key。显示 scope=billing 为「站点余额」，说明查询范围由站点决定、可能是账户或所选 Key；scope=account / key 继续标注账户余额／Key额度。旧 billing 不兼容时列表回退 Key额度，认证或服务错误保留明确原因。
 
 Model 接受 CNY 与 site_unit；公开元数据无法确认币种时标注「站点计费单位（币种未确认）」。余额、已用、总额度由核心查询和精确计算，前端不实现计费换算。范围未知、缺字段和 Key 无限额均不伪造钱包余额。共享 provider-account.json 增加 billing / billing_summary，核心与前端校验使用同一语义。保留受控桌面接口、查询互斥和 revision 隔离；未运行原生窗口或真实站点凭据验收。
+
+该修复已随 desktop.26 投放；本轮前端 typecheck/lint、14项定向模型／展示测试，以及五包 Go 适配器／核心／客户端／CLI／桥接测试通过。默认源下载验证通过，未进行真实站点凭据或原生窗口验收。

@@ -111,7 +111,7 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 | 内部操作 | sub2api | NewAPI | 原版 OneAPI |
 | --- | --- | --- | --- |
 | models | 既有目录读取器，所选推理 Key | 同左 | 同左 |
-| balance | 用户 `GET /api/v1/user/profile`；无用户授权时 Key `GET /v1/usage`，仅明确钱包 balance 可用 | 用户 `GET /api/user/self` | 用户 `GET /api/user/self` |
+| balance | 用户 `GET /api/v1/user/profile`；无用户授权时 Key `GET /v1/usage`，仅明确钱包 balance 可用 | 优先用户 `GET /api/user/self`；无用户授权时 Key `GET /v1/dashboard/billing/subscription` + `/v1/dashboard/billing/usage` | 用户 `GET /api/user/self` |
 | key-quota | Key `GET /v1/usage` | Key `GET /api/usage/token/`，兼容其布尔 `code:true` 成功封装 | 用户 `GET /api/token/{remote_key_id}` |
 | usage-records account | 用户 `GET /api/v1/usage?page=&page_size=` | 用户 `GET /api/log/self?type=2&p=&page_size=` | 用户 `GET /api/log/self?type=2&p=`，内部把页号转换成从0开始 |
 | usage-records key | 同上，加 api_key_id 筛选 | Key `GET /api/log/token`，只提供近期批次 | unsupported_key_filter，不使用可能重名的 token_name 筛选 |
@@ -121,7 +121,7 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 
 ### 数据口径与能力缺口
 
-`Amount` 保留 JSON 数字字面值与单位，sub2api 为 USD，NewAPI/OneAPI 为 quota，不按常见 quota_per_unit 假设换算。`Allowance` 显式区分 account/key/billing（站点决定账户或 Key 范围），remaining、used、limit、unlimited 和窗口缺失均可为 null。sub2api 订阅 remaining 或 Key cap 不能当账户钱包余额；unrestricted 表示 Key 本身不受额度上限限制，不表示账户余额无限。原版 OneAPI 旧 billing 接口受站点开关影响其范围／单位，兼容层不依赖它。
+`Amount` 保留 JSON 数字字面值与单位，sub2api 为 USD，NewAPI/OneAPI 的账户与 Key 原始额度为 quota；NewAPI billing 使用公开显示单位 USD/CNY/quota，无法确认则 site_unit，不按常见 quota_per_unit 假设换算。`Allowance` 显式区分 account/key/billing（站点决定账户或 Key 范围），remaining、used、limit、unlimited 和窗口缺失均可为 null。sub2api 订阅 remaining 或 Key cap 不能当账户钱包余额；unrestricted 表示 Key 本身不受额度上限限制，不表示账户余额无限。原版 OneAPI 旧 billing 接口受站点开关影响其范围／单位，兼容层不依赖它。
 
 账单只保留消费记录：sub2api `actual_cost` 为 charged_amount，`total_cost` 为 base_amount；NewAPI/OneAPI `quota` 为此次请求结算的内部额度。NewAPI 若返回 billing_source 则保留 wallet/subscription，并保留 wallet_quota_deducted、subscription_consumed 等数值，不能把订阅消耗当作钱包扣款。token 输入、输出、缓存读／写、5分钟／1小时写入独立返回，缺失保留 null。原版 OneAPI 的 prompt_tokens 在部分非文本计费路径可能承载其他含义，统一标记 `platform_fields_unverified`，不保证实际模型 token。NewAPI 日志 id 可被重新编号，`id_stable=false`，request_id 仅在站点返回时提供。
 

@@ -262,7 +262,7 @@
 - 缓存亲和与低延迟观察只留内存，低价按保存路由倍率；未知金额不填0或1。指定来源参与真实路由，失效时不调度到范围外Key，删除来源Key返回referenced。
 - schema5→6保留既有数据，旧模型空范围允许全部启用Key；旧核心拒绝schema6，升级须同步核心/CLI/桌面。CLI与桌面共用同一管理实现；定向验证结果见本轮更新记录。
 
-## 2026-10-13 — NewAPI 推理 Key 查询 billing 余额（当前源码）
+## 2026-10-13 — NewAPI 推理 Key 查询 billing 余额（desktop.26 dev）
 
 - 类型：修改。
 - 指令与参数：provider balance、provider balance-summary，参数不变；帮助补充 NewAPI 授权优先顺序。
