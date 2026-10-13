@@ -48,6 +48,24 @@
   ::selection { background: hsl(var(--primary) / .2); }
 }
 
+/* Keep document and nested scrollbars consistent across desktop WebViews. */
+@supports selector(::-webkit-scrollbar) {
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: hsl(var(--muted-foreground) / .45); background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background-color: hsl(var(--muted-foreground) / .7); }
+  ::-webkit-scrollbar-thumb:active { background-color: hsl(var(--muted-foreground) / .9); }
+  ::-webkit-scrollbar-button { display: none; }
+}
+@supports not selector(::-webkit-scrollbar) {
+  * { scrollbar-width: thin; scrollbar-color: hsl(var(--muted-foreground) / .45) transparent; }
+}
+@media (forced-colors: active) {
+  * { scrollbar-color: auto; }
+  ::-webkit-scrollbar-thumb { background-color: CanvasText; }
+  ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background-color: Highlight; }
+}
+
 .mono { font-family: ui-monospace, 'Cascadia Code', Consolas, 'Liberation Mono', monospace; }
 .appearance-control { display: flex; gap: 4px; padding: 4px; border: 1px solid hsl(var(--sidebar-border)); border-radius: 6px; background: hsl(var(--sidebar-accent)); }
 .appearance-control button { display: grid; place-items: center; flex: 1; height: 32px; border-radius: 4px; color: hsl(var(--muted-foreground)); }

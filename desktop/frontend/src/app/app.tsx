@@ -34,7 +34,7 @@ export function App() {
   return <SidebarProvider>
     <AppSidebar appearance={appearance} setAppearance={setAppearance} page={page} onNavigate={navigate} busy={busy} />
     <SidebarInset className="min-w-0">
-      <header onDoubleClick={windowController.onDragDoubleClick} className={cn("flex h-16 shrink-0 items-center justify-between gap-2 border-b px-4 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12", !prototype && "desktop-titlebar sticky top-0 z-20 bg-background pr-0 md:rounded-t-xl")}>
+      <header onDoubleClick={windowController.onDragDoubleClick} className={cn("flex h-10 shrink-0 items-center justify-between gap-2 border-b px-4", !prototype && "desktop-titlebar sticky top-0 z-20 bg-background pr-0 md:rounded-t-xl")}>
         <div className="flex min-w-0 items-center gap-2">
           <SidebarTrigger className="-ml-1 h-8 w-8" />
           <Separator orientation="vertical" className="mr-2 h-4" />
