@@ -271,7 +271,7 @@ test('mock directory shares synthetic model IDs without importing or incrementin
   await expect(detail.getByText('demo-model', { exact: true })).toBeVisible();
   await expect(detail).toContainText('已获取 2 个模型');
   await expect(detail).toContainText('revision 3');
-  await expect(page.getByText('所有数据均为模拟 · 刷新页面将重置')).toBeVisible();
+  await expect(page.getByText('Mock 设计预览', { exact: true })).toBeVisible();
 });
 
 test('key defaults and actual model overrides stay independent and inherit dynamically', async ({ page }) => {

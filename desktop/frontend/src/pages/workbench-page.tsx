@@ -15,6 +15,7 @@ import { scenarios, type Scenario } from '../features/providers/provider.mock';
 import type { Provider } from '../features/providers/provider.model';
 import type { DetailTab, ProviderDialog } from '../features/providers/provider-summary.model';
 import { useProviderController } from '../features/providers/use-provider-controller';
+import { useProviderBalances } from '../features/providers/use-provider-balances';
 import { useProviderSummaries } from '../features/providers/use-provider-summaries';
 
 /** Overview, providers and models share one controller so navigating between them keeps state and data. */
@@ -23,6 +24,7 @@ export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivit
 }) {
   const c = useProviderController(environment);
   const summaries = useProviderSummaries(c.providers, c.phase === 'ready', environment.transport, c.features.data);
+  const balances = useProviderBalances(c.providers, c.phase === 'ready' && page === 'providers' && !c.selected, environment.transport);
   const opener = useRef<HTMLElement | null>(null);
   const busy = c.busy || !!c.editor || !!c.toggle || !!c.dialog;
   useEffect(() => { onActivity(busy); }, [busy, onActivity]);
@@ -40,8 +42,8 @@ export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivit
     {page === 'overview' ? <Overview summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onCreate={() => { onNavigate('providers'); edit(); }} onShowProviders={() => onNavigate('providers')} onShowModels={() => onNavigate('models')}>{banner}</Overview>
       : page === 'models' ? <ModelsView summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onShowProviders={() => onNavigate('providers')}>{banner}</ModelsView>
       : c.selected ? <div className="workspace">{banner}<Notice text={c.features.notice || c.notice} /><ProviderDetail c={c} summary={summary} onEdit={() => edit(c.selected ?? undefined)} /></div>
-      : <ProviderList c={c} summaries={summaries} onEdit={edit} onCreate={() => edit()}>{banner}<Notice text={c.notice} /></ProviderList>}
-    {prototype && c.mock && <div className="workspace pt-0"><footer className="prototype-controls mt-4"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={busy} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div><span>所有数据均为模拟 · 刷新页面将重置</span></footer></div>}
+      : <ProviderList c={c} summaries={summaries} balances={balances} onEdit={edit} onCreate={() => edit()}>{banner}<Notice text={c.notice} /></ProviderList>}
+    {prototype && c.mock && <div className="workspace pt-0"><footer className="prototype-controls mt-4"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={busy} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></footer></div>}
     {c.editor && <ProviderEditor c={c} restoreFocus={() => { requestAnimationFrame(() => { if (opener.current?.isConnected) opener.current.focus(); }); }} />}
     <ProviderDialogs c={c} />
     <ConfirmAction open={!!c.toggle} title={`${c.toggle?.enabled ? '停用' : '启用'} ${c.toggle?.id ?? ''}？`} busy={c.busy} onCancel={c.cancelToggle} onConfirm={c.confirmToggle}>

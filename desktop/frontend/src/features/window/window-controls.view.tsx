@@ -8,6 +8,6 @@ export function WindowControls({ controller }: { controller: WindowController })
   return <div className="window-controls" data-window-no-drag role="group" aria-label="窗口控制">
     <button type="button" disabled={!controller.available} aria-label={windowMessages.minimise} title={windowMessages.minimise} onClick={controller.minimise}><Minus aria-hidden="true" /></button>
     <button type="button" disabled={!controller.available} aria-label={maximiseLabel} title={maximiseLabel} onClick={controller.toggleMaximise}><MaximiseIcon aria-hidden="true" /></button>
-    <button type="button" className="window-close" disabled={!controller.available} aria-label={windowMessages.close} title={windowMessages.closeHint} onClick={controller.close}><X aria-hidden="true" /></button>
+    <button type="button" className="window-close" disabled={!controller.available} aria-label={windowMessages.close} title={windowMessages.close} onClick={controller.close}><X aria-hidden="true" /></button>
   </div>;
 }

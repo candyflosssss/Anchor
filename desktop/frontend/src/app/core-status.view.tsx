@@ -17,10 +17,10 @@ export function CoreStatus({ session, busy, onExit, onStop }: { session: Session
   </button>}>
     {close => <div className="core-panel">
       <strong>本机核心</strong>
-      <p>{info ? `${info.source === 'started' ? '本次启动' : '复用已有核心'} · ` : ''}关闭窗口收起到系统托盘 · 核心持续运行</p>
+      {info && <p>{info.source === 'started' ? '本次启动' : '复用已有核心'}</p>}
       {info && <p className="mono break-all">实例 {info.instance_id}</p>}
       <div className="core-actions">
-        <Button variant="ghost" size="sm" title="退出界面进程，后台核心继续运行" disabled={busy || session.stopping} onClick={() => { close(); onExit(); }}><LogOut />退出界面</Button>
+        <Button variant="ghost" size="sm" disabled={busy || session.stopping} onClick={() => { close(); onExit(); }}><LogOut />退出界面</Button>
         {info?.can_stop && <Button variant="outline" size="sm" disabled={busy || session.stopping} onClick={() => { close(); onStop(); }}><Power />停止核心</Button>}
       </div>
     </div>}

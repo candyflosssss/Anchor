@@ -60,5 +60,5 @@ test('Agent write conflict rereads state and does not replay the write', async (
   await expect(page.getByRole('alert')).toContainText('已重新读取');
   expect(await page.evaluate(() => window.agentTest.enrolls.length)).toBe(1);
   expect(await page.evaluate(() => window.agentTest.reads)).toBe(reads + 1);
-  await expect(page.getByText('还没有托管目标。仅添加模型映射不会修改 Agent 配置。')).toBeVisible();
+  await expect(page.getByText('还没有托管目标。', { exact: true })).toBeVisible();
 });

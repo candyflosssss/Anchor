@@ -27,7 +27,7 @@ export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }
     <SidebarFooter>
       <SidebarMenu><SidebarMenuItem><SidebarMenuButton tooltip="设置 / 在线更新" aria-label="设置 / 在线更新" disabled={busy} isActive={page === 'settings'} aria-current={page === 'settings' ? 'page' : undefined} onClick={() => { onNavigate('settings'); if (isMobile) setOpenMobile(false); }}><Settings2 /><span>设置</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
       <div className="appearance-control" role="group" aria-label="外观设置">{([['light', Sun, '浅色'], ['dark', Moon, '深色'], ['system', Monitor, '跟随系统']] as const).map(([value, Icon, title]) => <button key={value} aria-label={title} title={title} aria-pressed={appearance === value} onClick={() => setAppearance(value)}><Icon size={16} /></button>)}</div>
-      <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden"><Monitor className="size-4" /><span>{prototype ? "Mock 设计预览 · 未接入核心" : "桌面版 · 关窗不停服"}</span></div>
+      {prototype && <div className="px-2 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">Mock 设计预览</div>}
     </SidebarFooter><SidebarRail />
   </Sidebar>;
 }

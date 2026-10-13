@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'rea
 import { CircleAlert, Play } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog';
 import { ProbeCard } from './provider-detail.view';
 import { protocolName } from './provider.model';
 import { isValidId, type ProviderDialog } from './provider-summary.model';
@@ -35,11 +35,10 @@ function Shell({ c, d }: { c: ProviderController; d: ProviderDialog }) {
     : d.kind === 'key' ? <KeyBody c={c} d={d} run={run} />
     : <MappingBody c={c} d={d} run={run} />;
   return <Dialog open onOpenChange={open => { if (!open) close(); }}>
-    <DialogContent className="action-dialog" closeLabel="关闭对话框" onRequestClose={close}
+    <DialogContent aria-describedby={undefined} className="action-dialog" closeLabel="关闭对话框" onRequestClose={close}
       onInteractOutside={e => { e.preventDefault(); close(); }} onEscapeKeyDown={e => { e.preventDefault(); close(); }}>
       <header className="editor-header"><span className="eyebrow">{c.selected?.id}{c.mock ? ' · 演示' : ''}</span>
         <DialogTitle className="text-xl font-semibold">{d.kind === 'key' ? (d.keyId ? `编辑 Key ${d.keyId}` : '添加 Key') : d.kind === 'mapping' ? (d.alias ? `编辑模型 ${d.alias}` : '添加模型映射') : titles[d.kind]}</DialogTitle>
-        <DialogDescription className="mt-2 text-sm text-muted-foreground">{descriptions[d.kind]}</DialogDescription>
       </header>
       {tried && f.error && <p className="dialog-error" role="alert"><CircleAlert size={15} />{f.error}</p>}
       {tried && f.notice && <p className="feedback notice-feedback" role="status">{f.notice}</p>}
@@ -47,18 +46,10 @@ function Shell({ c, d }: { c: ProviderController; d: ProviderDialog }) {
     </DialogContent>
   </Dialog>;
 }
-const descriptions: Record<ProviderDialog['kind'], string> = {
-  test: '发送一次最小推理请求，确认上游真的能生成内容。',
-  rename: '模型候选与密钥会在同一事务中迁移；在途请求保留旧快照。',
-  copy: '新供应商默认停用，确认无误后再启用。',
-  delete: '将删除配置和所有密钥。存在模型引用时会阻止删除；历史用量保留。',
-  key: '秘密只入不出；提交即清空。最多 64 个 Key。',
-  mapping: 'Agent 使用公开别名调用；Anchor 转发到这里填写的上游模型。',
-};
 type Run = (action: string, fields: Parameters<ProviderController['features']['run']>[1], keepOpen?: boolean) => Promise<boolean>;
 
 function Footer({ c, children }: { c: ProviderController; children: ReactNode }) {
-  return <footer className="editor-footer"><span>{c.mock ? '本次为模拟操作，不会修改真实实例。' : '将修改本机实例的真实配置。'}</span>
+  return <footer className="editor-footer">
     <div className="flex gap-2"><Button type="button" variant="outline" disabled={c.features.busy} onClick={c.closeDialog}>取消</Button>{children}</div></footer>;
 }
 
@@ -78,13 +69,12 @@ function TestBody({ c, d, run }: { c: ProviderController; d: Extract<ProviderDia
     <fieldset className="editor-fields" disabled={c.features.busy}>
       <div className="field"><label htmlFor="test-model">上游模型 ID</label>
         <Input id="test-model" list="test-model-options" value={model} onChange={e => setModel(e.target.value)} placeholder="例如 gpt-4.1-mini" autoComplete="off" />
-        <datalist id="test-model-options">{options.map(id => <option key={id} value={id} />)}</datalist>
-        {!options.length && <p className="field-hint">尚无映射；可先到「模型」获取上游目录。</p>}</div>
+        <datalist id="test-model-options">{options.map(id => <option key={id} value={id} />)}</datalist></div>
       <div className="field"><label htmlFor="test-key">使用 Key</label>
         <select id="test-key" className="select-field w-full" value={key} onChange={e => setKey(e.target.value)}>
           {w.keys.length ? w.keys.map(k => <option value={k.id} key={k.id}>{k.id}{k.enabled ? '' : '（已停用，仍可显式测试）'}</option>) : <option value="anonymous">匿名</option>}
         </select></div>
-      <p className="warning-box">将发送一次最小推理请求，可能产生少量用量。测试会绕过冷却供诊断，不修改启停设置。</p>
+      <p className="warning-box">将发送一次推理请求，可能产生少量用量。</p>
       {result && <div aria-live="polite"><ProbeCard probe={result} /></div>}
     </fieldset>
     <Footer c={c}><Button disabled={c.features.busy || !model.trim()}><Play />{c.features.busy ? '正在测试…' : result ? '再测一次' : '发起测试'}</Button></Footer>
@@ -97,8 +87,8 @@ function RenameBody({ c, run }: { c: ProviderController; run: Run }) {
   const error = id === p.id ? '' : !isValidId(id) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头。' : c.providers.some(x => x.id === id) ? '已存在同名供应商。' : '';
   return <form onSubmit={e => { e.preventDefault(); if (!error && id !== p.id) void run('rename', { target: id }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
-      <div className="field"><label htmlFor="rename-id">新名称</label><Input id="rename-id" value={id} onChange={e => setId(e.target.value.trim())} aria-invalid={!!error} aria-describedby="rename-hint" autoComplete="off" />
-        <p id="rename-hint" className={error ? 'field-error' : 'field-hint'}>{error || '名称同时作为 CLI 中的供应商 ID。'}</p></div>
+      <div className="field"><label htmlFor="rename-id">新名称</label><Input id="rename-id" value={id} onChange={e => setId(e.target.value.trim())} aria-invalid={!!error} aria-describedby={error ? 'rename-hint' : undefined} autoComplete="off" />
+        {error && <p id="rename-hint" className="field-error">{error}</p>}</div>
     </fieldset>
     <Footer c={c}><Button disabled={c.features.busy || !!error || id === p.id}>确认改名</Button></Footer>
   </form>;
@@ -111,8 +101,8 @@ function CopyBody({ c, run }: { c: ProviderController; run: Run }) {
   const error = !isValidId(id) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头。' : c.providers.some(x => x.id === id) ? '已存在同名供应商。' : '';
   return <form onSubmit={e => { e.preventDefault(); if (!error) void run('copy', { target: id, copy_keys: keys }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
-      <div className="field"><label htmlFor="copy-id">新供应商名称</label><Input id="copy-id" value={id} onChange={e => setId(e.target.value.trim())} aria-invalid={!!error} aria-describedby="copy-hint" autoComplete="off" />
-        <p id="copy-hint" className={error ? 'field-error' : 'field-hint'}>{error || (keys ? '将复制配置和所有密钥，新供应商默认停用。' : '仅复制配置，新供应商默认停用，不含密钥和模型映射。')}</p></div>
+      <div className="field"><label htmlFor="copy-id">新供应商名称</label><Input id="copy-id" value={id} onChange={e => setId(e.target.value.trim())} aria-invalid={!!error} aria-describedby={error ? 'copy-hint' : undefined} autoComplete="off" />
+        {error && <p id="copy-hint" className="field-error">{error}</p>}</div>
       <label className="checkbox-row"><input type="checkbox" checked={keys} onChange={e => setKeys(e.target.checked)} />同时复制 Key</label>
     </fieldset>
     <Footer c={c}><Button disabled={c.features.busy || !!error}>确认复制</Button></Footer>
@@ -150,11 +140,11 @@ function KeyBody({ c, d, run }: { c: ProviderController; d: Extract<ProviderDial
   }
   return <form onSubmit={submit} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
-      <div className="field"><label htmlFor="key-id">Key 名称</label><Input id="key-id" value={id} readOnly={!!existing} onChange={e => setId(e.target.value.trim())} aria-invalid={!!idError} aria-describedby="key-id-hint" autoComplete="off" />
-        <p id="key-id-hint" className={idError ? 'field-error' : 'field-hint'}>{idError || '仅用于区分和日志显示，不是密钥本身。'}</p></div>
-      <div className="field"><label htmlFor="key-secret">{existing ? '新的 API Key' : 'API Key'}</label><Input id="key-secret" type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={e => setSecret(e.target.value)} aria-invalid={!!secretError} aria-describedby="key-secret-hint" />
-        <p id="key-secret-hint" className={secretError ? 'field-error' : 'field-hint'}>{secretError || (existing ? '留空保留现有密钥；提交后输入框立即清空。' : '保存后无法回显；提交后输入框立即清空。')}</p></div>
-      <div className="field"><label htmlFor="key-protocol">Key 默认协议</label><select id="key-protocol" className="select-field" value={protocol} onChange={e => setProtocol(e.target.value)}>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><p className="field-hint">此 Key 下未单独设置协议的模型继承这个值。</p></div>
+      <div className="field"><label htmlFor="key-id">Key 名称</label><Input id="key-id" value={id} readOnly={!!existing} onChange={e => setId(e.target.value.trim())} aria-invalid={!!idError} aria-describedby={idError ? 'key-id-hint' : undefined} autoComplete="off" />
+        {idError && <p id="key-id-hint" className="field-error">{idError}</p>}</div>
+      <div className="field"><label htmlFor="key-secret">{existing ? '新的 API Key（留空保留）' : 'API Key'}</label><Input id="key-secret" type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={e => setSecret(e.target.value)} aria-invalid={!!secretError} aria-describedby={secretError ? 'key-secret-hint' : undefined} />
+        {secretError && <p id="key-secret-hint" className="field-error">{secretError}</p>}</div>
+      <div className="field"><label htmlFor="key-protocol">Key 默认协议</label><select id="key-protocol" className="select-field" value={protocol} onChange={e => setProtocol(e.target.value)}>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
     </fieldset>
     <Footer c={c}><Button disabled={c.features.busy || !!idError || !!secretError || (!existing && !trimmed)}>保存 Key</Button></Footer>
   </form>;
@@ -180,15 +170,13 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
         <Input id="mapping-upstream" list="mapping-upstream-options" value={upstream} autoComplete="off" onChange={e => { setUpstream(e.target.value); if (!touched) setAlias(e.target.value.trim()); }} />
         <datalist id="mapping-upstream-options">{options.map(id => <option key={id} value={id} />)}</datalist></div>
       <div className="field"><label htmlFor="mapping-alias">Anchor 公开别名</label>
-        <Input id="mapping-alias" value={alias} readOnly={!!editing} placeholder="例如 coding-main" autoComplete="off" aria-invalid={!!aliasError} aria-describedby="mapping-alias-hint" onChange={e => { setAlias(e.target.value.trim()); setTouched(true); }} />
-        <p id="mapping-alias-hint" className={aliasError ? 'field-error' : 'field-hint'}>{aliasError || 'Agent 请求时填写的模型名；多个供应商可映射同一别名互为候选。'}</p></div>
+        <Input id="mapping-alias" value={alias} readOnly={!!editing} placeholder="例如 coding-main" autoComplete="off" aria-invalid={!!aliasError} aria-describedby={aliasError ? 'mapping-alias-hint' : undefined} onChange={e => { setAlias(e.target.value.trim()); setTouched(true); }} />
+        {aliasError && <p id="mapping-alias-hint" className="field-error">{aliasError}</p>}</div>
       <div className="field"><label htmlFor="mapping-multiplier">此供应商的相对倍率</label>
         <Input id="mapping-multiplier" type="number" min="0.01" max="1000" step="any" value={multiplier} onChange={e => setMultiplier(e.target.value)} aria-invalid={!!multiplierError} />
-        <p className={multiplierError ? 'field-error' : 'field-hint'}>{multiplierError || '默认 1；加权轮询按倍率倒数分配请求，倍率越低占比越高。'}</p></div>
+        {multiplierError && <p className="field-error">{multiplierError}</p>}</div>
       {editing && <div className="field"><label htmlFor="mapping-strategy">公开模型调度策略</label>
-        <select id="mapping-strategy" className="select-field" value={strategy} onChange={e => setStrategy(e.target.value)}><option value="round-robin">按倍率加权轮询</option><option value="priority">按候选顺序优先</option></select>
-        <p className="field-hint">对这个公开模型的所有供应商生效。停用、冷却或并发已满的上游会跳过。</p></div>}
-      <p className="field-hint">新公开模型默认加权轮询；加入已有别名时保留它的调度策略和能力声明。编辑能力声明对所有供应商生效。</p>
+        <select id="mapping-strategy" className="select-field" value={strategy} onChange={e => setStrategy(e.target.value)}><option value="round-robin">按倍率加权轮询</option><option value="priority">按候选顺序优先</option></select></div>}
       <label className="checkbox-row"><input type="checkbox" checked={tools} onChange={e => setTools(e.target.checked)} />函数工具</label>
       <label className="checkbox-row"><input type="checkbox" checked={streaming} onChange={e => setStreaming(e.target.checked)} />流式输出</label>
     </fieldset>

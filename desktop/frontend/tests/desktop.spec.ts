@@ -94,7 +94,7 @@ test('desktop starts once, loads real-mode data and submits without persisting s
   await expect(page.getByText('原型场景', { exact: true })).toHaveCount(0);
   await expect(page.getByText('本机实例 · 模拟，未连接', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();
-  await expect(page.getByText('本次启动 · 关闭窗口收起到系统托盘 · 核心持续运行')).toBeVisible();
+  await expect(page.getByText('本次启动', { exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
   await page.getByLabel('供应商名称 / ID').fill('桌面供应商');
@@ -119,7 +119,7 @@ test('stop is separately confirmed, targeted and only reports acceptance', async
   await page.getByRole('button', { name: '停止核心', exact: true }).click();
   await confirmation.getByRole('button', { name: '确认变更', exact: true }).click();
   await expect(page.getByRole('heading', { name: '停服请求已接受' })).toBeVisible();
-  await expect(page.getByText('核心正在处理退出与配置恢复；请求接受不代表恢复已完成。')).toBeVisible();
+  await expect(page.getByText('核心正在处理退出与配置恢复。', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => ({ stops: window.desktopTest.stops, starts: window.desktopTest.starts }))).toEqual({ stops: 1, starts: 1 });
 });
 test('disconnect clears open secret drafts and never silently restarts the core', async ({ page }) => {
@@ -155,7 +155,7 @@ test('polling refreshes the authenticated source and stop capability without res
     };
   });
   await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();
-  await expect(page.getByText('复用已有核心 · 关闭窗口收起到系统托盘 · 核心持续运行')).toBeVisible({ timeout: 8000 });
+  await expect(page.getByText('复用已有核心', { exact: true })).toBeVisible({ timeout: 8000 });
   await expect(page.getByRole('button', { name: '停止核心', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.desktopTest.starts)).toBe(1);
 });
@@ -233,7 +233,7 @@ test('directory discovery is explicit, read-only and scoped to the selected prov
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).dblclick();
   await expect(detail.getByText('demo-model', { exact: true })).toBeVisible();
   await expect(detail).toContainText('已获取 1 个模型 · Key anonymous · HTTP 200 · 42 ms');
-  await expect(detail).toContainText('目录成功不代表推理可用');
+  await expect(detail).not.toContainText('目录成功不代表推理可用');
   expect(await page.evaluate(() => ({ saves: window.desktopTest.saves, directories: window.desktopTest.directories }))).toEqual({ saves: 0, directories: 1 });
   await detail.getByRole('button', { name: '返回供应商列表' }).click();
   await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();

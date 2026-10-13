@@ -17,10 +17,10 @@ export function Overview({ summaries, loading, disabled, onOpen, onCreate, onSho
     ['供应商', `${t.enabled} / ${t.providers}`, '已启用 / 全部', onShowProviders],
     ['模型别名', pending ? '…' : String(t.aliases), pending ? '读取中' : `${t.routes} 条供应商路由`, onShowModels],
     ['请求', pending ? '…' : t.requests.toLocaleString(), pending ? '读取中' : t.failures ? `${t.failures} 次失败` : '无失败记录'],
-    ['估算费用', pending ? '…' : `$${t.usd.toFixed(t.usd < 1 ? 4 : 2)}${t.usdPartial ? '+' : ''}`, '按当前单价估算，非账单'],
+    ['估算费用', pending ? '…' : `$${t.usd.toFixed(t.usd < 1 ? 4 : 2)}${t.usdPartial ? '+' : ''}`, 'USD'],
   ];
   return <div className="workspace">
-    <header className="page-header"><div><div className="eyebrow">工作台</div><h1>概览</h1><p>当前实例的供应商健康、模型和用量一览。</p></div><Button disabled={disabled} onClick={onCreate}><Plus />添加供应商</Button></header>
+    <header className="page-header"><div><div className="eyebrow">工作台</div><h1>概览</h1></div><Button disabled={disabled} onClick={onCreate}><Plus />添加供应商</Button></header>
     {children}
     <section className="metric-grid" aria-label="关键指标">
       {metrics.map(([label, value, hint, go]) => {
@@ -41,7 +41,7 @@ export function Overview({ summaries, loading, disabled, onOpen, onCreate, onSho
       </section>
       <section className="detail-card" aria-labelledby="overview-providers">
         <header className="card-toolbar"><h2 id="overview-providers">供应商</h2><Button variant="ghost" size="sm" disabled={disabled} onClick={onShowProviders}>全部<ArrowRight /></Button></header>
-        {!summaries.length ? <p className="card-hint">{loading ? '读取中…' : '添加一个上游服务后，这里会显示它的健康状态。'}</p>
+        {!summaries.length ? <p className="card-hint">{loading ? '读取中…' : '暂无供应商。'}</p>
           : <ul className="compact-list">{summaries.map(s => <li key={s.provider.id}>
             <button disabled={disabled} onClick={() => onOpen(s.provider.id)}>
               <span className="provider-avatar" aria-hidden="true">{Array.from(s.provider.id)[0]}</span>
