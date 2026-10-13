@@ -1,0 +1,49 @@
+import { expect, test } from '@playwright/test';
+
+test('quick test keeps the provider list visible and displays incremental output', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '测试 摸鱼AI', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.getByLabel('摸鱼AI 的详情')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '返回供应商列表', exact: true })).toHaveCount(0);
+  await expect(dialog.getByLabel('使用 Key')).toHaveValue('default');
+  await expect(dialog.getByLabel('可用模型')).toHaveValue('demo-model');
+  const labels = await dialog.locator('label').allTextContents();
+  expect(labels.indexOf('使用 Key')).toBeLessThan(labels.indexOf('可用模型'));
+  await dialog.getByRole('button', { name: '发起测试', exact: true }).click();
+  await expect(dialog.getByLabel('模型返回内容')).toHaveText('O');
+  await expect(dialog.getByRole('button', { name: '停止测试', exact: true })).toBeVisible();
+  await expect(dialog.getByLabel('模型返回内容')).toHaveText('OK');
+  await expect(dialog.getByText('推理测试成功', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
+});
+
+test('switching Key reloads available models and a running test can be stopped', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '测试 备用供应商', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('可用模型')).toHaveValue('demo-model');
+  await dialog.getByLabel('使用 Key').selectOption('primary');
+  await expect(dialog.getByLabel('可用模型')).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '发起测试', exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: '发起测试', exact: true }).click();
+  await expect(dialog.getByLabel('使用 Key')).toBeDisabled();
+  await dialog.getByRole('button', { name: '停止测试', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('测试已停止');
+  await expect(dialog.getByLabel('使用 Key')).toBeEnabled();
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(page.getByLabel('备用供应商 的详情')).toHaveCount(0);
+});
+
+test('detail test stays on the detail page after closing', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await page.getByLabel('摸鱼AI 的详情').getByRole('button', { name: '测试连通', exact: true }).first().click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('可用模型')).toHaveValue('demo-model');
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(page.getByLabel('摸鱼AI 的详情')).toBeVisible();
+});

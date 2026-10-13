@@ -35,7 +35,7 @@ export function ProviderList({ c, summaries, balances, onEdit, onCreate, childre
           <TableCell className="text-sm">{loaded ? s!.modelCount || <span className="cell-hint">未映射</span> : '—'}</TableCell>
           <TableCell className="col-wide">{s?.lastTest ? <span className={s.lastTest.failure ? 'cell-hint text-destructive' : 'cell-hint'}>{s.lastTest.failure ? '失败 · ' : ''}{formatAgo(s.lastTest.at)}</span> : <span className="cell-hint">{loaded ? '未测试' : '—'}</span>}</TableCell>
           <TableCell className="text-right"><div className="row-actions">
-            <Button variant="ghost" size="icon" disabled={c.blocked} title="测试连通" aria-label={`测试 ${p.id}`} onClick={() => c.openProvider(p.id, 'overview', { kind: 'test' })}><Play /></Button>
+            <Button variant="ghost" size="icon" disabled={c.blocked} title="测试连通" aria-label={`测试 ${p.id}`} onClick={() => c.openQuickTest(p.id)}><Play /></Button>
             <Button variant="ghost" size="icon" disabled={c.blocked} title="编辑配置" aria-label={`编辑 ${p.id}`} onClick={() => onEdit(p)}><Pencil /></Button>
             <Popover menu label={`${p.id} 的更多操作`} disabled={c.blocked} trigger={props => <Button variant="ghost" size="icon" title="更多操作" aria-label={`更多操作 ${p.id}`} {...props}><MoreHorizontal /></Button>}>
               <MenuItem onSelect={() => c.requestToggle(p)}><Power size={14} />{p.enabled ? '停用' : '启用'}</MenuItem>

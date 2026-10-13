@@ -6,9 +6,12 @@ import "errors"
 // its reasoning items and text metadata can be represented in another protocol.
 // A token-limited response may contain reasoning only and still prove execution.
 func ValidateProbeResponse(raw []byte, p string) (Usage, error) {
-	r, err := parseResponse(raw, p, true)
+	r, err := ParseProbeResponse(raw, p)
 	return r.Usage, err
 }
+
+// ParseProbeResponse retains validated output for transient diagnostic display.
+func ParseProbeResponse(raw []byte, p string) (Result, error) { return parseResponse(raw, p, true) }
 
 type responseValidationError struct {
 	reason string

@@ -248,3 +248,12 @@ type AccountRateObservationResult struct {
 	Data     *AccountRateObservation `json:"data"`
 	Problem  *Problem                `json:"problem"`
 }
+
+// The transient inference lifecycle uses the same core probe as CLI tests.
+type ProbeRequest = catalog.ProbeRequest
+type ProbeProgress = catalog.ProbeProgress
+type ProbeProgressResult struct {
+	Contract string         `json:"contract"`
+	Data     *ProbeProgress `json:"data"`
+	Problem  *Problem       `json:"problem"`
+}

@@ -162,3 +162,13 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。
 
 2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；平台倍率与已保存的候选路由倍率独立，查询不持久写回。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按默认启用 Key 查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
+
+## 实时推理测试生命周期（2026-10-13，当前源码）
+
+`POST /control/v1/providers/{id}/probe` 复用管理鉴权、实例身份与 revision 校验。`catalog.ProbeRequest` / `ProbeProgress` 是核心规范源，桌面 `contract.go` 引用并由 Go 生成 TS；共享样例为 `desktop/contract/provider-probe.json`。Wails `ProviderProbe` → 类型化 client → 管理 API；没有任意 URL、临时秘密或 shell 入口。原有 `provider test` / `ProviderAction(test)` 同步契约保持兼容，异步生命周期服务于弹窗显示。
+
+- 输入固定字段为 provider_id、expected_revision、action、key_id、model、run_id、approved。`start` 要求 approved=true、非空模型和明确的启用 Key；无已存 Key 可指定 anonymous，已存 Key 全停用时禁止匿名回退。`read` / `cancel` 使用开始返回的不可猜测 run_id；仅允许同供应商及 revision 读取，冲突在操作前失败。重复 start 是另一请求，前端同步锁禁止连点，不自动重放未知开始结果。
+- 输出固定字段为 provider_id、revision、run_id、key_id、model、status、phase、text、elapsed_ms、result。status 为 running / completed / cancelled；phase 为 connecting / receiving / complete；运行中 result=null，终态 result 为原有 Probe。耗时是毫秒；输出文本累计快照至多 16 KiB。前端运行中每150ms串行读取一次，终态／关闭／卸载停止轮询；迟到的开始结果取得 run_id 后仍发取消，取消不确认时由核心硬超时兜底。
+- 最小请求仍是「Reply OK.」、max_output_tokens=16、store=false。异步测试增加 stream=true；使用所选 Key 的实际模型协议、已有协议流转换器，以及与同步探针相同的并发、最多10秒期限、健康和累计用量。真实 SSE 文本逐段可见；上游忽略流式并返回 JSON 时，校验后显示一次完整文本。EOF 缺终止事件、非法流和 incomplete 返回固定 invalid_response，错误正文不显示。
+- 核心最多保留64次瞬态运行，开始一分钟后删除；停止取消上游 context，核心关闭取消并等待任务退出。文本只在运行内存／当前弹窗保留，不进入日志、数据库或浏览器存储。仅提取 output_text，不展示原始事件、思考内容、请求头或上游错误；所选 Key 凭据完整回显及跨片段前缀均被过滤。保留现有固定失败分类及 Probe DTO。
+- 目录只说明 Key 可列出该模型，不保证推理或流式成功。前端目录错误／空目录禁用发起按钮；Key 切换清空选择后重新查询，不从供应商全量映射猜测 Key 权限。关闭快速测试保持列表、关闭详情测试保持详情。

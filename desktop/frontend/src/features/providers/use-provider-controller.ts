@@ -13,6 +13,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   const [readVersion, setReadVersion] = useState(0);
   const [problem, setProblem] = useState<ProblemCode | null>(null);
   const [notice, setNotice] = useState('');
+  const [quickId, setQuickId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
@@ -65,7 +66,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     return () => { query.current?.abort(); write.current?.abort(); catalogQuery.current?.abort(); };
   }, [load]);
   const visible = useMemo(() => providers.filter(p => (filter === 'all' || p.enabled === (filter === 'enabled')) && `${p.id} ${p.homepage_url} ${p.base_urls.join(' ')}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [providers, filter, search]);
-  const selected = providers.find(p => p.id === selectedId) ?? null;
+  const selected = providers.find(p => p.id === (quickId ?? selectedId)) ?? null;
   const blocked = phase !== 'ready' || problem === 'unknown' || problem === 'conflict' || busy || modelsBusy;
   function openEditor(source?: Provider) {
     if (blocked || locked.current || (features.isBusy() || account.isBusy())) return;
@@ -146,7 +147,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   function changeScenario(value: Scenario) {
     if (!environment.reset || editor || busy || modelsBusy || (features.isBusy() || account.isBusy()) || toggle) return;
     clearModels(); query.current?.abort(); write.current?.abort(); generation.current++;
-    environment.reset(value); setScenario(value); setSelectedId(null); setDetailTab('overview'); setDialog(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
+    environment.reset(value); setScenario(value); setQuickId(null); setSelectedId(null); setDetailTab('overview'); setDialog(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
     void load();
   }
   const features = useProviderFeatures(selected, transport, async (id, action, from) => {
@@ -164,19 +165,20 @@ export function useProviderController(environment: ProviderEnvironment) {
   function openProvider(id: string, tab: DetailTab = 'overview', next?: ProviderDialog) {
     if (locked.current || (features.isBusy() || account.isBusy()) || dialog || editor || toggle) return;
     if (id !== selectedId) { clearModels(); setNotice(''); }
-    setSelectedId(id); setDetailTab(tab); setDialog(next ?? null);
+    setQuickId(null); setSelectedId(id); setDetailTab(tab); setDialog(next ?? null);
   }
   return {
     account,
     features: { ...features, importModels: (ids: string[]) => account.isBusy() || locked.current || blocked ? Promise.resolve() : features.importModels(ids), run: (...args: Parameters<typeof features.run>) => account.isBusy() ? Promise.resolve(false) : features.run(...args) },
+    transport, quickId, openQuickTest: (id: string) => { if (!blocked && !locked.current && !dialog && !features.isBusy() && !account.isBusy()) { setQuickId(id); setDialog({ kind: 'test' }); } },
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
     notice, search, setSearch, filter, setFilter, editor, errors, busy: busy || modelsBusy || features.busy || account.busy, blocked: blocked || features.busy || account.busy, toggle, scenario,
     models: models?.provider_id === selected?.id ? models : null,
     modelsProblem, modelsBusy, discoverModels,
     detailTab, setDetailTab, dialog, openProvider,
     openDialog: (next: ProviderDialog) => { if (!(features.isBusy() || account.isBusy()) && !locked.current) setDialog(next); },
-    closeDialog: () => { if (!(features.isBusy() || account.isBusy())) setDialog(null); },
-    select: (id: string | null) => { if (!locked.current && !(features.isBusy() || account.isBusy())) { clearModels(); setSelectedId(id); setDetailTab('overview'); setDialog(null); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
+    closeDialog: () => { if (!(features.isBusy() || account.isBusy())) { setDialog(null); setQuickId(null); } },
+    select: (id: string | null) => { if (!locked.current && !(features.isBusy() || account.isBusy())) { clearModels(); setQuickId(null); setSelectedId(id); setDetailTab('overview'); setDialog(null); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
     submit: () => editor && void save(editor.source, editor.draft),
     requestToggle: (provider: Provider) => { if (!blocked && !(features.isBusy() || account.isBusy())) { setNotice(''); setToggle(provider); } },
     cancelToggle: () => { if (!locked.current) setToggle(null); },

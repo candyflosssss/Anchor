@@ -17,6 +17,7 @@ async function host(page: Page, rateMappings = false) {
     let providers: Provider[] = rows;
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
     const api: DesktopBridge = {
+      ProviderProbe: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderAccountSettings: async input => ({ contract, data: settings(input.provider_id), problem: null }),
       SaveProviderAccount: async input => {
         window.accountTest.saves++;

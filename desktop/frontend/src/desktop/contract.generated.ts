@@ -2,6 +2,32 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface ProbeRequest {
+  provider_id: string;
+  expected_revision: number;
+  action: string;
+  key_id: string;
+  model: string;
+  run_id: string;
+  approved: boolean;
+}
+export interface ProbeProgress {
+  provider_id: string;
+  revision: number;
+  run_id: string;
+  key_id: string;
+  model: string;
+  status: string;
+  phase: string;
+  text: string;
+  elapsed_ms: number;
+  result: Probe | null;
+}
+export interface ProbeProgressResult {
+  contract: string;
+  data: ProbeProgress | null;
+  problem: Problem | null;
+}
 export interface AccountRate {
   group: string;
   group_name: string;
@@ -486,6 +512,7 @@ export interface DesktopBridge {
   ProviderAccountSettings(input1: WorkspaceQuery): Promise<AccountSettingsResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderAllowance(input1: AccountQuery): Promise<AccountObservationResult>;
+  ProviderProbe(input1: ProbeRequest): Promise<ProbeProgressResult>;
   ProviderRate(input1: AccountQuery): Promise<AccountRateObservationResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;

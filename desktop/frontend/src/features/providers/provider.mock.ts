@@ -1,3 +1,4 @@
+import type { ProbeProgress, ProbeRequest } from '../../desktop/contract.generated';
 import accountFixture from '../../../../contract/provider-account.json';
 import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountObservation, AccountRateObservation } from './provider-account.model';
 import mappingFixture from '../../../../contract/provider-model-mapping.json';
@@ -45,10 +46,11 @@ export class MockProviderTransport implements ProviderTransport {
   private workspaces = new Map<string, Workspace>();
   private accounts = new Map<string, AccountSettings>();
   private seeded = new Set<string>();
+  private probes = new Map<string, { value: ProbeProgress; started: number }>();
   private scenario: Scenario = 'normal';
   reset(scenario: Scenario) {
     this.scenario = scenario;
-    this.accounts.clear(); this.workspaces.clear(); this.seeded.clear();
+    this.probes.clear(); this.accounts.clear(); this.workspaces.clear(); this.seeded.clear();
     this.rows = scenario === 'empty' ? fixture.empty.map(checkedProvider) : examples().map(copy);
   }
   async accountSettings(id: string, signal: AbortSignal): Promise<AccountSettings> {
@@ -134,6 +136,33 @@ export class MockProviderTransport implements ProviderTransport {
       this.workspaces.set(p.id, w);
     }
     w.revision = p.revision; return w;
+  }
+  async probe(input: ProbeRequest, signal: AbortSignal): Promise<ProbeProgress> {
+    await delay(signal);
+    const p = this.rows.find(p => p.id === input.provider_id);
+    if (!p || p.revision !== input.expected_revision) throw fixtureError('conflict');
+    const w = this.detail(p);
+    if (input.action === 'start') {
+      if (!input.approved || !input.model || (w.keys.length && !w.keys.some(k => k.id === input.key_id && k.enabled))) throw fixtureError('invalid');
+      const value: ProbeProgress = { provider_id: p.id, revision: p.revision, run_id: `synthetic-${Date.now()}`, key_id: input.key_id, model: input.model,
+        status: 'running', phase: 'connecting', text: '', elapsed_ms: 0, result: null };
+      this.probes.set(value.run_id, { value, started: Date.now() }); return structuredClone(value);
+    }
+    const run = this.probes.get(input.run_id);
+    if (!run || run.value.provider_id !== p.id) throw fixtureError('invalid');
+    const value = run.value; value.elapsed_ms = Date.now() - run.started;
+    if (input.action === 'cancel') value.status = 'cancelled';
+    if (value.status === 'running') {
+      value.phase = 'receiving'; value.text = value.elapsed_ms > 700 ? 'OK' : 'O';
+      if (value.elapsed_ms > 1100) value.status = 'completed';
+    }
+    if (value.status !== 'running') {
+      value.phase = 'complete';
+      value.result = { revision: p.revision, key_id: value.key_id, model: value.model, at: Math.floor(Date.now() / 1000), http_status: 200,
+        elapsed_ms: value.elapsed_ms, failure: value.status === 'cancelled' ? 'network' : '' };
+      const k = w.keys.find(k => k.id === value.key_id); if (k) k.test = value.result; w.probe = value.result;
+    }
+    return structuredClone(value);
   }
   async workspace(id: string, signal: AbortSignal): Promise<Workspace> {
     await delay(signal);

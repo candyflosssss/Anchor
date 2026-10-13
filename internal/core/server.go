@@ -39,6 +39,7 @@ type Server struct {
 	mu               sync.Mutex
 	active           map[string]int
 	health           map[string]*keyHealth
+	probeRuns        map[string]*probeRun
 	routing          map[string]*modelSchedule
 	cursor           map[string]int
 	slots            chan struct{}
@@ -64,6 +65,18 @@ func New(store *state.Store, log *slog.Logger) *Server {
 }
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
+		s.stopping.Store(true)
+		s.mu.Lock()
+		runs := make([]*probeRun, 0, len(s.probeRuns))
+		for _, run := range s.probeRuns {
+			run.cancel()
+			run.expiry.Stop()
+			runs = append(runs, run)
+		}
+		s.mu.Unlock()
+		for _, run := range runs {
+			<-run.done
+		}
 		s.upstream.CloseIdleConnections()
 		if s.logs != nil {
 			_ = s.logs.Close()
@@ -251,6 +264,7 @@ func (s *Server) Control() http.Handler {
 		writeJSON(w, 200, p)
 	})
 	mux.HandleFunc("POST /control/v1/providers/{id}/discover-models", s.discoverProviderModels)
+	mux.HandleFunc("POST /control/v1/providers/{id}/probe", s.providerProbe)
 	mux.HandleFunc("GET /control/v1/models", func(w http.ResponseWriter, r *http.Request) {
 		m, err := s.Store.Models()
 		if err != nil {

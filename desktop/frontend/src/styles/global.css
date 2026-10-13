@@ -323,3 +323,7 @@ button.metric-card:hover:not(:disabled) { border-color: hsl(var(--ring) / .6); }
 .account-numbers dt { color: hsl(var(--muted-foreground)); flex-shrink: 0; }
 .account-numbers dd { text-align: right; overflow-wrap: anywhere; }
 .account-window { border-top: 1px solid hsl(var(--border)); padding: 10px 0; font-size: 12px; overflow-wrap: anywhere; }
+
+.test-live-output { padding: 0 24px 16px; display: grid; gap: 10px; min-width: 0; }
+.test-live-output > p { font-size: 13px; color: hsl(var(--muted-foreground)); }
+.test-live-output pre { border: 1px solid hsl(var(--border)); background: hsl(var(--muted)); border-radius: 8px; padding: 12px; min-height: 90px; max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }

@@ -267,6 +267,10 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, out)
 }
 func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model string) (*catalog.Probe, error) {
+	return s.probeObserved(ctx, p, keyID, model, nil)
+}
+
+func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, model string, notify func(string, string)) (*catalog.Probe, error) {
 	keys, err := s.Store.ProviderKeys(p.ID)
 	if err != nil {
 		return nil, err
@@ -295,7 +299,7 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 		return nil, err
 	}
 	callerCtx := ctx
-	stream := false
+	stream := notify != nil
 	row := logbook.Request{ID: id, StartedAtMS: start.UnixMilli(), Status: "pending", Source: "probe", ReasoningObserved: true, Stream: &stream, UpstreamModel: model, Model: model, Protocol: p.Protocol, Provider: p.ID, Key: key.ID, Revision: p.Revision, Delivery: "none", Stage: "route", Attempts: []logbook.Attempt{}, Evidence: map[string]string{}}
 	if s.logs != nil {
 		s.logs.Request(row)
@@ -382,7 +386,7 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 		return out, nil
 	}
 	defer s.release(p.ID)
-	raw, _ := json.Marshal(map[string]any{"model": model, "input": "Reply OK.", "max_output_tokens": 16, "store": false})
+	raw, _ := json.Marshal(map[string]any{"model": model, "input": "Reply OK.", "max_output_tokens": 16, "store": false, "stream": stream})
 	body, err := protocol.ConvertRequest(raw, "responses", p.Protocol)
 	if err != nil {
 		return nil, err
@@ -423,6 +427,25 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	if out.Failure != "" {
 		return out, nil
 	}
+	if notify != nil {
+		notify("receiving", "")
+		if strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+			output := &probeOutput{header: http.Header{}, secret: key.Secret, notify: notify}
+			observation := &protocol.Observation{}
+			u, err = protocol.StreamObserved(output, io.LimitReader(resp.Body, (1<<20)+1), p.Protocol, "responses", model, observation)
+			stage = "response_validate"
+			if err != nil || observation.Status == "failed" || observation.Status == "incomplete" {
+				out.Failure = "invalid_response"
+			}
+			if ctx.Err() != nil {
+				out.Failure = "timeout"
+			}
+			if out.Failure == "" {
+				notify("receiving", publicProbeText(output.text, key.Secret, false))
+			}
+			return out, nil
+		}
+	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
 		out.Failure = "network"
@@ -438,6 +461,25 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	} else {
 		u = usage
 		row.Evidence["validation"] = "passed"
+		if notify != nil {
+			parsed, e := protocol.ParseProbeResponse(data, p.Protocol)
+			if e == nil {
+				var text strings.Builder
+				for _, item := range parsed.Items {
+					if !item.Tool {
+						text.WriteString(item.Text)
+					}
+				}
+				value := text.String()
+				if len(value) > 16384 {
+					value = value[:16384]
+				}
+				if key.Secret != "" {
+					value = strings.ReplaceAll(value, key.Secret, "[redacted]")
+				}
+				notify("receiving", value)
+			}
+		}
 	}
 	return out, nil
 }
