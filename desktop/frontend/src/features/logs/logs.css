@@ -51,9 +51,10 @@
 .log-outcome-grid span { display: block; font-size: 11px; color: hsl(var(--muted-foreground)); margin-bottom: 8px; }
 .log-outcome-grid strong { display: block; font-size: 12px; font-weight: 500; }
 .log-outcome-grid > svg { color: hsl(var(--muted-foreground)); }
-.log-properties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 22px; }
+.log-properties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 22px; }
 .log-properties dt { color: hsl(var(--muted-foreground)); font-size: 11px; margin-bottom: 5px; }
 .log-properties dd { font-size: 12px; overflow-wrap: anywhere; }
+.log-properties .log-time { white-space: normal; }
 .log-timeline { padding-left: 12px; }
 .log-timeline li { position: relative; padding-left: 28px; padding-bottom: 14px; border-left: 1px solid hsl(var(--border)); }
 .log-timeline li:last-child { border-color: transparent; padding-bottom: 0; }

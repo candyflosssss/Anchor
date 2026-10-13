@@ -270,6 +270,8 @@ button.metric-card:hover:not(:disabled) { border-color: hsl(var(--ring) / .6); }
 .detail-card h2 { font-size: 14px; font-weight: 600; }
 .detail-card h3 { font-size: 13px; font-weight: 600; }
 .card-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.card-toolbar .toolbar-actions { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.card-toolbar .select-field { max-width: 100%; }
 .card-hint { font-size: 12px; line-height: 1.7; color: hsl(var(--muted-foreground)); }
 .overview-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .stack { display: grid; gap: 16px; min-width: 0; }
