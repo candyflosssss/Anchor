@@ -245,3 +245,29 @@ func (b *Bridge) ProviderAction(in Action) WorkspaceResult {
 	out.Data = &data
 	return out
 }
+
+func (b *Bridge) ConfigureModelRouting(in ModelRouting) ModelRoutingResult {
+	s := b.session
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := ModelRoutingResult{Contract: Contract}
+	if !state.ValidID(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= MaxSafeRevision || in.Strategy == "" || !state.ValidModelStrategy(in.Strategy) || len(in.Order) < 1 || len(in.Order) > 64 {
+		out.Problem = &Problem{"invalid"}
+		return out
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	defer cancel()
+	cl, _, err := s.connection(ctx)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	defer cl.Close()
+	data, err := cl.ConfigureModelRouting(ctx, in)
+	if err != nil {
+		out.Problem = problem(err, true)
+		return out
+	}
+	out.Data = &data
+	return out
+}

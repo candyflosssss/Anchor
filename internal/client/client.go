@@ -230,3 +230,12 @@ func (c *Client) EnrollAgent(ctx context.Context, in managed.EnrollAgent) (manag
 	err := c.call(ctx, "POST", "/control/v1/agents/enroll", in, &v)
 	return v, err
 }
+
+func (c *Client) ConfigureModelRouting(ctx context.Context, in catalog.ModelRouting) (catalog.ModelRoutingState, error) {
+	if !state.ValidID(in.ModelID) {
+		return catalog.ModelRoutingState{}, errors.New("invalid model ID")
+	}
+	var out catalog.ModelRoutingState
+	err := c.call(ctx, "POST", "/control/v1/models/"+in.ModelID+"/routing", in, &out)
+	return out, err
+}

@@ -88,17 +88,21 @@ export function overviewTotals(summaries: ProviderSummary[]) {
   };
 }
 
-export interface ModelCandidate { provider_id: string; upstream: string; tools: boolean; streaming: boolean; multiplier: number; strategy: string; tone: Tone; label: string }
-export interface ModelGroup { alias: string; candidates: ModelCandidate[] }
+export interface ModelCandidate { provider_id: string; upstream: string; tools: boolean; streaming: boolean; multiplier: number; strategy: string; revision: number; candidate_index: number; candidate_count: number; key_ids: string[]; keys: { id: string; state: string; enabled: boolean }[]; tone: Tone; label: string }
+export interface ModelGroup { alias: string; revision: number; strategy: string; complete: boolean; candidates: ModelCandidate[] }
 export function aggregateModels(summaries: ProviderSummary[]): ModelGroup[] {
   const groups = new Map<string, ModelCandidate[]>();
   for (const s of summaries) for (const m of s.workspace?.models ?? []) {
     const list = groups.get(m.id) ?? [];
-    list.push({ provider_id: s.provider.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming, multiplier: m.multiplier, strategy: m.strategy, tone: s.tone, label: s.label });
+    list.push({ provider_id: s.provider.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming, multiplier: m.multiplier, strategy: m.strategy, revision: m.revision, candidate_index: m.candidate_index, candidate_count: m.candidate_count, key_ids: m.key_ids, keys: s.workspace?.keys ?? [], tone: s.tone, label: s.label });
     groups.set(m.id, list);
   }
-  return [...groups].map(([alias, candidates]) => ({ alias, candidates: candidates.sort((a, b) => a.provider_id.localeCompare(b.provider_id, 'zh-CN')) }))
-    .sort((a, b) => a.alias.localeCompare(b.alias, 'zh-CN'));
+  return [...groups].map(([alias, candidates]) => {
+    candidates.sort((a, b) => a.candidate_index - b.candidate_index);
+    const first = candidates[0];
+    const complete = candidates.length === first.candidate_count && candidates.every((c, i) => c.revision === first.revision && c.strategy === first.strategy && c.candidate_index === i);
+    return { alias, revision: first.revision, strategy: first.strategy, complete, candidates };
+  }).sort((a, b) => a.alias.localeCompare(b.alias, 'zh-CN'));
 }
 
 export function formatAgo(at: number, now = Date.now() / 1000): string {

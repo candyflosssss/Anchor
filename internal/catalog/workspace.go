@@ -2,23 +2,24 @@ package catalog
 
 // Explicit DTOs shared by management, CLI and desktop. Secrets appear only in Action.
 type Action struct {
-	Multiplier       float64 `json:"multiplier"`
-	Protocol         string  `json:"protocol"`
-	Price            *Price  `json:"price"`
-	CatalogProvider  string  `json:"catalog_provider"`
-	ProviderID       string  `json:"provider_id"`
-	ExpectedRevision int64   `json:"expected_revision"`
-	Action           string  `json:"action"`
-	Target           string  `json:"target"`
-	Secret           string  `json:"secret"`
-	Enabled          bool    `json:"enabled"`
-	Approved         bool    `json:"approved"`
-	CopyKeys         bool    `json:"copy_keys"`
-	Strategy         string  `json:"strategy"`
-	Model            string  `json:"model"`
-	ModelRevision    int64   `json:"model_revision"`
-	Tools            bool    `json:"tools"`
-	Streaming        bool    `json:"streaming"`
+	KeyIDs           []string `json:"key_ids"`
+	Multiplier       float64  `json:"multiplier"`
+	Protocol         string   `json:"protocol"`
+	Price            *Price   `json:"price"`
+	CatalogProvider  string   `json:"catalog_provider"`
+	ProviderID       string   `json:"provider_id"`
+	ExpectedRevision int64    `json:"expected_revision"`
+	Action           string   `json:"action"`
+	Target           string   `json:"target"`
+	Secret           string   `json:"secret"`
+	Enabled          bool     `json:"enabled"`
+	Approved         bool     `json:"approved"`
+	CopyKeys         bool     `json:"copy_keys"`
+	Strategy         string   `json:"strategy"`
+	Model            string   `json:"model"`
+	ModelRevision    int64    `json:"model_revision"`
+	Tools            bool     `json:"tools"`
+	Streaming        bool     `json:"streaming"`
 }
 type ModelProtocol struct {
 	Model    string `json:"model"`
@@ -45,15 +46,17 @@ type Probe struct {
 	Failure    string `json:"failure"`
 }
 type ModelMapping struct {
-	Multiplier     float64 `json:"multiplier"`
-	Strategy       string  `json:"strategy"`
-	ID             string  `json:"id"`
-	DisplayName    string  `json:"display_name"`
-	Upstream       string  `json:"upstream"`
-	Tools          bool    `json:"tools"`
-	Streaming      bool    `json:"streaming"`
-	Revision       int64   `json:"revision"`
-	CandidateCount int     `json:"candidate_count"`
+	KeyIDs         []string `json:"key_ids"`
+	CandidateIndex int      `json:"candidate_index"`
+	Multiplier     float64  `json:"multiplier"`
+	Strategy       string   `json:"strategy"`
+	ID             string   `json:"id"`
+	DisplayName    string   `json:"display_name"`
+	Upstream       string   `json:"upstream"`
+	Tools          bool     `json:"tools"`
+	Streaming      bool     `json:"streaming"`
+	Revision       int64    `json:"revision"`
+	CandidateCount int      `json:"candidate_count"`
 }
 type UsageRow struct {
 	ProviderID   string `json:"provider_id"`

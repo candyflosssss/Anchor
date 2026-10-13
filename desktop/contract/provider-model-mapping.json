@@ -7,5 +7,7 @@
   "revision": 1,
   "candidate_count": 2,
   "multiplier": 1,
-  "strategy": "round-robin"
+  "strategy": "round-robin",
+  "key_ids": [],
+  "candidate_index": 0
 }

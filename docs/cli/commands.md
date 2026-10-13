@@ -80,6 +80,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `logs settings` | 查询日志保留设置 | 所选 Context 核心在线 |
 | `logs configure` | 校验并持久化保留设置 | 所选 Context 管理授权 |
 | `usage` | 持久用量汇总 | 所选 Context 的核心在线 |
+| `model routing` | 原子保存已有候选的完整顺序与调度规则 | 核心在线、当前模型 revision；来源和元数据保留 |
 | `model list` | 列出公开模型映射 | 所选 Context 的核心在线 |
 | `model add` | 新增公开模型 | 核心在线；候选供应商已配置 |
 | `model put` | 条件更新公开模型 | 核心在线；当前 revision |
@@ -277,7 +278,7 @@ anchor usage
 | key-delete / key-reset | target 与 approve 必填；delete 删除秘密，reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
 | strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
-| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1。新模型 strategy 默认 round-robin（按倍率倒数加权轮询），可选 priority（候选顺序）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；编辑 tools/streaming 默认 false，能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
+| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1。新模型 strategy 默认 round-robin（按倍率倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（路由倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；编辑 tools/streaming 默认 false，能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
 | model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，Binding 默认模型引用时409 referenced，事务回滚 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；固定公开目录最多8秒/16MiB，无凭据/重定向/环境代理。只返回 imported_price **预览**，不保存；核对后另行 price-put |
@@ -289,6 +290,22 @@ anchor usage
 usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
 
 GUI 在供应商详情的三个页签提供同等操作。数据库启动自动从 schema2 升至3并迁移旧 secret 为 default Key，再升至4将供应商旧协议复制给全部既存 Key；安装前正常停止旧核心，升级后旧二进制不能再打开该数据库，无数据库降级入口。
+
+
+
+### 来源 Key 与模型调度
+
+
+`provider model-put` 支持可重复 `--source-key ID` 限制候选Key；省略时编辑保留原范围、新建允许所有启用Key。`--all-keys` 显式清空限制，与 source-key互斥。导入的指定来源Key参与真实调度；健康失败只切换范围内Key或其他候选，仍被引用的Key不能删除。`workspace.models` 返回 key_ids／candidate_index。schema5→6自动迁移，旧核心不能打开，需同步升级CLI与核心。
+
+`model routing` 的 candidate列表必须完整且成员不变，原子修改共享模型顺序／规则、递增模型revision，保留所有来源Key、路由倍率、tools／streaming及Codex元数据。策略语义见[供应商接口 §9](../design/provider-interface.md#9-来源-key与模型调度2026-10-13当前源码)：缓存亲和10分钟（不保证缓存命中），低价按路由倍率，低延迟成功EWMA观察30分钟。输出JSON含model_id／revision／strategy／order。旧revision返回conflict，不自动重试写入。
+
+```bash
+anchor model routing --id coding-main --revision 3 --strategy priority \
+  --candidate backup:upstream-model --candidate primary:upstream-model
+anchor provider model-put --id primary --revision 2 --target coding-main \
+  --model upstream-model --model-revision 4 --source-key key-main --multiplier 0.8
+```
 
 ### 平台兼容查询（源码 CLI；desktop.21 核心已发布）
 
@@ -340,6 +357,7 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 anchor model list
 anchor model add --id ID --candidate PROVIDER:MODEL [OPTIONS]
 anchor model put --id ID --candidate PROVIDER:MODEL --revision N [OPTIONS]
+anchor model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL [--candidate ...]
 ```
 
 `list` 返回模型数组；add/put 返回保存后的模型对象。供应商/实际模型目录不自动探测。
@@ -348,6 +366,8 @@ anchor model put --id ID --candidate PROVIDER:MODEL --revision N [OPTIONS]
 | --- | --- | --- |
 | `--id` | 必填 | 对外公开模型 ID |
 | `--candidate` | 必填，可重复 | 1..16 个有序候选；格式 `供应商ID:上游模型ID`，按第一个冒号分隔；供应商须已配置，供应商 ID 支持中文，重复候选拒绝 |
+| `--candidate-key` | 可重复 | add/put：`候选序号:Key ID`（序号1开始），限制该候选来源 Key；未指定允许所有启用 Key，put为完整替换 |
+| `--strategy` | add/put默认priority；routing必填 | priority / round-robin / cache-priority / lowest-price / lowest-latency；provider strategy 仍只用于 Key 的前两种规则 |
 | `--display-name` | 空字符串 | 最多 256 字节 |
 | `--tools` | `false` | 声明函数工具能力，不等于上游验证通过 |
 | `--streaming` | `false` | 声明 SSE 能力，不等于上游验证通过 |

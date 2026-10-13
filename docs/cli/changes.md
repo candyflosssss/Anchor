@@ -252,3 +252,12 @@
 - 边界：最多4页各100条，并共用8次请求／2 MiB预算和核心超时；找不到返回 key_not_found。NewAPI auto 返回 unknown，可保留组名但倍率为 null；不默认1、不更改保存的路由倍率、不回显凭据。
 - 兼容与迁移：无需数据迁移；已有显式 ID 调用不变。依赖 remote_key_required 的脚本应改为检查实际 failure 或显式传入后台 ID。
 - 验证：隔离 Go CLI 测试覆盖自动核对与显式 ID、凭据不回显；实际执行结果见本轮任务记录。
+
+
+## 2026-10-13 — 来源Key范围与模型顺序／调度规则（当前源码，待dev投放）
+
+- 新增 model routing --id/--revision/--strategy/重复--candidate，已有完整候选成员原子排序，保留Key、倍率和模型元数据。
+- model add/put新增--strategy（默认priority，保持旧行为）、重复--candidate-key INDEX:KEY；provider model-put新增重复--source-key及--all-keys（编辑省略保留，新建空范围）。
+- model/workspace公开DTO增加key_ids、candidate_index；模型strategy新增cache-priority、lowest-price、lowest-latency。供应商Key策略仍为priority/round-robin。
+- 缓存亲和与低延迟观察只留内存，低价按保存路由倍率；未知金额不填0或1。指定来源参与真实路由，失效时不调度到范围外Key，删除来源Key返回referenced。
+- schema5→6保留既有数据，旧模型空范围允许全部启用Key；旧核心拒绝schema6，升级须同步核心/CLI/桌面。CLI与桌面共用同一管理实现；定向验证结果见本轮更新记录。

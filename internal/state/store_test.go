@@ -237,7 +237,7 @@ func TestSymlinkStorageRejected(t *testing.T) {
 func TestSchemaVersionGuard(t *testing.T) {
 	s := newStore(t)
 	dir := s.Dir
-	if _, e := s.db.Exec(`PRAGMA user_version=6`); e != nil {
+	if _, e := s.db.Exec(`PRAGMA user_version=7`); e != nil {
 		t.Fatal(e)
 	}
 	s.Close()

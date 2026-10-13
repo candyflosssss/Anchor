@@ -257,3 +257,13 @@ type ProbeProgressResult struct {
 	Data     *ProbeProgress `json:"data"`
 	Problem  *Problem       `json:"problem"`
 }
+
+// Model routing writes preserve candidate membership and all candidate metadata.
+type RouteCandidate = catalog.RouteCandidate
+type ModelRouting = catalog.ModelRouting
+type ModelRoutingState = catalog.ModelRoutingState
+type ModelRoutingResult struct {
+	Contract string             `json:"contract"`
+	Data     *ModelRoutingState `json:"data"`
+	Problem  *Problem           `json:"problem"`
+}

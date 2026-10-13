@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 5 {
+	if version > 6 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -141,6 +141,12 @@ COMMIT;`)
 		}
 	}
 
+	// Candidate Key restrictions must never be silently ignored by older cores.
+	if version < 6 {
+		if _, err = db.Exec(`PRAGMA user_version=6`); err != nil {
+			return fail(err)
+		}
+	}
 	return s, nil
 }
 func (s *Store) Close() error { return s.db.Close() }
@@ -420,6 +426,9 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 	}
 	if secret != nil {
 		if *secret == "" {
+			if err = checkKeyUnreferenced(tx, p.ID, "default"); err != nil {
+				return Provider{}, err
+			}
 			_, err = tx.Exec(`DELETE FROM provider_keys WHERE provider_id=? AND id='default'`, p.ID)
 		} else {
 			_, err = tx.Exec(`INSERT INTO provider_keys(provider_id,id,secret,enabled,protocol) VALUES(?,'default',?,1,?) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=1`, p.ID, *secret, p.Protocol)
@@ -520,6 +529,23 @@ func (s *Store) PutProviderModel(m Model, expected int64, providerID string, pro
 		if n != 1 {
 			return Model{}, fmt.Errorf("candidate provider does not exist: %s", c.ProviderID)
 		}
+		for _, id := range c.KeyIDs {
+			if err = tx.QueryRow(`SELECT count(*) FROM provider_keys WHERE provider_id=? AND id=?`, c.ProviderID, id).Scan(&n); err != nil {
+				return Model{}, err
+			}
+			if n == 1 {
+				continue
+			}
+			if id != "anonymous" {
+				return Model{}, ErrInvalid
+			}
+			if err = tx.QueryRow(`SELECT count(*) FROM provider_keys WHERE provider_id=?`, c.ProviderID).Scan(&n); err != nil {
+				return Model{}, err
+			}
+			if n != 0 {
+				return Model{}, ErrInvalid
+			}
+		}
 	}
 	m.Revision = expected + 1
 	b, _ := json.Marshal(m)
@@ -595,4 +621,17 @@ func (s *Store) UseContext(name string) error {
 	}
 	_, err := s.db.Exec(`INSERT INTO meta(key,value) VALUES('current_context',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, name)
 	return err
+}
+
+// A source Key cannot be deleted while a mapping explicitly references it.
+func checkKeyUnreferenced(tx *sql.Tx, provider, key string) error {
+	var n int
+	err := tx.QueryRow(`SELECT count(*) FROM models m, json_each(m.document,'$.candidates') c, json_each(c.value,'$.key_ids') k WHERE json_extract(c.value,'$.provider_id')=? AND k.value=?`, provider, key).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return ErrReferenced
+	}
+	return nil
 }

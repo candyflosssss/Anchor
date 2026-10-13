@@ -5,3 +5,15 @@
 .mapping-rate-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .mapping-rates .card-hint { margin: 0; font-size: 11px; }
 .mapping-rates .feedback { font-size: 12px; padding: 8px; }
+.mapping-source-header { display: flex; align-items: center; gap: 2px; }
+.mapping-source-header .candidate { flex: 1; min-width: 0; }
+.route-grip { background: transparent; border: 0; padding: 10px 4px; cursor: grab; color: hsl(var(--muted-foreground)); }
+.route-grip:disabled { cursor: default; opacity: .35; }
+.route-grip:active { cursor: grabbing; }
+.route-move { display: flex; flex-shrink: 0; }
+.route-move button { padding: 4px; height: 30px; }
+.route-settings { margin: 10px 0; font-size: 12px; }
+.route-settings summary { cursor: pointer; display: flex; gap: 6px; align-items: center; color: hsl(var(--muted-foreground)); }
+.route-settings-body { display: grid; gap: 8px; padding: 12px 0; }
+.route-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.mapping-key-rate { display: grid; gap: 5px; border-left: 2px solid hsl(var(--border)); padding-left: 8px; }

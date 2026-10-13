@@ -1,3 +1,4 @@
+import { validRoutingRule, checkedRouting, type ModelRouting } from '../models/model-routing.model';
 import type { ProbeProgress, ProbeRequest } from '../../desktop/contract.generated';
 import accountFixture from '../../../../contract/provider-account.json';
 import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountObservation, AccountRateObservation } from './provider-account.model';
@@ -35,7 +36,7 @@ function seed(id: string, w: Workspace) {
       { id: 'backup', protocol: 'chat-completions', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: { revision: w.revision, key_id: 'backup', model: 'backup-model', at: now - 7200, http_status: 200, elapsed_ms: 860, failure: '' } },
       { id: 'primary', protocol: 'responses', model_protocols: [], enabled: true, state: 'cooling', failures: 3, retry_at: now + 600, test: null },
     ];
-    w.models = [mapping('backup-model')];
+    w.models = [{ ...mapping('backup-model'), candidate_index: 1 }];
     w.usage = [{ provider_id: id, model: 'coding-main', requests: 42, failures: 1, elapsed_ms: 50400, known: 40, input_tokens: 120000, output_tokens: 30000, cache_read: 20000, cache_write: 0 }];
     w.estimates = [{ model: 'coding-main', usd: 0.0123 }];
   }
@@ -170,6 +171,17 @@ export class MockProviderTransport implements ProviderTransport {
     const p = this.rows.find(p => p.id === id); if (!p) throw new ProviderProblem('read_error');
     return structuredClone(this.detail(p));
   }
+  async routing(input: ModelRouting, signal: AbortSignal) {
+    await delay(signal);
+    const candidates = this.rows.flatMap(p => this.detail(p).models.filter(m => m.id === input.model_id).map(m => ({ p, m })));
+    if (!candidates.length || candidates.some(c => c.m.revision !== input.expected_revision) || this.scenario === 'conflict') { this.scenario = 'normal'; throw fixtureError('conflict'); }
+    if (!validRoutingRule(input.strategy) || candidates.length !== input.order.length) throw fixtureError('invalid');
+    const ordered = input.order.map(ref => candidates.find(c => c.p.id === ref.provider_id && c.m.upstream === ref.model));
+    if (ordered.some(c => !c) || new Set(ordered).size !== candidates.length) throw fixtureError('invalid');
+    ordered.forEach((c, i) => Object.assign(c!.m, { candidate_index: i, strategy: input.strategy, revision: input.expected_revision + 1 }));
+    if (this.scenario === 'unknown') throw fixtureError('unknown');
+    return checkedRouting({ model_id: input.model_id, revision: input.expected_revision + 1, strategy: input.strategy, order: input.order }, input);
+  }
   async action(a: Action, signal: AbortSignal): Promise<Workspace> {
     await delay(signal);
     if (this.scenario === 'offline' || this.scenario === 'unauthorized') throw fixtureError(this.scenario);
@@ -210,14 +222,14 @@ export class MockProviderTransport implements ProviderTransport {
         const multiplier = a.multiplier || local?.multiplier || 1;
         if (!Number.isFinite(multiplier) || multiplier < 0.01 || multiplier > 1000) throw fixtureError('invalid');
         const strategy = a.model_revision > 0 || !shared ? a.strategy || shared?.strategy || 'round-robin' : shared.strategy;
-        if (!['priority', 'round-robin'].includes(strategy)) throw fixtureError('invalid');
+        if (!validRoutingRule(strategy)) throw fixtureError('invalid');
         const revision = (shared?.revision ?? 0) + 1;
         const candidate_count = mappings.length + (local ? 0 : 1);
         const tools = a.model_revision > 0 || !shared ? a.tools : shared.tools;
         const streaming = a.model_revision > 0 || !shared ? a.streaming : shared.streaming;
         for (const m of mappings) Object.assign(m, { revision, candidate_count, strategy, tools, streaming });
-        if (local) Object.assign(local, { upstream: a.model, multiplier });
-        else w.models.push({ id: a.target, display_name: shared?.display_name ?? a.target, upstream: a.model, multiplier, revision, candidate_count, strategy, tools, streaming });
+        if (local) Object.assign(local, { upstream: a.model, multiplier, key_ids: a.key_ids ?? local.key_ids });
+        else w.models.push({ key_ids: a.key_ids ?? [], candidate_index: mappings.length, id: a.target, display_name: shared?.display_name ?? a.target, upstream: a.model, multiplier, revision, candidate_count, strategy, tools, streaming });
         break;
       }
       case 'model-delete': {
@@ -228,7 +240,7 @@ export class MockProviderTransport implements ProviderTransport {
         w.models = w.models.filter(m => m !== local);
         w.prices = w.prices.filter(p => p.model !== a.target);
         const remaining = all.flatMap(w => w.models.filter(m => m.id === a.target));
-        for (const m of remaining) { m.revision++; m.candidate_count = remaining.length; }
+        remaining.sort((a,b) => a.candidate_index-b.candidate_index).forEach((m,i) => { m.revision++; m.candidate_count = remaining.length; m.candidate_index = i; });
         break;
       }
       case 'test': if (!a.approved) throw fixtureError('invalid'); w.probe = { revision: p.revision, key_id: a.target, model: a.model, at: Math.floor(Date.now() / 1000), http_status: 200, elapsed_ms: 120, failure: '' }; { const k = w.keys.find(k => k.id === a.target); if (k) k.test = { ...w.probe }; } break;

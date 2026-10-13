@@ -169,7 +169,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   }
   return {
     account,
-    features: { ...features, importModels: (ids: string[]) => account.isBusy() || locked.current || blocked ? Promise.resolve() : features.importModels(ids), run: (...args: Parameters<typeof features.run>) => account.isBusy() ? Promise.resolve(false) : features.run(...args) },
+    features: { ...features, importModels: (ids: string[]) => account.isBusy() || locked.current || blocked ? Promise.resolve() : features.importModels(ids, Object.fromEntries((models?.entries ?? []).map(e => [e.id, e.key_ids]))), run: (...args: Parameters<typeof features.run>) => account.isBusy() ? Promise.resolve(false) : features.run(...args) },
     transport, quickId, openQuickTest: (id: string) => { if (!blocked && !locked.current && !dialog && !features.isBusy() && !account.isBusy()) { setQuickId(id); setDialog({ kind: 'test' }); } },
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
     notice, search, setSearch, filter, setFilter, editor, errors, busy: busy || modelsBusy || features.busy || account.busy, blocked: blocked || features.busy || account.busy, toggle, scenario,

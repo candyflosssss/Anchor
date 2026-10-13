@@ -161,6 +161,26 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。
 
+2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；平台倍率与已保存的候选路由倍率独立，查询不持久写回。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按来源 Key 逐项查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
+
+
+## 9. 来源 Key与模型调度（2026-10-13，当前源码）
+
+模型 candidates 新增可选 key_ids：空／缺失表示所有启用 Key，非空仅允许列出的本机 Key ID。写入检查 Key 属于候选供应商，去重且最多64项；anonymous 仅能用于没有 Key 的供应商。目录导入保留实际 entries.key_ids，禁止调度到目录未报告的其他 Key。停用／认证失效／冷却／半开探测等既有健康门禁照常生效，指定 Key 都不可用时切换其他候选，不越过范围。仍被显式来源引用的 Key 不允许删除（包括清除 default 凭据）；先在映射编辑中解除引用。schema5→6 顺序迁移保留模型、供应商与凭据，无新表；schema版本保护防止旧核心忽略 Key 限制。
+
+Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始，核心真实顺序）；revision／strategy／candidate_count 仍描述共享公开模型。多个平台可以映射同一别名；一个候选可包含多个 Key，具体 Key 沿用该供应商的 priority／round-robin 策略。
+
+新增管理 `POST /control/v1/models/{id}/routing`，复用管理鉴权与实例校验；输入为 model_id、expected_revision、strategy 和完整 order（provider_id／model）。只能排列已有候选，拒绝遗漏、重复、增加或替换成员；保留每个候选的 Key、倍率及全部模型元数据。原子提交递增模型 revision，不递增供应商 revision。响应为 ModelRoutingState；旧 revision 为 conflict，不自动重放。客户端 ConfigureModelRouting、CLI model routing 和桌面 Bridge.ConfigureModelRouting 共用此实现；共享样例 desktop/contract/model-routing.json，TS 由 Go DTO 生成。宿主15秒超时，前端取消仅丢弃结果，未知写结果必须重新读取。
+
+| strategy | 行为 | 无观察或失败时 |
+| --- | --- | --- |
+| priority | 固定保存顺序 | 健康／并发门禁与失败切换照常 |
+| round-robin | 候选权重为路由倍率倒数，平滑加权轮询 | 跳过不可用候选，revision变化重置权重债务 |
+| cache-priority | 同一认证调用者／模型／instructions／首个input项复用最近成功供应商、上游模型和Key，TTL10分钟 | 没有有效亲和时加权轮询；冷却、配置变化或失败时切换 |
+| lowest-price | 按保存的路由倍率升序，相同倍率按保存顺序 | 不获取或推断真实单价，不自动采纳平台分组倍率 |
+| lowest-latency | 先按保存顺序学习无观察来源；有观察后按成功请求首字耗时的EWMA升序（旧值80%／新值20%），无首字时总耗时 | 观察TTL30分钟，过期再学习；相同耗时按保存顺序 |
+
+观测只在内存保存，重启后清空；亲和最多1024项，延迟最多4096项，按模型和供应商revision隔离，删除过期后仍满则淘汰旧项。亲和只保留SHA256摘要，包含授权调用者与最大64KiB的稳定请求片段，不保存原始令牌或正文、不额外发探测推理。只使用成功请求观测；不是上游缓存命中承诺。成功采样、不可用过滤和实际转发前的Key健康／并发复查由核心完成。
 2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；平台倍率与已保存的候选路由倍率独立，查询不持久写回。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按默认启用 Key 查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
 
 ## 实时推理测试生命周期（2026-10-13，当前源码）

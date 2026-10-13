@@ -103,3 +103,56 @@ func TestSharedModelMappingFixture(t *testing.T) {
 		t.Fatal("mapping fixture drift")
 	}
 }
+
+func TestRoutingBridgePreservesSourceKeysAndRejectsStaleWrites(t *testing.T) {
+	s := testSession(t)
+	b := NewBridge(s)
+	requireReady(t, b)
+	secret := "synthetic-source"
+	for _, id := range []string{"a", "b"} {
+		out := b.SaveProvider(SaveProvider{Provider: Provider{ID: id, BaseURLs: []string{"http://127.0.0.1:1/v1"}, Enabled: true, TimeoutSeconds: 10, MaxConcurrent: 1}, Secret: &secret})
+		if out.Problem != nil {
+			t.Fatal(out)
+		}
+	}
+	for _, id := range []string{"a", "b"} {
+		out := b.ProviderAction(Action{ProviderID: id, ExpectedRevision: 1, Action: "model-put", Target: "public", Model: "up-" + id, Multiplier: 2, Tools: true, Streaming: true, KeyIDs: []string{"default"}})
+		if out.Problem != nil {
+			t.Fatal(out)
+		}
+	}
+	in := ModelRouting{ModelID: "public", ExpectedRevision: 2, Strategy: "cache-priority", Order: []RouteCandidate{{ProviderID: "b", Model: "up-b"}, {ProviderID: "a", Model: "up-a"}}}
+	out := b.ConfigureModelRouting(in)
+	if out.Problem != nil || out.Data == nil || out.Data.Revision != 3 {
+		t.Fatal(out)
+	}
+	w := b.ProviderWorkspace(WorkspaceQuery{ProviderID: "b"})
+	if w.Problem != nil || w.Data.Models[0].CandidateIndex != 0 || w.Data.Models[0].Strategy != "cache-priority" || len(w.Data.Models[0].KeyIDs) != 1 {
+		t.Fatal(w)
+	}
+	out = b.ConfigureModelRouting(in)
+	if out.Problem == nil || out.Problem.Code != "conflict" {
+		t.Fatal(out)
+	}
+	raw, _ := json.Marshal(w)
+	if strings.Contains(string(raw), secret) {
+		t.Fatal("secret returned")
+	}
+}
+
+func TestSharedRoutingContract(t *testing.T) {
+	raw, err := os.ReadFile("../../desktop/contract/model-routing.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Input   ModelRouting      `json:"input"`
+		Success ModelRoutingState `json:"success"`
+	}
+	if err = json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if fixture.Success.Revision != fixture.Input.ExpectedRevision+1 || fixture.Success.Strategy != fixture.Input.Strategy || len(fixture.Success.Order) != 2 {
+		t.Fatal(fixture)
+	}
+}

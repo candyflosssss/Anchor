@@ -16,6 +16,8 @@ async function host(page: Page, rateMappings = false) {
     const settings = (id: string): AccountSettings => ({ ...(accounts[id] ?? { ...account.settings, platform: '' }), provider_id: id, revision: providers.find(p => p.id === id)?.revision ?? 1 });
     let providers: Provider[] = rows;
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
+    window.routingTest = { calls: [] };
+    const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const api: DesktopBridge = {
       ProviderProbe: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderAccountSettings: async input => ({ contract, data: settings(input.provider_id), problem: null }),
@@ -46,6 +48,15 @@ async function host(page: Page, rateMappings = false) {
       Logs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogDetail: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogSettings: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ConfigureModelRouting: async input => {
+        window.routingTest.calls.push(input);
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const m = routingState[input.model_id];
+        if (!m || input.expected_revision !== m.revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
+        m.revision++; m.strategy = input.strategy; m.order = input.order;
+        if (counters.writeError === 'unknown') return { contract, data: null, problem: { code: 'unknown' } };
+        return { contract, data: { model_id: input.model_id, ...m }, problem: null };
+      },
       ConfigureLogs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ExportLogs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       UpdateStatus: async () => ({ contract, data: { ...update, latest_version: '', available: false, phase: 'idle', download_path: '', install_kind: '' }, problem: null }),
@@ -68,7 +79,7 @@ async function host(page: Page, rateMappings = false) {
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
         return { contract, data: { provider_id: provider.id, key_id: input.key_id || 'anonymous', revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '', partial: false, entries: [{ id: 'demo-model', key_ids: [input.key_id || 'anonymous'] }], keys: [{ id: input.key_id || 'anonymous', enabled: true, protocol: 'responses', http_status: 200, failure: '', group: '', group_name: '', multiplier: null, rate_basis: '', rate_failure: 'platform_required' }] }, problem: null };
       },
-      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ id, upstream: `upstream-${id}`, display_name: id, revision: 1, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: 'round-robin', tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
+      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
@@ -397,7 +408,7 @@ for (const failure of ['', 'unknown', 'conflict'] as const) {
       const api = window.go!.desktop!.Bridge!;
       const result = await api.ProviderWorkspace({ provider_id: '摸鱼AI' });
       const w = result.data!;
-      const mapping = { id: 'already', upstream: 'already-upstream', display_name: 'already', revision: 1, candidate_count: 1, multiplier: 2, strategy: 'priority', tools: false, streaming: false };
+      const mapping = { key_ids: [] as string[], candidate_index: 0, id: 'already', upstream: 'already-upstream', display_name: 'already', revision: 1, candidate_count: 1, multiplier: 2, strategy: 'priority', tools: false, streaming: false };
       w.models = [mapping];
       window.catalogImportTest = { calls: [], fail: failure };
       api.ProviderWorkspace = async () => ({ contract: 'anchor-desktop-v1', data: structuredClone(w), problem: null });
@@ -416,7 +427,7 @@ for (const failure of ['', 'unknown', 'conflict'] as const) {
         const failed = input.target === 'import-1' ? window.catalogImportTest.fail : '';
         // Unknown may mean the write persisted before the response was lost.
         if (failed === 'conflict') return { contract: 'anchor-desktop-v1', data: null, problem: { code: failed } };
-        w.models.push({ ...mapping, id: input.target, upstream: input.model, multiplier: input.multiplier, tools: input.tools, streaming: input.streaming, strategy: input.strategy });
+        w.models.push({ ...mapping, id: input.target, upstream: input.model, key_ids: input.key_ids ?? [], multiplier: input.multiplier, tools: input.tools, streaming: input.streaming, strategy: input.strategy });
         if (failed === 'unknown') return { contract: 'anchor-desktop-v1', data: null, problem: { code: failed } };
         return { contract: 'anchor-desktop-v1', data: structuredClone(w), problem: null };
       };
@@ -479,4 +490,38 @@ test('group rate mappings distinguish routing and platform values and deduplicat
   await expect(page.getByText('路由倍率', { exact: false }).filter({ hasText: '2.5×' })).toHaveCount(2);
   await page.getByRole('button', { name: '账户与授权', exact: true }).first().click();
   await expect(page.getByRole('tab', { name: '账户与余额', exact: true })).toHaveAttribute('aria-selected', 'true');
+});
+
+
+declare global { interface Window { routingTest: { calls: import('../src/desktop/contract.generated').ModelRouting[] } } }
+test('model routing supports source Keys, real drag ordering and saved rules (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await expect(card.getByText('来源 Key', { exact: false })).toHaveCount(3);
+  const sources = card.locator('li.mapping-candidate');
+  await card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true }).dragTo(sources.nth(1));
+  await expect(sources.nth(1)).toContainText('摸鱼AI');
+  await card.getByText('调度设置', { exact: true }).click();
+  await card.getByLabel('调度规则').selectOption('lowest-price');
+  await expect(card).toContainText('倍率不等于实际单价');
+  await card.getByRole('button', { name: '保存顺序与规则', exact: true }).dblclick();
+  await expect(page.getByRole('status').filter({ hasText: '顺序与调度规则已保存' })).toBeVisible();
+  await expect(card.getByRole('button', { name: '保存顺序与规则', exact: true })).toBeDisabled();
+  const calls = await page.evaluate(() => window.routingTest.calls);
+  expect(calls).toHaveLength(1); expect(calls[0].strategy).toBe('lowest-price'); expect(calls[0].order[1].provider_id).toBe('摸鱼AI');
+  await page.getByRole('button', { name: '供应商', exact: true }).click();
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await expect(card.locator('li.mapping-candidate').nth(1)).toContainText('摸鱼AI');
+  await expect(card).toContainText('低价优先');
+});
+test('model routing conflict refreshes without replaying the draft (simulated host)', async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }).click();
+  await page.evaluate(() => { window.desktopTest.writeError = 'conflict'; });
+  await card.getByRole('button', { name: '保存顺序与规则', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('未覆盖新版本');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
+  await expect(card.getByRole('button', { name: '保存顺序与规则', exact: true })).toBeDisabled();
 });

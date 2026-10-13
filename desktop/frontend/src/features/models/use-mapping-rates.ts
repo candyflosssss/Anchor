@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ProviderProblem, problemText, type Provider, type ProviderTransport } from '../providers/provider.model';
 import type { AccountRateObservation } from '../providers/provider-account.model';
 
-/** One explicit read per provider, serialized and bound to the current configuration. */
+export type RateTarget = { provider_id: string; key_id: string };
+export const rateID = (t: RateTarget) => JSON.stringify([t.provider_id, t.key_id]);
+/** Explicit reads per provider/Key pair, serialized and bound to the configuration. */
 export function useMappingRates(providers: Provider[], active: boolean, transport: ProviderTransport) {
   const [values, setValues] = useState<Record<string, AccountRateObservation>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -16,27 +18,28 @@ export function useMappingRates(providers: Provider[], active: boolean, transpor
     setValues({}); setErrors({}); setBusy(false); setPending('');
     return () => { epoch.current = at + 1; abortRef.current?.abort(); lock.current = false; };
   }, [signature, active, transport]);
-  async function refresh(ids: string[]) {
+  async function refresh(input: RateTarget[]) {
     if (!active || lock.current) return;
-    const targets = [...new Set(ids)].map(id => providers.find(p => p.id === id)).filter((p): p is Provider => !!p);
-    if (!targets.length) return;
+    const seen = new Set<string>();
+    const targets = input.filter(t => { const id = rateID(t); if (seen.has(id) || !providers.some(p => p.id === t.provider_id)) return false; seen.add(id); return true; });
     lock.current = true; setBusy(true);
     const at = epoch.current, abort = new AbortController(); abortRef.current = abort;
     try {
-      for (const p of targets) {
+      for (const target of targets) {
+        const p = providers.find(p => p.id === target.provider_id)!; const id = rateID(target);
         if (abort.signal.aborted || at !== epoch.current) break;
-        setPending(p.id);
-        setValues(old => { const next = { ...old }; delete next[p.id]; return next; });
-        setErrors(old => { const next = { ...old }; delete next[p.id]; return next; });
+        setPending(id);
+        setValues(old => { const next = { ...old }; delete next[id]; return next; });
+        setErrors(old => { const next = { ...old }; delete next[id]; return next; });
         try {
           if (!transport.rate) throw new ProviderProblem('read_error');
-          const value = await transport.rate({ provider_id: p.id, expected_revision: p.revision, operation: 'effective-rate', key_id: '', remote_key_id: 0 }, abort.signal);
+          const value = await transport.rate({ provider_id: p.id, expected_revision: p.revision, operation: 'effective-rate', key_id: target.key_id, remote_key_id: 0 }, abort.signal);
           if (abort.signal.aborted || at !== epoch.current) break;
-          setValues(old => ({ ...old, [p.id]: value }));
+          setValues(old => ({ ...old, [id]: value }));
         } catch (e) {
           if (abort.signal.aborted || at !== epoch.current) break;
           const code = e instanceof ProviderProblem ? e.code : 'read_error';
-          setErrors(old => ({ ...old, [p.id]: problemText[code] }));
+          setErrors(old => ({ ...old, [id]: problemText[code] }));
         }
       }
     } finally { if (at === epoch.current) { lock.current = false; setBusy(false); setPending(''); } }

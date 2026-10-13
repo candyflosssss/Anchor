@@ -2,6 +2,27 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface RouteCandidate {
+  provider_id: string;
+  model: string;
+}
+export interface ModelRouting {
+  model_id: string;
+  expected_revision: number;
+  strategy: string;
+  order: RouteCandidate[];
+}
+export interface ModelRoutingState {
+  model_id: string;
+  revision: number;
+  strategy: string;
+  order: RouteCandidate[];
+}
+export interface ModelRoutingResult {
+  contract: string;
+  data: ModelRoutingState | null;
+  problem: Problem | null;
+}
 export interface ProbeRequest {
   provider_id: string;
   expected_revision: number;
@@ -293,6 +314,7 @@ export interface Estimate {
   usd: number | null;
 }
 export interface Action {
+  key_ids: string[] | null;
   multiplier: number;
   protocol: string;
   price: Price | null;
@@ -335,6 +357,8 @@ export interface Probe {
   failure: string;
 }
 export interface ModelMapping {
+  key_ids: string[];
+  candidate_index: number;
   multiplier: number;
   strategy: string;
   id: string;
@@ -499,6 +523,7 @@ export interface DesktopBridge {
   AgentWorkspace(): Promise<AgentWorkspaceResult>;
   CheckUpdate(input1: string): Promise<UpdateResult>;
   ConfigureLogs(input1: Settings): Promise<LogSettingsResult>;
+  ConfigureModelRouting(input1: ModelRouting): Promise<ModelRoutingResult>;
   DiscoverProviderModels(input1: DiscoverProviderModels): Promise<ProviderModelsResult>;
   DownloadUpdate(input1: string): Promise<UpdateResult>;
   EnrollAgent(input1: EnrollAgent): Promise<AgentWorkspaceResult>;

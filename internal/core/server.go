@@ -41,6 +41,8 @@ type Server struct {
 	health           map[string]*keyHealth
 	probeRuns        map[string]*probeRun
 	routing          map[string]*modelSchedule
+	affinity         map[string]routeAffinity
+	latency          map[string]routeLatency
 	cursor           map[string]int
 	slots            chan struct{}
 	shutdown         chan struct{}
@@ -61,7 +63,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	tr.MaxConnsPerHost = 64
 	tr.MaxIdleConns = 32
 	tr.ResponseHeaderTimeout = 30 * time.Second
-	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
+	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
@@ -265,6 +267,7 @@ func (s *Server) Control() http.Handler {
 	})
 	mux.HandleFunc("POST /control/v1/providers/{id}/discover-models", s.discoverProviderModels)
 	mux.HandleFunc("POST /control/v1/providers/{id}/probe", s.providerProbe)
+	mux.HandleFunc("POST /control/v1/models/{id}/routing", s.configureModelRouting)
 	mux.HandleFunc("GET /control/v1/models", func(w http.ResponseWriter, r *http.Request) {
 		m, err := s.Store.Models()
 		if err != nil {

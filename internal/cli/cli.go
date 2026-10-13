@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
@@ -44,7 +45,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   provider key-delete|key-reset --id ID --revision N --target KEY --approve
   provider strategy --id ID --revision N --strategy round-robin|priority
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
-  provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy round-robin|priority] [--tools] [--streaming] [--approve]
+  provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy RULE] [--source-key ID | --all-keys] [--tools] [--streaming] [--approve]
   provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
   provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
   logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
@@ -59,7 +60,9 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
                 [--secret-stdin] [--revision N] [--protocol responses|chat-completions|anthropic]
                 [--timeout 120] [--max-concurrent 4] [--disabled]
   model list
-  model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...]
+  model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL...
+  RULE: priority|round-robin|cache-priority|lowest-price|lowest-latency
+  model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...] [--strategy RULE] [--candidate-key INDEX:KEY]
                [--display-name NAME] [--tools] [--streaming] [--revision N]
                [--codex-catalog FILE --codex-model SOURCE --codex-version X.Y.Z]
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
@@ -530,7 +533,7 @@ func (r *repeated) String() string     { return strings.Join(*r, ",") }
 func (r *repeated) Set(v string) error { *r = append(*r, v); return nil }
 func (a App) models(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("model requires list, add or put")
+		return errors.New("model requires list, add, put or routing")
 	}
 	if args[0] == "list" {
 		if len(args) != 1 {
@@ -542,11 +545,36 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 		}
 		return a.output(v)
 	}
+	if args[0] == "routing" {
+		f := a.flags("model routing")
+		id := f.String("id", "", "public model ID")
+		revision := f.Int64("revision", 0, "expected model revision")
+		strategy := f.String("strategy", "", "priority, round-robin, cache-priority, lowest-price or lowest-latency")
+		var order repeated
+		f.Var(&order, "candidate", "complete ordered provider:model list")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		in := catalog.ModelRouting{ModelID: *id, ExpectedRevision: *revision, Strategy: *strategy}
+		for _, raw := range order {
+			provider, model, ok := strings.Cut(raw, ":")
+			if !ok {
+				return errors.New("candidate must be provider:model")
+			}
+			in.Order = append(in.Order, catalog.RouteCandidate{ProviderID: provider, Model: model})
+		}
+		out, err := c.ConfigureModelRouting(ctx, in)
+		if err != nil {
+			return err
+		}
+		return a.output(out)
+	}
 	if args[0] != "add" && args[0] != "put" {
 		return errors.New("unknown model command")
 	}
 	f := a.flags("model " + args[0])
 	id := f.String("id", "", "public model ID")
+	strategy := f.String("strategy", "priority", "model routing strategy")
 	display := f.String("display-name", "", "display name")
 	tools := f.Bool("tools", false, "advertise function tools")
 	stream := f.Bool("streaming", false, "advertise SSE")
@@ -554,7 +582,8 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	catalog := f.String("codex-catalog", "", "local version-matched Codex catalog JSON (max 1 MiB)")
 	source := f.String("codex-model", "", "source catalog model; verify upstream capabilities match")
 	version := f.String("codex-version", "", "exact source/target Codex version X.Y.Z")
-	var candidates repeated
+	var candidates, candidateKeys repeated
+	f.Var(&candidateKeys, "candidate-key", "1-based candidate index:key ID; repeat for allowed source Keys")
 	f.Var(&candidates, "candidate", "ordered provider:model mapping")
 	if err := parse(f, args[1:]); err != nil {
 		return err
@@ -565,7 +594,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	if args[0] == "put" && *rev < 1 {
 		return errors.New("put requires the current --revision")
 	}
-	m := state.Model{ID: *id, DisplayName: *display, Tools: *tools, Streaming: *stream}
+	m := state.Model{ID: *id, Strategy: *strategy, DisplayName: *display, Tools: *tools, Streaming: *stream}
 	if *catalog != "" || *source != "" || *version != "" {
 		if *catalog == "" || *source == "" || *version == "" {
 			return errors.New("--codex-catalog, --codex-model and --codex-version must be supplied together")
@@ -590,6 +619,14 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 			return errors.New("candidate must be provider:model")
 		}
 		m.Candidates = append(m.Candidates, state.Candidate{ProviderID: provider, Model: model})
+	}
+	for _, raw := range candidateKeys {
+		index, key, ok := strings.Cut(raw, ":")
+		n, err := strconv.Atoi(index)
+		if !ok || err != nil || n < 1 || n > len(m.Candidates) {
+			return errors.New("candidate-key must be INDEX:KEY (1-based candidate index)")
+		}
+		m.Candidates[n-1].KeyIDs = append(m.Candidates[n-1].KeyIDs, key)
 	}
 	if err := m.Validate(); err != nil {
 		return err
@@ -634,7 +671,10 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	copyKeys := f.Bool("copy-keys", false, "explicitly copy credentials")
 	disabled := f.Bool("disabled", false, "disable key")
 	stdin := f.Bool("secret-stdin", false, "read secret from stdin; omission retains existing key")
-	strategy := f.String("strategy", "round-robin", "round-robin or priority")
+	strategy := f.String("strategy", "round-robin", "Key or model routing strategy")
+	var sourceKeys repeated
+	f.Var(&sourceKeys, "source-key", "allowed source Key ID for model-put; repeat; omit to preserve")
+	allKeys := f.Bool("all-keys", false, "clear source Key restriction on model-put")
 	model := f.String("model", "", "upstream model")
 	mr := f.Int64("model-revision", 0, "current model revision; zero creates or attaches a new provider")
 	multiplier := f.Float64("multiplier", 0, "relative cost multiplier 0.01..1000; omitted preserves existing or defaults to 1")
@@ -648,6 +688,14 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	}
 	in := catalog.Action{Protocol: *protocol, ProviderID: *id, ExpectedRevision: *revision, Action: args[0], Target: *target, Approved: *approve, CopyKeys: *copyKeys, Enabled: !*disabled, Strategy: *strategy, Model: *model, ModelRevision: *mr, Multiplier: *multiplier, Tools: *tools, Streaming: *stream}
 	if args[0] == "model-put" {
+		if *allKeys && len(sourceKeys) > 0 {
+			return errors.New("--all-keys conflicts with --source-key")
+		}
+		if *allKeys {
+			in.KeyIDs = []string{}
+		} else if len(sourceKeys) > 0 {
+			in.KeyIDs = append([]string{}, sourceKeys...)
+		}
 		explicitStrategy := false
 		f.Visit(func(flag *flag.Flag) {
 			if flag.Name == "strategy" {

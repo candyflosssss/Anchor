@@ -87,7 +87,7 @@ export function useProviderFeatures(p: Provider | null, transport: ProviderTrans
       if (generation === epoch.current) { lock.current = false; setBusy(false); }
     }
   }
-  async function importModels(ids: string[]) {
+  async function importModels(ids: string[], sources: Record<string, string[]> = {}) {
     const target = current.current;
     if (!target || !data || data.provider_id !== target.id || lock.current || query.current || needsRead) return;
     const plan = catalogImportPlan(ids, data);
@@ -105,7 +105,7 @@ export function useProviderFeatures(p: Provider | null, transport: ProviderTrans
       for (const model of plan.ready) {
         setImportStatus(`正在导入 ${completed + 1} / ${plan.ready.length}：${model}`);
         snapshot = await transport.action(actionFor({ ...target, revision: snapshot.revision }, 'model-put', {
-          target: model, model, multiplier: 1, tools: true, streaming: true,
+          target: model, model, key_ids: sources[model] ?? [], multiplier: 1, tools: true, streaming: true,
         }), abort.signal);
         if (abort.signal.aborted || generation !== epoch.current) return;
         completed++;

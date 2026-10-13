@@ -155,9 +155,10 @@ func (p Provider) Validate() error {
 }
 
 type Candidate struct {
-	ProviderID string  `json:"provider_id"`
-	Model      string  `json:"model"`
-	Multiplier float64 `json:"multiplier,omitempty"`
+	KeyIDs     []string `json:"key_ids,omitempty"`
+	ProviderID string   `json:"provider_id"`
+	Model      string   `json:"model"`
+	Multiplier float64  `json:"multiplier,omitempty"`
 }
 
 func (c Candidate) EffectiveMultiplier() float64 {
@@ -185,8 +186,12 @@ func (m Model) RoutingStrategy() string {
 	return m.Strategy
 }
 
+func ValidModelStrategy(v string) bool {
+	return v == "" || v == "priority" || v == "round-robin" || v == "cache-priority" || v == "lowest-price" || v == "lowest-latency"
+}
+
 func (m Model) Validate() error {
-	if m.Strategy != "" && m.Strategy != "priority" && m.Strategy != "round-robin" {
+	if !ValidModelStrategy(m.Strategy) {
 		return errors.New("invalid model strategy")
 	}
 	if m.Codex != nil {
@@ -202,6 +207,16 @@ func (m Model) Validate() error {
 	}
 	seen := map[string]bool{}
 	for _, c := range m.Candidates {
+		if len(c.KeyIDs) > 64 {
+			return errors.New("too many candidate keys")
+		}
+		keyIDs := map[string]bool{}
+		for _, id := range c.KeyIDs {
+			if !ValidID(id) || keyIDs[id] {
+				return errors.New("invalid candidate key")
+			}
+			keyIDs[id] = true
+		}
 		v := c.EffectiveMultiplier()
 		if math.IsNaN(v) || math.IsInf(v, 0) || v < 0.01 || v > 1000 {
 			return errors.New("candidate multiplier must be 0.01..1000")

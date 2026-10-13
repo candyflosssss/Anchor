@@ -133,6 +133,14 @@ func TestCLIManagementWorkflow(t *testing.T) {
 	if m, err := s.Model("shared"); err != nil || len(m.Candidates) != 1 || m.Candidates[0].ProviderID != "multi" {
 		t.Fatal(m, err)
 	}
+	run("", "model", "routing", "--id", "shared", "--revision", "3", "--strategy", "lowest-latency", "--candidate", "multi:up-multi")
+	if m, err := s.Model("shared"); err != nil || m.Strategy != "lowest-latency" || m.Revision != 4 {
+		t.Fatal(m, err)
+	}
+	run("", "model", "add", "--id", "key-scoped", "--candidate", "p:actual", "--candidate-key", "1:default", "--strategy", "cache-priority")
+	if m, err := s.Model("key-scoped"); err != nil || len(m.Candidates[0].KeyIDs) != 1 || m.Strategy != "cache-priority" {
+		t.Fatal(m, err)
+	}
 	run("", "model", "add", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:actual", "--tools", "--streaming")
 	run("", "model", "put", "--id", "chinese-provider-model", "--candidate", "摸鱼AI:updated-model", "--revision", "1", "--tools", "--streaming")
 	listed := run("", "provider", "list")

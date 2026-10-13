@@ -100,3 +100,6 @@ ProviderAllowance 增量接受 balance-summary，返回 account 或 key scope �
 新增受限 `Bridge.ProviderRate(AccountQuery)`，只接受 `operation=effective-rate`，复用 client → core 查询及 revision、超时和安全整数校验。返回 `AccountRateObservationResult`，包含查询身份、Key、平台、时间、失败及 `rate={group,group_name,multiplier,basis}`；multiplier 为十进制字符串或 null，用户令牌与推理密钥不返回。remote_key_id=0 时核心验证所选保存的 Key 与平台账户对应关系；正整数保持指定远端 Key 的原有语义。未知分组可保留组名但倍率为 null；前端不推断 1。
 
 账户页和模型映射页通过 AccountTransport.rate 调用，前端不访问平台 URL。共享样例 desktop/contract/provider-account.json 的 rate 同时由 Go DTO 漂移检查、前端 Model 与 Mock 使用；观察值不会写入模型映射或改变路由策略。
+
+
+2026-10-13 模型调度新增受控 `ConfigureModelRouting(ModelRouting)`，返回 ModelRoutingResult 标准 envelope，复用客户端与核心管理鉴权、实例校验和 revision。输入仅已有模型的完整候选引用及规则；不提供任意请求／配置修改入口。保存纳入前端活动锁，阻止退出／安装更新期间并发写入。Go DTO和共享样例见供应商接口 §9；旧核心不支持此方法，需同步升级，schema6不向旧程序开放。

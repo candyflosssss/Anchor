@@ -1,3 +1,5 @@
+import { useModelRouting } from '../features/models/use-model-routing';
+import { aggregateModels } from '../features/providers/provider-summary.model';
 import { useEffect, useRef } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
 import { ConfirmAction } from '../components/shared/confirm-action';
@@ -27,8 +29,9 @@ export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivit
   const summaries = useProviderSummaries(c.providers, c.phase === 'ready', environment.transport, c.features.data);
   const balances = useProviderBalances(c.providers, c.phase === 'ready' && page === 'providers' && !c.selected, environment.transport);
   const rates = useMappingRates(c.providers, c.phase === 'ready' && page === 'models', environment.transport);
+  const routing = useModelRouting(aggregateModels(summaries), page === 'models', environment.transport, async () => { await c.load(); });
   const opener = useRef<HTMLElement | null>(null);
-  const busy = rates.busy || c.busy || !!c.editor || !!c.toggle || !!c.dialog;
+  const busy = routing.busy || rates.busy || c.busy || !!c.editor || !!c.toggle || !!c.dialog;
   useEffect(() => { onActivity(busy); }, [busy, onActivity]);
   useEffect(() => () => onActivity(false), [onActivity]);
   const selectRef = useRef(c.select);
@@ -42,7 +45,7 @@ export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivit
   const banner = c.problem && !c.dialog ? <ProblemBanner code={c.problem} message={c.problemMessage} disabled={c.busy || !!c.editor} onReload={() => void c.load()} /> : null;
   return <>
     {page === 'overview' ? <Overview summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onCreate={() => { onNavigate('providers'); edit(); }} onShowProviders={() => onNavigate('providers')} onShowModels={() => onNavigate('models')}>{banner}</Overview>
-      : page === 'models' ? <ModelsView rates={rates} summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onShowProviders={() => onNavigate('providers')}>{banner}</ModelsView>
+      : page === 'models' ? <ModelsView routing={routing} rates={rates} summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onShowProviders={() => onNavigate('providers')}>{banner}</ModelsView>
       : c.selected && !c.quickId ? <div className="workspace">{banner}<Notice text={c.features.notice || c.notice} /><ProviderDetail c={c} summary={summary} onEdit={() => edit(c.selected ?? undefined)} /></div>
       : <ProviderList c={c} summaries={summaries} balances={balances} onEdit={edit} onCreate={() => edit()}>{banner}<Notice text={c.notice} /></ProviderList>}
     {prototype && c.mock && <div className="workspace pt-0"><footer className="prototype-controls mt-4"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={busy} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></footer></div>}

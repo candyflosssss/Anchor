@@ -35,6 +35,9 @@ func (s *Server) pruneHealthLocked(p state.Provider) {
 }
 func healthID(p state.Provider, k string) string { return fmt.Sprintf("%s/%d/%s", p.ID, p.Revision, k) }
 func (s *Server) chooseKey(p state.Provider, tried map[string]bool) (state.ProviderKey, bool) {
+	return s.chooseRouteKey(p, tried, nil, "")
+}
+func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed []string, preferred string) (state.ProviderKey, bool) {
 	keys, err := s.Store.ProviderKeys(p.ID)
 	if err != nil {
 		return state.ProviderKey{}, false
@@ -50,9 +53,17 @@ func (s *Server) chooseKey(p state.Provider, tried map[string]bool) (state.Provi
 	if strategy != "priority" {
 		start = s.cursor[p.ID] % len(keys)
 	}
+	if preferred != "" {
+		for i, k := range keys {
+			if k.ID == preferred && k.Enabled && !tried[k.ID] {
+				start = i
+				break
+			}
+		}
+	}
 	for i := 0; i < len(keys); i++ {
 		k := keys[(start+i)%len(keys)]
-		if !k.Enabled || tried[k.ID] {
+		if !k.Enabled || tried[k.ID] || !candidateAllowsKey(allowed, k.ID) {
 			continue
 		}
 		h := s.health[healthID(p, k.ID)]

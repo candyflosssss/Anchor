@@ -1,3 +1,4 @@
+import { checkedRouting, type ModelRouting } from '../features/models/model-routing.model';
 import { checkedProgress } from '../features/providers/provider-test.model';
 import { checkedAccountSettings, checkedAccountObservation, checkedAccountRate, type SaveAccountSettings, type AccountQuery } from '../features/providers/provider-account.model';
 import { checkedWorkspace } from '../features/providers/provider-features.model';
@@ -70,6 +71,11 @@ export class DesktopProviderTransport implements ProviderTransport {
     signal.throwIfAborted();
     try { const result = await call(() => this.getBridge().ProviderProbe(input), input.action === 'start'); signal.throwIfAborted(); return checkedProgress(result, input); }
     catch (error) { return providerError(error, input.action === 'start'); }
+  }
+  async routing(input: ModelRouting, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const v = await call(() => this.getBridge().ConfigureModelRouting(input), true); signal.throwIfAborted(); return checkedRouting(v, input); }
+    catch (error) { return providerError(error, true); }
   }
   async workspace(id: string, signal: AbortSignal) {
     signal.throwIfAborted();

@@ -36,9 +36,9 @@ func (s *Server) workspace(id string) (catalog.Workspace, error) {
 		return out, err
 	}
 	for _, m := range models {
-		for _, c := range m.Candidates {
+		for index, c := range m.Candidates {
 			if c.ProviderID == id {
-				out.Models = append(out.Models, catalog.ModelMapping{ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates), Multiplier: c.EffectiveMultiplier(), Strategy: m.RoutingStrategy()})
+				out.Models = append(out.Models, catalog.ModelMapping{KeyIDs: append([]string{}, c.KeyIDs...), CandidateIndex: index, ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates), Multiplier: c.EffectiveMultiplier(), Strategy: m.RoutingStrategy()})
 			}
 		}
 	}
@@ -174,7 +174,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		}
 		probe, err = s.probe(r.Context(), p, in.Target, in.Model)
 	case "model-put":
-		if !state.ValidID(in.Target) || in.Model == "" || (in.Strategy != "" && in.Strategy != "priority" && in.Strategy != "round-robin") {
+		if !state.ValidID(in.Target) || in.Model == "" || !state.ValidModelStrategy(in.Strategy) {
 			err = state.ErrInvalid
 			break
 		}
@@ -207,7 +207,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 			}
 			// Attach to the latest snapshot, preserving all existing candidates and metadata.
 			expected = m.Revision
-			m.Candidates = append(m.Candidates, state.Candidate{ProviderID: p.ID, Model: in.Model, Multiplier: in.Multiplier})
+			m.Candidates = append(m.Candidates, state.Candidate{ProviderID: p.ID, Model: in.Model, Multiplier: in.Multiplier, KeyIDs: in.KeyIDs})
 		} else {
 			if m.Revision != expected {
 				err = state.ErrConflict
@@ -218,6 +218,9 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			m.Candidates[index].Model = in.Model
+			if in.KeyIDs != nil {
+				m.Candidates[index].KeyIDs = in.KeyIDs
+			}
 			if in.Multiplier != 0 {
 				m.Candidates[index].Multiplier = in.Multiplier
 			}

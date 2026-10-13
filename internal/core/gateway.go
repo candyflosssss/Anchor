@@ -170,7 +170,8 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	candidates, err := s.routeCandidates(model)
+	affinity := routingAffinity(r.Header.Get("Authorization"), modelID, request)
+	candidates, err := s.routeCandidatesFor(model, affinity)
 	if err != nil {
 		apiError(w, err)
 		return
@@ -195,12 +196,12 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		}
 		tried := map[string]bool{}
 		for n := 0; n < max(1, len(keys)); n++ {
-			key, ok := s.chooseKey(provider, tried)
+			key, ok := s.chooseRouteKey(provider, tried, c.KeyIDs, s.preferredRouteKey(model, c, provider, affinity))
 			if !ok {
 				break
 			}
 			tried[key.ID] = true
-			retry := s.forward(w, r, request, modelID, c, provider, key, stream)
+			retry := s.forward(w, r, request, modelID, c, provider, key, stream, model, affinity)
 			if !retry {
 				s.release(provider.ID)
 				return
@@ -239,7 +240,7 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 }
-func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool) (retry bool) {
+func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string) (retry bool) {
 	// Resolve after key selection: the upstream model override wins over this key's default.
 	p.Protocol = key.EffectiveProtocol(c.Model)
 	started := time.Now()
@@ -280,6 +281,11 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		t := trace(r)
 		outcome := "failed"
 		if success {
+			elapsed := time.Since(started)
+			if !observation.FirstText.IsZero() {
+				elapsed = observation.FirstText.Sub(started)
+			}
+			s.rememberRoute(routeModel, c, p, key.ID, affinity, elapsed)
 			outcome = "succeeded"
 			if t != nil {
 				t.row.Status = "succeeded"

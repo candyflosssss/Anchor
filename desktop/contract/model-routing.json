@@ -1,0 +1,14 @@
+{
+  "input": {
+    "model_id": "public",
+    "expected_revision": 1,
+    "strategy": "lowest-price",
+    "order": [{"provider_id": "b", "model": "up-b"}, {"provider_id": "a", "model": "up-a"}]
+  },
+  "success": {
+    "model_id": "public",
+    "revision": 2,
+    "strategy": "lowest-price",
+    "order": [{"provider_id": "b", "model": "up-b"}, {"provider_id": "a", "model": "up-a"}]
+  }
+}

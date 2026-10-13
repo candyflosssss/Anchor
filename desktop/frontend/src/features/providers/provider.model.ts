@@ -31,6 +31,7 @@ export const problemText: Record<ProblemCode, string> = {
   invalid: '配置未通过校验。请核对字段后重新提交。',
 };
 export interface ProviderTransport extends AccountTransport {
+  routing?(input: import("../../desktop/contract.generated").ModelRouting, signal: AbortSignal): Promise<import("../../desktop/contract.generated").ModelRoutingState>;
   probe?(input: import("../../desktop/contract.generated").ProbeRequest, signal: AbortSignal): Promise<import("../../desktop/contract.generated").ProbeProgress>;
   workspace?(id: string, signal: AbortSignal): Promise<import("../../desktop/contract.generated").Workspace>;
   action?(input: import("../../desktop/contract.generated").Action, signal: AbortSignal): Promise<import("../../desktop/contract.generated").Workspace>;

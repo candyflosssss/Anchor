@@ -42,13 +42,16 @@ func TypeScript() string {
 			panic("unsupported contract type: " + t.String())
 		}
 	}
-	for _, v := range []any{ProbeRequest{}, ProbeProgress{}, ProbeProgressResult{}, AccountRate{}, AccountRateObservation{}, AccountRateObservationResult{}, AccountSettings{}, SaveAccountSettings{}, AccountQuery{}, AccountAmount{}, AccountWindow{}, AccountAllowance{}, AccountObservation{}, AccountSettingsResult{}, AccountObservationResult{}, CatalogTemplate{}, AgentTarget{}, AgentModel{}, ManagedAgent{}, AgentWorkspace{}, EnrollAgent{}, ManageAgent{}, AgentWorkspaceResult{}, Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ModelEntry{}, CatalogKey{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, ModelProtocol{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}, LogMetrics{}, LogAttempt{}, RequestLog{}, SystemLog{}, LogQuery{}, LogPage{}, LogHealth{}, LogSettings{}, LogsResult{}, LogDetailResult{}, LogSettingsResult{}} {
+	for _, v := range []any{RouteCandidate{}, ModelRouting{}, ModelRoutingState{}, ModelRoutingResult{}, ProbeRequest{}, ProbeProgress{}, ProbeProgressResult{}, AccountRate{}, AccountRateObservation{}, AccountRateObservationResult{}, AccountSettings{}, SaveAccountSettings{}, AccountQuery{}, AccountAmount{}, AccountWindow{}, AccountAllowance{}, AccountObservation{}, AccountSettingsResult{}, AccountObservationResult{}, CatalogTemplate{}, AgentTarget{}, AgentModel{}, ManagedAgent{}, AgentWorkspace{}, EnrollAgent{}, ManageAgent{}, AgentWorkspaceResult{}, Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ModelEntry{}, CatalogKey{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, ModelProtocol{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}, LogMetrics{}, LogAttempt{}, RequestLog{}, SystemLog{}, LogQuery{}, LogPage{}, LogHealth{}, LogSettings{}, LogsResult{}, LogDetailResult{}, LogSettingsResult{}} {
 		t := reflect.TypeOf(v)
 		fmt.Fprintf(&out, "export interface %s {\n", t.Name())
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
 			name := f.Tag.Get("json")
 			typ := ts(f.Type)
+			if t.Name() == "Action" && f.Name == "KeyIDs" {
+				typ += " | null"
+			}
 			if t.Name() == "Problem" && f.Name == "Code" {
 				typ = "ProblemCode"
 			}

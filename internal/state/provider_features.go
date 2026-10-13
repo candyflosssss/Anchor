@@ -209,6 +209,9 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 				return ErrInvalid
 			}
 			if action == "key-delete" {
+				if err = checkKeyUnreferenced(tx, id, target); err != nil {
+					return err
+				}
 				var res sql.Result
 				res, err = tx.Exec(`DELETE FROM provider_keys WHERE provider_id=? AND id=?`, id, target)
 				if err == nil {

@@ -1,3 +1,4 @@
+import { routingRules } from '../models/model-routing.model';
 import { isValidModelAlias } from './provider-features.model';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { CircleAlert, Play } from 'lucide-react';
@@ -166,16 +167,17 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
   const [touched, setTouched] = useState(!!d.alias);
   const [multiplier, setMultiplier] = useState(String(editing?.multiplier ?? 1));
   const [strategy, setStrategy] = useState(editing?.strategy ?? 'round-robin');
+  const [keyIDs, setKeyIDs] = useState<string[]>(editing?.key_ids ?? c.models?.entries.find(e => e.id === d.upstream)?.key_ids ?? []);
   const multiplierValue = Number(multiplier);
   const multiplierError = !multiplier.trim() || !Number.isFinite(multiplierValue) || multiplierValue < 0.01 || multiplierValue > 1000 ? '倍率须为 0.01–1000。' : '';
   const [tools, setTools] = useState(editing?.tools ?? d.tools ?? true);
   const [streaming, setStreaming] = useState(editing?.streaming ?? d.streaming ?? true);
   const aliasError = !alias ? '' : !isValidModelAlias(alias) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
   const options = c.models?.models ?? [];
-  return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError && !multiplierError) void run('model-put', { target: alias, model: upstream.trim(), multiplier: multiplierValue, strategy, tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
+  return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError && !multiplierError) void run('model-put', { target: alias, model: upstream.trim(), key_ids: keyIDs, multiplier: multiplierValue, strategy, tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
       <div className="field"><label htmlFor="mapping-upstream">上游模型 ID</label>
-        <Input id="mapping-upstream" list="mapping-upstream-options" value={upstream} autoComplete="off" onChange={e => { setUpstream(e.target.value); if (!touched) setAlias(e.target.value.trim()); }} />
+        <Input id="mapping-upstream" list="mapping-upstream-options" value={upstream} autoComplete="off" onChange={e => { setUpstream(e.target.value); const source = c.models?.entries.find(v => v.id === e.target.value.trim()); setKeyIDs(source?.key_ids ?? []); if (!touched) setAlias(e.target.value.trim()); }} />
         <datalist id="mapping-upstream-options">{options.map(id => <option key={id} value={id} />)}</datalist></div>
       <div className="field"><label htmlFor="mapping-alias">Anchor 公开别名</label>
         <Input id="mapping-alias" value={alias} readOnly={!!editing} placeholder="例如 coding-main" autoComplete="off" aria-invalid={!!aliasError} aria-describedby={aliasError ? 'mapping-alias-hint' : undefined} onChange={e => { setAlias(e.target.value.trim()); setTouched(true); }} />
@@ -184,7 +186,11 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
         <Input id="mapping-multiplier" type="number" min="0.01" max="1000" step="any" value={multiplier} onChange={e => setMultiplier(e.target.value)} aria-invalid={!!multiplierError} />
         {multiplierError && <p className="field-error">{multiplierError}</p>}</div>
       {editing && <div className="field"><label htmlFor="mapping-strategy">公开模型调度策略</label>
-        <select id="mapping-strategy" className="select-field" value={strategy} onChange={e => setStrategy(e.target.value)}><option value="round-robin">按倍率加权轮询</option><option value="priority">按候选顺序优先</option></select></div>}
+        <select id="mapping-strategy" className="select-field" value={strategy} onChange={e => setStrategy(e.target.value)}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select></div>}
+      <div className="field"><label>来源 Key（ID）</label><p className="field-hint">不勾选表示允许所有启用 Key；导入时默认保留目录来源。</p>
+        {w.keys.map(k => <label key={k.id} className="checkbox-row"><input type="checkbox" checked={keyIDs.includes(k.id)} onChange={e => setKeyIDs(ids => e.target.checked ? [...ids, k.id] : ids.filter(id => id !== k.id))} />{k.id}{!k.enabled && ' · 已停用'}</label>)}
+        {keyIDs.includes('anonymous') && <label className="checkbox-row"><input type="checkbox" checked onChange={() => setKeyIDs([])} />anonymous · 匿名来源</label>}
+      </div>
       <label className="checkbox-row"><input type="checkbox" checked={tools} onChange={e => setTools(e.target.checked)} />函数工具</label>
       <label className="checkbox-row"><input type="checkbox" checked={streaming} onChange={e => setStreaming(e.target.checked)} />流式输出</label>
     </fieldset>
