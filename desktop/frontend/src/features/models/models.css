@@ -1,4 +1,4 @@
-.workspace .model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.workspace .model-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .mapping-candidate { border: 1px solid hsl(var(--border)); border-radius: 8px; overflow: hidden; }
 .mapping-candidate .candidate { border: 0; border-radius: 0; width: 100%; flex-wrap: wrap; }
 .mapping-candidate .candidate strong { flex-shrink: 0; }
@@ -9,8 +9,12 @@
 .mapping-rate-actions { display: flex; flex-wrap: wrap; gap: 4px; }
 .mapping-rates .feedback { font-size: 12px; padding: 8px; margin: 0; }
 .mapping-source-header { display: flex; align-items: center; gap: 2px; }
+.mapping-candidate.can-reorder .mapping-source-header { background: hsl(var(--muted) / .4); }
+.mapping-candidate.can-reorder:hover, .mapping-candidate:has(.route-grip:focus-visible) { border-color: hsl(var(--muted-foreground) / .65); }
 .mapping-source-header .candidate { flex: 1; min-width: 0; }
-.route-grip { background: transparent; border: 0; padding: 10px 4px; cursor: grab; color: hsl(var(--muted-foreground)); }
+.route-grip { display: grid; place-items: center; flex: 0 0 26px; align-self: stretch; min-height: 28px; margin: 4px 0 4px 4px; border: 1px dashed hsl(var(--muted-foreground) / .5); border-radius: 4px; background: hsl(var(--muted)); padding: 0; cursor: grab; color: hsl(var(--muted-foreground)); }
+.route-grip:hover:not(:disabled), .route-grip:active:not(:disabled) { border-color: hsl(var(--foreground)); background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.route-grip:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .route-grip:disabled { cursor: default; opacity: .35; }
 .route-grip:active { cursor: grabbing; }
 .route-move { display: flex; flex-shrink: 0; }
@@ -24,4 +28,5 @@
 .mapping-key-name > span, .mapping-platform-rate { color: hsl(var(--muted-foreground)); }
 .mapping-key-name strong { font-weight: 500; }
 
-@media (max-width: 1280px) { .workspace .model-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1400px) { .workspace .model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1000px) { .workspace .model-grid { grid-template-columns: minmax(0, 1fr); } }

@@ -504,8 +504,8 @@ test('group rate mappings distinguish routing and platform values and deduplicat
       api.ProviderWorkspace = async input => {
         const result = await read(input);
         if (result.data) {
-          const aliases = input.provider_id === '摸鱼AI' ? ['codex-auto-review', 'gpt-6-astra', 'gpt-6.1-sol'] : input.provider_id === '备用供应商' ? ['claude-opus-4-6', 'claude-opus-5-5', 'claude-sonnet-5-5'] : [];
-          result.data.models = aliases.map(id => ({ ...result.data!.models[0], id, upstream: id, display_name: id, candidate_count: 1, candidate_index: 0, key_ids: ['default'], multiplier: 1, strategy: 'priority' }));
+          const aliases = input.provider_id === '摸鱼AI' ? ['claude-opus-4-6', 'codex-auto-review', 'gpt-6-astra', 'gpt-6.1-sol'] : input.provider_id === '备用供应商' ? ['claude-opus-4-6', 'claude-opus-5-5', 'claude-sonnet-5-5'] : [];
+          result.data.models = aliases.map(id => ({ ...result.data!.models[0], id, upstream: id, display_name: id, candidate_count: id === 'claude-opus-4-6' ? 2 : 1, candidate_index: id === 'claude-opus-4-6' && input.provider_id === '摸鱼AI' ? 1 : 0, key_ids: ['default'], multiplier: 1, strategy: 'priority' }));
         }
         return result;
       };
@@ -515,6 +515,7 @@ test('group rate mappings distinguish routing and platform values and deduplicat
     await expect(page.getByRole('article', { name: '模型 claude-opus-4-6', exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1789, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
+    await page.getByRole('button', { name: '拖动 备用供应商 claude-opus-4-6', exact: true }).hover();
     await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/model-mappings-light.png` });
     await page.setViewportSize({ width: 820, height: 1000 });
     await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/model-mappings-narrow.png`, fullPage: true });
