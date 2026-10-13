@@ -1,15 +1,13 @@
 .workspace .model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.workspace .model-card > header { margin-bottom: 0; }
 .mapping-candidate { border: 1px solid hsl(var(--border)); border-radius: 8px; overflow: hidden; }
-.mapping-candidate .candidate { border: 0; border-radius: 0; width: 100%; align-items: baseline; flex-wrap: wrap; padding: 12px 8px; font-size: 13px; }
+.mapping-candidate .candidate { border: 0; border-radius: 0; width: 100%; flex-wrap: wrap; }
 .mapping-candidate .candidate strong { flex-shrink: 0; }
-.mapping-candidate .candidate .mono { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; color: hsl(var(--foreground)); }
-.mapping-rates { padding: 0 12px 12px 30px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 20px; }
+.mapping-candidate .candidate .mono { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
+.mapping-rates { padding: 8px 12px; border-top: 1px solid hsl(var(--border)); display: grid; gap: 6px; }
 .mapping-route-rate, .mapping-key-rate { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
-.mapping-route-rate { flex-shrink: 0; color: hsl(var(--muted-foreground)); }
 .mapping-route-rate strong, .mapping-platform-rate strong { color: hsl(var(--foreground)); font-weight: 500; }
 .mapping-rate-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.mapping-rates .feedback { font-size: 12px; padding: 8px; margin: 0; flex-basis: 100%; }
+.mapping-rates .feedback { font-size: 12px; padding: 8px; margin: 0; }
 .mapping-source-header { display: flex; align-items: center; gap: 2px; }
 .mapping-source-header .candidate { flex: 1; min-width: 0; }
 .route-grip { background: transparent; border: 0; padding: 10px 4px; cursor: grab; color: hsl(var(--muted-foreground)); }
@@ -21,13 +19,9 @@
 .route-settings summary { cursor: pointer; display: flex; gap: 6px; align-items: center; color: hsl(var(--muted-foreground)); }
 .route-settings-body { display: grid; gap: 8px; padding: 12px 0; }
 .route-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-.mapping-key-rate { display: flex; flex: 1 1 220px; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; min-width: 0; }
+.mapping-key-rate { display: grid; gap: 5px; border-left: 2px solid hsl(var(--border)); padding-left: 8px; min-width: 0; }
 .mapping-key-name { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
 .mapping-key-name > span, .mapping-platform-rate { color: hsl(var(--muted-foreground)); }
 .mapping-key-name strong { font-weight: 500; }
-.mapping-platform-rate { margin-left: auto; }
 
 @media (max-width: 1280px) { .workspace .model-grid { grid-template-columns: minmax(0, 1fr); } }
-
-.mapping-candidate.single-source .candidate { padding-left: 12px; }
-.mapping-candidate.single-source .mapping-rates { padding-left: 12px; }
