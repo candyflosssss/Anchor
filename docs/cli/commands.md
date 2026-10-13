@@ -642,7 +642,7 @@ anchor logs export --kind requests --since 168h > anchor-logs.jsonl
 anchor logs configure --days 14 --max-requests 100000
 ```
 
-## 13. models.dev 参考目录与本地费用估算（当前源码，未发布）
+## 13. models.dev 参考目录与本地费用估算（desktop.29 dev）
 
 ```bash
 anchor catalog providers [--refresh]

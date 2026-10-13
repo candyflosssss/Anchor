@@ -1,6 +1,6 @@
 # models.dev 模型参考目录契约
 
-状态：2026-10-13 当前源码，未发布。已实现共享目录、核心管理 API、Go 客户端、CLI、桌面桥接及前端 Model 方法。模型映射自动填充、日志逐请求参考价／实际费用对比和价格快照持久化待接入。
+状态：2026-10-13 实现，随 desktop.29 dev 已交付。已实现共享目录、核心管理 API、Go 客户端、CLI、桌面桥接及前端 Model 方法。模型映射自动填充、日志逐请求参考价／实际费用对比和价格快照持久化待接入。
 
 ## 数据与身份
 
@@ -50,7 +50,7 @@ models.dev 元数据是用户可核对的默认参考，不能证明某个中转
 | Go client | ModelCatalog / EstimateModelCost | 类型化只读POST，失败 Unknown=false，不自动重放 |
 | 桌面 Bridge | ModelCatalog / EstimateModelCost | 标准 anchor-desktop-v1 Result，复用当前本机实例和管理凭据，45秒方法超时 |
 | 前端 Model | modelCatalogService.query / estimate | 校验 DTO／精确模型身份／用量，拷贝并筛选字段；可用 AbortSignal 在调用前／返回后丢弃响应 |
-| CLI | catalog providers/models/model/estimate | JSON 只读入口，完整语法与未知计数见[指令大全 §13](../cli/commands.md#13-modelsdev-参考目录与本地费用估算当前源码未发布) |
+| CLI | catalog providers/models/model/estimate | JSON 只读入口，完整语法与未知计数见[指令大全 §13](../cli/commands.md#13-modelsdev-参考目录与本地费用估算desktop29-dev) |
 
 管理路由仍要求 management scope、实例 X-Anchor-Instance 和受限 Host／Origin，不能由浏览器直接跨源调用。invalid=400、not_found=404、catalog_unavailable=502；对外不泄露远端错误内容。桌面将目录不可用映射 read_error、传输断开 offline；纯读失败无需写入结果未知确认。前端取消只停止消费，不能取消已发到 Wails 的调用；调用取消只停止等待共享下载；核心退出和30秒抓取超时负责终止下载。
 
