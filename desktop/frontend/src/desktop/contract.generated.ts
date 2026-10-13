@@ -85,6 +85,7 @@ export interface AgentModel {
   tools: boolean;
   streaming: boolean;
   upstream_models: string[];
+  available_targets: string[];
 }
 export interface ManagedAgent {
   id: string;

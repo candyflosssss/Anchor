@@ -64,7 +64,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
                [--codex-catalog FILE --codex-model SOURCE --codex-version X.Y.Z]
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
   access list | access revoke ID      Local-owner authorization operations
-  agent discover                     Read local targets and managed workspace
+  agent discover                     Read targets, mapped model availability and bindings
   agent enroll --target ID --model MODEL --approve [--revision N]
                [--template ALIAS:LOCAL_SOURCE ...] (empty source excludes alias)
   agent add --id ID --adapter codex --codex-home ABS_DIR --model MODEL --approve

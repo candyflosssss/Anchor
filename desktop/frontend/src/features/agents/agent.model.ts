@@ -12,8 +12,8 @@ export function checkedAgentWorkspace(value: AgentWorkspace): AgentWorkspace {
         templates: t.templates.map(v => { if (!v || typeof v.slug !== 'string' || typeof v.display_name !== 'string') return bad(); return { slug: v.slug, display_name: v.display_name }; }) };
     }),
     models: value.models.map(m => {
-      if (!m || typeof m.id !== 'string' || typeof m.tools !== 'boolean' || typeof m.streaming !== 'boolean' || !Array.isArray(m.upstream_models) || m.upstream_models.some(v => typeof v !== 'string')) return bad();
-      return { id: m.id, tools: m.tools, streaming: m.streaming, upstream_models: [...m.upstream_models] };
+      if (!m || typeof m.id !== 'string' || typeof m.tools !== 'boolean' || typeof m.streaming !== 'boolean' || !Array.isArray(m.upstream_models) || m.upstream_models.some(v => typeof v !== 'string') || !Array.isArray(m.available_targets) || m.available_targets.some(v => typeof v !== 'string')) return bad();
+      return { id: m.id, tools: m.tools, streaming: m.streaming, upstream_models: [...m.upstream_models], available_targets: [...m.available_targets] };
     }),
     bindings: value.bindings.map(b => {
       if (!b || ![b.id, b.config_root, b.model, b.model_scope, b.catalog_version, b.status, b.catalog_path].every(v => typeof v === 'string') || !Number.isSafeInteger(b.revision) || b.revision < 1 || typeof b.enabled !== 'boolean' || !Array.isArray(b.available_models) || b.available_models.some(v => typeof v !== 'string') || !b.model_templates || Array.isArray(b.model_templates) || typeof b.model_templates !== 'object' || Object.values(b.model_templates).some(v => typeof v !== 'string')) return bad();
@@ -22,12 +22,9 @@ export function checkedAgentWorkspace(value: AgentWorkspace): AgentWorkspace {
   };
 }
 
-/** Exact identity only; conflicting upstream identities require an explicit choice. */
-export function matchingTemplate(target: AgentTarget, model: AgentModel): string {
-  const slugs = new Set(target.templates.map(t => t.slug));
-  if (slugs.has(model.id)) return model.id;
-  const sources = [...new Set(model.upstream_models.filter(v => slugs.has(v)))];
-  return sources.length === 1 ? sources[0] : '';
+/** The core resolves mapping metadata and provider availability for each target. */
+export function availableAgentModels(data: AgentWorkspace, target: AgentTarget): AgentModel[] {
+  return data.models.filter(m => m.available_targets.includes(target.id));
 }
 export function createAgentService(getBridge: () => DesktopBridge = bridge) { return {
   workspace: async () => checkedAgentWorkspace(await call(() => getBridge().AgentWorkspace())),

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { agentMessage, agentService, matchingTemplate, type AgentTarget, type AgentWorkspace, type ManagedAgent } from './agent.model';
+import { agentMessage, agentService, availableAgentModels, type AgentTarget, type AgentWorkspace, type ManagedAgent } from './agent.model';
 
 export function useAgentController(enabled: boolean, onActivity: (busy: boolean) => void) {
   const [data, setData] = useState<AgentWorkspace | null>(null);
@@ -9,7 +9,6 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
   const [notice, setNotice] = useState('');
   const [targetId, setTargetId] = useState('');
   const [model, setModel] = useState('');
-  const [templates, setTemplates] = useState<Record<string, string>>({});
   const [approved, setApproved] = useState(false);
   const [disableTarget, setDisableTarget] = useState<ManagedAgent | null>(null);
   const alive = useRef(false);
@@ -36,8 +35,8 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
   function select(target: AgentTarget) {
     if (busy || !data) return;
     const binding = data.bindings.find(b => sameRoot(b.config_root, target.config_root));
-    setTargetId(target.id); setModel(binding?.model ?? data.models.find(m => m.tools && m.streaming && matchingTemplate(target, m))?.id ?? '');
-    setTemplates(Object.fromEntries(data.models.map(m => [m.id, binding?.model_templates[m.id] ?? matchingTemplate(target, m)])));
+    const available = availableAgentModels(data, target);
+    setTargetId(target.id); setModel(available.find(m => m.id === binding?.model)?.id ?? available[0]?.id ?? '');
     setApproved(false); setError(''); setNotice('');
   }
   async function write(action: () => Promise<AgentWorkspace>) {
@@ -58,11 +57,12 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
   }
   const selected = data?.targets.find(t => t.id === targetId);
   const binding = selected ? data?.bindings.find(b => sameRoot(b.config_root, selected.config_root)) : undefined;
-  return { data, loading, busy, error, notice, selected, binding, model, setModel, templates, approved, setApproved, disableTarget, setDisableTarget,
+  const availableModels = selected && data ? availableAgentModels(data, selected) : [];
+  const unavailableModels = selected && data ? data.models.filter(m => !m.available_targets.includes(selected.id)) : [];
+  return { data, availableModels, unavailableModels, loading, busy, error, notice, selected, binding, model, setModel, approved, setApproved, disableTarget, setDisableTarget,
     read, select, cancel: () => { if (!busy) setTargetId(''); },
-    chooseTemplate: (alias: string, source: string) => { setTemplates(v => ({ ...v, [alias]: source })); setApproved(false); },
-    enroll: () => selected && approved && write(() => agentService.enroll({ target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
-      model_templates: templates, approved: true })),
+    enroll: () => selected && approved && availableModels.some(m => m.id === model) && write(() => agentService.enroll({ target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
+      model_templates: {}, approved: true })),
     manage: (row: ManagedAgent, action: 'sync' | 'enable' | 'disable') => write(() => agentService.manage({ binding_id: row.id, expected_revision: row.revision, action })),
   };
 }

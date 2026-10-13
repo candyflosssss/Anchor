@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/agents.json';
 import { CONTRACT, type AgentWorkspace, type DesktopBridge } from '../../desktop/contract.generated';
-import { checkedAgentWorkspace, createAgentService, matchingTemplate, targetStatus } from './agent.model';
+import { checkedAgentWorkspace, createAgentService, availableAgentModels, targetStatus } from './agent.model';
 
 function api(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   const result = { contract: CONTRACT, data: fixture.workspace, problem: null };
@@ -19,13 +19,14 @@ describe('Agent contract and controlled transport', () => {
     expect(fixture.contract).toBe(CONTRACT);
     expect(checkedAgentWorkspace({ ...fixture.workspace, token: 'private' } as AgentWorkspace)).toEqual(fixture.workspace);
   });
-  it('matches exact identities and rejects conflicting upstream identities', () => {
-    const t = fixture.workspace.targets[0], m = fixture.workspace.models[0];
-    expect(matchingTemplate(t, m)).toBe('fixture-source');
-    expect(matchingTemplate(t, { ...m, upstream_models: ['unmatched'] })).toBe('');
-    const multi = { ...t, templates: [...t.templates, { slug: 'second', display_name: 'Second' }] };
-    expect(matchingTemplate(multi, { ...m, upstream_models: ['fixture-source', 'second'] })).toBe('');
-    expect(matchingTemplate(multi, { ...m, id: 'fixture-source', upstream_models: ['second'] })).toBe('fixture-source');
+  it('uses core availability even when shared metadata has no matching cache slug', () => {
+    const target = fixture.workspace.targets[0], model = fixture.workspace.models[0];
+    const data = { ...fixture.workspace, models: [
+      { ...model, upstream_models: ['upstream-with-shared-metadata'] },
+      { ...model, id: 'disabled-provider', available_targets: [] },
+      { ...model, id: 'different-target', available_targets: ['other-codex'] },
+    ] };
+    expect(availableAgentModels(data, target).map(m => m.id)).toEqual(['public']);
   });
   it('passes approval and expected revision without generic file or command access', async () => {
     const enroll = vi.fn(api().EnrollAgent), manage = vi.fn(api().ManageAgent);
@@ -40,6 +41,8 @@ describe('Agent contract and controlled transport', () => {
     { bindings: [{ ...fixture.workspace.bindings[0], model_templates: { public: 42 } }] },
     { targets: [{ ...fixture.workspace.targets[0], templates: null }] },
     { models: [{ ...fixture.workspace.models[0], upstream_models: [null] }] },
+    { models: [{ ...fixture.workspace.models[0], available_targets: null }] },
+    { models: [{ ...fixture.workspace.models[0], available_targets: [42] }] },
   ])('rejects malformed host data %j', changed => {
     expect(() => checkedAgentWorkspace({ ...fixture.workspace, ...changed } as unknown as AgentWorkspace)).toThrow('read_error');
   });

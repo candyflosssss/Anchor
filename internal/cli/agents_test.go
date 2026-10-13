@@ -213,9 +213,12 @@ func TestCLIDiscoverEnrollSync(t *testing.T) {
 		t.Fatal(output)
 	}
 	id := workspace.Targets[0].ID
+	if len(workspace.Models) != 1 || len(workspace.Models[0].AvailableTargets) != 1 || workspace.Models[0].AvailableTargets[0] != id {
+		t.Fatal("missing automatic model availability", output)
+	}
 	run(false, "agent", "enroll", "--target", id, "--model", "public")
 	run(false, "agent", "enroll", "--target", id, "--model", "public", "--approve", "--template", "public:missing")
-	output = run(true, "agent", "enroll", "--target", id, "--model", "public", "--approve", "--template", "public:fixture-source")
+	output = run(true, "agent", "enroll", "--target", id, "--model", "public", "--approve")
 	if json.Unmarshal([]byte(output), &workspace) != nil || workspace.Bindings[0].Status != "pending" {
 		t.Fatal(output)
 	}

@@ -310,3 +310,107 @@ func TestSyncLegacySingleWithoutCatalog(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestWorkspaceAutomaticMappingAvailability(t *testing.T) {
+	m, env, target := workspaceManager(t)
+	secret := "fixture-secret"
+	if _, err := m.Store.PutProvider(state.Provider{ID: "disabled", BaseURL: "http://127.0.0.1:1", Protocol: "responses", Enabled: false, TimeoutSeconds: 5, MaxConcurrent: 1}, 0, &secret); err != nil {
+		t.Fatal(err)
+	}
+	shared := metadata(t)
+	old := *shared
+	old.Version = "0.100.0"
+	for _, model := range []state.Model{
+		{ID: "shared", Tools: true, Streaming: true, Codex: shared, Candidates: []state.Candidate{{ProviderID: "p", Model: "upstream-not-in-cache"}}},
+		{ID: "missing", Tools: true, Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "unmatched"}}},
+		{ID: "disabled", Tools: true, Streaming: true, Candidates: []state.Candidate{{ProviderID: "disabled", Model: "fixture-source"}}},
+		{ID: "no-tools", Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "fixture-source"}}},
+		{ID: "no-streaming", Tools: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "fixture-source"}}},
+		{ID: "wrong-version", Tools: true, Streaming: true, Codex: &old, Candidates: []state.Candidate{{ProviderID: "p", Model: "unmatched"}}},
+	} {
+		if _, err := m.Store.PutModel(model, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
+	originalMapping, err := m.Store.Model("shared")
+	if err != nil {
+		t.Fatal(err)
+	}
+	originalJSON, err := json.Marshal(originalMapping)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, _ := os.ReadFile(filepath.Join(env.CodexHome, "config.toml"))
+	workspace, err := m.Workspace(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, model := range workspace.Models {
+		wantAvailable := model.ID == "public" || model.ID == "shared"
+		if wantAvailable {
+			if len(model.AvailableTargets) != 1 || model.AvailableTargets[0] != target.ID {
+				t.Fatalf("%s availability: %v", model.ID, model.AvailableTargets)
+			}
+		} else if model.AvailableTargets == nil || len(model.AvailableTargets) != 0 {
+			t.Fatalf("%s should be unavailable: %v", model.ID, model.AvailableTargets)
+		}
+	}
+	after, _ := os.ReadFile(filepath.Join(env.CodexHome, "config.toml"))
+	if !bytes.Equal(before, after) {
+		t.Fatal("workspace wrote Agent configuration")
+	}
+	// The model with shared metadata must enroll without any target-local choice.
+	b, err := m.Enroll(env, EnrollAgent{TargetID: target.ID, Model: "shared", Approved: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(b.ModelTemplates) != 0 {
+		t.Fatal("automatic enrollment persisted template overrides")
+	}
+	allowed, err := m.Store.BindingModels(b)
+	if err != nil || len(allowed) != 2 {
+		t.Fatal("preview and enrollment disagree", allowed, err)
+	}
+	// Re-saving a legacy target drops its duplicate exclusions, while preserving
+	// credentials and shared mapping metadata.
+	token, err := m.Store.BindingToken(b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = m.Enroll(env, EnrollAgent{TargetID: target.ID, Model: "public", ExpectedRevision: b.Revision, ModelTemplates: map[string]string{"shared": ""}, Approved: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err = m.Enroll(env, EnrollAgent{TargetID: target.ID, Model: "shared", ExpectedRevision: b.Revision, Approved: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowed, err = m.Store.BindingModels(b)
+	if err != nil || len(allowed) != 2 || len(b.ModelTemplates) != 0 {
+		t.Fatal("legacy exclusions survived automatic enrollment", allowed, err)
+	}
+	if current, err := m.Store.BindingToken(b.ID); err != nil || current != token {
+		t.Fatal("credential changed", err)
+	}
+	mapped, err := m.Store.Model("shared")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mappedJSON, err := json.Marshal(mapped)
+	if err != nil || !bytes.Equal(mappedJSON, originalJSON) {
+		t.Fatal("shared mapping changed", err)
+	}
+	// An invalid cache remains discoverable with empty availability lists.
+	if err := os.WriteFile(filepath.Join(env.CodexHome, "models_cache.json"), []byte(`{}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	workspace, err = m.Workspace(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, model := range workspace.Models {
+		if model.AvailableTargets == nil || len(model.AvailableTargets) != 0 {
+			t.Fatalf("invalid target available for %s", model.ID)
+		}
+	}
+}

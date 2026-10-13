@@ -87,7 +87,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `access list` | 查看授权元数据 | 本机已初始化，无需核心在线 |
 | `access revoke` | 撤销授权 | 本机已初始化，无需核心在线 |
 | `agent discover` | 只读识别本地已知配置目录及托管状态 | 新版核心在线；不证明安装或运行 |
-| `agent enroll` | 批准本地 Codex 目录及目标模型模板 | 新版核心在线；完整本地缓存；更新须当前 revision |
+| `agent enroll` | 批准 Codex 托管并复用已有模型映射 | 新版核心在线；完整本地缓存；更新须当前 revision |
 | `agent sync` | 条件恢复并同步当前模型目录 | 核心在线、Binding enabled、当前 revision |
 | `agent add` | 明确批准并登记 Codex 基础配置目标 | 核心在线；配置根存在；默认 all-compatible 需版本匹配元数据 |
 | `agent list` | 查询 Binding 元数据 | 所选 Context 的核心在线 |
@@ -404,11 +404,11 @@ anchor agent enroll --target ID --model MODEL --approve [--revision N]
 anchor agent sync ID --revision N
 ```
 
-作用域为所选 Context 的核心所在机器，需要本轮新版核心在线；当前 Context 仅本机。`discover` 无参数，只读返回 `{targets, bindings, models}`：目标包含路径、来源、适配状态、缓存版本与模板摘要；托管行包含 revision、默认模型、当前兼容模型及状态，不返回令牌或完整模型指令。只查 `CODEX_HOME`、`~/.codex`、`~/.claude`、`~/.gemini`、`~/.config/opencode`，Windows 另查用户 `AppData/Roaming/opencode`；同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录存在仅表示配置痕迹，不能证明程序已安装或正在运行。其他产品暂时只识别、无适配器。
+作用域为所选 Context 的核心所在机器，需要本轮新版核心在线；当前 Context 仅本机。`discover` 无参数，只读返回 `{targets, bindings, models}`：目标包含路径、来源、适配状态、缓存版本与模板摘要；托管行包含 revision、默认模型、当前兼容模型及状态；models 每项增加 `available_targets` 数组，列出按已有映射自动登记时可用的目标 ID，无可用目标时为 `[]`。该预览复用核心 tools/streaming、启用供应商和版本匹配元数据规则，不包含旧目标级模板覆盖；现有绑定实际授权仍看 bindings.available_models。不返回令牌或完整模型指令。只查 `CODEX_HOME`、`~/.codex`、`~/.claude`、`~/.gemini`、`~/.config/opencode`，Windows 另查用户 `AppData/Roaming/opencode`；同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录存在仅表示配置痕迹，不能证明程序已安装或正在运行。其他产品暂时只识别、无适配器。
 
 缓存失败现在通过 target.status 区分：`catalog_missing`（该目录无缓存）、`catalog_unreadable`（无法读取）、`catalog_unsafe`（路径或类型不安全）、`catalog_invalid`（JSON 格式无效）、`catalog_version_invalid`（缺少有效 X.Y.Z）、`catalog_empty`（无模型）、`catalog_too_large`（字节/条目超限）、`catalog_metadata_invalid`（条目不完整/不兼容）、`catalog_duplicate`（重复 slug）。旧核心可能仍返回 `catalog_unavailable`。文件缺失时核对 Codex 实际使用的 CODEX_HOME；格式或元数据校验失败不能仅靠重复重启处理。状态不返回任意 OS/解析器错误或模型指令。
 
-`enroll` 的 target/model/approve 必填。target 取 discover 返回的 ID；默认模型必须声明 tools/streaming、至少有一个启用的供应商候选，且有版本匹配的完整模板。revision 默认0，仅新目标使用；已登记目标必须传当前值，包括先前由 add 自定义 ID 登记的同一目录。重复 `--template` 指定公开别名到本地源 slug 的选择，同一别名重复拒绝；空源如 `--template other:` 显式排除此模型。未指定选择时，优先有效的共享元数据，然后精确别名或唯一上游 slug 匹配；多个源命中不猜测，需明确指定。
+`enroll` 的 target/model/approve 必填。target 取 discover 返回的 ID；默认模型必须声明 tools/streaming、至少有一个启用的供应商候选，且有版本匹配的完整模板。revision 默认0，仅新目标使用；已登记目标必须传当前值，包括先前由 add 自定义 ID 登记的同一目录。重复 `--template` 指定公开别名到本地源 slug 的选择，同一别名重复拒绝；空源如 `--template other:` 显式排除此模型。未指定选择时，优先有效的共享元数据，然后精确别名或唯一上游 slug 匹配；多个源命中不猜测，可在共享模型元数据中明确配置；CLI 仍允许高级 `--template` 覆盖。桌面托管直接采用已有映射与自动匹配，不再提供逐模型模板表单，默认模型只从 `available_targets` 含所选目标的映射中选择。更新桌面托管会清除旧目标级模板覆盖/排除，需批准页面展示的自动模型列表；供应商映射不变。
 
 核心重新识别目标并读取其 `models_cache.json`（最多4 MiB、128个完整条目），缓存必须含有效的 `client_version=X.Y.Z`。缓存文件缺失时先核对目录与 Codex 是否生成缓存；文件已存在但校验失败时按发现状态处理，不统一要求重复启动。Codex 可选的旧版 `supports_parallel_tool_calls` 字段允许缺省，`context_window` 允许缺省或 null；导入原样保留，不补造并行能力或上下文值，存在的字段仍校验类型。缓存报告的版本不是可执行程序版本探测；批准前仍需核对版本和上游能力，不凭名称伪造元数据。模板快照和显式选择保存在 Binding 中，不修改供应商映射。新建凭据；更新保留原凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需重新 discover 检查，不能盲目重复提交。成功返回更新后的 workspace。
 

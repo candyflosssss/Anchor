@@ -8,10 +8,11 @@ import (
 )
 
 type AgentModel struct {
-	ID             string   `json:"id"`
-	Tools          bool     `json:"tools"`
-	Streaming      bool     `json:"streaming"`
-	UpstreamModels []string `json:"upstream_models"`
+	ID               string   `json:"id"`
+	Tools            bool     `json:"tools"`
+	Streaming        bool     `json:"streaming"`
+	UpstreamModels   []string `json:"upstream_models"`
+	AvailableTargets []string `json:"available_targets"`
 }
 type ManagedAgent struct {
 	ID              string            `json:"id"`
@@ -51,12 +52,33 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 		return out, err
 	}
 	out.Targets = targets
+	// Preview the same automatic policy used by Enroll and live authorization.
+	// Availability belongs to the core, including shared metadata and enabled
+	// provider checks; clients must not reconstruct it from model names.
+	availableTargets := map[string][]string{}
+	for _, target := range targets {
+		if !target.Supported || target.Status != "ready" {
+			continue
+		}
+		version, catalog, err := localCatalog(target.ConfigRoot)
+		if err != nil {
+			return out, err
+		}
+		available, err := m.Store.BindingModels(state.Binding{ModelScope: "all-compatible", CodexVersion: version, CodexCatalog: catalog})
+		if err != nil {
+			return out, err
+		}
+		for _, model := range available {
+			availableTargets[model.ID] = append(availableTargets[model.ID], target.ID)
+		}
+	}
 	models, err := m.Store.Models()
 	if err != nil {
 		return out, err
 	}
 	for _, model := range models {
-		row := AgentModel{ID: model.ID, Tools: model.Tools, Streaming: model.Streaming, UpstreamModels: []string{}}
+		row := AgentModel{ID: model.ID, Tools: model.Tools, Streaming: model.Streaming, UpstreamModels: []string{}, AvailableTargets: []string{}}
+		row.AvailableTargets = append(row.AvailableTargets, availableTargets[model.ID]...)
 		for _, c := range model.Candidates {
 			row.UpstreamModels = append(row.UpstreamModels, c.Model)
 		}

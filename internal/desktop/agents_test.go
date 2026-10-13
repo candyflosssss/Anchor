@@ -91,11 +91,17 @@ func TestRealCoreAgentBridgeLifecycle(t *testing.T) {
 	if r.Problem != nil || r.Data == nil || len(r.Data.Targets) != 1 || r.Data.Targets[0].Status != "ready" {
 		t.Fatalf("discovery: %+v", r)
 	}
+	if len(r.Data.Models) != 1 || len(r.Data.Models[0].AvailableTargets) != 1 || r.Data.Models[0].AvailableTargets[0] != r.Data.Targets[0].ID {
+		t.Fatal("core availability missing at desktop boundary", r.Data.Models)
+	}
 	r = b.EnrollAgent(EnrollAgent{TargetID: r.Data.Targets[0].ID, Model: "public", Approved: true})
 	if r.Problem != nil || r.Data.Bindings[0].Status != "applied" {
 		t.Fatalf("enroll: %+v", r)
 	}
 	row := r.Data.Bindings[0]
+	if len(row.ModelTemplates) != 0 {
+		t.Fatal("automatic enrollment stored template overrides")
+	}
 	exe, _ := os.Executable()
 	helper := exec.Command(exe, "--data-dir", s.options.Dir, "agent", "token", row.ID)
 	tokenRaw, helperErr := helper.Output()

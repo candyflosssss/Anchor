@@ -25,6 +25,9 @@
         "streaming": true,
         "upstream_models": [
           "fixture-source"
+        ],
+        "available_targets": [
+          "codex-fixture"
         ]
       }
     ],
@@ -42,9 +45,7 @@
           "public"
         ],
         "catalog_path": "C:\\Users\\Fixture\\.codex\\anchor_codex-fixture.models.json",
-        "model_templates": {
-          "public": "fixture-source"
-        }
+        "model_templates": {}
       }
     ]
   },
@@ -52,9 +53,7 @@
     "target_id": "codex-fixture",
     "model": "public",
     "expected_revision": 0,
-    "model_templates": {
-      "public": "fixture-source"
-    },
+    "model_templates": {},
     "approved": true
   },
   "sync": {
