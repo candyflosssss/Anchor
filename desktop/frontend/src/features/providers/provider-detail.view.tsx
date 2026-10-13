@@ -1,3 +1,4 @@
+import { ProviderAccountView } from './provider-account.view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, Download, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RotateCcw, ShieldCheck, Trash2, TextCursorInput } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -10,7 +11,7 @@ import { catalogFailureText, catalogProblemText, protocolName, type Provider } f
 import { formatAgo, type DetailTab, type ProviderSummary, type Tone } from './provider-summary.model';
 import type { ProviderController } from './use-provider-controller';
 
-const tabs: [DetailTab, string][] = [['overview', '概况'], ['keys', 'Key'], ['models', '模型'], ['usage', '用量']];
+const tabs: [DetailTab, string][] = [['overview', '概况'], ['keys', 'Key'], ['models', '模型'], ['usage', '用量'], ['account', '账户与余额']];
 type Ask = { action: string; title: string; body: string; fields: Partial<Action> };
 
 export function HealthPill({ tone, label }: { tone: Tone; label: string }) {
@@ -39,7 +40,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
     if (next < 0) return;
     e.preventDefault(); c.setDetailTab(tabs[next][0]); tabRefs.current[tabs[next][0]]?.focus();
   }
-  return <section className="provider-page" aria-label={`${p.id} 的详情`} aria-busy={f.busy || c.modelsBusy}>
+  return <section className="provider-page" aria-label={`${p.id} 的详情`} aria-busy={c.busy}>
     <Button variant="ghost" size="sm" className="back-link" disabled={c.blocked} onClick={() => c.select(null)}><ArrowLeft />返回供应商列表</Button>
     <header className="detail-hero">
       <span className="provider-avatar large" aria-hidden="true">{Array.from(p.id)[0]}</span>
@@ -66,7 +67,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
     </div>
     <div role="tabpanel" id={`panel-${c.detailTab}`} aria-labelledby={`tab-${c.detailTab}`} className="detail-panel" tabIndex={0}>
       {f.error && !c.dialog && <div className="feedback error-feedback" role="alert"><CircleAlert size={16} /><span>{f.error}</span><Button variant="outline" size="sm" disabled={f.busy} onClick={() => void (f.needsRead ? c.load() : f.refresh())}>重新读取</Button></div>}
-      {!w ? (!f.error && <div className="empty-state compact" role="status"><LoaderCircle className="loading-icon" size={24} /><p>正在读取 Key、模型与用量…</p></div>)
+      {c.detailTab === 'account' ? <ProviderAccountView c={c} /> : !w ? (!f.error && <div className="empty-state compact" role="status"><LoaderCircle className="loading-icon" size={24} /><p>正在读取 Key、模型与用量…</p></div>)
         : c.detailTab === 'overview' ? <OverviewTab c={c} p={p} w={w} />
         : c.detailTab === 'keys' ? <KeysTab c={c} w={w} disabled={blocked} ask={setAsk} />
         : c.detailTab === 'models' ? <ModelsTab c={c} w={w} disabled={blocked} ask={setAsk} />
@@ -90,7 +91,7 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
   const ready = enabled.filter(k => k.state === 'ready');
   const probe = [w.probe, ...w.keys.map(k => k.test)].reduce<Probe | null>((b, x) => x && (!b || x.at > b.at) ? x : b, null);
   return <div className="overview-grid">
-    <section className="detail-card"><h2>接入检查</h2><p className="card-hint">按顺序完成后即可被 Agent 调用。</p>
+    <section className="detail-card"><div className="card-toolbar"><h2>接入检查</h2><Button size="sm" variant="outline" disabled={disabled} onClick={() => c.setDetailTab('account')}>账户与余额</Button></div><p className="card-hint">按顺序完成后即可被 Agent 调用。</p>
       <ul className="checklist">
         {!p.enabled && <Check ok={false} title="供应商已停用" detail="不参与新的路由选择；配置和密钥均保留。" action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.requestToggle(p)}>重新启用</Button>} />}
         <Check ok title="请求地址" detail={p.base_urls.length > 1 ? `${p.base_urls.length} 个地址轮询 · ${p.base_urls[0]}` : p.base_urls[0]} />

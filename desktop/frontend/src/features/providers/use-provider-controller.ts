@@ -1,3 +1,4 @@
+import { useProviderAccount } from './use-provider-account';
 import { useProviderFeatures } from './use-provider-features';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
@@ -68,7 +69,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   const selected = providers.find(p => p.id === selectedId) ?? null;
   const blocked = phase !== 'ready' || problem === 'unknown' || problem === 'conflict' || busy || modelsBusy;
   function openEditor(source?: Provider) {
-    if (blocked || locked.current || features.isBusy()) return;
+    if (blocked || locked.current || (features.isBusy() || account.isBusy())) return;
     setNotice(''); setEditor({ source, draft: newDraft(source) }); setErrors({});
   }
   function changeDraft<K extends keyof ProviderDraft>(key: K, value: ProviderDraft[K]) {
@@ -86,7 +87,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     setEditor(null); setErrors({});
   }
   async function save(source: Provider | undefined, draft: ProviderDraft, toggling = false) {
-    if (blocked || locked.current || features.isBusy()) return;
+    if (blocked || locked.current || (features.isBusy() || account.isBusy())) return;
     const nextErrors = validateDraft(draft);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
@@ -120,7 +121,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     }
   }
   async function discoverModels() {
-    if (!selected || blocked || locked.current || features.isBusy() || editor || toggle) return;
+    if (!selected || blocked || locked.current || (features.isBusy() || account.isBusy()) || editor || toggle) return;
     const target = { provider_id: selected.id, expected_revision: selected.revision, key_id: catalogKey };
     clearModels(); locked.current = true; setModelsBusy(true);
     const abort = new AbortController(); catalogQuery.current = abort;
@@ -145,7 +146,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     setNotice(`${mock ? '演示：' : ''}已重新读取。请核对最新配置，再打开编辑；原草稿已丢弃。`);
   }
   function changeScenario(value: Scenario) {
-    if (!environment.reset || editor || busy || modelsBusy || features.isBusy() || toggle) return;
+    if (!environment.reset || editor || busy || modelsBusy || (features.isBusy() || account.isBusy()) || toggle) return;
     clearModels(); query.current?.abort(); write.current?.abort(); generation.current++;
     environment.reset(value); setScenario(value); setCatalogKey(''); setSelectedId(null); setDetailTab('overview'); setDialog(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
     void load();
@@ -159,24 +160,29 @@ export function useProviderController(environment: ProviderEnvironment) {
       setNotice(action === 'rename' ? `已改名为 ${id}` : action === 'copy' ? `已复制为 ${id}（默认停用）` : `已删除 ${from}`);
     } else await load();
   }, () => setNotice(''), readVersion);
+  const account = useProviderAccount(selected, transport, async () => {
+    clearModels(); await load();
+    setNotice(`${mock ? '演示：' : ''}平台配置已保存。可在「账户与余额」刷新余额或 Key 额度。`);
+  }, () => blocked || locked.current || features.busy || !!editor || !!toggle || !!dialog, readVersion);
   function openProvider(id: string, tab: DetailTab = 'overview', next?: ProviderDialog) {
-    if (locked.current || features.isBusy() || dialog || editor || toggle) return;
+    if (locked.current || (features.isBusy() || account.isBusy()) || dialog || editor || toggle) return;
     if (id !== selectedId) { setCatalogKey(''); clearModels(); setNotice(''); }
     setSelectedId(id); setDetailTab(tab); setDialog(next ?? null);
   }
   return {
-    features,
+    account,
+    features: { ...features, run: (...args: Parameters<typeof features.run>) => account.isBusy() ? Promise.resolve(false) : features.run(...args) },
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
-    notice, search, setSearch, filter, setFilter, editor, errors, busy: busy || modelsBusy || features.busy, blocked: blocked || features.busy, toggle, scenario,
+    notice, search, setSearch, filter, setFilter, editor, errors, busy: busy || modelsBusy || features.busy || account.busy, blocked: blocked || features.busy || account.busy, toggle, scenario,
     models: models?.provider_id === selected?.id ? models : null,
     modelsProblem, modelsBusy, discoverModels, catalogKey,
-    selectCatalogKey: (id: string) => { if (!features.isBusy() && !locked.current) { clearModels(); setCatalogKey(id); } },
+    selectCatalogKey: (id: string) => { if (!(features.isBusy() || account.isBusy()) && !locked.current) { clearModels(); setCatalogKey(id); } },
     detailTab, setDetailTab, dialog, openProvider,
-    openDialog: (next: ProviderDialog) => { if (!features.isBusy() && !locked.current) setDialog(next); },
-    closeDialog: () => { if (!features.isBusy()) setDialog(null); },
-    select: (id: string | null) => { if (!locked.current && !features.isBusy()) { clearModels(); setCatalogKey(''); setSelectedId(id); setDetailTab('overview'); setDialog(null); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
+    openDialog: (next: ProviderDialog) => { if (!(features.isBusy() || account.isBusy()) && !locked.current) setDialog(next); },
+    closeDialog: () => { if (!(features.isBusy() || account.isBusy())) setDialog(null); },
+    select: (id: string | null) => { if (!locked.current && !(features.isBusy() || account.isBusy())) { clearModels(); setCatalogKey(''); setSelectedId(id); setDetailTab('overview'); setDialog(null); } }, load, openEditor, changeDraft, closeEditor, changeScenario, reloadFromEditor,
     submit: () => editor && void save(editor.source, editor.draft),
-    requestToggle: (provider: Provider) => { if (!blocked && !features.isBusy()) { setNotice(''); setToggle(provider); } },
+    requestToggle: (provider: Provider) => { if (!blocked && !(features.isBusy() || account.isBusy())) { setNotice(''); setToggle(provider); } },
     cancelToggle: () => { if (!locked.current) setToggle(null); },
     confirmToggle: () => { if (toggle) void save(toggle, { ...newDraft(toggle), enabled: !toggle.enabled }, true); },
   };

@@ -1,3 +1,4 @@
+import { checkedAccountSettings, checkedAccountObservation, type SaveAccountSettings, type AccountQuery } from '../features/providers/provider-account.model';
 import { checkedWorkspace } from '../features/providers/provider-features.model';
 import { CONTRACT, PROBLEM_CODES, type DesktopBridge, type ProblemCode, type Provider as DesktopProvider, type SessionInfo } from './contract.generated';
 import { ProviderProblem, checkedCatalog, type DiscoverProviderModels, type ProviderModels, type Provider, type ProviderTransport, type SaveProvider } from '../features/providers/provider.model';
@@ -44,6 +45,21 @@ function providerError(error: unknown, writing: boolean): never {
 }
 export class DesktopProviderTransport implements ProviderTransport {
   constructor(private readonly getBridge = bridge) {}
+  async accountSettings(id: string, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const v = await call(() => this.getBridge().ProviderAccountSettings({ provider_id: id })); signal.throwIfAborted(); return checkedAccountSettings(v, id); }
+    catch (error) { return providerError(error, false); }
+  }
+  async saveAccount(input: SaveAccountSettings, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const v = await call(() => this.getBridge().SaveProviderAccount(input), true); signal.throwIfAborted(); return checkedAccountSettings(v, input.provider_id); }
+    catch (error) { return providerError(error, true); }
+  }
+  async allowance(input: AccountQuery, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const v = await call(() => this.getBridge().ProviderAllowance(input)); signal.throwIfAborted(); return checkedAccountObservation(v, input); }
+    catch (error) { return providerError(error, false); }
+  }
   async workspace(id: string, signal: AbortSignal) {
     signal.throwIfAborted();
     try { const result = await call(() => this.getBridge().ProviderWorkspace({ provider_id: id })); signal.throwIfAborted(); return checkedWorkspace(result); }

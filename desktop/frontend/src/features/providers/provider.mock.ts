@@ -1,3 +1,5 @@
+import accountFixture from '../../../../contract/provider-account.json';
+import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountObservation } from './provider-account.model';
 import mappingFixture from '../../../../contract/provider-model-mapping.json';
 import workspaceFixture from '../../../../contract/provider-workspace.json';
 import { checkedWorkspace, type Action, type Workspace } from './provider-features.model';
@@ -41,12 +43,51 @@ function seed(id: string, w: Workspace) {
 export class MockProviderTransport implements ProviderTransport {
   private rows = examples().map(copy);
   private workspaces = new Map<string, Workspace>();
+  private accounts = new Map<string, AccountSettings>();
   private seeded = new Set<string>();
   private scenario: Scenario = 'normal';
   reset(scenario: Scenario) {
     this.scenario = scenario;
-    this.workspaces.clear(); this.seeded.clear();
+    this.accounts.clear(); this.workspaces.clear(); this.seeded.clear();
     this.rows = scenario === 'empty' ? fixture.empty.map(checkedProvider) : examples().map(copy);
+  }
+  async accountSettings(id: string, signal: AbortSignal): Promise<AccountSettings> {
+    await delay(signal);
+    const p = this.rows.find(p => p.id === id); if (!p) throw new ProviderProblem('invalid');
+    const saved = this.accounts.get(id) ?? { ...accountFixture.settings, provider_id: id };
+    return { ...saved, revision: p.revision };
+  }
+  async saveAccount(input: SaveAccountSettings, signal: AbortSignal): Promise<AccountSettings> {
+    await delay(signal);
+    const p = this.rows.find(p => p.id === input.provider_id);
+    if (!p || p.revision !== input.expected_revision || this.scenario === 'conflict') { this.scenario = 'normal'; throw new ProviderProblem('conflict'); }
+    const old = this.accounts.get(p.id);
+    const sameTarget = old && old.platform === input.platform && old.site_url === input.site_url && old.user_id === input.user_id;
+    const v: AccountSettings = { provider_id: p.id, revision: ++p.revision, platform: input.platform, site_url: input.site_url, user_id: input.user_id,
+      has_user_token: input.user_token === null ? !!(sameTarget && old.has_user_token) : !!input.user_token };
+    this.accounts.set(p.id, v);
+    if (this.scenario === 'unknown') { this.scenario = 'normal'; throw new ProviderProblem('unknown'); }
+    return { ...v };
+  }
+  async allowance(q: AccountQuery, signal: AbortSignal): Promise<AccountObservation> {
+    await delay(signal);
+    const p = this.rows.find(p => p.id === q.provider_id); if (!p || p.revision !== q.expected_revision) throw new ProviderProblem('conflict');
+    const settings = this.accounts.get(p.id) ?? accountFixture.settings;
+    const w = this.detail(p), key = q.key_id ? w.keys.find(k => k.id === q.key_id) : w.keys.find(k => k.enabled);
+    if (q.key_id && !key) throw new ProviderProblem('invalid');
+    const v = structuredClone(q.operation === 'balance' ? accountFixture.balance : accountFixture.quota);
+    Object.assign(v, { provider_id: p.id, revision: p.revision, platform: settings.platform, key_id: key?.id ?? 'anonymous', remote_key_id: q.remote_key_id, observed_at: new Date().toISOString() });
+    let failure = '';
+    if (!settings.platform) failure = 'platform_required';
+    else if (settings.platform !== 'sub2api' && !settings.has_user_token && (q.operation === 'balance' || settings.platform === 'oneapi')) failure = 'auth_required';
+    else if (settings.platform === 'newapi' && settings.has_user_token && !settings.user_id && q.operation === 'balance') failure = 'auth_required';
+    else if (settings.platform === 'oneapi' && q.operation === 'key-quota' && !q.remote_key_id) failure = 'remote_key_required';
+    else if ((settings.platform === 'sub2api' || settings.platform === 'newapi' && q.operation === 'key-quota') && !key && !(q.operation === 'balance' && settings.has_user_token)) failure = 'auth_required';
+    const out: AccountObservation = { ...v, failure, allowance: failure ? null : v.allowance };
+    if (out.allowance && settings.platform !== 'sub2api') {
+      out.allowance = { scope: q.operation === 'balance' ? 'account' : 'key', remaining: { value: '1250000', unit: 'quota' }, used: { value: '250000', unit: 'quota' }, limit: null, unlimited: null, windows: [] };
+    }
+    return out;
   }
   async list(signal: AbortSignal): Promise<Provider[]> {
     await delay(signal);

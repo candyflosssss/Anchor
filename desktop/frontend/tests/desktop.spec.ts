@@ -1,17 +1,37 @@
+import accountFixture from '../../contract/provider-account.json' with { type: 'json' };
 import { expect, test, type Page } from '@playwright/test';
 import fixture from '../../contract/providers.json' with { type: 'json' };
 import updateFixture from '../../contract/updates.json' with { type: 'json' };
-import { CONTRACT, type DesktopBridge, type Provider } from '../src/desktop/contract.generated';
+import { CONTRACT, type AccountSettings, type DesktopBridge, type Provider } from '../src/desktop/contract.generated';
 
 declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
+declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
 async function host(page: Page) {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows, update }) => {
+  await page.addInitScript(({ contract, rows, update, account }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
+    window.accountTest = { saves: 0, queries: 0, failure: '' };
+    const accounts: Record<string, AccountSettings> = {};
+    const settings = (id: string): AccountSettings => ({ ...(accounts[id] ?? { ...account.settings, platform: '' }), provider_id: id, revision: providers.find(p => p.id === id)?.revision ?? 1 });
     let providers: Provider[] = rows;
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
     const api: DesktopBridge = {
+      ProviderAccountSettings: async input => ({ contract, data: settings(input.provider_id), problem: null }),
+      SaveProviderAccount: async input => {
+        window.accountTest.saves++;
+        const p = providers.find(p => p.id === input.provider_id);
+        if (!p || p.revision !== input.expected_revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
+        accounts[p.id] = { provider_id: p.id, revision: ++p.revision, platform: input.platform, site_url: input.site_url, user_id: input.user_id, has_user_token: input.user_token === null ? settings(p.id).has_user_token : !!input.user_token };
+        if (counters.writeError === 'unknown') return { contract, data: null, problem: { code: 'unknown' } };
+        return { contract, data: settings(p.id), problem: null };
+      },
+      ProviderAllowance: async input => {
+        window.accountTest.queries++;
+        const failure = window.accountTest.failure;
+        return { contract, data: { ...account.balance, provider_id: input.provider_id, revision: input.expected_revision, platform: settings(input.provider_id).platform, operation: input.operation, key_id: 'anonymous', remote_key_id: input.remote_key_id, failure,
+          allowance: failure ? null : { ...account.balance.allowance, scope: input.operation === 'balance' ? 'account' : 'key', remaining: { value: '9007199254740993123', unit: 'quota' } } }, problem: null };
+      },
       AgentWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       EnrollAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ManageAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
@@ -57,7 +77,7 @@ async function host(page: Page) {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -247,4 +267,51 @@ test('logs reports unavailable without a desktop bridge', async ({ page }) => {
  await expect(page.getByRole('heading',{name:'日志',exact:true})).toBeVisible();
  await expect(page.getByText('日志读取失败',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:/查看请求/})).toHaveCount(0);
+});
+
+
+test('account page configures authorization and keeps wallet and key quota independent', async ({ page }) => {
+  await host(page);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await page.getByRole('tab', { name: '账户与余额' }).click();
+  await page.getByLabel('平台类型', { exact: true }).selectOption('newapi');
+  await page.getByLabel('NewAPI 用户 ID').fill('7');
+  await page.getByLabel('用户令牌 · 未配置', { exact: true }).selectOption('replace');
+  await page.getByLabel('平台用户令牌', { exact: true }).fill('synthetic-account-private-token');
+  await expect(page.getByRole('button', { name: '刷新余额', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '保存平台配置' }).click();
+  await expect(page.getByLabel('用户令牌 · 已保存', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('平台用户令牌', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '刷新余额', exact: true }).click();
+  const wallet = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: '账户余额', exact: true }) });
+  const quota = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: 'Key 额度', exact: true }) });
+  await expect(wallet.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '刷新额度', exact: true }).click();
+  await expect(quota.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toBeVisible();
+  await expect(wallet.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toBeVisible();
+  await page.evaluate(() => { window.accountTest.failure = 'authentication'; });
+  await page.getByRole('button', { name: '刷新余额', exact: true }).click();
+  await expect(wallet.getByRole('alert')).toContainText('平台拒绝授权');
+  await expect(wallet.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain('synthetic-account-private-token');
+  expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
+});
+
+test('account unknown save clears the submitted token and requires a read before retry', async ({ page }) => {
+  await host(page);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await page.getByRole('tab', { name: '账户与余额' }).click();
+  await page.getByLabel('平台类型', { exact: true }).selectOption('sub2api');
+  await page.getByLabel('用户令牌 · 未配置', { exact: true }).selectOption('replace');
+  await page.getByLabel('平台用户令牌', { exact: true }).fill('synthetic-unknown-account-token');
+  await page.evaluate(() => { window.desktopTest.writeError = 'unknown'; });
+  await page.getByRole('button', { name: '保存平台配置' }).click();
+  await expect(page.getByRole('alert')).toContainText('写入结果未知');
+  await expect(page.getByLabel('平台用户令牌', { exact: true })).toHaveValue('');
+  await expect(page.getByRole('button', { name: '保存平台配置' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '刷新余额', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '重新读取配置', exact: true }).click();
+  await expect(page.getByLabel('用户令牌 · 已保存', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '刷新余额', exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
 });

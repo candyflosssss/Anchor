@@ -3,7 +3,7 @@ import type { Provider } from './provider.model';
 
 /** Pure view-model derivations shared by overview, list, detail and model pages. */
 export type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'unknown';
-export type DetailTab = 'overview' | 'keys' | 'models' | 'usage';
+export type DetailTab = 'overview' | 'keys' | 'models' | 'usage' | 'account';
 export type ProviderDialog =
   | { kind: 'test'; model?: string; keyId?: string }
   | { kind: 'rename' } | { kind: 'copy' } | { kind: 'delete' }

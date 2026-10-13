@@ -1,3 +1,4 @@
+import type { AccountTransport } from './provider-account.model';
 import type { Provider as DesktopProvider, SaveProvider, DiscoverProviderModels, ProviderModels } from "../../desktop/contract.generated";
 export type { SaveProvider, DiscoverProviderModels, ProviderModels };
 export type Provider = DesktopProvider;
@@ -29,7 +30,7 @@ export const problemText: Record<ProblemCode, string> = {
   referenced: '仍有模型或 Binding 引用此项目。请先移除引用，再执行删除。',
   invalid: '配置未通过校验。请核对字段后重新提交。',
 };
-export interface ProviderTransport {
+export interface ProviderTransport extends AccountTransport {
   workspace?(id: string, signal: AbortSignal): Promise<import("../../desktop/contract.generated").Workspace>;
   action?(input: import("../../desktop/contract.generated").Action, signal: AbortSignal): Promise<import("../../desktop/contract.generated").Workspace>;
   list(signal: AbortSignal): Promise<Provider[]>;
@@ -70,7 +71,7 @@ export function validateDraft(draft: ProviderDraft): FieldErrors {
   if (draft.secretMode === 'clear' && !draft.confirmClear) errors.secret = '请确认清除密钥的影响。';
   return errors;
 }
-function requestURLError(raw: string): string | undefined {
+export function requestURLError(raw: string): string | undefined {
   try {
     const url = new URL(raw);
     const authority = raw.match(/^https?:\/\/([^/]+)/)?.[1] ?? '';

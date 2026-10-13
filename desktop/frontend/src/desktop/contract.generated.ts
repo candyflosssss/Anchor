@@ -2,6 +2,70 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface AccountSettings {
+  provider_id: string;
+  revision: number;
+  platform: string;
+  site_url: string;
+  user_id: number;
+  has_user_token: boolean;
+}
+export interface SaveAccountSettings {
+  provider_id: string;
+  expected_revision: number;
+  platform: string;
+  site_url: string;
+  user_id: number;
+  user_token: string | null;
+}
+export interface AccountQuery {
+  provider_id: string;
+  expected_revision: number;
+  operation: string;
+  key_id: string;
+  remote_key_id: number;
+}
+export interface AccountAmount {
+  value: string;
+  unit: string;
+}
+export interface AccountWindow {
+  period: string;
+  remaining: AccountAmount | null;
+  used: AccountAmount | null;
+  limit: AccountAmount | null;
+  reset_at: string;
+}
+export interface AccountAllowance {
+  scope: string;
+  remaining: AccountAmount | null;
+  used: AccountAmount | null;
+  limit: AccountAmount | null;
+  unlimited: boolean | null;
+  windows: AccountWindow[];
+}
+export interface AccountObservation {
+  provider_id: string;
+  revision: number;
+  platform: string;
+  operation: string;
+  key_id: string;
+  remote_key_id: number;
+  observed_at: string;
+  http_status: number;
+  failure: string;
+  allowance: AccountAllowance | null;
+}
+export interface AccountSettingsResult {
+  contract: string;
+  data: AccountSettings | null;
+  problem: Problem | null;
+}
+export interface AccountObservationResult {
+  contract: string;
+  data: AccountObservation | null;
+  problem: Problem | null;
+}
 export interface CatalogTemplate {
   slug: string;
   display_name: string;
@@ -376,10 +440,13 @@ export interface DesktopBridge {
   LogSettings(): Promise<LogSettingsResult>;
   Logs(input1: Query): Promise<LogsResult>;
   ManageAgent(input1: ManageAgent): Promise<AgentWorkspaceResult>;
+  ProviderAccountSettings(input1: WorkspaceQuery): Promise<AccountSettingsResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
+  ProviderAllowance(input1: AccountQuery): Promise<AccountObservationResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;
   SaveProvider(input1: SaveProvider): Promise<SaveResult>;
+  SaveProviderAccount(input1: SaveAccountSettings): Promise<AccountSettingsResult>;
   Start(): Promise<SessionResult>;
   Status(): Promise<SessionResult>;
   StopCore(input1: ConfirmStop): Promise<StopResult>;

@@ -84,3 +84,9 @@ ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径�
 启动/停止仍由 Session 管理；进入页面要求核心 ready，核心启动只应用已批准 enabled 目标，不自动批准发现结果。GUI enable 先更新 enabled/revision，再 sync，新状态可能部分成功，因此失败后读取核对。正常停服条件恢复；关闭窗口保持核心运行。桌面可执行程序支持适配器精确 token helper 入口，在创建窗口前分派 CLI 凭据读取。
 
 前端 Mock 交互、共享 DTO 检查和真实 Bridge/core 隔离测试分别验证不同层次，不代表 Windows 原生模型选择器或真实上游通过。
+
+## 平台账户与额度桌面接入（2026-10-13，当前源码）
+
+供应商详情新增「账户与余额」。受控方法 `ProviderAccountSettings` / `SaveProviderAccount` / `ProviderAllowance` 复用类型化管理客户端与已有 providerapi 核心。连接与实例身份在会话锁内校验，平台网络查询在解锁后执行，使用会话上下文和有界超时；不持有宿主锁等待上游。JS 不获得任意 upstream HTTP 方法或用户令牌读取能力。
+
+公开 DTO、令牌三态、十进制字符串、额度 scope 和冲突语义详见[供应商契约 §8](provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。共享样例同时用于 Go round-trip、前端 Model 测试和 Mock；真实桌面模式无 Mock 回退。隔离 Go 桥接→核心→模拟三平台测试覆盖读取、写入、认证、精度和冲突；浏览器模拟 Wails 只验证交互，不代替 Windows/Linux 原生窗口、安装或真实站点授权验收。没有新增数据库迁移或修改 CLI 契约。

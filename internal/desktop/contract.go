@@ -152,3 +152,70 @@ type AgentWorkspaceResult struct {
 	Data     *AgentWorkspace `json:"data"`
 	Problem  *Problem        `json:"problem"`
 }
+
+// Account DTOs expose public configuration and decimal strings only. Credentials
+// are write-only; account wallets and inference-key caps retain distinct scopes.
+type AccountSettings struct {
+	ProviderID   string `json:"provider_id"`
+	Revision     int64  `json:"revision"`
+	Platform     string `json:"platform"`
+	SiteURL      string `json:"site_url"`
+	UserID       int64  `json:"user_id"`
+	HasUserToken bool   `json:"has_user_token"`
+}
+type SaveAccountSettings struct {
+	ProviderID       string  `json:"provider_id"`
+	ExpectedRevision int64   `json:"expected_revision"`
+	Platform         string  `json:"platform"`
+	SiteURL          string  `json:"site_url"`
+	UserID           int64   `json:"user_id"`
+	UserToken        *string `json:"user_token"`
+}
+type AccountQuery struct {
+	ProviderID       string `json:"provider_id"`
+	ExpectedRevision int64  `json:"expected_revision"`
+	Operation        string `json:"operation"`
+	KeyID            string `json:"key_id"`
+	RemoteKeyID      int64  `json:"remote_key_id"`
+}
+type AccountAmount struct {
+	Value string `json:"value"`
+	Unit  string `json:"unit"`
+}
+type AccountWindow struct {
+	Period    string         `json:"period"`
+	Remaining *AccountAmount `json:"remaining"`
+	Used      *AccountAmount `json:"used"`
+	Limit     *AccountAmount `json:"limit"`
+	ResetAt   string         `json:"reset_at"`
+}
+type AccountAllowance struct {
+	Scope     string          `json:"scope"`
+	Remaining *AccountAmount  `json:"remaining"`
+	Used      *AccountAmount  `json:"used"`
+	Limit     *AccountAmount  `json:"limit"`
+	Unlimited *bool           `json:"unlimited"`
+	Windows   []AccountWindow `json:"windows"`
+}
+type AccountObservation struct {
+	ProviderID  string            `json:"provider_id"`
+	Revision    int64             `json:"revision"`
+	Platform    string            `json:"platform"`
+	Operation   string            `json:"operation"`
+	KeyID       string            `json:"key_id"`
+	RemoteKeyID int64             `json:"remote_key_id"`
+	ObservedAt  string            `json:"observed_at"`
+	HTTPStatus  int               `json:"http_status"`
+	Failure     string            `json:"failure"`
+	Allowance   *AccountAllowance `json:"allowance"`
+}
+type AccountSettingsResult struct {
+	Contract string           `json:"contract"`
+	Data     *AccountSettings `json:"data"`
+	Problem  *Problem         `json:"problem"`
+}
+type AccountObservationResult struct {
+	Contract string              `json:"contract"`
+	Data     *AccountObservation `json:"data"`
+	Problem  *Problem            `json:"problem"`
+}

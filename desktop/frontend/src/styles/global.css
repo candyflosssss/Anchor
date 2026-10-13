@@ -301,3 +301,17 @@ button.metric-card:hover:not(:disabled) { border-color: hsl(var(--ring) / .6); }
   .detail-actions { justify-content: start; width: 100%; }
 }
 @media (max-width: 480px) { .metric-grid { grid-template-columns: minmax(0, 1fr); } }
+
+.account-form { display: grid; gap: 14px; margin-top: 16px; }
+.account-fields { display: grid; gap: 16px; border: 0; padding: 0; min-width: 0; }
+.account-fields .select-field { width: 100%; }
+.account-form > button { justify-self: start; }
+.account-token-label { margin-top: 12px; }
+.account-clear { display: flex !important; align-items: center; gap: 8px; margin-top: 12px; }
+.account-remote { margin-top: 14px; }
+.account-amount { font-size: 22px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; margin: 12px 0; font-variant-numeric: tabular-nums; }
+.account-numbers { display: grid; gap: 10px; margin-bottom: 12px; font-size: 13px; }
+.account-numbers > div { display: flex; justify-content: space-between; gap: 12px; }
+.account-numbers dt { color: hsl(var(--muted-foreground)); flex-shrink: 0; }
+.account-numbers dd { text-align: right; overflow-wrap: anywhere; }
+.account-window { border-top: 1px solid hsl(var(--border)); padding: 10px 0; font-size: 12px; overflow-wrap: anywhere; }

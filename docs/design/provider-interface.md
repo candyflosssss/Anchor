@@ -88,7 +88,7 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 
 ## 8. 平台账户与计费兼容层（2026-10-13，当前源码）
 
-本节是核心／客户端／源码 CLI 已实现的兼容契约，核心已随 desktop.21 dev 发布；尚未纳入桌面 DTO、Wails 方法或查询页面，alpha.6 CLI 不含这些命令。既有桌面模型目录不变；不得将本节写成 GUI 已支持余额或账单。CLI 完整语法见[指令大全](../cli/commands.md#平台兼容查询源码-clidesktop21-核心已发布)。
+本节是核心／客户端／源码 CLI 已实现的兼容契约，核心已随 desktop.21 dev 发布；当前源码已将平台配置、账户余额与 Key 额度纳入桌面 DTO、Wails 方法和供应商详情「账户与余额」页签；请求账单与倍率仍仅核心／源码 CLI，alpha.6 CLI 不含这些命令。既有桌面模型目录入口不变。CLI 完整语法见[指令大全](../cli/commands.md#平台兼容查询源码-clidesktop21-核心已发布)。
 
 ### 身份、入口和返回
 
@@ -141,3 +141,13 @@ records 的 history 区分近期批次 `recent` 和可分页保留记录 `pagina
 - [原版 OneAPI 8df4a26](https://github.com/songquanpeng/one-api/tree/8df4a2670b98266bd287c698243fff327d9748cf)：user/token/log/billing controller 与 log model；不将各分叉能力当成原版保证。
 
 使用隔离 SQLite 与模拟 HTTP 站点验证认证、版本、请求路径、分页、金额精度、字段缺失、上游失败、体积限制和脱敏，以及 CLI／客户端完整调用链。没有使用真实站点令牌，没有调用付费推理，没有完成原生桌面接入或发行验证。
+
+### 桌面账户查询契约（2026-10-13）
+
+Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例为 `desktop/contract/provider-account.json`。
+
+- `ProviderAccountSettings(WorkspaceQuery)` 读取公有平台配置；`SaveProviderAccount(SaveAccountSettings)` 完整写入 platform/site_url/user_id，user_token 为 null 保留同目标授权、空字符串清除、非空替换。只返回 has_user_token，提交后清空表单令牌；清除须勾选确认，改变授权目标保留模式会明确提示旧令牌被清除。
+- `ProviderAllowance(AccountQuery)` 只接受 balance / key-quota，通过现有 client.QueryProvider 复用核心端点、鉴权、并发和超时。校验当前 provider revision；Key 留空时自动选择已启用 Key，OneAPI Key 额度需用户核对并输入远端整数令牌 ID。
+- 标准桌面 envelope 的 Problem 表示管理／连接失败；AccountObservation.failure 表示平台查询失败。账户 scope=account，Key scope=key；amount.value 为十进制字符串，unit 保留 USD 或 quota，不进行价格换算；null 为未知，unlimited=true 仅说明 Key 自身无限额，不能推导账户钱包。
+- 读取、写入、额度查询共享页面操作互斥；配置或供应商变化取消／丢弃旧查询，改变 Key 或远端 ID 清空旧观察值。余额与 Key 查询各自更新对应结果，刷新失败不把旧数值当当前结果。写入结果 unknown 或 conflict 需显式重新读取，不自动重放写入。
+- 后台根地址为空时沿用核心推导；可选地址仅由用户按真实部署填写，不自动加 `/newapi` 等平台名路径。查询不发推理请求，不将余额写入路由配置，不修改倍率。
