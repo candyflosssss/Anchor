@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-13。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.27`，北京时间 2026-10-13 21:40:01 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：修复 NewAPI 供应商列表忽略系统访问令牌的问题；列表与详情均优先查询账户余额。账户配置补充后台令牌生成路径、独立填写与权限说明。沿用此前 billing 查询、来源 Key、逐 Key 分组倍率、拖动排序与调度规则；账单桌面页尚未接入。
-- 已有 `.9`～`.26`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.27`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.28`，北京时间 2026-10-13 23:15:54 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：修复 sub2api 分组倍率只能用 JWT 查询的问题；支持 Key billing 的站点只需已保存推理 Key 即可查询当前有效计费倍率，账户页、目录及模型来源展示均接入。包含个人／高峰规则，分组未披露时显示「当前计费倍率」。沿用既有余额、来源 Key、拖动排序与调度规则；账单桌面页尚未接入。
+- 已有 `.9`～`.27`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版无法检查更新时可手动安装一次 `.28`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
 - 首次启动核心自动迁移 state.db schema5→6，保留既有模型与 Key；旧模型未指定来源时继续允许所有启用 Key。更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
-- 本轮 providerapi/core/client/desktop/CLI 定向 Go 测试、前端 typecheck/lint 和15项定向单测通过；双平台生产编译、安装包构建、六附件大小／digest核对和默认源 Linux 实际更新下载通过。未使用真实站点凭据，未执行浏览器、原生窗口、安装器或 apply 验收。
+- 本轮五包定向 Go 测试、隔离前端 typecheck/lint 和44项定向单测通过；双平台生产编译、安装包构建、六附件大小／digest核对和默认源 Linux 实际更新下载通过。未使用真实站点凭据，未执行浏览器、原生窗口、安装器或 apply 验收。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.27_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.28_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -84,7 +84,27 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.27`
+### 当前在线 dev 版 `.28`
+
+`0.1.0-dev.desktop.28` 于北京时间 2026-10-13 23:15:54 发布为 dev prerelease（非 latest）。构建提交 `af7359642bcb340c3f723b19ee2b294b496bc3a8`，独立工作区的 SOURCE.json 为 dirty=false。
+
+sub2api 默认以所选推理 Key 调用 `/v1/sub2api/billing`，读取服务端 `effective_rate_multiplier`，包含个人覆盖及当前高峰规则，无需 JWT。账户页、逐 Key 目录和模型来源倍率接受 `key_billing`；接口未披露分组 ID／名称时留空并显示「当前计费倍率」。只读快照不改路由倍率。旧站仅在404/405或200 HTML页面时回退用户授权，认证、权限、限流、服务及格式错误保留；显式后台 Key ID 仍按旧用户授权查询。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.28-windows-amd64-setup.exe` | 7,842,288 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.28_amd64.deb` | 5,645,700 |
+
+```text
+301b1affe1c5d46d8451a12513d3e145bdaaf3e465c0722b3f36cbb1af5da1aa  Anchor-Desktop-0.1.0-dev.desktop.28-windows-amd64-setup.exe
+381f40d2b6f233cdef6caaf18e4237f90bbcc086e9c7c893f22aed8c36ffe0dc  anchor-desktop_0.1.0-dev.desktop.28_amd64.deb
+```
+
+六附件完整投放，GitHub附件大小／digest及正式URL与本地清单一致，标签指向实际构建提交。源码归档含 vendored Go 依赖及本轮修复，go.sum与构建提交一致；元数据ZIP CRC通过，原始BUILD.json的原生／安装／签名状态保留。发布及下载证据位于 `dist/desktop/0.1.0-dev.desktop.28/publication/`。
+
+隔离数据目录从本轮源码运行 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.27 --json`，默认源发现`.28`并实际下载Linux包，大小与SHA256通过；Windows附件digest与本地一致。五包Go定向测试、前端typecheck/lint和44项账户／目录／展示测试通过。未使用真实站点凭据、真实Agent配置或付费推理；未执行原生窗口、安装器或apply验收。
+
+### 历史在线 dev 版 `.27`
 
 `0.1.0-dev.desktop.27` 于北京时间 2026-10-13 21:40:01 发布为 dev prerelease（非 latest）。构建提交 `5b1e676c5fbbe66c8802fe8962bfecea8b723664`，干净独立 worktree 的 SOURCE.json 为 dirty=false。
 
