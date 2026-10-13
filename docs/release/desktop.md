@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-13。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.26`，北京时间 2026-10-13 19:27:47 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：修复 NewAPI 只配推理 API Key 时的余额查询，供应商列表和详情「余额」接入 billing；明确显示站点范围、币种或原始单位。已有用户授权仍优先查账户钱包。沿用此前来源 Key、逐 Key 分组倍率、拖动排序与调度规则；账单桌面页尚未接入。
-- 已有 `.9`～`.25`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.26`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.27`，北京时间 2026-10-13 21:40:01 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：修复 NewAPI 供应商列表忽略系统访问令牌的问题；列表与详情均优先查询账户余额。账户配置补充后台令牌生成路径、独立填写与权限说明。沿用此前 billing 查询、来源 Key、逐 Key 分组倍率、拖动排序与调度规则；账单桌面页尚未接入。
+- 已有 `.9`～`.26`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.27`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
 - 首次启动核心自动迁移 state.db schema5→6，保留既有模型与 Key；旧模型未指定来源时继续允许所有启用 Key。更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
-- 本轮 providerapi/core/client/desktop/CLI 定向 Go 测试、前端 typecheck/lint 和14项定向单测通过；双平台生产编译、安装包构建、六附件大小／digest核对和默认源 Linux 实际更新下载通过。未使用真实站点凭据，未执行浏览器、原生窗口、安装器或 apply 验收。
+- 本轮 providerapi/core/client/desktop/CLI 定向 Go 测试、前端 typecheck/lint 和15项定向单测通过；双平台生产编译、安装包构建、六附件大小／digest核对和默认源 Linux 实际更新下载通过。未使用真实站点凭据，未执行浏览器、原生窗口、安装器或 apply 验收。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.26_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.27_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -84,11 +84,33 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.26`
+### 当前在线 dev 版 `.27`
+
+`0.1.0-dev.desktop.27` 于北京时间 2026-10-13 21:40:01 发布为 dev prerelease（非 latest）。构建提交 `5b1e676c5fbbe66c8802fe8962bfecea8b723664`，干净独立 worktree 的 SOURCE.json 为 dirty=false。
+
+NewAPI 保存后台系统访问令牌后，供应商列表的余额摘要现在与账户详情一致，优先调用账户接口，返回 scope=account。此前列表忽略已保存用户授权；本版修复该缺口。系统令牌无效、权限不足或账户查询失败时保留错误，不退回 Key 限额。明确配置 NewAPI 时无需推理 Key 即可查询；未配置系统令牌时沿用 `.26` 的 billing / Key 额度兼容查询。
+
+「供应商 → 账户与余额 → 平台账户配置」明确标注“NewAPI 系统访问令牌”，说明后台生成路径、输入／替换与保存方式、按站点要求填写的用户 ID，以及支持权限选择的站点所需的查询权限：余额读取需 profile:read，自动核对 Key 分组需 api_key:read、api_key:reveal。没有新增参数、公开 DTO 字段或数据库迁移。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.27-windows-amd64-setup.exe` | 7,836,542 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.27_amd64.deb` | 5,644,688 |
+
+```text
+cdfbace6b16b52292518d12b4487cdcbe5a81e16186743c49cbb7452666f147d  Anchor-Desktop-0.1.0-dev.desktop.27-windows-amd64-setup.exe
+337861a9c6c8ee473a57ec2bf5d9e11f92d89f0d8af6aff62fdd10fce2af4205  anchor-desktop_0.1.0-dev.desktop.27_amd64.deb
+```
+
+两安装包、flat 更新清单、对应提交的源码（含 vendored Go 依赖）、许可／构建元数据和 SHA256SUMS 共六附件上传状态、大小及 GitHub digest 与本地一致；标签指向实际构建提交。原始 BUILD.json 的编译／安装验收状态保留，发布证据位于 `dist/desktop/0.1.0-dev.desktop.27/publication/`。隔离数据目录用本轮源码执行 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.26 --json`，默认源发现 `.27` 并实际下载 Linux 包，通过大小和 SHA256 校验；未运行安装器或 apply。
+
+本轮五包定向 Go 测试、前端 typecheck/lint、15项模型／展示测试和两平台构建通过。首次打包因隔离目录的 node_modules 外部软链接在容器中不可达而失败，复制依赖到隔离目录后重新构建成功。未使用真实站点凭据、真实 Agent 配置或付费推理请求；未执行浏览器、双平台原生窗口及安装验收。
+
+### 上一在线 dev 版 `.26`
 
 `0.1.0-dev.desktop.26` 于北京时间 2026-10-13 19:27:47 发布为 dev prerelease（非 latest）。构建提交 `f9b40872e50fcdd5c692d934334e9d55cbfdd993`，干净独立 worktree 的 SOURCE.json 为 dirty=false。
 
-NewAPI 无用户授权时，供应商列表和账户详情的「余额」使用所选推理 API Key 查询 billing subscription/usage，剩余值按 `hard_limit_usd - total_usage/100` 精确计算。用户授权仍优先查账户钱包；billing 范围由站点设置决定，显示「站点余额」，不能直接视为账户钱包。公开显示单位保留 USD/CNY/quota，无法确认则标注 site_unit。无限额 Key 的占位数不当资金；列表仅在接口缺失或不兼容时回退 Key 额度，认证／权限／限流／服务失败保留原因。CLI 同步修复，本轮不新增数据库迁移。
+NewAPI 无用户授权时，供应商列表和账户详情的「余额」使用所选推理 API Key 查询 billing subscription/usage，剩余值按 `hard_limit_usd - total_usage/100` 精确计算。账户详情使用用户授权时仍优先查账户钱包；billing 范围由站点设置决定，显示「站点余额」，不能直接视为账户钱包。公开显示单位保留 USD/CNY/quota，无法确认则标注 site_unit。无限额 Key 的占位数不当资金；列表仅在接口缺失或不兼容时回退 Key 额度，认证／权限／限流／服务失败保留原因。CLI 同步修复，本轮不新增数据库迁移。
 
 | 平台 | 安装包 | 字节数 |
 | --- | --- | ---: |
@@ -104,7 +126,7 @@ a296db47f12ed0ed2f9ec501f8d5886f16a021174e563ad553f43ec830a9c1c7  anchor-desktop
 
 本轮五包定向 Go 测试、前端 typecheck/lint、14项模型／展示测试和两平台构建通过。未使用真实站点凭据、真实 Agent 配置或付费推理请求；未执行浏览器、双平台原生窗口及安装验收。
 
-### 上一在线 dev 版 `.25`
+### 历史在线 dev 版 `.25`
 
 `0.1.0-dev.desktop.25` 于北京时间 2026-10-13 18:37:11 发布为 dev prerelease（非 latest）。构建提交 `f37d11fc45ffa4e6ada05896164916528e0169e0`，干净独立 worktree 的 SOURCE.json 为 dirty=false。
 

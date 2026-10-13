@@ -266,11 +266,11 @@
 
 - 类型：修改。
 - 指令与参数：provider balance、provider balance-summary，参数不变；帮助补充 NewAPI 授权优先顺序。
-- 旧 → 新：无用户授权的 balance 原来返回 auth_required，现在使用推理 Key 调用 subscription/usage；balance-summary 原来只读 Key quota，现在优先 billing，接口缺失或格式不兼容时回退 Key quota。用户授权仍优先查询账户钱包。
+- 旧 → 新：无用户授权的 balance 原来返回 auth_required，现在使用推理 Key 调用 subscription/usage；balance-summary 原来只读 Key quota，现在优先 billing，接口缺失或格式不兼容时回退 Key quota。balance 在配置用户授权时仍优先查询账户钱包。
 - 兼容与迁移：输出 scope 新增 billing，金额 unit 新增 CNY/site_unit；站点未公开查询范围时明确保留 billing，不冒充账户钱包。剩余值用精确十进制相减，usage 按上游定义除以100；无限额占位值不当资金显示。旧的严格校验客户端需与核心同步升级；数据库不新增迁移。
 - 验证：模拟 HTTP NewAPI 下的适配器、核心、客户端、CLI 和桌面桥接定向 Go 测试通过，包含无用户授权查询、已有授权优先、默认／指定 Key、部署前缀、回退及分类失败；未调用真实付费上游。
 
-## 2026-10-13 — NewAPI 系统访问令牌用于列表账户余额（源码，待 desktop.27 投放）
+## 2026-10-13 — NewAPI 系统访问令牌用于列表账户余额（desktop.27 dev）
 
 - 类型：修改行为和帮助，参数不变。
 - 指令与参数：provider balance-summary；provider platform-put --user-token-stdin，provider balance 沿用已有授权优先顺序。
