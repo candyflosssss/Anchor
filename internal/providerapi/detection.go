@@ -84,10 +84,13 @@ func (a *Adapter) DetectPlatform(ctx context.Context) (string, error) {
 	return "", failure("platform_unknown")
 }
 
-// GetBalanceSummary only uses the selected inference key. A key cap is returned
-// with key scope; NewAPI legacy billing has site-controlled scope. This query
-// never uses a saved user token.
+// GetBalanceSummary prefers an explicitly configured NewAPI account token.
+// Without it, the selected inference key exposes site-controlled billing or a
+// key cap. Account authorization failures must not fall back to key figures.
 func (a *Adapter) GetBalanceSummary(ctx context.Context) (*Allowance, error) {
+	if a.Config.Platform == "newapi" && a.Config.UserToken != "" {
+		return a.GetBalance(ctx)
+	}
 	if err := a.key(); err != nil {
 		return nil, err
 	}

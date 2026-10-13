@@ -17,14 +17,15 @@ func TestSharedAccountFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var v struct {
-		Billing        AccountObservation     `json:"billing"`
-		BillingSummary AccountObservation     `json:"billing_summary"`
-		Rate           AccountRateObservation `json:"rate"`
-		Settings       AccountSettings        `json:"settings"`
-		Balance        AccountObservation     `json:"balance"`
-		Quota          AccountObservation     `json:"quota"`
-		Summary        AccountObservation     `json:"summary"`
-		KeySummary     AccountObservation     `json:"key_summary"`
+		NewAPIAccountSummary AccountObservation     `json:"newapi_account_summary"`
+		Billing              AccountObservation     `json:"billing"`
+		BillingSummary       AccountObservation     `json:"billing_summary"`
+		Rate                 AccountRateObservation `json:"rate"`
+		Settings             AccountSettings        `json:"settings"`
+		Balance              AccountObservation     `json:"balance"`
+		Quota                AccountObservation     `json:"quota"`
+		Summary              AccountObservation     `json:"summary"`
+		KeySummary           AccountObservation     `json:"key_summary"`
 	}
 	if err := json.Unmarshal(raw, &v); err != nil {
 		t.Fatal(err)
@@ -35,6 +36,9 @@ func TestSharedAccountFixture(t *testing.T) {
 	json.Unmarshal(encoded, &b)
 	if v.Billing.Allowance == nil || v.Billing.Allowance.Scope != "billing" || v.BillingSummary.Operation != "balance-summary" {
 		t.Fatal("billing fixture drift")
+	}
+	if v.NewAPIAccountSummary.Platform != "newapi" || v.NewAPIAccountSummary.Operation != "balance-summary" || v.NewAPIAccountSummary.Allowance == nil || v.NewAPIAccountSummary.Allowance.Scope != "account" {
+		t.Fatal("NewAPI account summary fixture drift")
 	}
 	if !reflect.DeepEqual(a, b) || v.Balance.Allowance.Remaining.Value != "12.34567890123456789" || v.Balance.Allowance.Used != nil || v.Quota.Allowance.Unlimited == nil || !*v.Quota.Allowance.Unlimited {
 		t.Fatal("account fixture drift")

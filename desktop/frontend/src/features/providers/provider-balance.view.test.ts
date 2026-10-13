@@ -7,6 +7,14 @@ import { checkedAccountObservation } from './provider-account.model';
 
 const query = { provider_id: 'demo', expected_revision: 3, operation: 'balance-summary', key_id: '', remote_key_id: 0 };
 describe('provider billing balance display', () => {
+  it('shows an authorized NewAPI summary as an account wallet', () => {
+    const observation = checkedAccountObservation(fixture.newapi_account_summary, query);
+    const html = renderToStaticMarkup(createElement(ProviderBalanceCell, { value: { observation } }));
+    expect(html).toContain('345 quota（原始额度）');
+    expect(html).toContain('账户余额');
+    expect(html).not.toContain('Key 额度');
+    expect(html).not.toContain('站点余额');
+  });
   it('shows the billing amount and site scope for a Key-only NewAPI query', () => {
     const observation = checkedAccountObservation(fixture.billing_summary, query);
     const html = renderToStaticMarkup(createElement(ProviderBalanceCell, { value: { observation } }));

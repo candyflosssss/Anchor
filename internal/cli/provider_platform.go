@@ -27,7 +27,7 @@ func (a App) providerPlatform(ctx context.Context, c *client.Client, args []stri
 		platform := f.String("platform", "auto", "auto (default), sub2api, newapi or oneapi")
 		site := f.String("site-url", "", "dashboard deployment root; empty derives from request URL")
 		userID := f.Int64("user-id", 0, "NewAPI user ID for deployments requiring New-Api-User")
-		stdin := f.Bool("user-token-stdin", false, "read dashboard user token from stdin")
+		stdin := f.Bool("user-token-stdin", false, "read dashboard user token from stdin (NewAPI: system access token generated in personal/security settings)")
 		clear := f.Bool("clear-user-token", false, "remove saved dashboard user authorization")
 		if err := parse(f, args[1:]); err != nil {
 			return err

@@ -328,9 +328,9 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 
 `--platform` 默认 `auto`；既有未配置平台同样自动探测。`detect-platform` 根据公开接口和必要的 Key 接口响应重新识别 sub2api／NewAPI／OneAPI，不凭域名或站点品牌猜测，不写配置。无法确认返回 `platform_unknown`，凭据被拒绝保留分类失败。人工指定平台可覆盖自动模式。
 
-`balance-summary` 使用默认推理 Key，不使用保存的用户令牌：sub2api 明确钱包返回 scope=account，受限 Key 返回 scope=key；NewAPI 优先读旧 billing 的 subscription 与 usage，以总额度减去已用量得到剩余值，scope=billing 表示范围由站点设置决定。仅在 billing 缺失或格式不兼容时回退 Key 原始 quota（scope=key）；认证、权限、限流、网络和服务错误直接报告。原版 OneAPI 返回 auth_required。余额／额度字段为空或失败时不能当作0。查询结果的 platform 为本次识别值，key_id 为实际所选 Key。NewAPI `balance` 有已保存用户授权时仍查账户钱包，无用户授权时使用所选 API Key 查 billing；不会将站点范围直接标成账户钱包。
+`balance-summary` 在 NewAPI 已保存系统访问令牌时优先查询 `/api/user/self` 的账户余额（scope=account），与 `balance` 一致；授权失败直接报告，不退回 Key 数值。其他情况下使用默认推理 Key：sub2api 明确钱包返回 scope=account，受限 Key 返回 scope=key；NewAPI 优先读旧 billing 的 subscription 与 usage，以总额度减去已用量得到剩余值，scope=billing 表示范围由站点设置决定。仅在 billing 缺失或格式不兼容时回退 Key 原始 quota（scope=key）；认证、权限、限流、网络和服务错误直接报告。原版 OneAPI 返回 auth_required。余额／额度字段为空或失败时不能当作0。查询结果的 platform 为本次识别值，key_id 为实际所选 Key。NewAPI `balance` 有已保存用户授权时仍查账户钱包，无用户授权时使用所选 API Key 查 billing；不会将站点范围直接标成账户钱包。
 
-`--user-token-stdin` 读取独立的后台用户授权（sub2api JWT、NewAPI/OneAPI 用户 access token）；不能使用 `--secret` 参数传入。空 stdin 拒绝；与 `--clear-user-token` 互斥。未指定令牌选项时，仅平台、后台根地址和用户 ID 都不变才保留原令牌；改变其中任一项会清除。后台地址由请求地址推导时，修改请求地址也清除令牌；显式独立后台地址不受此影响。复制供应商不复制用户授权，即使指定 `--copy-keys`；改名保留，删除级联清除。凭据存于本机受限数据库，不能理解为数据库列加密。
+`--user-token-stdin` 读取独立的后台用户授权（sub2api JWT、NewAPI/OneAPI 用户 access token）；NewAPI 在该站后台「个人设置／安全设置 → 系统访问令牌」生成，与推理 API Key 分开配置。支持权限选择的新版本，余额需 profile:read，自动核对 Key 分组还需 api_key:read 和 api_key:reveal。不能使用 `--secret` 参数传入。空 stdin 拒绝；与 `--clear-user-token` 互斥。未指定令牌选项时，仅平台、后台根地址和用户 ID 都不变才保留原令牌；改变其中任一项会清除。后台地址由请求地址推导时，修改请求地址也清除令牌；显式独立后台地址不受此影响。复制供应商不复制用户授权，即使指定 `--copy-keys`；改名保留，删除级联清除。凭据存于本机受限数据库，不能理解为数据库列加密。
 
 `--key` 默认优先已启用的 `default`，否则回退首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。显式指定时，调用者须确保该数字对应希望查询的站点 Key。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询在该数字为0（默认）时，通过用户账户列表核对所选保存的完整密钥后读取分组；最多4页各100条。NewAPI 的掩码需通过固定的 POST `/api/token/{id}/key` 读取完整密钥核对，掩码本身不能证明身份；找不到返回 `key_not_found`。正整数仍直接读取指定远端 Key 的绑定分组。
 

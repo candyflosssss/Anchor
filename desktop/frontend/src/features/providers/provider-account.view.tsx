@@ -31,6 +31,8 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
   const authTargetChanged = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || Number(userID || '0') !== s.user_id;
   const keys = c.features.data?.keys ?? [];
   const oneAPI = s.platform === 'oneapi' || a.observedPlatform === 'oneapi';
+  const newAPI = platform === 'newapi' || platform === 'auto' && a.observedPlatform === 'newapi';
+  const tokenLabel = newAPI ? 'NewAPI 系统访问令牌' : '用户令牌';
   async function save(e: FormEvent) {
     e.preventDefault();
     if (disabled) return;
@@ -66,10 +68,16 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
       <form className="account-form" onSubmit={e => void save(e)} autoComplete="off">
         <fieldset disabled={disabled} className="account-fields">
           <div className="field"><label htmlFor="account-platform">平台类型</label><select id="account-platform" className="select-field" value={platform} onChange={e => setPlatform(e.target.value)}>{Object.entries(platformLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></div>
-          {(platform === 'newapi' || platform === 'auto' && a.observedPlatform === 'newapi') && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="该站后台的用户 ID" /><p className="card-hint">确认账户钱包需用户 access token，按站点版本填写用户 ID；仅用推理 Key 也可查询站点 billing 余额。</p></div>}
+          {newAPI && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID（按站点要求填写）</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="可先留空；该站要求时填写数字用户 ID" /><p className="card-hint">这是该站后台的账户 ID。仅当该站要求用户 ID 时填写。</p></div>}
           <details className="pricing-details"><summary>账户接口地址（可选）</summary><div className="field"><label htmlFor="account-site-url">站点根地址</label><input id="account-site-url" value={siteURL} onChange={e => setSiteURL(e.target.value)} placeholder="留空，沿用请求地址并移除末尾 /v1" /><p className="card-hint">后台与推理 API 地址不同时填写。包含站点实际使用的部署路径前缀。</p></div></details>
-          <div className="field"><label htmlFor="account-token-mode">用户令牌 · {s.has_user_token ? '已保存' : '未配置'}</label><select id="account-token-mode" className="select-field" value={tokenMode} onChange={e => { setTokenMode(e.target.value as typeof tokenMode); setToken(''); setConfirmClear(false); }}><option value="keep">保留现有授权</option><option value="replace">输入／替换用户令牌</option><option value="clear">清除用户令牌</option></select>
-            {tokenMode === 'replace' && <><label htmlFor="account-token" className="account-token-label">平台用户令牌</label><input id="account-token" type="password" autoComplete="new-password" value={token} onChange={e => setToken(e.target.value)} placeholder={platform === 'sub2api' ? '用户登录 JWT' : '平台用户 access token'} /></>}
+          {platform === 'auto' && !a.observedPlatform && <p className="card-hint">NewAPI 账户余额需要后台单独生成的系统访问令牌。选择「NewAPI」可查看获取步骤并配置。</p>}
+          {newAPI && <div className="card-hint">
+            <p>登录该 NewAPI 站点后台 → 个人设置／安全设置 → 系统访问令牌，生成后选择下方「输入／替换系统访问令牌」，粘贴并保存。它与调用模型的 API Key 分开配置。</p>
+            <p>支持权限选择的站点：余额查询需「个人信息读取」（profile:read）；自动核对 Key 的分组倍率还需「API Key 读取」（api_key:read）和「查看完整 API Key」（api_key:reveal）。</p>
+            <p>{s.has_user_token ? '已保存系统访问令牌，列表与详情优先查询账户余额。' : '尚未配置系统访问令牌，查询结果可能是 Key 限额；确认账户余额请先配置。'}</p>
+          </div>}
+          <div className="field"><label htmlFor="account-token-mode">{tokenLabel} · {s.has_user_token ? '已保存' : '未配置'}</label><select id="account-token-mode" className="select-field" value={tokenMode} onChange={e => { setTokenMode(e.target.value as typeof tokenMode); setToken(''); setConfirmClear(false); }}><option value="keep">保留现有授权</option><option value="replace">输入／替换{newAPI ? '系统访问令牌' : '用户令牌'}</option><option value="clear">清除{newAPI ? '系统访问令牌' : '用户令牌'}</option></select>
+            {tokenMode === 'replace' && <><label htmlFor="account-token" className="account-token-label">{newAPI ? tokenLabel : '平台用户令牌'}</label><input id="account-token" type="password" autoComplete="new-password" value={token} onChange={e => setToken(e.target.value)} placeholder={newAPI ? '粘贴后台生成的系统访问令牌' : platform === 'sub2api' ? '用户登录 JWT' : '平台用户 access token'} /></>}
             {tokenMode === 'clear' && <label className="account-clear"><input type="checkbox" checked={confirmClear} onChange={e => setConfirmClear(e.target.checked)} />确认清除，之后部分查询将需要重新授权</label>}
             {s.has_user_token && authTargetChanged && tokenMode === 'keep' && <p className="card-hint">平台、站点地址或用户 ID 已改变，保存时将清除旧用户令牌。需要继续查询时请选择「输入／替换用户令牌」。</p>}
           </div>

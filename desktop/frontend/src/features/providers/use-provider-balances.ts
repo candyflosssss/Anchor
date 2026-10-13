@@ -4,7 +4,7 @@ import { checkedAccountObservation, type AccountObservation } from './provider-a
 
 export interface ProviderBalance { observation?: AccountObservation; error?: string }
 
-/** Default-key observations are bounded to two queries and owned by one list snapshot. */
+/** Balance observations are bounded to two queries and owned by one list snapshot. */
 export function useProviderBalances(providers: Provider[], active: boolean, transport: ProviderTransport): Record<string, ProviderBalance> {
   const [snapshot, setSnapshot] = useState<{ providers: Provider[]; transport: ProviderTransport; entries: Record<string, ProviderBalance> } | null>(null);
   useEffect(() => {

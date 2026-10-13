@@ -60,7 +60,7 @@ func TestAutomaticPlatformAndDefaultKeySummary(t *testing.T) {
 				io.WriteString(w, body)
 			}))
 			defer upstream.Close()
-			a := Adapter{HTTP: upstream.Client(), BaseURL: upstream.URL + "/prefix/v1", Key: "default-key-fixture", Config: Config{Platform: "auto", UserToken: "user-fixture", UserID: 7}}
+			a := Adapter{HTTP: upstream.Client(), BaseURL: upstream.URL + "/prefix/v1", Key: "default-key-fixture", Config: Config{Platform: "auto"}}
 			result := a.Query(context.Background(), Query{ProviderID: "demo", ExpectedRevision: 1, Operation: "balance-summary"})
 			if result.Platform != tc.platform || result.Failure != tc.fail {
 				t.Fatalf("%+v", result)

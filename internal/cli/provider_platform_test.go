@@ -37,7 +37,7 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 			}
 			io.WriteString(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false,"quota_display_type":"USD"}}`)
 		case "/api/user/self":
-			if r.Header.Get("Authorization") != "Bearer cli-user-fixture" {
+			if r.Header.Get("Authorization") != "Bearer cli-user-fixture" || r.Header.Get("New-Api-User") != "9" {
 				t.Error("incorrect dashboard token")
 			}
 			io.WriteString(w, `{"success":true,"data":{"quota":345,"used_quota":12}}`)
@@ -111,9 +111,11 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 		t.Fatal(got)
 	}
 	run("", false, "provider", "platform", "--id", "p")
-	got = run("", false, "provider", "balance", "--id", "p", "--revision", "2")
-	if !strings.Contains(got, `"value":345`) || !strings.Contains(got, `"unit":"quota"`) {
-		t.Fatal(got)
+	for _, op := range []string{"balance", "balance-summary"} {
+		got = run("", false, "provider", op, "--id", "p", "--revision", "2")
+		if !strings.Contains(got, `"scope":"account"`) || !strings.Contains(got, `"value":345`) || !strings.Contains(got, `"unit":"quota"`) {
+			t.Fatal(got)
+		}
 	}
 	got = run("", false, "provider", "key-quota", "--id", "p", "--revision", "2")
 	if !strings.Contains(got, `"value":25`) {

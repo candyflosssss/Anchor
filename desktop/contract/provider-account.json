@@ -167,5 +167,30 @@
       "unlimited": null,
       "windows": []
     }
+  },
+  "newapi_account_summary": {
+    "provider_id": "demo",
+    "revision": 3,
+    "platform": "newapi",
+    "operation": "balance-summary",
+    "key_id": "default",
+    "remote_key_id": 0,
+    "observed_at": "2026-10-13T02:00:00Z",
+    "http_status": 200,
+    "failure": "",
+    "allowance": {
+      "scope": "account",
+      "remaining": {
+        "value": "345",
+        "unit": "quota"
+      },
+      "used": {
+        "value": "12",
+        "unit": "quota"
+      },
+      "limit": null,
+      "unlimited": null,
+      "windows": []
+    }
   }
 }
