@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/candyflosssss/Anchor/internal/client"
 	"github.com/candyflosssss/Anchor/internal/logbook"
+	"github.com/candyflosssss/Anchor/internal/protocol"
 	"github.com/candyflosssss/Anchor/internal/state"
 	"io"
 	"log/slog"
@@ -165,6 +166,116 @@ func TestRetryTraceAndNoRoute(t *testing.T) {
 	r, err = f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
 	if err != nil || r.Status != "failed" || r.AttemptCount != 0 || r.HTTP != nil {
 		t.Fatal(r, err)
+	}
+}
+
+// completionDisconnectWriter reproduces a client closing its connection as soon
+// as it receives the terminal event, before the gateway finishes its bookkeeping.
+type completionDisconnectWriter struct {
+	*httptest.ResponseRecorder
+	cancel context.CancelFunc
+	marker string
+	fail   bool
+}
+
+func (w *completionDisconnectWriter) Write(data []byte) (int, error) {
+	if !bytes.Contains(data, []byte(w.marker)) {
+		return w.ResponseRecorder.Write(data)
+	}
+	defer w.cancel()
+	if w.fail {
+		n, _ := w.ResponseRecorder.Write(data[:len(data)/2])
+		return n, io.ErrClosedPipe
+	}
+	return w.ResponseRecorder.Write(data)
+}
+
+func TestCompletedResponseSurvivesClientDisconnect(t *testing.T) {
+	for _, tc := range []struct {
+		name, marker string
+		stream, fail bool
+	}{
+		{name: "stream", marker: "response.completed", stream: true},
+		{name: "json", marker: `"status":"completed"`},
+		{name: "terminal_write_failure", marker: "response.completed", stream: true, fail: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := setup(t)
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				response := `{"id":"r","status":"completed","output":[],"usage":{"input_tokens":12,"output_tokens":9,"output_tokens_details":{"reasoning_tokens":0}}}`
+				if !tc.stream {
+					w.Header().Set("Content-Type", "application/json")
+					io.WriteString(w, response)
+					return
+				}
+				w.Header().Set("Content-Type", "text/event-stream")
+				io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"synthetic\"}\n\n")
+				w.(http.Flusher).Flush()
+				time.Sleep(15 * time.Millisecond)
+				io.WriteString(w, `data: {"type":"response.completed","response":`+response+"}\n\n")
+			}))
+			defer up.Close()
+			f.add(t, "p", up.URL, "synthetic")
+			f.model(t, state.Candidate{ProviderID: "p", Model: "up"})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			body, _ := json.Marshal(map[string]any{"model": "public", "input": "synthetic", "stream": tc.stream})
+			req := httptest.NewRequest("POST", f.gateway.URL+"/v1/responses", bytes.NewReader(body)).WithContext(ctx)
+			req.Header.Set("Authorization", "Bearer "+f.token)
+			w := &completionDisconnectWriter{ResponseRecorder: httptest.NewRecorder(), cancel: cancel, marker: tc.marker, fail: tc.fail}
+			f.core.Gateway().ServeHTTP(w, req)
+			if ctx.Err() != context.Canceled {
+				t.Fatal("completion did not trigger disconnect")
+			}
+			if err := f.core.logs.Flush(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			row, err := f.core.logs.Detail(t.Context(), w.Header().Get("X-Anchor-Request-ID"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.fail {
+				if row.Status != "cancelled" || row.Code != "client_cancelled" || row.Delivery != "partial" || row.Metrics.GenerationMS != nil {
+					t.Fatalf("failed terminal write reported as complete: %+v", row)
+				}
+				return
+			}
+			if row.Status != "succeeded" || row.Code != "" || row.Delivery != "complete" || row.Attempts[0].Outcome != "succeeded" {
+				t.Fatalf("disconnect overwrote a completed response: %+v", row)
+			}
+			if tc.stream && (!row.Metrics.TextIntervalComplete || row.Metrics.GenerationMS == nil || row.Metrics.OutputTextTokens == nil || *row.Metrics.OutputTextTokens != 9) {
+				t.Fatalf("completed stream lost TPS measurements: %+v", row.Metrics)
+			}
+		})
+	}
+}
+
+func TestTPSRequiresConfirmedTextMeasurements(t *testing.T) {
+	start := time.Now()
+	for _, tc := range []struct {
+		name               string
+		observation        protocol.Observation
+		usage              protocol.Usage
+		wantText, interval bool
+	}{
+		{name: "text", observation: protocol.Observation{FirstText: start, Terminal: start.Add(time.Second), Status: "completed"}, usage: protocol.Usage{Known: true, Output: 20, ReasoningKnown: true, Reasoning: 5}, wantText: true, interval: true},
+		{name: "missing_usage", observation: protocol.Observation{FirstText: start, Terminal: start.Add(time.Second), Status: "completed"}, interval: true},
+		{name: "missing_reasoning_usage", observation: protocol.Observation{FirstText: start, Terminal: start.Add(time.Second), Status: "completed"}, usage: protocol.Usage{Known: true, Output: 20}, interval: true},
+		{name: "mixed_tool_output", observation: protocol.Observation{FirstText: start, Terminal: start.Add(time.Second), Status: "completed", NonText: true}, usage: protocol.Usage{Known: true, Output: 20, ReasoningKnown: true}, interval: true},
+		{name: "tool_only", observation: protocol.Observation{Terminal: start.Add(time.Second), Status: "completed", NonText: true}, usage: protocol.Usage{Known: true, Output: 20, ReasoningKnown: true}},
+		{name: "interrupted", observation: protocol.Observation{FirstText: start}, usage: protocol.Usage{Known: true, Output: 20, ReasoningKnown: true}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			trace := &requestTrace{start: start}
+			setLogMetrics(trace, tc.observation, tc.usage, "responses", true)
+			metrics := trace.row.Metrics
+			if (metrics.OutputTextTokens != nil) != tc.wantText || metrics.TextIntervalComplete != tc.interval {
+				t.Fatalf("unexpected text measurements: %+v", metrics)
+			}
+			if tc.wantText && (*metrics.OutputTextTokens != 15 || metrics.GenerationMS == nil || *metrics.GenerationMS != 1000) {
+				t.Fatalf("TPS must exclude reasoning tokens and first-text wait: %+v", metrics)
+			}
+		})
 	}
 }
 

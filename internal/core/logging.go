@@ -65,7 +65,11 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 		defer func() {
 			ms := time.Since(now).Milliseconds()
 			t.row.ElapsedMS = &ms
-			if r.Context().Err() != nil {
+			// A client may disconnect immediately after receiving the terminal
+			// event, while usage and log bookkeeping are still running. Keep a
+			// response that was fully written successful; failed writes and
+			// requests interrupted before completion remain cancellations.
+			if r.Context().Err() != nil && (t.row.Status != "succeeded" || t.writeFailed) {
 				t.row.Status = "cancelled"
 				t.row.Code = "client_cancelled"
 			}

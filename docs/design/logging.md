@@ -35,7 +35,7 @@
 
 日志不记录请求/响应正文、提示词、思考原文、工具参数、认证头、密钥或任意上游错误文本。probe 只记录固定错误码及 `body_bytes`、`json_valid`、校验通过等有限结构事实。2026-10-13 当前源码（未发布）在失败详情的 `evidence` 中增加 `validation_reason`：`invalid_json`、`missing_response_id`、`upstream_error`、`unsupported_content`、`unsupported_output`、`invalid_tool_call`、`invalid_choices`、`refusal`，未知错误固定为 `invalid_structure`；不直接存储解析错误字符串，其中可能含任意上游字段名。已有 evidence 字典契约、查询/复制/导出沿用，列表仍省略 evidence，历史记录不补写。文本项的 `logprobs` 和 `annotations` 只用于测试结构校验，不进入日志。系统事件使用代码消息与属性白名单。复制和导出来自这些安全结构化字段，不触发新的上游请求。未知 reasoning effort 不作为任意字符串写入日志。
 
-客户端取消保存 cancelled；已经写出 HTTP 200 数据的失败请求保存 partial；没有写出数据则 none。success/complete 只表示本机写入没有报错，不代表最终用户确认收到。旧 pending 在核心重新打开数据库时改为 interrupted/core_interrupted，交付结果 unknown；NORMAL WAL 在突然断电时可能丢失最近批次，不承诺断电零损失。
+2026-10-13 当前源码（未发布）修正完成响应的取消误判：协议正常结束且响应写入成功后，即使客户端在日志／用量收尾前断开，也保留 succeeded/complete；尚未完成或写入失败时的客户端取消仍保存 cancelled。已经写出 HTTP 200 数据的失败请求保存 partial；没有写出数据则 none。success/complete 只表示本机写入没有报错，不代表最终用户确认收到。历史记录不自动重判；TPS 是否可计算仍由正文区间及可确认的正文 Token 决定，与结果标签独立。旧 pending 在核心重新打开数据库时改为 interrupted/core_interrupted，交付结果 unknown；NORMAL WAL 在突然断电时可能丢失最近批次，不承诺断电零损失。
 
 ## 4. 存储、性能与保留
 

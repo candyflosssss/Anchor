@@ -628,6 +628,8 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts/evidence 大字段，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 
+2026-10-13 当前源码（未发布）：`list/detail/follow/export` 的请求结果在协议正常结束且响应写入成功后保留 `succeeded` / `complete`，客户端在日志或用量收尾期间断开不再改记为 `client_cancelled`；未完成或写入失败时的取消仍为 `cancelled`。历史记录不自动重判，须升级正在处理请求的核心后才能影响新记录。TPS 仅在完整正文区间及正文 Token 可确认时计算；工具／非文本输出、缺少用量或 reasoning Token、非流式及中断区间保持未知。命令、参数及 JSON 字段不变。
+
 `follow` 每 2 秒输出一页完整 JSON（不是逐条去重订阅，可重复且 pending 后续会更新）；窗口起点在启动时固定，cursor/until 按提供值使用。Ctrl+C 终止，正常退出规则沿用应用。`export` 忽略 cursor/limit，从固定 latest 上界按页流式写 JSONL 到 stdout，最多 200,000 条、2分钟；每条为完整请求或系统事件，适合重定向到文件。记录到期/更新仍可能改变导出内容，不承诺事务级快照。中途失败返回非零，CLI 输出文件可能不完整，应按退出码处理。
 
 `settings` 输出 `{days,max_requests,request_bytes,system_bytes,system_days}`；`configure` 沿用未提供项并校验、持久化配置，返回最终设置。收紧限制后每次清理有限删除，逐步收敛；没有 clear/delete 命令。未知记录 ID 返回错误；无授权、实例不匹配、存储不可用或超时均非零，禁止 Mock 回退。隐藏 UI 字段不影响采集、详情或导出。
