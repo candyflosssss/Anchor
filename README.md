@@ -25,9 +25,9 @@ CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/inst
 SQLite 供应商与模型配置、Responses / Chat Completions / Anthropic Messages 无状态文本及函数工具转换，以及托管层/条件恢复、Codex 基础配置与模型目录、多模型绑定授权。当前版本为 `0.1.0-dev`，
 不等于整体初版已完成；SSH、其他 Agent 适配器、Codex profile 和完整协议能力仍待实现。
 
-支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.23 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，模型目录 30 项单测及 1 项浏览器交互通过；不执行安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
+支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.25 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，76 项定向前端单测及 8 项模拟宿主浏览器交互通过；不执行安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
 
-供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」「账户与余额」等页签，CLI 同步提供。实现边界和 schema3→4 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。当前源码进一步把协议设置移至 Key，并支持按实际模型覆盖、默认动态继承 Key 协议；该协议继承已随 desktop.16 发布。desktop.21 加入三平台账户与计费查询核心接口，并升级到 schema5；desktop.22 接入「供应商 → 选择供应商 → 账户与余额」，可保存独立用户授权并分别刷新账户余额／Key 额度；desktop.23 默认查询全部启用 Key 的模型目录，同名模型合并并显示全部可选 Key、所属分组与抓取倍率，停用 Key 不抓取；账单及独立倍率查询页尚未接入，命令由源码 CLI 提供，公开 alpha.6 CLI 不含。
+供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」「账户与余额」等页签，CLI 同步提供。实现边界和 schema3→4 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。当前源码进一步把协议设置移至 Key，并支持按实际模型覆盖、默认动态继承 Key 协议；该协议继承已随 desktop.16 发布。desktop.21 加入三平台账户与计费查询核心接口，并升级到 schema5；desktop.22 接入「供应商 → 选择供应商 → 账户与余额」，可保存独立用户授权并分别刷新账户余额／Key 额度；desktop.23 默认查询全部启用 Key 的模型目录，同名模型合并并显示全部可选 Key、所属分组与抓取倍率，停用 Key 不抓取；desktop.25新增映射来源Key、逐Key分组倍率、拖动排序与实际调度菜单，并接入账户页分组倍率查询，升级到schema6。账单桌面页尚未接入，命令由源码CLI提供，公开alpha.6 CLI不含。
 
 **已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；desktop.14 关闭窗口隐藏到系统托盘，单击托盘图标恢复；无可用托盘时直接退出界面。「退出界面」退出宿主，均不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。桌面 dev 包已包含启动／复用与窗口生命周期实现；开机自启动设置未实现，原生安装与窗口行为未验收。
 
@@ -61,7 +61,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-以下一键安装入口用于 CLI alpha.6。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 已随 desktop.12 发布到 dev 在线更新渠道，使用方式与构建结果见[桌面安装说明](docs/release/desktop.md)；本轮未做原生安装／运行验收。
+以下一键安装入口用于 CLI alpha.6。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 已随 desktop.25 发布到 dev 在线更新渠道，使用方式与构建结果见[桌面安装说明](docs/release/desktop.md)；本轮未做原生安装／运行验收。
 
 已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux / Windows AMD64 `0.1.0-alpha.6` 已公开发布；两平台附件匿名下载与校验通过，Linux 远程一键安装已验证**。不从 Actions artifact 或草稿偷偷安装。
 
@@ -98,8 +98,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.21 已投放 dev 渠道）
+### 在线更新（desktop.25 已投放 dev 渠道）
 
-已有 desktop.9～.20：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.21` 的 Windows / Ubuntu24.04 安装包与同版清单。本版带入 Agent 托管页面，以及 sub2api / NewAPI / 原版 OneAPI 的账户、Key额度、逐请求计费及当前分组倍率兼容核心接口；平台查询页面尚未接入，源码 CLI 可调用。首次启动核心将 state.db schema4→5，旧程序不能打开升级后的数据库，不支持降级。沿用 `.20` 的环境代理、Windows 手动系统代理与 PAC、GitHub 官方订阅回退；旧版无法接入代理时请手动下载安装 `.21` 一次，安装前先停止核心并退出界面。已保存渠道保持不变，开发更新请选择 dev。默认源真实 Linux 更新下载及大小／SHA256 校验通过，Windows 附件大小／digest 与本地一致；原生 PAC、窗口、安装未实机验收。旧 desktop.8 无入口，首次须手动安装。
+已有 desktop.9～.23：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.25` 的 Windows / Ubuntu24.04 安装包与同版清单。模型映射显示来源 Key、路由倍率和逐 Key 分组倍率，支持拖动排序，并提供固定顺序、按倍率加权轮询、缓存优先、低价优先、低延迟优先；规则接入实际请求调度，Key范围同时限制重试。账户页支持余额、Key额度与分组倍率查询，逐请求账单由源码CLI提供。低价按保存倍率排序，查询的平台倍率不会自动覆盖它；缓存优先不保证上游命中。首次启动 schema5→6，旧程序不能打开升级后的数据库，不支持降级。沿用环境代理、Windows手动系统代理与PAC、GitHub官方订阅回退；旧版无法接入代理时可手动下载安装 `.25` 一次，安装前先停止核心并退出界面。已保存渠道保持不变，开发更新请选择dev。Linux默认源实际下载及大小／SHA256检查通过，Windows远端digest与本地一致；原生PAC、窗口和安装未验收。旧desktop.8无更新入口。
 
-桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、schema3→4 迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。
+桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、数据库迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。

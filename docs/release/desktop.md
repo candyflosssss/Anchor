@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-13。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.23`，北京时间 2026-10-13 15:28:01 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：Agent 托管页面与本机发现／登记／同步；sub2api / NewAPI / 原版 OneAPI 账户与计费兼容核心接口、类型化客户端及源码 CLI。desktop.23 默认合并全部启用 Key 的模型目录，显示同名模型全部可选 Key、所属分组与抓取倍率，停用 Key 不查询；沿用 desktop.22 的平台配置、账户余额与 Key 额度桌面查询；账单及独立倍率查询页尚未接入；原版 OneAPI 倍率不支持，NewAPI 自动分组倍率未知。更新器沿用 `.20` 的代理和官方订阅回退。
-- 已有 `.9`～`.22`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.23`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
-- 首次启动核心自动迁移 state.db schema4→5，保留既有供应商及 Key；更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
-- 功能阶段 Go core/CLI/desktop 定向测试、前端 typecheck/lint、模型目录30项单测及1项浏览器交互通过；本轮契约检查、生产编译、两平台打包、六附件大小／digest 校验及默认源真实 Linux 更新下载通过。**Windows PAC、双平台原生窗口、安装和 apply 未验收**；dev 预发行未签名。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.25`，北京时间 2026-10-13 18:37:11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：模型映射显示来源 Key ID、状态、路由倍率和逐 Key 平台分组倍率，支持拖动排序与调度设置；固定顺序、按倍率加权轮询、缓存优先、低价优先和低延迟优先接入实际路由。来源 Key 约束同时用于请求与重试。账户页可独立查询分组倍率；账单桌面页尚未接入。沿用此前模型目录、账户余额、Key 额度、Agent 托管、更新代理及官方订阅回退。
+- 已有 `.9`～`.23`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.25`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 首次启动核心自动迁移 state.db schema5→6，保留既有模型与 Key；旧模型未指定来源时继续允许所有启用 Key。更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
+- state/core/client/desktop/CLI 定向 Go 测试、前端 typecheck/lint、76项定向单测及8项模拟宿主浏览器检查通过；双平台生产编译、安装包构建、六附件大小／digest核对和默认源 Linux 实际更新下载通过。**Windows PAC、双平台原生窗口、安装和 apply 未验收**；dev预发行未签名。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.23_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.25_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -39,7 +39,7 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.23_amd64.deb
 
 **手动安装或卸载前，先明确停止核心并等待退出，再退出全部窗口（`.12` 起使用「退出界面」）。** 应用内确认安装会正常停止核心并真正退出当前宿主，其余窗口需要先手动退出。 Windows 安装器／卸载器拒绝替换或删除正在使用的程序，不强杀、不安排重启强删。Linux 由包管理器替换文件，不会自动升级或停止旧运行进程；跳过停服可能留下旧核心。卸载不是停服操作。
 
-**从旧版升级，首次启动核心将 SQLite schema2 自动迁移到3，旧密钥保留为 default Key；`.16` 再从3迁移到4，保留 Key 的协议继承设置；`.21` 从4迁移到5，新增独立的平台身份与用户授权，保留供应商和 Key。旧二进制无法打开升级后的数据库，本版不提供数据库降级。**
+**从旧版升级，首次启动核心将 SQLite schema2 自动迁移到3，旧密钥保留为 default Key；`.16` 再从3迁移到4，保留 Key 的协议继承设置；`.21` 从4迁移到5，新增独立的平台身份与用户授权，保留供应商和 Key。旧二进制无法打开升级后的数据库，本版不提供数据库降级。** `.25` 在此基础上继续 schema5→6，旧二进制不能打开已迁移数据库。
 
 卸载仅移除程序和快捷入口，保留用户的状态目录、数据库、秘密和恢复材料。安装不新增 Agent 授权；打开应用后仍可能执行此前已批准的托管策略。开机自启动为独立默认关闭的需求，当前没有可用设置开关，本轮不实现。
 
@@ -84,7 +84,35 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.23`
+### 当前在线 dev 版 `.25`
+
+`0.1.0-dev.desktop.25` 于北京时间 2026-10-13 18:37:11 发布为 dev prerelease（非 latest）。构建提交 `f37d11fc45ffa4e6ada05896164916528e0169e0`，干净独立 worktree 的 SOURCE.json 为 dirty=false。
+
+模型映射显示真实来源 Key ID、启用／健康状态、已保存路由倍率及查询的平台分组倍率。目录导入保留来源范围，请求和重试不会越过该范围；旧模型空范围允许供应商全部启用 Key。候选可以拖动或上移／下移，每个模型有「调度设置」，「保存顺序与规则」以模型 revision 原子提交；冲突重读，不重放写入。引用中的来源 Key 不能被删除或清空。
+
+固定顺序按保存顺序；加权轮询按路由倍率倒数分配；缓存优先将同一调用方、模型及稳定请求前缀交给最近成功的供应商／模型／Key，记录10分钟有效，无记录时加权轮询，不保证上游缓存命中。低价优先按保存路由倍率排序，不是实时货币价格；平台分组倍率不自动覆盖路由倍率。低延迟先学习未知来源，再按成功首段文本延迟平滑均值排序，无首段时使用总耗时，记录30分钟有效。两类观察仅在内存中保存，重启后重新学习。所有策略继续受健康和并发限制并保留故障回退。
+
+「刷新分组倍率」及候选「查询分组倍率」按来源 Key 串行去重；「供应商 → 账户与余额 → 分组倍率」支持选择保存的 Key。sub2api优先个人覆盖倍率，再用默认分组；NewAPI核对完整 Key 后读取已认证分组倍率。需独立平台用户授权，NewAPI可能需用户ID；原版OneAPI不支持，未知不补默认值。CLI提供 model routing、model add/put --strategy / --candidate-key、provider model-put --source-key / --all-keys。首次启动 schema5→6，旧程序不能打开迁移后数据库。逐请求账单桌面页尚未接入。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.25-windows-amd64-setup.exe` | 7,829,725 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.25_amd64.deb` | 5,634,024 |
+
+```text
+dc0adecd1c4514bb47807ba65c2f4ce045227568fa522770c396644979342d5f  Anchor-Desktop-0.1.0-dev.desktop.25-windows-amd64-setup.exe
+ae00061cf5f2448b98ad84ab039e21441076337655136d764c39c8b8099d084e  anchor-desktop_0.1.0-dev.desktop.25_amd64.deb
+```
+
+六附件包含两平台安装包、flat更新清单、含vendored Go依赖的对应源码、许可／构建元数据和SHA256SUMS。全部上传状态、大小、GitHub digest、清单URL与版本已核对；标签指向构建提交。原始BUILD.json验证状态保留，发布证据位于 `dist/desktop/0.1.0-dev.desktop.25/publication/` 的 PUBLISHED.json、TAG_VERIFIED.json和ONLINE_DOWNLOAD.json。
+
+隔离状态使用本轮源码 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.23 --json`，从默认GitHub源实际下载Linux包并通过大小／SHA256校验，Windows远端digest与本地一致。定向Go测试、76项前端单测、8项单worker模拟宿主浏览器检查、typecheck/lint和双平台生产构建通过；未执行全量、race、原生窗口、PAC、安装器或apply验收，未修改真实Agent配置或请求真实付费上游。
+
+### 保留本地包 `.24`（未在线发布）
+
+同轮较早已从干净提交 `3f5fe7d9578fc698232a4d666d4237043b3a8bf3` 构建 `.24`，包含分组倍率显示；Windows安装包7,805,948字节，Linux包5,613,392字节，SOURCE.json dirty=false。该包保留在 `dist/desktop/0.1.0-dev.desktop.24/`；没有更新清单、附件上传或公开Release。后续来源Key与调度规则整合进 `.25` 交付，`.24` 不作为线上更新目标。
+
+### 历史在线 dev 版 `.23`
 
 `0.1.0-dev.desktop.23` 于北京时间 2026-10-13 15:28:01 发布为 dev prerelease（非 latest）。构建提交 `2ffc82b97fdcdf36a682bccd204184e4faec6070`，干净独立 worktree 的 SOURCE.json 为 dirty=false。
 

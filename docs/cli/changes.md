@@ -244,7 +244,7 @@
 - 兼容与迁移：`available_targets` 是追加字段，无可用目标时为 `[]`；客户端与核心需一同升级。既有绑定在用户重新保存前保持原策略；桌面更新提交空模板覆盖，移除旧目标级选择/排除并采用用户批准的自动模型列表，凭据及供应商映射保持不变。缺失或歧义元数据仍不伪造，请在共享模型配置补齐；CLI 可继续显式覆盖。
 - 验证：结果见本轮任务更新记录，区分隔离核心/CLI/桥接测试与浏览器模拟桌面；未构建或发布安装包，未操作真实 Agent 配置或付费上游。
 
-## 2026-10-13 — 当前分组倍率默认核对保存的 Key（当前源码，待 dev 投放）
+## 2026-10-13 — 当前分组倍率默认核对保存的 Key（源码 CLI；desktop.25 dev 已投放）
 
 - 类型：修改行为；无新增或删除命令／参数。
 - 指令：`provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id N]`。
@@ -254,7 +254,7 @@
 - 验证：隔离 Go CLI 测试覆盖自动核对与显式 ID、凭据不回显；实际执行结果见本轮任务记录。
 
 
-## 2026-10-13 — 来源Key范围与模型顺序／调度规则（当前源码，待dev投放）
+## 2026-10-13 — 来源Key范围与模型顺序／调度规则（源码 CLI；desktop.25 dev 已投放）
 
 - 新增 model routing --id/--revision/--strategy/重复--candidate，已有完整候选成员原子排序，保留Key、倍率和模型元数据。
 - model add/put新增--strategy（默认priority，保持旧行为）、重复--candidate-key INDEX:KEY；provider model-put新增重复--source-key及--all-keys（编辑省略保留，新建空范围）。
