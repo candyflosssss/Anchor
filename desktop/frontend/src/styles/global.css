@@ -260,7 +260,7 @@ button.metric-card:hover:not(:disabled) { border-color: hsl(var(--ring) / .6); }
 .detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .detail-title .provider-url { margin-top: 0; max-width: 100%; }
 .detail-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 8px; }
-.detail-tabs { display: flex; gap: 4px; border-bottom: 1px solid hsl(var(--border)); overflow-x: auto; }
+.detail-tabs { display: flex; gap: 4px; border-bottom: 1px solid hsl(var(--border)); overflow-x: auto; overflow-y: hidden; }
 .detail-tabs [role=tab] { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; font-size: 13px; color: hsl(var(--muted-foreground)); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .detail-tabs [role=tab]:hover { color: hsl(var(--foreground)); }
 .detail-tabs [role=tab][aria-selected=true] { color: hsl(var(--foreground)); border-color: hsl(var(--foreground)); font-weight: 500; }
