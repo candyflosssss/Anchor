@@ -57,7 +57,7 @@ func TestV1MigrationPreservesIdentityAndConfig(t *testing.T) {
 		t.Fatal(e)
 	}
 	token, _ := s.OwnerToken()
-	if _, e = s.db.Exec(`DROP TABLE bindings; DROP TABLE key_model_protocols; DROP TABLE provider_keys; DROP TABLE provider_strategy; DROP TABLE provider_prices; DROP TABLE usage_totals; PRAGMA user_version=1;`); e != nil {
+	if _, e = s.db.Exec(`DROP TABLE provider_platforms; DROP TABLE bindings; DROP TABLE key_model_protocols; DROP TABLE provider_keys; DROP TABLE provider_strategy; DROP TABLE provider_prices; DROP TABLE usage_totals; PRAGMA user_version=1;`); e != nil {
 		t.Fatal(e)
 	}
 	s.Close()

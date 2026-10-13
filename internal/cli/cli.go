@@ -28,6 +28,12 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   status                             Query selected context
   stop --approve                     Request graceful shutdown of selected context
   provider list
+  provider platform --id ID             Read platform configuration (redacted)
+  provider platform-put --id ID --revision N --platform sub2api|newapi|oneapi
+      [--site-url URL] [--user-id N] [--user-token-stdin | --clear-user-token]
+  provider balance|key-quota|effective-rate --id ID --revision N [--key KEY] [--remote-key-id N]
+  provider usage-records --id ID --revision N [--key KEY] [--remote-key-id N]
+      [--scope account|key] [--page N] [--page-size N]
   provider models --id ID --revision N [--key KEY]  Fetch key model directory (paths + pagination)
   provider workspace --id ID           Keys, health, mappings and usage
   provider delete|rename|copy --id ID --revision N [--target ID] [--approve] [--copy-keys]
@@ -430,6 +436,10 @@ func (a App) contexts(ctx context.Context, s *state.Store, args []string) error 
 func (a App) providers(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
 		return errors.New("provider requires list, models, add or put")
+	}
+	switch args[0] {
+	case "platform", "platform-put", "balance", "key-quota", "usage-records", "effective-rate":
+		return a.providerPlatform(ctx, c, args)
 	}
 	if args[0] == "list" {
 		if len(args) != 1 {

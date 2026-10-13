@@ -182,6 +182,12 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 			if err != nil {
 				return err
 			}
+			// Copy platform identity, but dashboard user authorization is a separate
+			// credential and is never included in copyKeys.
+			_, err = tx.Exec(`INSERT INTO provider_platforms SELECT ?,document,'' FROM provider_platforms WHERE provider_id=?`, target, id)
+			if err != nil {
+				return err
+			}
 			if copyKeys {
 				_, err = tx.Exec(`INSERT INTO provider_keys SELECT ?,id,secret,enabled,protocol FROM provider_keys WHERE provider_id=?`, target, id)
 			}

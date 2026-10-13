@@ -182,3 +182,11 @@
 - 输出：discover/enroll 返回目标、可选模型模板、公开映射及托管状态；目录存在只表示配置证据，不证明程序已安装或运行。已有 list/add/inspect/set-models/enable/disable 的 Binding 输出不返回完整模板快照，只保留选择策略；其他字段语义保留。
 - 兼容与迁移：保留原 agent add 及单模型托管，其他已知 Agent 目录只识别、不托管。桌面、CLI 和核心需升级到本轮源码；desktop.20 安装包不含新页面。Codex 缓存缺失、版本无效或元数据不完整时不猜测能力、不自动请求上游；先由 Codex 生成有效缓存。缓存版本或模板选择变化请重新 enroll，应用配置后完全退出并重启 Codex。
 - 验证：全量 `GOMAXPROCS=2 go test -p 1 ./...` 通过，覆盖隔离真实核心/CLI/桌面桥接、凭据助手、启动恢复和冲突保护；前端 typecheck、lint、103项单元测试通过；2项托管页面浏览器 Mock 边界测试通过。Windows desktop/managed/platform/desktop 包交叉编译通过（未执行 Windows 二进制）；未修改个人 Agent 配置、未请求真实付费上游、未生成安装包。
+
+## 2026-10-13 — 平台账户与请求计费兼容查询（当前源码，未发布）
+
+- 类型：新增。
+- 指令与参数：`provider platform --id`、`platform-put --id --revision --platform [--site-url] [--user-id] [--user-token-stdin | --clear-user-token]`；`balance`、`key-quota`、`usage-records`、`effective-rate` 均接受供应商 ID、revision、可选本地 Key／站点数字 Key ID；账单另有 scope、page、page-size。模型目录复用现有 `provider models`，核心通用 query 也支持 models。
+- 旧 → 新：本地用量／手动价格之外，新增 sub2api、NewAPI、原版 OneAPI 的远端只读查询；显式区分账户钱包、Key 额度、USD／quota、近期／分页账单，保留扣费、token、缓存及已知数值计费明细；不提供不可靠的倍率或 Key 过滤结果，不自动写入路由。NewAPI Key额度正确兼容 `code:true`，用户接口和推理 Key 分别认证。
+- 兼容与迁移：SQLite schema4 自动升级到5，旧程序不能打开，须同步升级核心和客户端；无须重建供应商或 Key。新增平台配置独立于推理协议，用户授权仅 stdin 输入、输出脱敏；目标改变清除旧授权，复制不复制用户授权。查询成功或分类失败退出0且需检查 failure，管理错误仍非零。当前仅核心／Go客户端／CLI，未接入桌面查询页、未发布安装包。
+- 验证：经 resource-guard 运行 `GOMAXPROCS=2 go test -p 1 -timeout 120s ./...` 全部通过；随后补充工具附加费数组、计费来源和订阅数值字段并复测 providerapi/state/core/client/cli。覆盖模拟站点真实响应封装、部署前缀、认证头、金额精度、分页差异、token缺失／缓存别名／阶梯计费、敏感字段过滤、请求边界、revision／实例／授权、CLI及客户端完整链路、schema4→5及凭据清除／复制／改名／删除。未使用真实站点授权或请求付费上游，未验收原生桌面。

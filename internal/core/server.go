@@ -296,6 +296,7 @@ func (s *Server) Control() http.Handler {
 		writeJSON(w, 200, m)
 	})
 	s.providerFeatureRoutes(mux)
+	s.providerPlatformRoutes(mux)
 	s.agentRoutes(mux)
 	return s.guard("manage", mux)
 }

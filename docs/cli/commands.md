@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-12
+- 最近核对：2026-10-13
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
@@ -10,6 +10,7 @@
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
 - 本轮 Agent discover/enroll/sync 与桌面托管入口仅在当前源码（未发布），不包含于 desktop.20 安装包；需升级客户端和核心。
+- 平台兼容查询（sub2api / NewAPI / 原版 OneAPI）仅在当前源码，未打包发布；新增 schema5，旧程序不能打开升级后的数据库，客户端与核心需一起升级。桌面页面尚未接入这些查询。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -58,6 +59,9 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `status` | 查询核心状态 | 所选 Context 的核心在线 |
 | `stop --approve` | 请求核心正常停服 | 所选 Context 在线、已核验身份及管理授权；需要本轮新版核心 |
 | `provider list` | 列出供应商 | 所选 Context 的核心在线 |
+| `provider platform` / `platform-put` | 读取／配置平台身份和独立用户授权 | 核心在线；写入需当前 revision，令牌仅 stdin |
+| `provider balance` / `key-quota` | 分别读取远端账户余额、Key 额度 | 核心在线；平台已配置、当前 revision；按平台提供授权 |
+| `provider usage-records` / `effective-rate` | 读取远端逐请求账单／当前分组倍率 | 核心在线；当前 revision；部分平台需用户授权和站点 Key ID |
 | `provider models` | 手动读取已存供应商的上游模型目录 | 核心在线；供应商 ID 与当前 revision |
 | `provider add` | 新增供应商 | 所选 Context 的核心在线 |
 | `provider put` | 条件更新供应商 | 核心在线；当前 revision |
@@ -282,6 +286,44 @@ usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/
 
 GUI 在供应商详情的三个页签提供同等操作。数据库启动自动从 schema2 升至3并迁移旧 secret 为 default Key，再升至4将供应商旧协议复制给全部既存 Key；安装前正常停止旧核心，升级后旧二进制不能再打开该数据库，无数据库降级入口。
 
+### 平台兼容查询（当前源码，未发布）
+
+```text
+anchor provider platform --id ID
+anchor provider platform-put --id ID --revision N --platform sub2api|newapi|oneapi
+    [--site-url URL] [--user-id N] [--user-token-stdin | --clear-user-token]
+anchor provider balance --id ID --revision N [--key KEY] [--remote-key-id N]
+anchor provider key-quota --id ID --revision N [--key KEY] [--remote-key-id N]
+anchor provider usage-records --id ID --revision N [--key KEY] [--remote-key-id N]
+    [--scope account|key] [--page N] [--page-size N]
+anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id N]
+```
+
+这些命令使用所选 Context 的在线核心、管理授权和实例校验。`--id` 为已保存供应商，查询和配置的 `--revision` 为 `provider list` 当前版本；配置成功递增版本，后续查询须使用新版本。普通查询不改供应商、公开模型、路由倍率、本地用量或日志保留设置，不请求付费推理。可查询停用供应商；显式 `--key` 可选择停用 Key。
+
+`platform` 返回 `{provider_id, revision, config}`，配置只有平台、可选 `site_url` / `user_id` 和 `has_user_token`，不返回令牌。`platform-put` 完整替换公开配置；平台与推理协议分开，不能用 `responses` 等协议推断平台。`--site-url` 默认为空，从供应商首个请求地址去掉末尾 `/v1` 后推导后台根地址，保留真实部署前缀；若后台路径不同，显式指定 HTTP(S) 根地址，不能带查询、片段或 URL 凭据。`--user-id` 默认0，仅 NewAPI 用户接口使用，需该站点要求 `New-Api-User` 时填写。
+
+`--user-token-stdin` 读取独立的后台用户授权（sub2api JWT、NewAPI/OneAPI 用户 access token）；不能使用 `--secret` 参数传入。空 stdin 拒绝；与 `--clear-user-token` 互斥。未指定令牌选项时，仅平台、后台根地址和用户 ID 都不变才保留原令牌；改变其中任一项会清除。后台地址由请求地址推导时，修改请求地址也清除令牌；显式独立后台地址不受此影响。复制供应商不复制用户授权，即使指定 `--copy-keys`；改名保留，删除级联清除。凭据存于本机受限数据库，不能理解为数据库列加密。
+
+`--key` 默认为首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。调用者须确保该数字对应希望查询的站点 Key；兼容层不猜测二者映射。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询使用该数字读取绑定分组。
+
+| 功能 | sub2api | NewAPI | 原版 OneAPI |
+| --- | --- | --- | --- |
+| 模型目录 | 沿用 `provider models`，当前 Key 过滤后的声明目录 | 同左 | 同左 |
+| 账户余额 | 用户授权查钱包；仅 Key 时要求 `/v1/usage` 明确包含钱包 `balance` | 用户授权查账户 quota | 用户授权查账户 quota |
+| Key 额度 | Key 查询总额度／滚动窗口，未限额不等于钱包无限 | Key 查询 remaining / used / limit / unlimited | 用户授权 + remote-key-id 查 Key，保留原始 quota |
+| 请求账单 | 用户授权分页；Key 范围另需 remote-key-id | 用户授权分页，或 Key 查近期批次 | 用户授权分页；Key 范围返回 unsupported_key_filter |
+| 实际扣费及 tokens | USD actual_cost、输入输出、缓存、费用分项 | quota、输入输出及已有缓存／音频等数值明细 | quota、基础字段；token 语义标记待核验 |
+| 当前有效分组倍率 | 用户授权 + remote-key-id，个人覆盖优先 | 用户授权 + remote-key-id，用户身份定价；auto 返回 unknown | unsupported |
+
+`usage-records` 的 `--scope` 默认 `account`，可选 `key`。`--page` 默认1，上限100000；`--page-size` 默认50，范围1..100。sub2api 和 NewAPI 用户日志正常分页；NewAPI Key 日志只支持第1页且批次大小由站点决定，`history=recent`、`page_size=0`、`total=null`、`has_more=false`，不表示完整历史。原版 OneAPI 使用站点固定分页大小，返回 `page_size=0`、`total=null`，非空页 `has_more=true`，需空末页确定结束。所有记录受上游默认时间范围、日志保留和站点开关限制；这不是 Anchor 本地 `usage show` 或 `logs list`。
+
+查询 stdout 为 `{provider_id, key_id, remote_key_id?, revision, platform, operation, observed_at, source, http_status, failure?, balance?, key_quota?, records?, effective_rate?}`，按操作只返回对应 payload。金额为 `{value, unit}`，`unit=USD` 或站点内部 `quota`，不猜汇率或默认换算。额度以 `scope` 区分账户和 Key，字段未知为 null，不能当作0；`unlimited=true` 仅表示 Key 自身不设上限。账单含 `charged_amount`、可选 `base_amount`、`billing_source`（NewAPI 已报告 wallet/subscription 时）、历史 `rate_multiplier`、tokens、已知内建工具的 tool_charges（次数与站点原始价格）和数值明细白名单；原始提示词、IP、后台信息及原始日志正文不返回。NewAPI 的日志 id 不是稳定标识，`id_stable=false`，有 `request_id` 时可关联请求；不承诺所有平台存在该字段。原版 OneAPI 的 token 字段标记 `platform_fields_unverified`，部分非文本计费可能不是实际 token 数。当前分组倍率是查询时快照，不替代历史账单扣费，也不自动写入候选路由。
+
+模型查询仍用前一节 `provider models` 的输出和边界；其他查询最多8次 GET、累计2 MiB响应，共用供应商超时与8秒的较小值，遵守全局／供应商并发限制，不重试、不跟随重定向，沿用核心上游传输策略（不读环境代理）。后台兼容路径和完整数据契约见 [供应商接口语义](../design/provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。
+
+管理错误（参数、实例、授权、revision、Key 不存在）非零退出且不请求上游。上游能力失败仍输出 JSON 并退出0，需检查 `failure`，包括 `platform_required`、`auth_required`、`remote_key_required`、`unsupported`、`unsupported_key_filter`、`unsupported_pagination`、`unknown`、`authentication`、`permission_denied`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`、`upstream_rejected`。失败不返回部分 payload，上游错误正文不暴露。
+
 ## 6. 公开模型与候选路由
 
 ```text
@@ -472,6 +514,7 @@ anchor recover [--id ID]
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
+| 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | 当前源码仅核心、类型化客户端和 CLI；桌面页面尚未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |

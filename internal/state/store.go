@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 4 {
+	if version > 5 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -122,6 +122,19 @@ CREATE TABLE key_model_protocols (
  FOREIGN KEY(provider_id,key_id) REFERENCES provider_keys(provider_id,id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 PRAGMA user_version=4;
+COMMIT;`)
+		if err != nil {
+			return fail(err)
+		}
+	}
+
+	if version < 5 {
+		_, err = db.Exec(`BEGIN IMMEDIATE;
+CREATE TABLE provider_platforms (
+ provider_id TEXT PRIMARY KEY REFERENCES providers(id) ON DELETE CASCADE ON UPDATE CASCADE,
+ document TEXT NOT NULL, user_token TEXT NOT NULL
+);
+PRAGMA user_version=5;
 COMMIT;`)
 		if err != nil {
 			return fail(err)
@@ -394,6 +407,16 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 	}
 	if err != nil {
 		return Provider{}, err
+	}
+	// A derived dashboard URL follows BaseURL. Never carry a dashboard token
+	// across a request-root change; an explicit SiteURL remains independent.
+	if oldDocument != "" {
+		var old Provider
+		if json.Unmarshal([]byte(oldDocument), &old) == nil && old.BaseURL != p.BaseURL {
+			if _, err = tx.Exec(`UPDATE provider_platforms SET user_token='' WHERE provider_id=? AND COALESCE(json_extract(document,'$.site_url'),'')=''`, p.ID); err != nil {
+				return Provider{}, err
+			}
+		}
 	}
 	if secret != nil {
 		if *secret == "" {

@@ -1,6 +1,6 @@
 # 供应商桌面接口语义
 
-- 更新：2026-10-12；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
+- 更新：2026-10-13；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
 - 状态：真实 Go 桥接、桌面传输和共享契约已实现；隔离核心读写已测试，**不等于 Wails 原生窗口或安装验收通过**。
 - 桌面 DTO 权威：`internal/desktop/contract.go`；TypeScript 由 `go run ./cmd/desktop-contract` 生成，漂移由 Go 测试检查。核心业务规则仍归 `internal/state` / `internal/core`，不复制到宿主。
 - 受限方法、窗口／核心生命周期与构建边界见[桌面运行契约](desktop-runtime.md)。
@@ -85,3 +85,59 @@ Action 新增 multiplier；model-put 使用 strategy=round-robin|priority 设置
 model_revision=0 表示当前供应商加入别名，不覆盖它已有的映射；别名不存在则创建并默认round-robin，已存在则追加并保留其他候选、能力、策略及Codex元数据。正 revision 编辑须匹配共享模型 revision，只改当前供应商上游/倍率；tools/streaming/strategy 为共享模型字段。追加写入仍以读取的最新模型 revision 进行CAS及供应商 revision 事务校验，不自动重放并发冲突。model-delete 事务内只删当前供应商候选与价格，剩余模型 revision+1；最后一个候选才删除公开模型、清理模型价格并检查 Binding 默认模型引用。
 
 round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍率1，范围0.01..1000；只在当前可调度候选中分配首选上游，不预占半开Key。真正转发时再次核对并发及Key状态；失败转移仍遵循原有禁止未知结果/流式重放规则。倍率不从外部站点拉取，目录成功不表示可推理。
+
+## 8. 平台账户与计费兼容层（2026-10-13，当前源码）
+
+本节是核心／客户端／CLI 已实现的兼容契约，尚未纳入桌面 DTO、Wails 方法或页面，也未构建发行包。既有桌面模型目录不变；不得将本节写成 GUI 已支持余额或账单。CLI 完整语法见[指令大全](../cli/commands.md#平台兼容查询当前源码未发布)。
+
+### 身份、入口和返回
+
+平台类型 `sub2api|newapi|oneapi` 独立于 Key 的推理协议。`provider_platforms` 表按 provider_id 保存公开配置及独立 user_token，schema4→5 自动迁移；既有供应商默认未配置平台，模型目录仍可查，其他操作返回 `platform_required`。旧程序不能打开 schema5，升级需同步核心与客户端。
+
+- `GET /control/v1/providers/{id}/platform`：返回 `providerapi.Settings`，仅 `has_user_token`，不返回用户授权。
+- `PUT /control/v1/providers/{id}/platform`：`providerapi.Configure`，包含 provider_id、expected_revision、完整公开 config 及可选 user_token。nil 保留同目标授权，空字符串清除；平台、site_url、user_id 或推导后台根地址改变时，不隐式迁移旧令牌。写成功递增供应商 revision。
+- `POST /control/v1/providers/{id}/query`：`providerapi.Query`，operation 为 `models|balance|key-quota|usage-records|effective-rate`；provider_id 必须与路径一致，expected_revision 必填。records 的 scope 为 account（默认）或 key；page 从1开始，默认1，page_size 默认50且最大100。remote_key_id 是用户提供的站点数字 ID，不会自动按本地 key_id 推断或证明两者对应。
+- 统一核心方法 `Server.QueryProvider` 负责读取供应商、授权与 Key，校验 revision、限制并发／超时和选取平台。`providerapi.Adapter` 提供 `GetBalance`、`GetKeyQuota`、`ListUsageRecords`、`GetEffectiveRate`；models 复用核心现有目录读取器。Go 客户端 `ProviderPlatform`、`ConfigureProviderPlatform`、`QueryProvider` 与 CLI 复用这些管理入口。
+
+所有管理路径沿用管理鉴权、Host／Origin 规则；PUT／POST 校验实例，不能让浏览器绕过宿主直接请求。query 虽用 POST，业务上只读；不写本地消费估算、不调整路由倍率、不自动导入目录。选定默认 Key 的规则同目录查询，用户授权查询不要求推理 Key 存在。模型仍受所选 Key 默认推理协议认证约束，不通过平台身份强行改变协议。
+
+`Result` 包含 provider_id、实际选用的本地 key_id（没有时 anonymous）、用户提供的 remote_key_id、revision、platform、operation、observed_at、source 路径、http_status，以及操作对应的 payload 或 failure。models 的 source 为 `model_catalog`（表示复用目录读取器），其他为真实请求的端点路径；不含站点 URL、查询秘密、原始错误正文。管理错误使用原管理错误响应；平台能力或上游失败作为结构化 Result，不返回部分数据。
+
+### 端点选择与认证
+
+后台根地址取显式 site_url，否则将供应商首个 Base URL 去掉末尾 `/v1`，保留自定义部署前缀。不会凭空添加 `/newapi`；示例中的 `/newapi` 只是用户 URL 自带的代理部署前缀。模型目录沿 §4 的版本路径／回退规则，不使用后台根地址规则替代。
+
+| 内部操作 | sub2api | NewAPI | 原版 OneAPI |
+| --- | --- | --- | --- |
+| models | 既有目录读取器，所选推理 Key | 同左 | 同左 |
+| balance | 用户 `GET /api/v1/user/profile`；无用户授权时 Key `GET /v1/usage`，仅明确钱包 balance 可用 | 用户 `GET /api/user/self` | 用户 `GET /api/user/self` |
+| key-quota | Key `GET /v1/usage` | Key `GET /api/usage/token/`，兼容其布尔 `code:true` 成功封装 | 用户 `GET /api/token/{remote_key_id}` |
+| usage-records account | 用户 `GET /api/v1/usage?page=&page_size=` | 用户 `GET /api/log/self?type=2&p=&page_size=` | 用户 `GET /api/log/self?type=2&p=`，内部把页号转换成从0开始 |
+| usage-records key | 同上，加 api_key_id 筛选 | Key `GET /api/log/token`，只提供近期批次 | unsupported_key_filter，不使用可能重名的 token_name 筛选 |
+| effective-rate | 用户读取 `/api/v1/keys/{id}`、`/api/v1/groups/rates`、必要时 `/api/v1/groups/available` | 用户读取 `/api/token/{id}`、必要时 `/api/user/self`、`/api/pricing` | unsupported |
+
+推理 Key 与用户令牌均放 Bearer 请求头；NewAPI 用户授权若配置 user_id 则加 `New-Api-User`。sub2api 用户令牌为登录 JWT；NewAPI/OneAPI 用户接口需用户级 access token，不把 `sk-` 推理令牌当后台授权。不要请求管理员接口或将上游原始日志转发到桌面。
+
+### 数据口径与能力缺口
+
+`Amount` 保留 JSON 数字字面值与单位，sub2api 为 USD，NewAPI/OneAPI 为 quota，不按常见 quota_per_unit 假设换算。`Allowance` 显式区分 account/key，remaining、used、limit、unlimited 和窗口缺失均可为 null。sub2api 订阅 remaining 或 Key cap 不能当账户钱包余额；unrestricted 表示 Key 本身不受额度上限限制，不表示账户余额无限。原版 OneAPI 旧 billing 接口受站点开关影响其范围／单位，兼容层不依赖它。
+
+账单只保留消费记录：sub2api `actual_cost` 为 charged_amount，`total_cost` 为 base_amount；NewAPI/OneAPI `quota` 为此次请求结算的内部额度。NewAPI 若返回 billing_source 则保留 wallet/subscription，并保留 wallet_quota_deducted、subscription_consumed 等数值，不能把订阅消耗当作钱包扣款。token 输入、输出、缓存读／写、5分钟／1小时写入独立返回，缺失保留 null。原版 OneAPI 的 prompt_tokens 在部分非文本计费路径可能承载其他含义，统一标记 `platform_fields_unverified`，不保证实际模型 token。NewAPI 日志 id 可被重新编号，`id_stable=false`，request_id 仅在站点返回时提供。
+
+`tool_charges` 保留 NewAPI 已知内建工具的名称、次数和站点原始 price（不转换币种）；未知工具名或附带正文不复制。`details` 仅含已知数值白名单：sub2api 费用分项、图像 token／费用／数量、billing_type；NewAPI 缓存分项及倍率、音频／文本 token 与倍率、图像、工具计费字段、订阅计费数值，以及 `billing_tokens.p/c/len/cr/cc/cc1h/img/img_cr/img_o/ai/ao` 等阶梯计费实际计费 token 字段（仅原站返回时）。兼容常见分支的缓存字段别名。不返回原始 other、content、提示词、IP、admin_info、表达式或 request_rules，未知字段不复制。
+
+records 的 history 区分近期批次 `recent` 和可分页保留记录 `paginated_retained`；不是永久全历史。NewAPI Key 日志只支持第1页，批次大小由站点决定，total=null / has_more=false / page_size=0。原版 OneAPI 的服务器固定 page_size 不可从响应确认，返回0，需请求空末页确认结束。其他分页返回站点 total；默认日期范围／日志保留由上游决定。
+
+当前倍率按 remote_key_id 的绑定分组查询：sub2api 个人覆盖优先，再读可用分组默认倍率；NewAPI 使用用户身份下 pricing 的 group_ratio（覆盖后的倍率），空 Key 分组继承用户分组，auto 可能按请求变化因此返回 unknown。历史账单 rate_multiplier 是上游报告值，NewAPI 同时保留 group_ratio / user_group_ratio，不能据当前倍率重算历史实际扣费；OneAPI 普通用户没有可靠的当前有效倍率接口。
+
+账户查询单次最多8个 GET、累计2 MiB响应、每页最多1000条原始记录，统一供应商超时与8秒的较小值，全局与供应商并发共用现有核心限额。禁止重定向、沿用核心不使用环境代理的上游策略，不重试；登录过期、权限不足、限流、超限、格式变化或分页失败返回分类失败。模型目录沿 §4 自身更小的响应限制。未提供本轮未勾选的用量汇总、完整分组列表、模型价格目录和订阅列表；不将站点目录声明当作推理健康或自动负载均衡依据。
+
+### 来源与验证边界
+
+实现对照固定修订的原始项目路由／处理器，分支或站点定制可能与其不同：
+
+- [sub2api ab80abc](https://github.com/Wei-Shaw/sub2api/tree/ab80abc6d1f929a6864c8804fd077b509d21fda2)：gateway usage、用户 routes、usage handler、DTO、API Key handler。
+- [NewAPI 633b4c5](https://github.com/QuantumNous/new-api/tree/633b4c5b190dc1af99a2814391354d86948e7943)：token/log/pricing controller、API router、公开日志计费信息及 text_quota 的工具附加费／缓存字段。
+- [原版 OneAPI 8df4a26](https://github.com/songquanpeng/one-api/tree/8df4a2670b98266bd287c698243fff327d9748cf)：user/token/log/billing controller 与 log model；不将各分叉能力当成原版保证。
+
+使用隔离 SQLite 与模拟 HTTP 站点验证认证、版本、请求路径、分页、金额精度、字段缺失、上游失败、体积限制和脱敏，以及 CLI／客户端完整调用链。没有使用真实站点令牌，没有调用付费推理，没有完成原生桌面接入或发行验证。
