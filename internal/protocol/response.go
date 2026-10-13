@@ -86,14 +86,6 @@ type Result struct {
 	Usage             Usage
 }
 
-// ValidateProbeResponse checks a minimal inference result without requiring that
-// its reasoning items can be represented in another protocol. A token-limited
-// response may contain reasoning only; it still proves the upstream executed.
-func ValidateProbeResponse(raw []byte, p string) (Usage, error) {
-	r, err := parseResponse(raw, p, true)
-	return r.Usage, err
-}
-
 func ParseResponse(raw []byte, p string) (Result, error) {
 	return parseResponse(raw, p, false)
 }
@@ -101,13 +93,13 @@ func ParseResponse(raw []byte, p string) (Result, error) {
 func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 	m, e := Decode(raw)
 	if e != nil {
-		return Result{}, e
+		return Result{}, validationFailure("invalid_json", e)
 	}
 	r := Result{ID: str(m["id"]), Model: str(m["model"]), Finish: "stop", Usage: ReadUsage(m, p)}
 	switch p {
 	case "responses":
 		if m["status"] == "failed" || m["error"] != nil {
-			return r, errors.New("upstream failed")
+			return r, validationFailure("upstream_error", errors.New("upstream failed"))
 		}
 		if m["status"] == "incomplete" {
 			r.Finish = "length"
@@ -117,34 +109,34 @@ func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 			switch x["type"] {
 			case "reasoning":
 				if !probe {
-					return r, ErrUnsupported
+					return r, validationFailure("unsupported_output", ErrUnsupported)
 				}
 			case "message":
-				t, e := text(x["content"])
+				t, e := responseText(x["content"], probe)
 				if e != nil {
-					return r, e
+					return r, validationFailure("unsupported_content", e)
 				}
 				r.Items = append(r.Items, Item{ID: str(x["id"]), Text: t})
 			case "function_call":
 				r.Items = append(r.Items, Item{ID: str(x["id"]), CallID: str(x["call_id"]), Name: str(x["name"]), Arguments: str(x["arguments"]), Tool: true})
 			default:
-				return r, ErrUnsupported
+				return r, validationFailure("unsupported_output", ErrUnsupported)
 			}
 		}
 	case "chat-completions":
 		choices := arr(m["choices"])
 		if len(choices) != 1 {
-			return r, ErrUnsupported
+			return r, validationFailure("invalid_choices", ErrUnsupported)
 		}
 		c := obj(choices[0])
 		r.Finish = str(c["finish_reason"])
 		msg := obj(c["message"])
 		if msg["refusal"] != nil && msg["refusal"] != "" {
-			return r, ErrUnsupported
+			return r, validationFailure("refusal", ErrUnsupported)
 		}
-		t, e := text(msg["content"])
+		t, e := responseText(msg["content"], probe)
 		if e != nil {
-			return r, e
+			return r, validationFailure("unsupported_content", e)
 		}
 		if t != "" {
 			r.Items = append(r.Items, Item{Text: t})
@@ -152,7 +144,7 @@ func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 		for _, v := range arr(msg["tool_calls"]) {
 			x := obj(v)
 			if x["type"] != "function" {
-				return r, ErrUnsupported
+				return r, validationFailure("unsupported_output", ErrUnsupported)
 			}
 			f := obj(x["function"])
 			r.Items = append(r.Items, Item{CallID: str(x["id"]), Name: str(f["name"]), Arguments: str(f["arguments"]), Tool: true})
@@ -168,7 +160,7 @@ func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 				args, _ := json.Marshal(x["input"])
 				r.Items = append(r.Items, Item{CallID: str(x["id"]), Name: str(x["name"]), Arguments: string(args), Tool: true})
 			default:
-				return r, ErrUnsupported
+				return r, validationFailure("unsupported_output", ErrUnsupported)
 			}
 		}
 	}
@@ -176,12 +168,12 @@ func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 		if item.Tool {
 			var args Object
 			if item.CallID == "" || item.Name == "" || json.Unmarshal([]byte(item.Arguments), &args) != nil || args == nil {
-				return r, ErrUnsupported
+				return r, validationFailure("invalid_tool_call", ErrUnsupported)
 			}
 		}
 	}
 	if r.ID == "" {
-		return r, errors.New("missing response id")
+		return r, validationFailure("missing_response_id", errors.New("missing response id"))
 	}
 	return r, nil
 }

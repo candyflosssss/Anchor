@@ -434,6 +434,7 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 	usage, err := protocol.ValidateProbeResponse(data, p.Protocol)
 	if err != nil {
 		out.Failure = "invalid_response"
+		row.Evidence["validation_reason"] = protocol.ResponseValidationReason(err)
 	} else {
 		u = usage
 		row.Evidence["validation"] = "passed"

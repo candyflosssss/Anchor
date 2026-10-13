@@ -278,7 +278,7 @@ anchor usage
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；固定公开目录最多8秒/16MiB，无凭据/重定向/环境代理。只返回 imported_price **预览**，不保存；核对后另行 price-put |
 
-推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。此修复已随 desktop.16 dev 发布，命令语法和退出码不变。
+推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。推理项修复已随 desktop.16 dev 发布。当前源码进一步修复文本元数据误判（未发布）：测试允许文本项携带 `logprobs`、非空 `annotations`，只检查文本和元数据容器，不保存其内容；跨协议转换边界保持原有要求。测试失败时，`logs detail REQUEST_ID` / `logs export` 的 `evidence.validation_reason` 提供固定原因：`invalid_json`（无效 JSON）、`missing_response_id`（缺少响应 ID）、`upstream_error`（上游错误或 failed）、`unsupported_content`（文本结构不支持）、`unsupported_output`（输出类型不支持）、`invalid_tool_call`（工具调用不完整）、`invalid_choices`（Chat Completions choices 不符合要求）、`refusal`（拒绝回复）；未分类错误使用 `invalid_structure`。此字段不含原始错误文本或未知字段名，历史日志不会补写。命令语法、`probe.failure` 和退出码不变。
 
 配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 

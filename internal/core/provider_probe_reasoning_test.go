@@ -5,7 +5,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/candyflosssss/Anchor/internal/logbook"
 )
 
 func TestProbeResponsesReasoning(t *testing.T) {
@@ -14,6 +17,7 @@ func TestProbeResponsesReasoning(t *testing.T) {
 	}{
 		{"completed", `{"id":"r","status":"completed","output":[{"type":"reasoning","id":"rs","summary":[]},{"type":"message","id":"msg","content":[{"type":"output_text","text":"OK"}]}],"usage":{"input_tokens":3,"output_tokens":16}}`, ""},
 		{"token-limited", `{"id":"r","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"reasoning","id":"rs","summary":[]}],"usage":{"input_tokens":3,"output_tokens":16}}`, ""},
+		{"text-metadata", `{"id":"r","status":"completed","output":[{"type":"reasoning","id":"rs","summary":[],"encrypted_content":"private reasoning"},{"type":"message","content":[{"type":"output_text","text":"OK","annotations":[],"logprobs":[]}]}],"usage":{"input_tokens":3,"output_tokens":16}}`, ""},
 		{"failed", `{"id":"r","status":"failed","output":[{"type":"reasoning","id":"rs","summary":[]}],"error":{"message":"private upstream detail"}}`, "invalid_response"},
 		{"invalid-json", `<html>upstream proxy</html>`, "invalid_response"},
 		{"missing-id", `{"output":[{"type":"reasoning","id":"rs","summary":[]}]}`, "invalid_response"},
@@ -46,6 +50,28 @@ func TestProbeResponsesReasoning(t *testing.T) {
 			}
 			if probe.Failure != tc.failure || probe.HTTPStatus != 200 || probe.KeyID != "default" || probe.Revision != p.Revision || calls != 1 {
 				t.Fatalf("probe=%+v calls=%d; want failure=%q", probe, calls, tc.failure)
+			}
+			if err := f.core.logs.Flush(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			logs, err := f.core.logs.List(t.Context(), logbook.Query{Source: "probe"})
+			if err != nil || len(logs.Requests) != 1 {
+				t.Fatalf("logs=%+v err=%v", logs, err)
+			}
+			row, err := f.core.logs.Detail(t.Context(), logs.Requests[0].ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.failure == "" && (row.Status != "succeeded" || row.Evidence["validation"] != "passed" || row.Evidence["validation_reason"] != "") {
+				t.Fatalf("valid response has failure diagnosis: %+v", row)
+			}
+			reasons := map[string]string{"failed": "upstream_error", "invalid-json": "invalid_json", "missing-id": "missing_response_id", "unsupported-output": "unsupported_output"}
+			if tc.failure != "" && row.Evidence["validation_reason"] != reasons[tc.name] {
+				t.Fatalf("failure reason=%q want=%q", row.Evidence["validation_reason"], reasons[tc.name])
+			}
+			snapshot, err := json.Marshal(row)
+			if err != nil || strings.Contains(string(snapshot), "private") || strings.Contains(string(snapshot), "encrypted_content") {
+				t.Fatalf("response content leaked into logs: %v", err)
 			}
 			w, err := f.core.workspace("p")
 			if err != nil || len(w.Keys) != 1 || len(w.Usage) != 1 {

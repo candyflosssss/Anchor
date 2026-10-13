@@ -108,6 +108,10 @@ func TestProbeHTTP200ValidationFailureIsRecorded(t *testing.T) {
 	if r.Status != "failed" || r.Code != "invalid_response" || r.Stage != "response_validate" || r.HTTP == nil || *r.HTTP != 200 || r.AttemptCount != 1 || r.ElapsedMS == nil {
 		t.Fatalf("%+v", r)
 	}
+	r, err = f.core.logs.Detail(t.Context(), r.ID)
+	if err != nil || r.Evidence["validation_reason"] != "missing_response_id" || r.Evidence["json_valid"] != "true" {
+		t.Fatalf("validation diagnosis missing: %+v %v", r, err)
+	}
 	raw, _ := json.Marshal(r)
 	if bytes.Contains(raw, []byte("DO_NOT_STORE")) {
 		t.Fatal("body leaked")
