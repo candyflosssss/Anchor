@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../../../../contract/provider-account.json';
-import { amountText, checkedAccountObservation, checkedAccountSettings, checkedAccountRate } from './provider-account.model';
+import { amountText, allowanceScopeText, checkedAccountObservation, checkedAccountSettings, checkedAccountRate } from './provider-account.model';
 import { DesktopProviderTransport } from '../../desktop/transport';
 import { CONTRACT, type DesktopBridge } from '../../desktop/contract.generated';
 const balanceQuery = { provider_id: 'demo', expected_revision: 3, operation: 'balance', key_id: '', remote_key_id: 0 };
@@ -23,6 +23,15 @@ describe('account contract and precision', () => {
     expect(checkedAccountObservation(fixture.summary, q).allowance!.scope).toBe('account');
     expect(checkedAccountObservation(fixture.key_summary, q).allowance!.scope).toBe('key');
     expect(() => checkedAccountObservation({ ...fixture.key_summary, allowance: { ...fixture.key_summary.allowance, scope: 'subscription' } }, q)).toThrow('read_error');
+  });
+  it('accepts NewAPI billing for balances and summaries, preserving unknown currencies', () => {
+    expect(checkedAccountObservation(fixture.billing, balanceQuery)).toEqual(fixture.billing);
+    expect(checkedAccountObservation(fixture.billing_summary, { ...balanceQuery, operation: 'balance-summary' })).toEqual(fixture.billing_summary);
+    expect(amountText({ value: '7.3', unit: 'CNY' })).toBe('7.3 CNY');
+    expect(amountText({ value: '7.3', unit: 'site_unit' })).toContain('币种未确认');
+    expect(allowanceScopeText('billing')).toBe('站点余额');
+    expect(() => checkedAccountObservation({ ...fixture.billing, platform: 'sub2api' }, balanceQuery)).toThrow('read_error');
+    expect(() => checkedAccountObservation({ ...fixture.billing, operation: 'key-quota' }, { ...balanceQuery, operation: 'key-quota' })).toThrow('read_error');
   });
   it('rejects wrong provider, revision, selected key, scope and malformed or missing amounts', () => {
     for (const changes of [ { provider_id: 'other' }, { revision: 4 }, { remote_key_id: 3 },

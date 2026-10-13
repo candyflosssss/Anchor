@@ -7,6 +7,9 @@ import (
 
 func (a *Adapter) GetBalance(ctx context.Context) (*Allowance, error) {
 	out := allowance("account")
+	if a.Config.Platform == "newapi" && a.Config.UserToken == "" {
+		return a.getNewAPIBilling(ctx)
+	}
 	if a.Config.Platform == "sub2api" && a.Config.UserToken == "" {
 		if err := a.key(); err != nil {
 			return nil, err

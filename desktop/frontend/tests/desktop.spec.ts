@@ -306,7 +306,7 @@ test('account page configures authorization and keeps wallet and key quota indep
   await expect(page.getByLabel('用户令牌 · 已保存', { exact: true })).toBeVisible();
   await expect(page.getByLabel('平台用户令牌', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '刷新余额', exact: true }).click();
-  const wallet = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: '账户余额', exact: true }) });
+  const wallet = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: '余额', exact: true }) });
   const quota = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: 'Key 额度', exact: true }) });
   await expect(wallet.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '刷新额度', exact: true }).click();

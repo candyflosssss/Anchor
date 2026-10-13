@@ -17,12 +17,14 @@ func TestSharedAccountFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var v struct {
-		Rate       AccountRateObservation `json:"rate"`
-		Settings   AccountSettings        `json:"settings"`
-		Balance    AccountObservation     `json:"balance"`
-		Quota      AccountObservation     `json:"quota"`
-		Summary    AccountObservation     `json:"summary"`
-		KeySummary AccountObservation     `json:"key_summary"`
+		Billing        AccountObservation     `json:"billing"`
+		BillingSummary AccountObservation     `json:"billing_summary"`
+		Rate           AccountRateObservation `json:"rate"`
+		Settings       AccountSettings        `json:"settings"`
+		Balance        AccountObservation     `json:"balance"`
+		Quota          AccountObservation     `json:"quota"`
+		Summary        AccountObservation     `json:"summary"`
+		KeySummary     AccountObservation     `json:"key_summary"`
 	}
 	if err := json.Unmarshal(raw, &v); err != nil {
 		t.Fatal(err)
@@ -31,6 +33,9 @@ func TestSharedAccountFixture(t *testing.T) {
 	var a, b any
 	json.Unmarshal(raw, &a)
 	json.Unmarshal(encoded, &b)
+	if v.Billing.Allowance == nil || v.Billing.Allowance.Scope != "billing" || v.BillingSummary.Operation != "balance-summary" {
+		t.Fatal("billing fixture drift")
+	}
 	if !reflect.DeepEqual(a, b) || v.Balance.Allowance.Remaining.Value != "12.34567890123456789" || v.Balance.Allowance.Used != nil || v.Quota.Allowance.Unlimited == nil || !*v.Quota.Allowance.Unlimited {
 		t.Fatal("account fixture drift")
 	}
@@ -55,6 +60,20 @@ func TestAccountBridgeCoreUpstream(t *testing.T) {
 						t.Error("missing user ID")
 					}
 					fmt.Fprint(w, `{"success":true,"data":{"balance":8.12,"quota":9007199254740993123,"used_quota":17,"remain_quota":1500,"unlimited_quota":false}}`)
+				case "/proxy/v1/dashboard/billing/subscription", "/proxy/v1/dashboard/billing/usage":
+					if r.Header.Get("Authorization") != "Bearer "+key || r.Header.Get("New-Api-User") != "" {
+						t.Error("wrong billing credential")
+					}
+					if strings.HasSuffix(r.URL.Path, "subscription") {
+						fmt.Fprint(w, `{"hard_limit_usd":20.12}`)
+					} else {
+						fmt.Fprint(w, `{"total_usage":100}`)
+					}
+				case "/proxy/api/status":
+					if r.Header.Get("Authorization") != "" {
+						t.Error("public credential")
+					}
+					fmt.Fprint(w, `{"success":true,"data":{"quota_display_type":"USD"}}`)
 				case "/proxy/api/usage/token/":
 					if r.Header.Get("Authorization") != "Bearer "+key {
 						t.Error("wrong quota credential")
@@ -88,6 +107,10 @@ func TestAccountBridgeCoreUpstream(t *testing.T) {
 			}
 			if platform == "sub2api" {
 				if wallet.Data.Allowance == nil || wallet.Data.Allowance.Remaining.Value != "12.34567890123456789" || wallet.Data.Allowance.Scope != "account" {
+					t.Fatal(wallet)
+				}
+			} else if platform == "newapi" {
+				if wallet.Data.Failure != "" || wallet.Data.Allowance == nil || wallet.Data.Allowance.Scope != "billing" || wallet.Data.Allowance.Remaining.Value != "19.12" || wallet.Data.Allowance.Remaining.Unit != "USD" {
 					t.Fatal(wallet)
 				}
 			} else if wallet.Data.Failure != "auth_required" || wallet.Data.Allowance != nil {
@@ -173,6 +196,8 @@ func TestAccountBridgeAutomaticallyDetectsSummary(t *testing.T) {
 				t.Error("public request credential")
 			}
 			fmt.Fprint(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false}}`)
+		case "/prefix/v1/dashboard/billing/subscription":
+			w.WriteHeader(404)
 		case "/prefix/api/usage/token/":
 			if r.Header.Get("Authorization") != "Bearer "+key {
 				t.Error("wrong key")

@@ -261,3 +261,11 @@
 - model/workspace公开DTO增加key_ids、candidate_index；模型strategy新增cache-priority、lowest-price、lowest-latency。供应商Key策略仍为priority/round-robin。
 - 缓存亲和与低延迟观察只留内存，低价按保存路由倍率；未知金额不填0或1。指定来源参与真实路由，失效时不调度到范围外Key，删除来源Key返回referenced。
 - schema5→6保留既有数据，旧模型空范围允许全部启用Key；旧核心拒绝schema6，升级须同步核心/CLI/桌面。CLI与桌面共用同一管理实现；定向验证结果见本轮更新记录。
+
+## 2026-10-13 — NewAPI 推理 Key 查询 billing 余额（当前源码）
+
+- 类型：修改。
+- 指令与参数：provider balance、provider balance-summary，参数不变；帮助补充 NewAPI 授权优先顺序。
+- 旧 → 新：无用户授权的 balance 原来返回 auth_required，现在使用推理 Key 调用 subscription/usage；balance-summary 原来只读 Key quota，现在优先 billing，接口缺失或格式不兼容时回退 Key quota。用户授权仍优先查询账户钱包。
+- 兼容与迁移：输出 scope 新增 billing，金额 unit 新增 CNY/site_unit；站点未公开查询范围时明确保留 billing，不冒充账户钱包。剩余值用精确十进制相减，usage 按上游定义除以100；无限额占位值不当资金显示。旧的严格校验客户端需与核心同步升级；数据库不新增迁移。
+- 验证：模拟 HTTP NewAPI 下的适配器、核心、客户端、CLI 和桌面桥接定向 Go 测试通过，包含无用户授权查询、已有授权优先、默认／指定 Key、部署前缀、回退及分类失败；未调用真实付费上游。

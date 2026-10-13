@@ -181,6 +181,8 @@ type AccountQuery struct {
 	KeyID       string `json:"key_id"`
 	RemoteKeyID int64  `json:"remote_key_id"`
 }
+
+// AccountAmount keeps USD/CNY, raw quota, or site_unit when currency is unknown.
 type AccountAmount struct {
 	Value string `json:"value"`
 	Unit  string `json:"unit"`
@@ -192,6 +194,8 @@ type AccountWindow struct {
 	Limit     *AccountAmount `json:"limit"`
 	ResetAt   string         `json:"reset_at"`
 }
+
+// AccountAllowance scope is account, key, or billing (site-controlled scope).
 type AccountAllowance struct {
 	Scope     string          `json:"scope"`
 	Remaining *AccountAmount  `json:"remaining"`

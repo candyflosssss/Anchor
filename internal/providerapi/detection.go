@@ -71,6 +71,9 @@ func (a *Adapter) DetectPlatform(ctx context.Context) (string, error) {
 			}
 			continue
 		}
+		if p.path == "/api/status" {
+			a.publicStatus = data(m)
+		}
 		if platform := p.identify(m); platform != "" {
 			return platform, nil
 		}
@@ -82,7 +85,8 @@ func (a *Adapter) DetectPlatform(ctx context.Context) (string, error) {
 }
 
 // GetBalanceSummary only uses the selected inference key. A key cap is returned
-// with key scope; it never becomes an account wallet or uses a saved user token.
+// with key scope; NewAPI legacy billing has site-controlled scope. This query
+// never uses a saved user token.
 func (a *Adapter) GetBalanceSummary(ctx context.Context) (*Allowance, error) {
 	if err := a.key(); err != nil {
 		return nil, err
@@ -103,7 +107,11 @@ func (a *Adapter) GetBalanceSummary(ctx context.Context) (*Allowance, error) {
 		}
 		return sub2KeyQuota(m)
 	case "newapi":
-		return a.GetKeyQuota(ctx, 0)
+		out, err := a.getNewAPIBilling(ctx)
+		if billingUnavailable(err) {
+			return a.GetKeyQuota(ctx, 0)
+		}
+		return out, err
 	case "oneapi":
 		return nil, failure("auth_required")
 	default:

@@ -16,11 +16,11 @@ export function checkedAccountSettings(v: AccountSettings, id: string): AccountS
 }
 function amount(v: AccountAmount | null): AccountAmount | null {
   if (v === null) return null;
-  if (!v || typeof v.value !== 'string' || !/^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(v.value) || v.value.length > 128 || !['USD', 'quota'].includes(v.unit)) throw new ProviderProblem('read_error');
+  if (!v || typeof v.value !== 'string' || !/^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(v.value) || v.value.length > 512 || !['USD', 'CNY', 'quota', 'site_unit'].includes(v.unit)) throw new ProviderProblem('read_error');
   return { value: v.value, unit: v.unit };
 }
-function allowance(v: AccountAllowance, scope: string): AccountAllowance {
-  if (!v || v.scope !== scope || (v.unlimited !== null && typeof v.unlimited !== 'boolean') || !Array.isArray(v.windows) || v.windows.length > 32) throw new ProviderProblem('read_error');
+function allowance(v: AccountAllowance, scopes: string[]): AccountAllowance {
+  if (!v || !scopes.includes(v.scope) || (v.unlimited !== null && typeof v.unlimited !== 'boolean') || !Array.isArray(v.windows) || v.windows.length > 32) throw new ProviderProblem('read_error');
   return { scope: v.scope, remaining: amount(v.remaining), used: amount(v.used), limit: amount(v.limit), unlimited: v.unlimited,
     windows: v.windows.map(w => {
       if (!w || typeof w.period !== 'string' || w.period.length > 64 || typeof w.reset_at !== 'string' || w.reset_at.length > 128) throw new ProviderProblem('read_error');
@@ -33,11 +33,16 @@ export function checkedAccountObservation(v: AccountObservation, q: AccountQuery
     typeof v.observed_at !== 'string' || !Number.isFinite(Date.parse(v.observed_at)) || !Number.isInteger(v.http_status) || v.http_status < 0 || v.http_status > 599 ||
     (!v.failure && ['', 'auto'].includes(v.platform)) || typeof v.failure !== 'string' || v.failure.length > 64 || (v.failure ? v.allowance !== null : v.allowance === null)) throw new ProviderProblem('read_error');
   return { provider_id: v.provider_id, revision: v.revision, platform: v.platform, operation: v.operation, key_id: v.key_id, remote_key_id: v.remote_key_id,
-    observed_at: v.observed_at, http_status: v.http_status, failure: v.failure, allowance: v.allowance === null ? null : allowance(v.allowance, q.operation === 'balance-summary' ? (v.allowance.scope === 'account' ? 'account' : 'key') : q.operation === 'balance' ? 'account' : 'key') };
+    observed_at: v.observed_at, http_status: v.http_status, failure: v.failure, allowance: v.allowance === null ? null : allowance(v.allowance, q.operation === 'key-quota' ? ['key'] : v.platform === 'newapi' ? ['account', 'key', 'billing'] : q.operation === 'balance-summary' ? ['account', 'key'] : ['account']) };
 }
 export function amountText(v: AccountAmount | null): string {
-  return v === null ? '未知' : `${v.value} ${v.unit === 'USD' ? 'USD' : 'quota（原始额度）'}`;
+  const units: Record<string, string> = { USD: 'USD', CNY: 'CNY', quota: 'quota（原始额度）', site_unit: '站点计费单位（币种未确认）' };
+  return v === null ? '未知' : `${v.value} ${units[v.unit]}`;
 }
+export function allowanceScopeText(scope: string): string {
+  return ({ account: '账户余额', key: 'Key 额度', billing: '站点余额' } as Record<string, string>)[scope] ?? '未知范围';
+}
+export const billingScopeHint = '站点 billing 接口返回的余额；查询范围由站点设置决定，可能是账户或所选 Key。查询账户钱包可配置用户授权。';
 export const accountFailureText: Record<string, string> = {
   unknown: '平台没有返回明确的额度或周期窗口，当前额度未知。',
   platform_unknown: '无法自动识别平台，可在账户页指定平台类型。',

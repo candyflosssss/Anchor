@@ -116,6 +116,8 @@ func TestDefaultKeyPreferenceAndAutomaticSummary(t *testing.T) {
 				t.Error("public probe carried credential")
 			}
 			io.WriteString(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false}}`)
+		case "/prefix/v1/dashboard/billing/subscription":
+			w.WriteHeader(404)
 		case "/prefix/api/usage/token/":
 			if r.Header.Get("Authorization") != "Bearer "+wantSecret {
 				t.Error("wrong default key")

@@ -328,7 +328,7 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 
 `--platform` 默认 `auto`；既有未配置平台同样自动探测。`detect-platform` 根据公开接口和必要的 Key 接口响应重新识别 sub2api／NewAPI／OneAPI，不凭域名或站点品牌猜测，不写配置。无法确认返回 `platform_unknown`，凭据被拒绝保留分类失败。人工指定平台可覆盖自动模式。
 
-`balance-summary`（本轮源码新增，未发布）使用默认推理 Key，不使用保存的用户令牌：sub2api 明确钱包返回 scope=account，受限 Key 返回 scope=key；NewAPI 返回 Key 原始 quota；原版 OneAPI 返回 auth_required。余额／额度字段为空或失败时不能当作0。查询结果的 platform 为本次识别值，key_id 为实际所选 Key。原 `balance` 的账户钱包语义保持不变。
+`balance-summary` 使用默认推理 Key，不使用保存的用户令牌：sub2api 明确钱包返回 scope=account，受限 Key 返回 scope=key；NewAPI 优先读旧 billing 的 subscription 与 usage，以总额度减去已用量得到剩余值，scope=billing 表示范围由站点设置决定。仅在 billing 缺失或格式不兼容时回退 Key 原始 quota（scope=key）；认证、权限、限流、网络和服务错误直接报告。原版 OneAPI 返回 auth_required。余额／额度字段为空或失败时不能当作0。查询结果的 platform 为本次识别值，key_id 为实际所选 Key。NewAPI `balance` 有已保存用户授权时仍查账户钱包，无用户授权时使用所选 API Key 查 billing；不会将站点范围直接标成账户钱包。
 
 `--user-token-stdin` 读取独立的后台用户授权（sub2api JWT、NewAPI/OneAPI 用户 access token）；不能使用 `--secret` 参数传入。空 stdin 拒绝；与 `--clear-user-token` 互斥。未指定令牌选项时，仅平台、后台根地址和用户 ID 都不变才保留原令牌；改变其中任一项会清除。后台地址由请求地址推导时，修改请求地址也清除令牌；显式独立后台地址不受此影响。复制供应商不复制用户授权，即使指定 `--copy-keys`；改名保留，删除级联清除。凭据存于本机受限数据库，不能理解为数据库列加密。
 
@@ -337,7 +337,7 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 | 功能 | sub2api | NewAPI | 原版 OneAPI |
 | --- | --- | --- | --- |
 | 模型目录 | 沿用 `provider models`，当前 Key 过滤后的声明目录 | 同左 | 同左 |
-| 账户余额 | 用户授权查钱包；仅 Key 时要求 `/v1/usage` 明确包含钱包 `balance` | 用户授权查账户 quota | 用户授权查账户 quota |
+| 账户余额 | 用户授权查钱包；仅 Key 时要求 `/v1/usage` 明确包含钱包 `balance` | 用户授权查账户 quota；仅 Key 时查 billing 站点余额 | 用户授权查账户 quota |
 | Key 额度 | Key 查询总额度／滚动窗口，未限额不等于钱包无限 | Key 查询 remaining / used / limit / unlimited | 用户授权 + remote-key-id 查 Key，保留原始 quota |
 | 请求账单 | 用户授权分页；Key 范围另需 remote-key-id | 用户授权分页，或 Key 查近期批次 | 用户授权分页；Key 范围返回 unsupported_key_filter |
 | 实际扣费及 tokens | USD actual_cost、输入输出、缓存、费用分项 | quota、输入输出及已有缓存／音频等数值明细 | quota、基础字段；token 语义标记待核验 |
@@ -345,7 +345,7 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 
 `usage-records` 的 `--scope` 默认 `account`，可选 `key`。`--page` 默认1，上限100000；`--page-size` 默认50，范围1..100。sub2api 和 NewAPI 用户日志正常分页；NewAPI Key 日志只支持第1页且批次大小由站点决定，`history=recent`、`page_size=0`、`total=null`、`has_more=false`，不表示完整历史。原版 OneAPI 使用站点固定分页大小，返回 `page_size=0`、`total=null`，非空页 `has_more=true`，需空末页确定结束。所有记录受上游默认时间范围、日志保留和站点开关限制；这不是 Anchor 本地 `usage show` 或 `logs list`。
 
-查询 stdout 为 `{provider_id, key_id, remote_key_id?, revision, platform, operation, observed_at, source, http_status, failure?, balance?, key_quota?, records?, effective_rate?}`，按操作只返回对应 payload。金额为 `{value, unit}`，`unit=USD` 或站点内部 `quota`，不猜汇率或默认换算。额度以 `scope` 区分账户和 Key，字段未知为 null，不能当作0；`unlimited=true` 仅表示 Key 自身不设上限。账单含 `charged_amount`、可选 `base_amount`、`billing_source`（NewAPI 已报告 wallet/subscription 时）、历史 `rate_multiplier`、tokens、已知内建工具的 tool_charges（次数与站点原始价格）和数值明细白名单；原始提示词、IP、后台信息及原始日志正文不返回。NewAPI 的日志 id 不是稳定标识，`id_stable=false`，有 `request_id` 时可关联请求；不承诺所有平台存在该字段。原版 OneAPI 的 token 字段标记 `platform_fields_unverified`，部分非文本计费可能不是实际 token 数。当前分组倍率是查询时快照，不替代历史账单扣费，也不自动写入候选路由。
+查询 stdout 为 `{provider_id, key_id, remote_key_id?, revision, platform, operation, observed_at, source, http_status, failure?, balance?, key_quota?, records?, effective_rate?}`，按操作只返回对应 payload。金额为 `{value, unit}`，`unit=USD|CNY|quota|site_unit`，不猜汇率或默认换算；billing 仅按公开 `quota_display_type` 确认 USD/CNY/TOKENS，无法确认则 site_unit。额度以 `scope=account|key|billing` 区分账户、Key 和范围未确认的站点余额，字段未知为 null，不能当作0；`unlimited=true` 仅表示 Key 自身不设上限。账单含 `charged_amount`、可选 `base_amount`、`billing_source`（NewAPI 已报告 wallet/subscription 时）、历史 `rate_multiplier`、tokens、已知内建工具的 tool_charges（次数与站点原始价格）和数值明细白名单；原始提示词、IP、后台信息及原始日志正文不返回。NewAPI 的日志 id 不是稳定标识，`id_stable=false`，有 `request_id` 时可关联请求；不承诺所有平台存在该字段。原版 OneAPI 的 token 字段标记 `platform_fields_unverified`，部分非文本计费可能不是实际 token 数。当前分组倍率是查询时快照，不替代历史账单扣费，也不自动写入候选路由。
 
 模型查询仍用前一节 `provider models` 的输出和边界；其他查询最多8次请求（NewAPI 掩码核对包含固定 POST 读接口）、累计2 MiB响应，共用供应商超时与8秒的较小值，遵守全局／供应商并发限制，不重试、不跟随重定向，沿用核心上游传输策略（不读环境代理）。后台兼容路径和完整数据契约见 [供应商接口语义](../design/provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。
 
@@ -553,7 +553,7 @@ anchor recover [--id ID]
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
-| 平台自动识别与列表余额（本轮源码） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询默认 Key；钱包／Key额度明确区分；未发布 |
+| 平台自动识别与列表余额（本轮源码） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询默认 Key；钱包／Key额度明确区分；NewAPI billing 兼容为当前源码新增 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |

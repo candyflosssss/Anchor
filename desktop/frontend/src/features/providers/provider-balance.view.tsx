@@ -1,4 +1,4 @@
-import { accountFailureText, amountText, platformLabels } from './provider-account.model';
+import { accountFailureText, amountText, platformLabels, allowanceScopeText, billingScopeHint } from './provider-account.model';
 import type { ProviderBalance } from './use-provider-balances';
 
 export function ProviderBalanceCell({ value }: { value?: ProviderBalance }) {
@@ -10,8 +10,8 @@ export function ProviderBalanceCell({ value }: { value?: ProviderBalance }) {
   const a = v?.allowance;
   if (!v || !a) return <span className="cell-hint">未知</span>;
   const remaining = a.remaining ?? a.windows[0]?.remaining ?? null;
-  return <div title={`${platform ?? '平台'} · ${a.scope === 'account' ? '账户余额' : 'Key 额度'}\nKey：${v.key_id}\n查询时间：${new Date(v.observed_at).toLocaleString()}${a.windows[0] ? `\n周期：${a.windows[0].period}` : ''}`}>
+  return <div title={`${platform ?? '平台'} · ${allowanceScopeText(a.scope)}\nKey：${v.key_id}\n查询时间：${new Date(v.observed_at).toLocaleString()}${a.windows[0] ? `\n周期：${a.windows[0].period}` : ''}${a.scope === 'billing' ? `\n${billingScopeHint}` : ''}`}>
     <span className="block text-sm font-medium tabular-nums">{a.unlimited === true ? '不限额' : remaining ? amountText(remaining) : '未知'}</span>
-    <span className="block text-xs text-muted-foreground">{platform} · {a.scope === 'account' ? '账户余额' : 'Key 额度'}{!a.remaining && a.windows[0] ? ` · ${a.windows[0].period}` : ''}</span>
+    <span className="block text-xs text-muted-foreground">{platform} · {allowanceScopeText(a.scope)}{!a.remaining && a.windows[0] ? ` · ${a.windows[0].period}` : ''}</span>
   </div>;
 }

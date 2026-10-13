@@ -28,18 +28,32 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	if _, e = s.Initialize(strings.TrimPrefix(web.URL, "http://"), "127.0.0.1:17860"); e != nil {
 		t.Fatal(e)
 	}
+	billingEnabled := false
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/status":
 			if r.Header.Get("Authorization") != "" {
 				t.Error("public probe credential")
 			}
-			io.WriteString(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false}}`)
+			io.WriteString(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false,"quota_display_type":"USD"}}`)
 		case "/api/user/self":
 			if r.Header.Get("Authorization") != "Bearer cli-user-fixture" {
 				t.Error("incorrect dashboard token")
 			}
 			io.WriteString(w, `{"success":true,"data":{"quota":345,"used_quota":12}}`)
+		case "/v1/dashboard/billing/subscription", "/v1/dashboard/billing/usage":
+			if r.Header.Get("Authorization") != "Bearer cli-model-fixture" {
+				t.Error("incorrect billing key")
+			}
+			if !billingEnabled {
+				w.WriteHeader(404)
+				return
+			}
+			if strings.HasSuffix(r.URL.Path, "subscription") {
+				io.WriteString(w, `{"hard_limit_usd":10.5}`)
+			} else {
+				io.WriteString(w, `{"total_usage":125}`)
+			}
 		case "/api/usage/token/":
 			if r.Header.Get("Authorization") != "Bearer cli-model-fixture" {
 				t.Error("incorrect inference key")
@@ -83,6 +97,13 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	if !strings.Contains(summary, `"scope":"key"`) || !strings.Contains(summary, `"value":25`) {
 		t.Fatal(summary)
 	}
+	billingEnabled = true
+	for _, op := range []string{"balance", "balance-summary"} {
+		got := run("", false, "provider", op, "--id", "p", "--revision", "1")
+		if !strings.Contains(got, `"scope":"billing"`) || !strings.Contains(got, `"value":9.25`) || !strings.Contains(got, `"unit":"USD"`) {
+			t.Fatal(got)
+		}
+	}
 	run("", true, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-token-stdin", "--clear-user-token")
 	run("\n", true, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-token-stdin")
 	got := run("cli-user-fixture\n", false, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-id", "9", "--user-token-stdin")
@@ -114,7 +135,7 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	run("", true, "provider", "usage-records", "--id", "p", "--revision", "2", "--page", "0")
 	run("", false, "provider", "platform-put", "--id", "p", "--revision", "2", "--platform", "newapi", "--clear-user-token")
 	got = run("", false, "provider", "balance", "--id", "p", "--revision", "3")
-	if !strings.Contains(got, `"failure":"auth_required"`) {
+	if !strings.Contains(got, `"scope":"billing"`) || !strings.Contains(got, `"value":9.25`) {
 		t.Fatal(got)
 	}
 	got = run("", false, "provider", "platform-put", "--id", "p", "--revision", "3")

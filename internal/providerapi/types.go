@@ -80,10 +80,10 @@ func (q Query) Validate() error {
 
 type Amount struct {
 	Value json.Number `json:"value"`
-	Unit  string      `json:"unit"` // USD, or quota (no guessed currency conversion)
+	Unit  string      `json:"unit"` // USD, CNY, quota or site_unit (no guessed currency conversion)
 }
 type Allowance struct {
-	Scope     string   `json:"scope"` // account or key, never inferred from a field name
+	Scope     string   `json:"scope"` // account, key or billing (site-controlled account/key scope)
 	Remaining *Amount  `json:"remaining"`
 	Used      *Amount  `json:"used"`
 	Limit     *Amount  `json:"limit"`
@@ -169,14 +169,15 @@ func (e *Failure) Error() string { return e.Code }
 func failure(code string) error  { return &Failure{code} }
 
 type Adapter struct {
-	HTTP    *http.Client
-	Config  Config
-	BaseURL string
-	Key     string
-	paths   []string
-	status  int
-	calls   int
-	bytes   int
+	HTTP         *http.Client
+	Config       Config
+	BaseURL      string
+	Key          string
+	paths        []string
+	status       int
+	calls        int
+	bytes        int
+	publicStatus object
 }
 
 func (a *Adapter) root() string {
@@ -222,6 +223,7 @@ func (a *Adapter) query(ctx context.Context, q Query, resolveKey bool) Result {
 	a.status = 0
 	a.calls = 0
 	a.bytes = 0
+	a.publicStatus = nil
 	var err error
 	if q.Operation == "detect-platform" || a.Config.Platform == "" || a.Config.Platform == "auto" {
 		a.Config.Platform, err = a.DetectPlatform(ctx)

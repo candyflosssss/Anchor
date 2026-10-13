@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { RefreshCw, LoaderCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { requestURLError } from './provider.model';
-import { accountFailureText, amountText, platformLabels, type AccountObservation, type AccountSettings, type AccountQuery } from './provider-account.model';
+import { accountFailureText, amountText, platformLabels, allowanceScopeText, billingScopeHint, type AccountObservation, type AccountSettings, type AccountQuery } from './provider-account.model';
 import { GroupRateObservation } from './provider-rate.view';
 import type { ProviderController } from './use-provider-controller';
 
@@ -66,7 +66,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
       <form className="account-form" onSubmit={e => void save(e)} autoComplete="off">
         <fieldset disabled={disabled} className="account-fields">
           <div className="field"><label htmlFor="account-platform">平台类型</label><select id="account-platform" className="select-field" value={platform} onChange={e => setPlatform(e.target.value)}>{Object.entries(platformLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></div>
-          {(platform === 'newapi' || platform === 'auto' && a.observedPlatform === 'newapi') && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="该站后台的用户 ID" /><p className="card-hint">查询账户余额需要用户 access token 和正确的用户 ID。</p></div>}
+          {(platform === 'newapi' || platform === 'auto' && a.observedPlatform === 'newapi') && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="该站后台的用户 ID" /><p className="card-hint">确认账户钱包需用户 access token，按站点版本填写用户 ID；仅用推理 Key 也可查询站点 billing 余额。</p></div>}
           <details className="pricing-details"><summary>账户接口地址（可选）</summary><div className="field"><label htmlFor="account-site-url">站点根地址</label><input id="account-site-url" value={siteURL} onChange={e => setSiteURL(e.target.value)} placeholder="留空，沿用请求地址并移除末尾 /v1" /><p className="card-hint">后台与推理 API 地址不同时填写。包含站点实际使用的部署路径前缀。</p></div></details>
           <div className="field"><label htmlFor="account-token-mode">用户令牌 · {s.has_user_token ? '已保存' : '未配置'}</label><select id="account-token-mode" className="select-field" value={tokenMode} onChange={e => { setTokenMode(e.target.value as typeof tokenMode); setToken(''); setConfirmClear(false); }}><option value="keep">保留现有授权</option><option value="replace">输入／替换用户令牌</option><option value="clear">清除用户令牌</option></select>
             {tokenMode === 'replace' && <><label htmlFor="account-token" className="account-token-label">平台用户令牌</label><input id="account-token" type="password" autoComplete="new-password" value={token} onChange={e => setToken(e.target.value)} placeholder={platform === 'sub2api' ? '用户登录 JWT' : '平台用户 access token'} /></>}
@@ -90,7 +90,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
       <p className="card-hint">这是查询 Key 的平台分组倍率。模型映射中的路由倍率单独保存，查询不会修改路由。</p>
     </section>
     <div className="overview-grid">
-      <Observation title="账户余额" value={a.balance} disabled={queryDisabled} onRefresh={() => query('balance')} />
+      <Observation title="余额" value={a.balance} disabled={queryDisabled} onRefresh={() => query('balance')} />
       <Observation title="Key 额度" value={a.quota} disabled={queryDisabled} onRefresh={() => query('key-quota')} />
     </div>
   </>;
@@ -98,8 +98,9 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
 function Observation({ title, value, disabled, onRefresh }: { title: string; value: AccountObservation | null; disabled: boolean; onRefresh: () => void }) {
   const a = value?.allowance;
   return <section className="detail-card">
-    <div className="card-toolbar"><h2>{title}</h2><Button variant="outline" size="sm" disabled={disabled} onClick={onRefresh}><RefreshCw size={14} />刷新{title === '账户余额' ? '余额' : '额度'}</Button></div>
+    <div className="card-toolbar"><h2>{title}</h2><Button variant="outline" size="sm" disabled={disabled} onClick={onRefresh}><RefreshCw size={14} />刷新{title === '余额' ? '余额' : '额度'}</Button></div>
     {!value ? <p className="card-hint">尚未查询。</p> : value.failure ? <p className="feedback error-feedback" role="alert">{accountFailureText[value.failure] ?? '查询失败，平台暂未返回可用数据。'}{value.http_status > 0 ? `（HTTP ${value.http_status}）` : ''}</p> : a && <>
+      <p className="card-hint">{allowanceScopeText(a.scope)}{a.scope === 'billing' ? ` · ${billingScopeHint}` : ''}</p>
       <p className="account-amount">{a.unlimited === true ? '无限额' : amountText(a.remaining)}</p>
       <dl className="account-numbers"><div><dt>已用</dt><dd>{amountText(a.used)}</dd></div><div><dt>总额度</dt><dd>{amountText(a.limit)}</dd></div></dl>
       {a.windows.map((w, i) => <div className="account-window" key={`${w.period}:${i}`}><strong>{({ daily: '每日', weekly: '每周', monthly: '每月', '5h': '5 小时', '1d': '每日', '7d': '7 天' } as Record<string, string>)[w.period] ?? w.period}窗口</strong><p>剩余 {amountText(w.remaining)} · 已用 {amountText(w.used)} · 限额 {amountText(w.limit)}</p>{w.reset_at && <p className="card-hint">重置时间：{w.reset_at}</p>}</div>)}
