@@ -2,6 +2,29 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface AccountRate {
+  group: string;
+  group_name: string;
+  multiplier: string | null;
+  basis: string;
+}
+export interface AccountRateObservation {
+  provider_id: string;
+  revision: number;
+  platform: string;
+  operation: string;
+  key_id: string;
+  remote_key_id: number;
+  observed_at: string;
+  http_status: number;
+  failure: string;
+  rate: AccountRate | null;
+}
+export interface AccountRateObservationResult {
+  contract: string;
+  data: AccountRateObservation | null;
+  problem: Problem | null;
+}
 export interface AccountSettings {
   provider_id: string;
   revision: number;
@@ -463,6 +486,7 @@ export interface DesktopBridge {
   ProviderAccountSettings(input1: WorkspaceQuery): Promise<AccountSettingsResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderAllowance(input1: AccountQuery): Promise<AccountObservationResult>;
+  ProviderRate(input1: AccountQuery): Promise<AccountRateObservationResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;
   SaveProvider(input1: SaveProvider): Promise<SaveResult>;

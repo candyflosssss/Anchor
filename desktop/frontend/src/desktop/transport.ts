@@ -1,4 +1,4 @@
-import { checkedAccountSettings, checkedAccountObservation, type SaveAccountSettings, type AccountQuery } from '../features/providers/provider-account.model';
+import { checkedAccountSettings, checkedAccountObservation, checkedAccountRate, type SaveAccountSettings, type AccountQuery } from '../features/providers/provider-account.model';
 import { checkedWorkspace } from '../features/providers/provider-features.model';
 import { CONTRACT, PROBLEM_CODES, type DesktopBridge, type ProblemCode, type Provider as DesktopProvider, type SessionInfo } from './contract.generated';
 import { ProviderProblem, checkedCatalog, type DiscoverProviderModels, type ProviderModels, type Provider, type ProviderTransport, type SaveProvider } from '../features/providers/provider.model';
@@ -58,6 +58,11 @@ export class DesktopProviderTransport implements ProviderTransport {
   async allowance(input: AccountQuery, signal: AbortSignal) {
     signal.throwIfAborted();
     try { const v = await call(() => this.getBridge().ProviderAllowance(input)); signal.throwIfAborted(); return checkedAccountObservation(v, input); }
+    catch (error) { return providerError(error, false); }
+  }
+  async rate(input: AccountQuery, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const v = await call(() => this.getBridge().ProviderRate(input)); signal.throwIfAborted(); return checkedAccountRate(v, input); }
     catch (error) { return providerError(error, false); }
   }
   async workspace(id: string, signal: AbortSignal) {

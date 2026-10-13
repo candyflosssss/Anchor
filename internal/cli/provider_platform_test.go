@@ -45,6 +45,12 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 				t.Error("incorrect inference key")
 			}
 			io.WriteString(w, `{"code":true,"data":{"total_available":25,"total_used":5,"total_granted":30,"unlimited_quota":false}}`)
+		case "/api/token/":
+			io.WriteString(w, `{"success":true,"data":{"items":[{"id":42,"key":"cli-model-fixture"}],"total":1}}`)
+		case "/api/token/42":
+			io.WriteString(w, `{"success":true,"data":{"group":"vip"}}`)
+		case "/api/pricing":
+			io.WriteString(w, `{"success":true,"group_ratio":{"vip":0.80000000000000001}}`)
 		case "/api/log/token":
 			io.WriteString(w, `{"success":true,"data":[]}`)
 		default:
@@ -97,7 +103,11 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 		t.Fatal(got)
 	}
 	got = run("", false, "provider", "effective-rate", "--id", "p", "--revision", "2")
-	if !strings.Contains(got, `"failure":"remote_key_required"`) {
+	if !strings.Contains(got, `"multiplier":0.80000000000000001`) {
+		t.Fatal(got)
+	}
+	got = run("", false, "provider", "effective-rate", "--id", "p", "--revision", "2", "--remote-key-id", "42")
+	if !strings.Contains(got, `"group":"vip"`) {
 		t.Fatal(got)
 	}
 	run("", true, "provider", "balance", "--id", "p", "--revision", "1")

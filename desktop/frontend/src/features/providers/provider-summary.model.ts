@@ -88,13 +88,13 @@ export function overviewTotals(summaries: ProviderSummary[]) {
   };
 }
 
-export interface ModelCandidate { provider_id: string; upstream: string; tools: boolean; streaming: boolean; tone: Tone; label: string }
+export interface ModelCandidate { provider_id: string; upstream: string; tools: boolean; streaming: boolean; multiplier: number; strategy: string; tone: Tone; label: string }
 export interface ModelGroup { alias: string; candidates: ModelCandidate[] }
 export function aggregateModels(summaries: ProviderSummary[]): ModelGroup[] {
   const groups = new Map<string, ModelCandidate[]>();
   for (const s of summaries) for (const m of s.workspace?.models ?? []) {
     const list = groups.get(m.id) ?? [];
-    list.push({ provider_id: s.provider.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming, tone: s.tone, label: s.label });
+    list.push({ provider_id: s.provider.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming, multiplier: m.multiplier, strategy: m.strategy, tone: s.tone, label: s.label });
     groups.set(m.id, list);
   }
   return [...groups].map(([alias, candidates]) => ({ alias, candidates: candidates.sort((a, b) => a.provider_id.localeCompare(b.provider_id, 'zh-CN')) }))

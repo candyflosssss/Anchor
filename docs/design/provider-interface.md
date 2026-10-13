@@ -97,7 +97,7 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 
 - `GET /control/v1/providers/{id}/platform`：返回 `providerapi.Settings`，仅 `has_user_token`，不返回用户授权。
 - `PUT /control/v1/providers/{id}/platform`：`providerapi.Configure`，包含 provider_id、expected_revision、完整公开 config 及可选 user_token。nil 保留同目标授权，空字符串清除；平台、site_url、user_id 或推导后台根地址改变时，不隐式迁移旧令牌。写成功递增供应商 revision。
-- `POST /control/v1/providers/{id}/query`：`providerapi.Query`，operation 为 `models|detect-platform|balance-summary|balance|key-quota|usage-records|effective-rate`；provider_id 必须与路径一致，expected_revision 必填。records 的 scope 为 account（默认）或 key；page 从1开始，默认1，page_size 默认50且最大100。remote_key_id 是用户提供的站点数字 ID，不会自动按本地 key_id 推断或证明两者对应。
+- `POST /control/v1/providers/{id}/query`：`providerapi.Query`，operation 为 `models|detect-platform|balance-summary|balance|key-quota|usage-records|effective-rate`；provider_id 必须与路径一致，expected_revision 必填。records 的 scope 为 account（默认）或 key；page 从1开始，默认1，page_size 默认50且最大100。remote_key_id 是用户提供的站点数字 ID；正整数不会证明与本地 key_id 对应。effective-rate 在 remote_key_id=0 时会使用账户列表核对所选保存的完整密钥，NewAPI 掩码须经固定 POST /api/token/{id}/key 读取完整密钥后才能匹配；其余操作的数字 ID 语义不变。
 - 统一核心方法 `Server.QueryProvider` 负责读取供应商、授权与 Key，校验 revision、限制并发／超时和选取平台。`providerapi.Adapter` 提供 `GetBalance`、`GetKeyQuota`、`ListUsageRecords`、`GetEffectiveRate`；models 复用核心现有目录读取器。Go 客户端 `ProviderPlatform`、`ConfigureProviderPlatform`、`QueryProvider` 与 CLI 复用这些管理入口。
 
 所有管理路径沿用管理鉴权、Host／Origin 规则；PUT／POST 校验实例，不能让浏览器绕过宿主直接请求。query 虽用 POST，业务上只读；不写本地消费估算、不调整路由倍率、不自动导入目录。查询未指定 key_id 时优先选择已启用的 `default`，否则回退到第一个已启用 Key；用户授权查询不要求推理 Key 存在。模型仍受所选 Key 默认推理协议认证约束，不通过平台身份强行改变协议。
@@ -160,3 +160,5 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 `balance-summary` 供列表自动读取，仅用推理 Key，不使用已保存用户令牌。sub2api unrestricted 的明确 balance 返回 account 钱包；受限 Key 返回 key 额度及周期窗口。NewAPI 返回 key 的原始 quota，不换算货币；原版 OneAPI 缺少默认 Key 的明确钱包接口，返回 auth_required。原 `balance` 保持账户钱包语义，用户授权可在详情配置。缺失值保持 null，失败不伪造0。
 
 桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。
+
+2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；平台倍率与已保存的候选路由倍率独立，查询不持久写回。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按默认启用 Key 查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。

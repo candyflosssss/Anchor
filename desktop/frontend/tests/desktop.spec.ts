@@ -6,9 +6,9 @@ import { CONTRACT, type AccountSettings, type DesktopBridge, type Provider } fro
 
 declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
-async function host(page: Page) {
+async function host(page: Page, rateMappings = false) {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows, update, account }) => {
+  await page.addInitScript(({ contract, rows, update, account, rateMappings }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     window.accountTest = { saves: 0, queries: 0, failure: '' };
@@ -25,6 +25,13 @@ async function host(page: Page) {
         accounts[p.id] = { provider_id: p.id, revision: ++p.revision, platform: input.platform, site_url: input.site_url, user_id: input.user_id, has_user_token: input.user_token === null ? settings(p.id).has_user_token : !!input.user_token };
         if (counters.writeError === 'unknown') return { contract, data: null, problem: { code: 'unknown' } };
         return { contract, data: settings(p.id), problem: null };
+      },
+      ProviderRate: async input => {
+        window.accountTest.queries++;
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const failure = window.accountTest.failure;
+        return { contract, data: { ...account.rate, provider_id: input.provider_id, revision: input.expected_revision, platform: settings(input.provider_id).platform || 'sub2api', key_id: input.key_id || 'default', remote_key_id: input.remote_key_id, failure,
+          rate: failure ? null : { ...account.rate.rate } }, problem: null };
       },
       ProviderAllowance: async input => {
         window.accountTest.queries++;
@@ -60,7 +67,7 @@ async function host(page: Page) {
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
         return { contract, data: { provider_id: provider.id, key_id: input.key_id || 'anonymous', revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '', partial: false, entries: [{ id: 'demo-model', key_ids: [input.key_id || 'anonymous'] }], keys: [{ id: input.key_id || 'anonymous', enabled: true, protocol: 'responses', http_status: 200, failure: '', group: '', group_name: '', multiplier: null, rate_basis: '', rate_failure: 'platform_required' }] }, problem: null };
       },
-      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: [], models: [], usage: [], probe: null, deleted: false }, problem: null }),
+      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ id, upstream: `upstream-${id}`, display_name: id, revision: 1, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: 'round-robin', tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
@@ -77,7 +84,7 @@ async function host(page: Page) {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, rateMappings });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -442,3 +449,33 @@ for (const failure of ['', 'unknown', 'conflict'] as const) {
     await expect(page.getByRole('dialog').getByLabel('此供应商的相对倍率')).toHaveValue('2');
   });
 }
+
+test('group rate account reads selected key and removes a failed previous rate (simulated host)', async ({ page }) => {
+  await host(page);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await page.getByRole('tab', { name: '账户与余额', exact: true }).click();
+  await page.getByRole('button', { name: '刷新分组倍率', exact: true }).click();
+  await expect(page.getByText('0.80000000000000001×', { exact: true })).toBeVisible();
+  await expect(page.getByText('来源：个人倍率覆盖', { exact: true })).toBeVisible();
+  await page.evaluate(() => { window.accountTest.failure = 'authentication'; });
+  await page.getByRole('button', { name: '刷新分组倍率', exact: true }).click();
+  await expect(page.getByText('0.80000000000000001×', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('alert')).toContainText('平台拒绝授权');
+});
+
+test('group rate mappings distinguish routing and platform values and deduplicate providers (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'shared-one', exact: true })).toBeVisible();
+  await expect(page.getByText('路由倍率', { exact: false }).filter({ hasText: '2.5×' })).toHaveCount(2);
+  const before = await page.evaluate(() => window.accountTest.queries);
+  await page.getByRole('button', { name: '刷新分组倍率', exact: true }).dblclick();
+  await expect(page.getByText('0.80000000000000001×', { exact: true })).toHaveCount(6);
+  expect(await page.evaluate(() => window.accountTest.queries)).toBe(before + 3);
+  await page.evaluate(() => { window.accountTest.failure = 'auth_required'; });
+  await page.getByRole('button', { name: '查询分组倍率', exact: true }).first().click();
+  await expect(page.getByRole('alert').first()).toContainText('查询分组倍率需要平台用户令牌');
+  await expect(page.getByText('路由倍率', { exact: false }).filter({ hasText: '2.5×' })).toHaveCount(2);
+  await page.getByRole('button', { name: '账户与授权', exact: true }).first().click();
+  await expect(page.getByRole('tab', { name: '账户与余额', exact: true })).toHaveAttribute('aria-selected', 'true');
+});

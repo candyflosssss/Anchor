@@ -94,5 +94,22 @@
       "unlimited": null,
       "windows": []
     }
+  },
+  "rate": {
+    "provider_id": "demo",
+    "revision": 3,
+    "platform": "sub2api",
+    "operation": "effective-rate",
+    "key_id": "default",
+    "remote_key_id": 0,
+    "observed_at": "2026-10-13T02:00:00Z",
+    "http_status": 200,
+    "failure": "",
+    "rate": {
+      "group": "7",
+      "group_name": "标准组",
+      "multiplier": "0.80000000000000001",
+      "basis": "personal_override"
+    }
   }
 }

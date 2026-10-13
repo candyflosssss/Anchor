@@ -146,7 +146,10 @@ export function checkedCatalog(value: ProviderModels, input: DiscoverProviderMod
       e.key_ids.some(id => !keyIDs.has(id) || value.keys.find(k => k.id === id)?.failure !== '')) return invalid();
     entryIDs.add(e.id);
   }
-  return { ...value, models: [...value.models], entries: value.entries.map(e => ({ ...e, key_ids: [...e.key_ids] })), keys: value.keys.map(k => ({ ...k })) };
+  return { provider_id: value.provider_id, key_id: value.key_id, revision: value.revision, http_status: value.http_status, elapsed_ms: value.elapsed_ms,
+    failure: value.failure, partial: value.partial, models: [...value.models], entries: value.entries.map(e => ({ id: e.id, key_ids: [...e.key_ids] })),
+    keys: value.keys.map(k => ({ id: k.id, enabled: k.enabled, protocol: k.protocol, http_status: k.http_status, failure: k.failure,
+      group: k.group, group_name: k.group_name, multiplier: k.multiplier, rate_basis: k.rate_basis, rate_failure: k.rate_failure })) };
 }
 export function catalogProblemText(code: ProblemCode): string {
   if (code === 'conflict') return '配置版本已变化。请重新读取配置后再查询目录；没有覆盖配置。';

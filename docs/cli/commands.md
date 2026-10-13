@@ -315,7 +315,7 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 
 `--user-token-stdin` 读取独立的后台用户授权（sub2api JWT、NewAPI/OneAPI 用户 access token）；不能使用 `--secret` 参数传入。空 stdin 拒绝；与 `--clear-user-token` 互斥。未指定令牌选项时，仅平台、后台根地址和用户 ID 都不变才保留原令牌；改变其中任一项会清除。后台地址由请求地址推导时，修改请求地址也清除令牌；显式独立后台地址不受此影响。复制供应商不复制用户授权，即使指定 `--copy-keys`；改名保留，删除级联清除。凭据存于本机受限数据库，不能理解为数据库列加密。
 
-`--key` 默认优先已启用的 `default`，否则回退首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。调用者须确保该数字对应希望查询的站点 Key；兼容层不猜测二者映射。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询使用该数字读取绑定分组。
+`--key` 默认优先已启用的 `default`，否则回退首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。显式指定时，调用者须确保该数字对应希望查询的站点 Key。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询在该数字为0（默认）时，通过用户账户列表核对所选保存的完整密钥后读取分组；最多4页各100条。NewAPI 的掩码需通过固定的 POST `/api/token/{id}/key` 读取完整密钥核对，掩码本身不能证明身份；找不到返回 `key_not_found`。正整数仍直接读取指定远端 Key 的绑定分组。
 
 | 功能 | sub2api | NewAPI | 原版 OneAPI |
 | --- | --- | --- | --- |
@@ -324,15 +324,15 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 | Key 额度 | Key 查询总额度／滚动窗口，未限额不等于钱包无限 | Key 查询 remaining / used / limit / unlimited | 用户授权 + remote-key-id 查 Key，保留原始 quota |
 | 请求账单 | 用户授权分页；Key 范围另需 remote-key-id | 用户授权分页，或 Key 查近期批次 | 用户授权分页；Key 范围返回 unsupported_key_filter |
 | 实际扣费及 tokens | USD actual_cost、输入输出、缓存、费用分项 | quota、输入输出及已有缓存／音频等数值明细 | quota、基础字段；token 语义标记待核验 |
-| 当前有效分组倍率 | 用户授权 + remote-key-id，个人覆盖优先 | 用户授权 + remote-key-id，用户身份定价；auto 返回 unknown | unsupported |
+| 当前有效分组倍率 | 用户授权，默认自动核对所选 Key；可显式 remote-key-id，个人覆盖优先 | 用户授权，默认自动核对所选 Key；可显式 remote-key-id，用户身份定价；auto 返回 unknown | unsupported |
 
 `usage-records` 的 `--scope` 默认 `account`，可选 `key`。`--page` 默认1，上限100000；`--page-size` 默认50，范围1..100。sub2api 和 NewAPI 用户日志正常分页；NewAPI Key 日志只支持第1页且批次大小由站点决定，`history=recent`、`page_size=0`、`total=null`、`has_more=false`，不表示完整历史。原版 OneAPI 使用站点固定分页大小，返回 `page_size=0`、`total=null`，非空页 `has_more=true`，需空末页确定结束。所有记录受上游默认时间范围、日志保留和站点开关限制；这不是 Anchor 本地 `usage show` 或 `logs list`。
 
 查询 stdout 为 `{provider_id, key_id, remote_key_id?, revision, platform, operation, observed_at, source, http_status, failure?, balance?, key_quota?, records?, effective_rate?}`，按操作只返回对应 payload。金额为 `{value, unit}`，`unit=USD` 或站点内部 `quota`，不猜汇率或默认换算。额度以 `scope` 区分账户和 Key，字段未知为 null，不能当作0；`unlimited=true` 仅表示 Key 自身不设上限。账单含 `charged_amount`、可选 `base_amount`、`billing_source`（NewAPI 已报告 wallet/subscription 时）、历史 `rate_multiplier`、tokens、已知内建工具的 tool_charges（次数与站点原始价格）和数值明细白名单；原始提示词、IP、后台信息及原始日志正文不返回。NewAPI 的日志 id 不是稳定标识，`id_stable=false`，有 `request_id` 时可关联请求；不承诺所有平台存在该字段。原版 OneAPI 的 token 字段标记 `platform_fields_unverified`，部分非文本计费可能不是实际 token 数。当前分组倍率是查询时快照，不替代历史账单扣费，也不自动写入候选路由。
 
-模型查询仍用前一节 `provider models` 的输出和边界；其他查询最多8次 GET、累计2 MiB响应，共用供应商超时与8秒的较小值，遵守全局／供应商并发限制，不重试、不跟随重定向，沿用核心上游传输策略（不读环境代理）。后台兼容路径和完整数据契约见 [供应商接口语义](../design/provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。
+模型查询仍用前一节 `provider models` 的输出和边界；其他查询最多8次请求（NewAPI 掩码核对包含固定 POST 读接口）、累计2 MiB响应，共用供应商超时与8秒的较小值，遵守全局／供应商并发限制，不重试、不跟随重定向，沿用核心上游传输策略（不读环境代理）。后台兼容路径和完整数据契约见 [供应商接口语义](../design/provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。
 
-管理错误（参数、实例、授权、revision、Key 不存在）非零退出且不请求上游。上游能力失败仍输出 JSON 并退出0，需检查 `failure`，包括 `platform_required`、`auth_required`、`remote_key_required`、`unsupported`、`unsupported_key_filter`、`unsupported_pagination`、`unknown`、`authentication`、`permission_denied`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`、`upstream_rejected`。失败不返回部分 payload，上游错误正文不暴露。
+管理错误（参数、实例、授权、revision、Key 不存在）非零退出且不请求上游。上游能力失败仍输出 JSON 并退出0，需检查 `failure`，包括 `platform_required`、`auth_required`、`remote_key_required`、`key_not_found`、`unsupported`、`unsupported_key_filter`、`unsupported_pagination`、`unknown`、`authentication`、`permission_denied`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`、`upstream_rejected`。失败不返回可用额度或账单；自动核对分组倍率失败时可保留已知分组但 multiplier=null，上游错误正文不暴露。
 
 ## 6. 公开模型与候选路由
 
@@ -526,7 +526,7 @@ anchor recover [--id ID]
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
-| 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，账单与倍率页面未接入；原版 OneAPI 能力缺口如上表 |
+| 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，当前源码账户／模型映射页已接分组倍率，账单页面未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
 | 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --multiplier 1 --tools --streaming | 桌面新建默认开启两项能力；CLI 默认不变。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |

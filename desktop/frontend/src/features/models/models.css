@@ -1,0 +1,7 @@
+.mapping-candidate { border: 1px solid hsl(var(--border)); border-radius: 8px; overflow: hidden; }
+.mapping-candidate .candidate { border: 0; border-radius: 0; width: 100%; flex-wrap: wrap; }
+.mapping-rates { padding: 8px 12px; border-top: 1px solid hsl(var(--border)); display: grid; gap: 6px; }
+.mapping-route-rate, .group-rate-value { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.mapping-rate-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.mapping-rates .card-hint { margin: 0; font-size: 11px; }
+.mapping-rates .feedback { font-size: 12px; padding: 8px; }

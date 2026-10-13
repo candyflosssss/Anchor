@@ -3,6 +3,7 @@ import { RefreshCw, LoaderCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { requestURLError } from './provider.model';
 import { accountFailureText, amountText, platformLabels, type AccountObservation, type AccountSettings, type AccountQuery } from './provider-account.model';
+import { GroupRateObservation } from './provider-rate.view';
 import type { ProviderController } from './use-provider-controller';
 
 export function ProviderAccountView({ c }: { c: ProviderController }) {
@@ -44,12 +45,16 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
     setToken(''); // Never keep a submitted credential in the visible form, including failures.
     await a.save({ provider_id: s.provider_id, expected_revision: s.revision, platform, site_url: siteURL.trim(), user_id: Number(uid), user_token: userToken });
   }
-  function query(operation: 'balance' | 'key-quota') {
+  function query(operation: 'balance' | 'key-quota' | 'effective-rate') {
     if (queryDisabled) return;
     setFormError('');
     let remote = 0;
     if (operation === 'key-quota' && oneAPI) {
       if (!/^\d+$/.test(remoteID) || !Number.isSafeInteger(+remoteID) || +remoteID < 1) { setFormError('请填写 OneAPI 后台中该令牌的正整数 ID；它不是 Anchor 的本地 Key 名称。'); return; }
+      remote = +remoteID;
+    }
+    if (operation === 'effective-rate' && remoteID.trim()) {
+      if (!/^\d+$/.test(remoteID.trim()) || !Number.isSafeInteger(+remoteID) || +remoteID < 1) { setFormError('后台 Key ID 必须为安全范围内的正整数；留空可自动核对所选 Key。'); return; }
       remote = +remoteID;
     }
     const input: AccountQuery = { provider_id: s.provider_id, expected_revision: s.revision, operation, key_id: keyID, remote_key_id: remote };
@@ -76,7 +81,13 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
     </section>
     <section className="detail-card">
       <div className="card-toolbar"><h2>查询使用的 Key</h2><select className="select-field" aria-label="余额查询 Key" disabled={disabled} value={keyID} onChange={e => { setKeyID(e.target.value); setRemoteID(''); a.clearObservations(); }}><option value="">默认 Key（优先 default）</option>{keys.map(k => <option key={k.id} value={k.id}>{k.id}{k.enabled ? '' : '（已停用）'}</option>)}</select></div>
+      {!oneAPI && <div className="field account-remote"><label htmlFor="account-rate-key-id">后台 Key ID（查询分组倍率时可选）</label><input id="account-rate-key-id" inputMode="numeric" value={remoteID} disabled={disabled} onChange={e => { setRemoteID(e.target.value); a.clearObservations(); }} placeholder="留空，自动核对所选 Key" /><p className="card-hint">需要平台用户授权。填写 ID 时查询该远端 Key 的分组；请在平台后台核对与所选 Key 的对应关系。</p></div>}
       {oneAPI && <div className="field account-remote"><label htmlFor="account-remote-id">OneAPI 后台令牌 ID（查询 Key 额度时必填）</label><input id="account-remote-id" inputMode="numeric" value={remoteID} disabled={disabled} onChange={e => { setRemoteID(e.target.value); a.clearObservations(); }} placeholder="例如 123；请在 OneAPI 后台核对" /></div>}
+    </section>
+    <section className="detail-card">
+      <div className="card-toolbar"><h2>分组倍率</h2><Button variant="outline" size="sm" disabled={queryDisabled} onClick={() => query('effective-rate')}><RefreshCw size={14} />刷新分组倍率</Button></div>
+      <GroupRateObservation value={a.rate} />
+      <p className="card-hint">这是查询 Key 的平台分组倍率。模型映射中的路由倍率单独保存，查询不会修改路由。</p>
     </section>
     <div className="overview-grid">
       <Observation title="账户余额" value={a.balance} disabled={queryDisabled} onRefresh={() => query('balance')} />

@@ -1,5 +1,5 @@
 import accountFixture from '../../../../contract/provider-account.json';
-import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountObservation } from './provider-account.model';
+import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountObservation, AccountRateObservation } from './provider-account.model';
 import mappingFixture from '../../../../contract/provider-model-mapping.json';
 import workspaceFixture from '../../../../contract/provider-workspace.json';
 import { checkedWorkspace, type Action, type Workspace } from './provider-features.model';
@@ -68,6 +68,16 @@ export class MockProviderTransport implements ProviderTransport {
     this.accounts.set(p.id, v);
     if (this.scenario === 'unknown') { this.scenario = 'normal'; throw new ProviderProblem('unknown'); }
     return { ...v };
+  }
+  async rate(q: AccountQuery, signal: AbortSignal): Promise<AccountRateObservation> {
+    await delay(signal);
+    const settings = await this.accountSettings(q.provider_id, signal);
+    if (settings.revision !== q.expected_revision) throw new ProviderProblem('conflict');
+    const platform = settings.platform && settings.platform !== 'auto' ? settings.platform : 'sub2api';
+    const failure = platform === 'oneapi' ? 'unsupported' : !settings.has_user_token ? 'auth_required' : '';
+    return { ...accountFixture.rate, provider_id: q.provider_id, revision: q.expected_revision, platform,
+      key_id: q.key_id || 'default', remote_key_id: q.remote_key_id, observed_at: new Date().toISOString(), failure,
+      rate: failure ? null : { ...accountFixture.rate.rate } };
   }
   async allowance(q: AccountQuery, signal: AbortSignal): Promise<AccountObservation> {
     await delay(signal);

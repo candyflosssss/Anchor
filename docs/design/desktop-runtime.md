@@ -94,3 +94,9 @@ ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径�
 ### 列表余额与自动平台（2026-10-13，当前源码未发布）
 
 ProviderAllowance 增量接受 balance-summary，返回 account 或 key scope 与本次识别的平台。缺少／auto 配置由核心探测；列表只使用默认推理 Key，保存的独立用户授权只供显式账户查询等既有用途。沿用 anchor-desktop-v1、现有管理认证、revision、宿主有界上下文和共享样例；DTO 字段不变，生成 TS 无结构变化。无新增任意网络桥接或数据迁移。
+
+### 2026-10-13 账户分组倍率查询（当前源码）
+
+新增受限 `Bridge.ProviderRate(AccountQuery)`，只接受 `operation=effective-rate`，复用 client → core 查询及 revision、超时和安全整数校验。返回 `AccountRateObservationResult`，包含查询身份、Key、平台、时间、失败及 `rate={group,group_name,multiplier,basis}`；multiplier 为十进制字符串或 null，用户令牌与推理密钥不返回。remote_key_id=0 时核心验证所选保存的 Key 与平台账户对应关系；正整数保持指定远端 Key 的原有语义。未知分组可保留组名但倍率为 null；前端不推断 1。
+
+账户页和模型映射页通过 AccountTransport.rate 调用，前端不访问平台 URL。共享样例 desktop/contract/provider-account.json 的 rate 同时由 Go DTO 漂移检查、前端 Model 与 Mock 使用；观察值不会写入模型映射或改变路由策略。

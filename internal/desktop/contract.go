@@ -176,7 +176,7 @@ type SaveAccountSettings struct {
 type AccountQuery struct {
 	ProviderID       string `json:"provider_id"`
 	ExpectedRevision int64  `json:"expected_revision"`
-	// Operation is balance (wallet), key-quota, or balance-summary (default-key account/key scope).
+	// Operation is balance, key-quota, balance-summary, or effective-rate (via ProviderRate).
 	Operation   string `json:"operation"`
 	KeyID       string `json:"key_id"`
 	RemoteKeyID int64  `json:"remote_key_id"`
@@ -221,4 +221,30 @@ type AccountObservationResult struct {
 	Contract string              `json:"contract"`
 	Data     *AccountObservation `json:"data"`
 	Problem  *Problem            `json:"problem"`
+}
+
+// Platform rates are observations of a selected Key's group, independent of
+// the saved model mapping's routing multiplier. A missing rate is never 1.
+type AccountRate struct {
+	Group      string  `json:"group"`
+	GroupName  string  `json:"group_name"`
+	Multiplier *string `json:"multiplier"`
+	Basis      string  `json:"basis"`
+}
+type AccountRateObservation struct {
+	ProviderID  string       `json:"provider_id"`
+	Revision    int64        `json:"revision"`
+	Platform    string       `json:"platform"`
+	Operation   string       `json:"operation"`
+	KeyID       string       `json:"key_id"`
+	RemoteKeyID int64        `json:"remote_key_id"`
+	ObservedAt  string       `json:"observed_at"`
+	HTTPStatus  int          `json:"http_status"`
+	Failure     string       `json:"failure"`
+	Rate        *AccountRate `json:"rate"`
+}
+type AccountRateObservationResult struct {
+	Contract string                  `json:"contract"`
+	Data     *AccountRateObservation `json:"data"`
+	Problem  *Problem                `json:"problem"`
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../../../../contract/provider-account.json';
-import { amountText, checkedAccountObservation, checkedAccountSettings } from './provider-account.model';
+import { amountText, checkedAccountObservation, checkedAccountSettings, checkedAccountRate } from './provider-account.model';
 import { DesktopProviderTransport } from '../../desktop/transport';
 import { CONTRACT, type DesktopBridge } from '../../desktop/contract.generated';
 const balanceQuery = { provider_id: 'demo', expected_revision: 3, operation: 'balance', key_id: '', remote_key_id: 0 };
@@ -68,5 +68,26 @@ describe('account desktop transport', () => {
     const abort = new AbortController();
     const t = new DesktopProviderTransport(() => ({ ProviderAllowance: async () => { abort.abort(); return { contract: CONTRACT, data: fixture.balance, problem: null }; } } as unknown as DesktopBridge));
     await expect(t.allowance(balanceQuery, abort.signal)).rejects.toThrow();
+  });
+});
+
+describe('group rate contract', () => {
+  const query = { provider_id: 'demo', expected_revision: 3, operation: 'effective-rate', key_id: 'default', remote_key_id: 0 };
+  it('preserves precision and accepts unknown auto groups without inventing 1', () => {
+    expect(checkedAccountRate(fixture.rate, query)).toEqual(fixture.rate);
+    const auto = { ...fixture.rate, platform: 'newapi', failure: 'unknown', rate: { ...fixture.rate.rate, group: 'auto', multiplier: null } };
+    expect(checkedAccountRate(auto, query).rate?.multiplier).toBeNull();
+    expect(checkedAccountRate({ ...auto, rate: null }, query).rate).toBeNull();
+  });
+  it('rejects stale, malformed, negative, missing and failed positive observations', () => {
+    for (const patch of [{ revision: 2 }, { key_id: 'other' }, { operation: 'balance' }, { rate: null },
+      { rate: { ...fixture.rate.rate, multiplier: '-1' } }, { rate: { ...fixture.rate.rate, multiplier: 'NaN' } },
+      { failure: 'authentication' }, { rate: { ...fixture.rate.rate, basis: 'guess' } }]) {
+      expect(() => checkedAccountRate({ ...fixture.rate, ...patch }, query)).toThrow('read_error');
+    }
+  });
+  it('uses only the rate bridge and drops unexpected response properties', async () => {
+    const t = new DesktopProviderTransport(() => ({ ProviderRate: async () => ({ contract: CONTRACT, data: { ...fixture.rate, secret: 'discard', rate: { ...fixture.rate.rate, secret: 'discard' } }, problem: null }) } as unknown as DesktopBridge));
+    expect(await t.rate(query, signal())).toEqual(fixture.rate);
   });
 });

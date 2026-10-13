@@ -1,11 +1,12 @@
-import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation } from '../../desktop/contract.generated';
+import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation, AccountRate, AccountRateObservation } from '../../desktop/contract.generated';
 import { ProviderProblem, requestURLError } from './provider.model';
-export type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation };
+export type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation, AccountRate, AccountRateObservation };
 export const platformLabels: Record<string, string> = { auto: '自动探测', sub2api: 'sub2api', newapi: 'NewAPI', oneapi: 'OneAPI' };
 export interface AccountTransport {
   accountSettings?(id: string, signal: AbortSignal): Promise<AccountSettings>;
   saveAccount?(input: SaveAccountSettings, signal: AbortSignal): Promise<AccountSettings>;
   allowance?(input: AccountQuery, signal: AbortSignal): Promise<AccountObservation>;
+  rate?(input: AccountQuery, signal: AbortSignal): Promise<AccountRateObservation>;
 }
 const safeID = (n: number) => Number.isSafeInteger(n) && n >= 0;
 export function checkedAccountSettings(v: AccountSettings, id: string): AccountSettings {
@@ -54,4 +55,29 @@ export const accountFailureText: Record<string, string> = {
   http_error: '平台接口请求失败，请检查站点是否支持此功能。',
   too_large: '平台响应超过安全读取范围。',
   invalid_request: '查询参数无效，请重新读取配置。',
+};
+
+export function checkedAccountRate(v: AccountRateObservation, q: AccountQuery): AccountRateObservation {
+  if (!v || q.operation !== 'effective-rate' || v.operation !== q.operation || v.provider_id !== q.provider_id || v.revision !== q.expected_revision ||
+    !['', ...Object.keys(platformLabels)].includes(v.platform) || typeof v.key_id !== 'string' || !v.key_id || (q.key_id && v.key_id !== q.key_id) || v.remote_key_id !== q.remote_key_id ||
+    typeof v.observed_at !== 'string' || !Number.isFinite(Date.parse(v.observed_at)) || !Number.isInteger(v.http_status) || v.http_status < 0 || v.http_status > 599 ||
+    typeof v.failure !== 'string' || v.failure.length > 64 || (!v.failure && ['', 'auto'].includes(v.platform))) throw new ProviderProblem('read_error');
+  const r = v.rate;
+  if (r !== null && (!r || typeof r.group !== 'string' || !r.group || r.group.length > 128 || typeof r.group_name !== 'string' || r.group_name.length > 256 ||
+    !['personal_override', 'authenticated_group'].includes(r.basis) ||
+    (r.multiplier !== null && (typeof r.multiplier !== 'string' || r.multiplier.length > 128 || !/^(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(r.multiplier) || !Number.isFinite(Number(r.multiplier)) || Number(r.multiplier) < 0)))) throw new ProviderProblem('read_error');
+  if (v.failure ? r?.multiplier != null : r?.multiplier == null) throw new ProviderProblem('read_error');
+  return { provider_id: v.provider_id, revision: v.revision, platform: v.platform, operation: v.operation, key_id: v.key_id, remote_key_id: v.remote_key_id,
+    observed_at: v.observed_at, http_status: v.http_status, failure: v.failure,
+    rate: r === null ? null : { group: r.group, group_name: r.group_name, multiplier: r.multiplier, basis: r.basis } };
+}
+export const rateBasisText: Record<string, string> = { personal_override: '个人倍率覆盖', authenticated_group: '已认证分组倍率' };
+export const rateFailureText: Record<string, string> = {
+  ...accountFailureText,
+  auth_required: '查询分组倍率需要平台用户令牌及所选推理 Key；请在账户页保存授权。',
+  remote_key_required: '请填写该站后台的 Key ID，或留空以核对当前保存的 Key。',
+  key_not_found: '平台账户中未找到所选 Key；请核对用户授权、Key 或后台 Key ID。',
+  unknown: '分组倍率未知。自动分组可能按请求选择分组，无法显示一个固定倍率。',
+  unsupported: '该平台未提供可读取的分组倍率；原版 OneAPI 不支持此查询。',
+  invalid_response: '平台没有返回有效的分组倍率，无法确认数值。',
 };

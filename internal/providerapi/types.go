@@ -200,7 +200,7 @@ func (a *Adapter) key() error {
 
 // Query resets a bounded operation. A single adapter is owned by one query.
 func (a *Adapter) Query(ctx context.Context, q Query) Result {
-	return a.query(ctx, q, false)
+	return a.query(ctx, q, q.Operation == "effective-rate" && q.RemoteKeyID == 0)
 }
 
 // QueryKeyRate resolves this saved inference credential against the authorized
@@ -246,6 +246,12 @@ func (a *Adapter) query(ctx context.Context, q Query, resolveKey bool) Result {
 			}
 		default:
 			err = failure("unsupported") // models uses the shared catalog reader in core
+		}
+	}
+	if err == nil && q.Operation == "effective-rate" && out.EffectiveRate != nil && out.EffectiveRate.Multiplier != nil {
+		value, parseErr := strconv.ParseFloat(out.EffectiveRate.Multiplier.String(), 64)
+		if parseErr != nil || value < 0 {
+			err = failure("invalid_response")
 		}
 	}
 	out.Source = append(out.Source, a.paths...)

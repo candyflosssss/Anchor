@@ -107,3 +107,44 @@ func accountAllowance(v *providerapi.Allowance) *AccountAllowance {
 	}
 	return out
 }
+
+// ProviderRate reads the saved Key's authenticated group, using the core's
+// bounded identity lookup when no remote ID is provided. It never saves a mapping.
+func (b *Bridge) ProviderRate(in AccountQuery) AccountRateObservationResult {
+	out := AccountRateObservationResult{Contract: Contract}
+	if !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 || in.ExpectedRevision > MaxSafeRevision || in.RemoteKeyID < 0 || in.RemoteKeyID > MaxSafeRevision || (in.KeyID != "" && !state.ValidID(in.KeyID)) || in.Operation != "effective-rate" {
+		out.Problem = &Problem{"invalid"}
+		return out
+	}
+	s := b.session
+	s.mu.Lock()
+	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	cl, _, err := s.connection(ctx)
+	s.mu.Unlock()
+	defer cancel()
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	defer cl.Close()
+	v, err := cl.QueryProvider(ctx, providerapi.Query{ProviderID: in.ProviderID, ExpectedRevision: in.ExpectedRevision, Operation: in.Operation, KeyID: in.KeyID, RemoteKeyID: in.RemoteKeyID})
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	if v.ProviderID != in.ProviderID || v.Revision != in.ExpectedRevision || v.Operation != in.Operation || v.RemoteKeyID != in.RemoteKeyID || (in.KeyID != "" && v.KeyID != in.KeyID) {
+		out.Problem = &Problem{"read_error"}
+		return out
+	}
+	var rate *AccountRate
+	if v.EffectiveRate != nil {
+		r := v.EffectiveRate
+		rate = &AccountRate{Group: r.Group, GroupName: r.GroupName, Basis: r.Basis}
+		if r.Multiplier != nil {
+			n := r.Multiplier.String()
+			rate.Multiplier = &n
+		}
+	}
+	out.Data = &AccountRateObservation{ProviderID: v.ProviderID, Revision: v.Revision, Platform: v.Platform, Operation: v.Operation, KeyID: v.KeyID, RemoteKeyID: v.RemoteKeyID, ObservedAt: v.ObservedAt, HTTPStatus: v.HTTPStatus, Failure: v.Failure, Rate: rate}
+	return out
+}

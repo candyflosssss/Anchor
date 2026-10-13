@@ -17,11 +17,12 @@ func TestSharedAccountFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var v struct {
-		Settings   AccountSettings    `json:"settings"`
-		Balance    AccountObservation `json:"balance"`
-		Quota      AccountObservation `json:"quota"`
-		Summary    AccountObservation `json:"summary"`
-		KeySummary AccountObservation `json:"key_summary"`
+		Rate       AccountRateObservation `json:"rate"`
+		Settings   AccountSettings        `json:"settings"`
+		Balance    AccountObservation     `json:"balance"`
+		Quota      AccountObservation     `json:"quota"`
+		Summary    AccountObservation     `json:"summary"`
+		KeySummary AccountObservation     `json:"key_summary"`
 	}
 	if err := json.Unmarshal(raw, &v); err != nil {
 		t.Fatal(err)
@@ -200,5 +201,121 @@ func TestAccountBridgeAutomaticallyDetectsSummary(t *testing.T) {
 	}
 	if stale := b.ProviderAllowance(q); stale.Problem == nil || stale.Problem.Code != "conflict" {
 		t.Fatal(stale)
+	}
+}
+
+func TestRateBridgeCoreUpstream(t *testing.T) {
+	for _, tc := range []struct {
+		name, platform, group, failure string
+		authorized, personal           bool
+	}{
+		{"personal", "sub2api", "7", "", true, true},
+		{"default", "sub2api", "7", "", true, false},
+		{"newapi", "newapi", "vip", "", true, false},
+		{"auto", "newapi", "auto", "unknown", true, false},
+		{"missing-auth", "sub2api", "7", "auth_required", false, false},
+		{"oneapi", "oneapi", "", "unsupported", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			key, token := "synthetic-inference-123", "synthetic-user-jwt"
+			calls := 0
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				if r.Header.Get("Authorization") != "Bearer "+token {
+					t.Error("incorrect user authorization")
+				}
+				if tc.platform == "newapi" && r.Header.Get("New-Api-User") != "9" {
+					t.Error("missing user ID")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				switch r.URL.Path {
+				case "/proxy/api/v1/keys":
+					fmt.Fprintf(w, `{"data":{"items":[{"id":42,"key":%q}],"total":1}}`, key)
+				case "/proxy/api/token/":
+					fmt.Fprint(w, `{"success":true,"data":{"items":[{"id":42,"key":"synthetic*****-123"}],"total":1}}`)
+				case "/proxy/api/token/42/key":
+					if r.Method != "POST" {
+						t.Error("key read must be POST")
+					}
+					fmt.Fprintf(w, `{"success":true,"data":{"key":%q}}`, key)
+				case "/proxy/api/v1/keys/42":
+					fmt.Fprint(w, `{"data":{"group_id":7,"group":{"name":"标准组"}}}`)
+				case "/proxy/api/token/42":
+					fmt.Fprintf(w, `{"success":true,"data":{"group":%q}}`, tc.group)
+				case "/proxy/api/v1/groups/rates":
+					if tc.personal {
+						fmt.Fprint(w, `{"data":{"7":0.80000000000000001}}`)
+					} else {
+						fmt.Fprint(w, `{"data":null}`)
+					}
+				case "/proxy/api/v1/groups/available":
+					fmt.Fprint(w, `{"data":[{"id":7,"name":"标准组","rate_multiplier":0.80000000000000001}]}`)
+				case "/proxy/api/pricing":
+					fmt.Fprint(w, `{"success":true,"group_ratio":{"vip":0.80000000000000001}}`)
+				default:
+					t.Errorf("unexpected request %s", r.URL.Path)
+					w.WriteHeader(404)
+				}
+			}))
+			defer upstream.Close()
+			b := NewBridge(testSession(t))
+			requireReady(t, b)
+			saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "rates", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
+			if saved.Problem != nil {
+				t.Fatal(saved)
+			}
+			cfg := SaveAccountSettings{ProviderID: "rates", ExpectedRevision: 1, Platform: tc.platform, UserID: 9}
+			if tc.authorized {
+				cfg.UserToken = &token
+			}
+			configured := b.SaveProviderAccount(cfg)
+			if configured.Problem != nil {
+				t.Fatal(configured)
+			}
+			q := AccountQuery{ProviderID: "rates", ExpectedRevision: 2, Operation: "effective-rate"}
+			result := b.ProviderRate(q)
+			if result.Problem != nil || result.Data == nil {
+				t.Fatal(result)
+			}
+			v := result.Data
+			if v.Failure != tc.failure || v.Revision != 2 || v.KeyID != "default" || v.RemoteKeyID != 0 {
+				t.Fatalf("unexpected rate %+v", v)
+			}
+			if tc.failure == "" {
+				if v.Rate == nil || v.Rate.Multiplier == nil || *v.Rate.Multiplier != "0.80000000000000001" || v.Rate.Group != tc.group {
+					t.Fatalf("rate %+v", v.Rate)
+				}
+				basis := "authenticated_group"
+				if tc.personal {
+					basis = "personal_override"
+				}
+				if v.Rate.Basis != basis {
+					t.Fatal(v.Rate)
+				}
+			} else if v.Rate != nil && v.Rate.Multiplier != nil {
+				t.Fatal("failed query returned a rate")
+			}
+			if !tc.authorized && calls != 0 {
+				t.Fatal("query without auth sent upstream requests")
+			}
+			if tc.name == "auto" && (v.Rate == nil || v.Rate.Group != "auto") {
+				t.Fatal("lost unknown group")
+			}
+			raw, _ := json.Marshal(result)
+			if strings.Contains(string(raw), key) || strings.Contains(string(raw), token) {
+				t.Fatal("secret echoed")
+			}
+			q.ExpectedRevision = 1
+			stale := b.ProviderRate(q)
+			if stale.Problem == nil || stale.Problem.Code != "conflict" {
+				t.Fatal(stale)
+			}
+			for _, bad := range []AccountQuery{{ProviderID: "rates", ExpectedRevision: 2, Operation: "balance"}, {ProviderID: "rates", ExpectedRevision: 2, Operation: "effective-rate", RemoteKeyID: MaxSafeRevision + 1}} {
+				invalid := b.ProviderRate(bad)
+				if invalid.Problem == nil || invalid.Problem.Code != "invalid" {
+					t.Fatal(invalid)
+				}
+			}
+		})
 	}
 }
