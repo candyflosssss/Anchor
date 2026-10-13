@@ -1,0 +1,57 @@
+# models.dev 模型参考目录契约
+
+状态：2026-10-13 当前源码，未发布。已实现共享目录、核心管理 API、Go 客户端、CLI、桌面桥接及前端 Model 方法。模型映射自动填充、日志逐请求参考价／实际费用对比和价格快照持久化待接入。
+
+## 数据与身份
+
+固定来源 `https://models.dev/api.json`。这是社区维护的参考目录；官方供应商文档及实际请求账单仍需单独核对。模型按 `(provider_id, model_id)` 精确选择；供应商 ID 属于 models.dev，与 Anchor 本机供应商 ID 无自动对应关系。`canonical_model_id` 只保留原始声明，不自动跨供应商匹配。
+
+`ModelCatalogQuery`：`provider_id/model_id/search` 默认空，`limit` 默认0（模型列表实际取50，最大100），`refresh` 默认false。空 provider 返回供应商列表；只给 provider 返回模型列表，search 做 ID／名称子串过滤；给 provider+model 精确查询一条模型，不能同时 search。provider/model/search 最多128/256/128字节，无控制字符或首尾空白。未知供应商／模型返回 not_found；目录默认排序并给出 `total/truncated`。
+
+返回 `ModelCatalog`：`source=models.dev`、`fetched_at/expires_at`（Unix秒）、`version`（响应内容SHA256）、`stale/failure`，以及非空或空数组 `providers/models`。模型 `source_updated_at` 保留源目录 `last_updated`（可能缺失，不等同本次下载时间）。展示名称去除首尾空白；ID 不做修改。每次返回深拷贝，编辑默认值不会改变共享缓存。
+
+模型字段：
+
+- `capabilities`：输入／输出模态数组，视觉从输入 image 推导，attachment、tool_call、reasoning、structured_output、temperature 保留源布尔。未声明布尔为 null；模态未声明时视觉为 null。streaming 不在此目录契约中，不擅自补全。
+- `limits`：context、input、output 都可空。源目录的0限制归为未知，正整数保留，不根据 context 反推 input 或 output。
+- `reasoning_options`：保留 toggle、effort 和 budget_tokens。effort 可含 null 或 none/minimal/low/medium/high/xhigh/max/default，只保留实际值，不生成统一等级；budget min 可为-1（供应商自动预算）。未声明选项为空数组，即使 reasoning=true 也不猜选项。
+- `pricing` 可空；币种 USD、单位 per_million_tokens。input/output/cache_read/cache_write/reasoning/input_audio/output_audio 为可空十进制字符串，null未知、"0"免费。tiers 保留按上下文输入长度分档的精确阈值；存在精确 tiers 时优先于旧 context_over_200k，否则兼容旧200000阈值。未知源字段忽略，已支持字段类型／值无效则拒绝整个快照，保留已有缓存。
+
+models.dev 元数据是用户可核对的默认参考，不能证明某个中转商或 Key 的真实能力、实际可用性和收费倍率；不替代 Codex 的版本匹配完整 ModelInfo 模板。后续映射消费者应让用户明确选择来源和模型，保留人工覆盖，不用新参考值覆盖已保存配置。
+
+## 获取与缓存
+
+`internal/modeldev.Client` 使用独立 HTTP 客户端：GET 固定公开地址、30秒总超时、16MiB响应上限、最多一个该主机连接，不携带 Authorization，不允许重定向或推理探测；公开下载支持标准 HTTPS_PROXY／NO_PROXY 环境配置。解析上限1024供应商／50000模型。数值长度与指数在精确解析前限制，避免小型异常数字导致大整数无限分配。
+
+每个核心维护一个内存快照，TTL为1小时，首次需要时加载，不后台轮询、不写磁盘。并发刷新合并；`refresh=true` 显式刷新。失败有旧快照则返回旧值并标 `stale=true/failure=refresh_failed`，自动调用1分钟后重试；无快照返回 catalog_unavailable，1分钟内自动失败退避。显式刷新可以立即重试。调用取消只停止等待共享抓取；核心退出取消并等待抓取结束，关闭闲置连接。
+
+旧 `provider price-import` 也复用此缓存：只返回基础输入／输出／缓存单价预览，价格更新时间为快照获取时间；不能表示分档及陈旧状态，因此拒绝陈旧快照。用户核对后仍需 price-put，查询和刷新不写配置。
+
+## 文本 token 估算
+
+`CatalogEstimateInput={query,usage}`，query 必须精确指定 provider+model，limit=0。usage 的 input_tokens、output_tokens、cache_read_tokens、cache_write_tokens、reasoning_tokens 均可空；有值须为0..9007199254740991。输入总量**包含**缓存读写，输出总量**包含**思考 token。缓存之和不得超过输入，思考不得超过输出。供应商适配器须先规范化原始用量，尤其 Anthropic 等可能单独提供缓存计数；不能直接将各协议原始字段一一复制。
+
+纯函数 `modeldev.Estimate(model,usage)` 不发网络请求，后续日志可以对捕获的价格快照使用此函数。客户端 `Estimate` 方法先查询目录再调用纯函数，不应将它放入代理请求关键路径。
+
+输入估算=(总输入−缓存读−缓存写)×输入价；输出估算=(总输出−已知思考)×输出价；缓存读／写和思考各计一次。思考未单独定价时使用输出价；单独思考价与输出价相同则无需思考计数即可估总额。各分项除以1000000。选择输入总量严格超过阈值的最高分档，不对缓存进行阈值前扣除；分档率是完整档价，缺失字段保持未知，不擅自继承基础价。
+
+金额采用有界有理数计算，结果十进制字符串最多18位小数，舍入极小值可能为0。目录价以最多64字符、指数±308和不大于1000000 USD／百万 token 限制异常数据。
+
+结果 `CatalogEstimate` 携带目录来源／版本／陈旧状态、本次usage、`basis=text_tokens/currency=USD`、`usd` 及分项、`above_tokens` 和 `reason`。价格缺失、输入／输出未观测、缓存计数未观测、不同思考价但计数未观测，以及正数类别缺少单价，均 `usd=null` 并说明原因；已完成的分项可以存在，不代表完整总价。观测为0的类别计0，即使该类别价格缺失。目录已公布的音频单价仍保留供未来消费者；当前估算不纳入音视频／图像专用费、按请求费、平台倍率／折扣／税费或其他币种。
+
+后续日志应保留本次用量口径和捕获的目录版本／价格、估算状态，以及独立的真实账单来源／币种／倍率，不能拿后来刷新价格当历史账单。
+
+## 调用边界
+
+| 层 | 方法／路由 | 行为 |
+| --- | --- | --- |
+| 核心 | POST /control/v1/model-catalog/query | ModelCatalogQuery → ModelCatalog |
+| 核心 | POST /control/v1/model-catalog/estimate | CatalogEstimateInput → CatalogEstimate |
+| Go client | ModelCatalog / EstimateModelCost | 类型化只读POST，失败 Unknown=false，不自动重放 |
+| 桌面 Bridge | ModelCatalog / EstimateModelCost | 标准 anchor-desktop-v1 Result，复用当前本机实例和管理凭据，45秒方法超时 |
+| 前端 Model | modelCatalogService.query / estimate | 校验 DTO／精确模型身份／用量，拷贝并筛选字段；可用 AbortSignal 在调用前／返回后丢弃响应 |
+| CLI | catalog providers/models/model/estimate | JSON 只读入口，完整语法与未知计数见[指令大全 §13](../cli/commands.md#13-modelsdev-参考目录与本地费用估算当前源码未发布) |
+
+管理路由仍要求 management scope、实例 X-Anchor-Instance 和受限 Host／Origin，不能由浏览器直接跨源调用。invalid=400、not_found=404、catalog_unavailable=502；对外不泄露远端错误内容。桌面将目录不可用映射 read_error、传输断开 offline；纯读失败无需写入结果未知确认。前端取消只停止消费，不能取消已发到 Wails 的调用；调用取消只停止等待共享下载；核心退出和30秒抓取超时负责终止下载。
+
+DTO 由 Go 生成到 `desktop/contract.generated.ts`，共享离线样例 `desktop/contract/model-catalog.json` 在 Go 与前端验证。默认测试均离线；公开目录兼容检查显式 opt-in，不涉及凭据和付费推理。原生窗口／安装包和后续消费界面不在本轮验收范围。

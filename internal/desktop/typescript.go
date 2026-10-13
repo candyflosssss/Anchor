@@ -24,6 +24,9 @@ func TypeScript() string {
 		case reflect.Pointer:
 			return ts(t.Elem()) + " | null"
 		case reflect.Slice:
+			if t.Elem().Kind() == reflect.Pointer {
+				return "(" + ts(t.Elem()) + ")[]"
+			}
 			return ts(t.Elem()) + "[]"
 		case reflect.Map:
 			if t.Key().Kind() != reflect.String {
@@ -42,7 +45,7 @@ func TypeScript() string {
 			panic("unsupported contract type: " + t.String())
 		}
 	}
-	for _, v := range []any{RouteCandidate{}, ModelRouting{}, ModelRoutingState{}, ModelRoutingResult{}, ProbeRequest{}, ProbeProgress{}, ProbeProgressResult{}, AccountRate{}, AccountRateObservation{}, AccountRateObservationResult{}, AccountSettings{}, SaveAccountSettings{}, AccountQuery{}, AccountAmount{}, AccountWindow{}, AccountAllowance{}, AccountObservation{}, AccountSettingsResult{}, AccountObservationResult{}, CatalogTemplate{}, AgentTarget{}, AgentModel{}, ManagedAgent{}, AgentWorkspace{}, EnrollAgent{}, ManageAgent{}, AgentWorkspaceResult{}, Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ModelEntry{}, CatalogKey{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, ModelProtocol{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}, LogMetrics{}, LogAttempt{}, RequestLog{}, SystemLog{}, LogQuery{}, LogPage{}, LogHealth{}, LogSettings{}, LogsResult{}, LogDetailResult{}, LogSettingsResult{}} {
+	for _, v := range []any{ModelCatalogQuery{}, CatalogProvider{}, CatalogCapabilities{}, CatalogLimits{}, ReasoningOption{}, CatalogRates{}, CatalogTier{}, CatalogPricing{}, CatalogModel{}, ModelCatalog{}, CatalogUsage{}, CatalogEstimateInput{}, CatalogEstimate{}, ModelCatalogResult{}, CatalogEstimateResult{}, RouteCandidate{}, ModelRouting{}, ModelRoutingState{}, ModelRoutingResult{}, ProbeRequest{}, ProbeProgress{}, ProbeProgressResult{}, AccountRate{}, AccountRateObservation{}, AccountRateObservationResult{}, AccountSettings{}, SaveAccountSettings{}, AccountQuery{}, AccountAmount{}, AccountWindow{}, AccountAllowance{}, AccountObservation{}, AccountSettingsResult{}, AccountObservationResult{}, CatalogTemplate{}, AgentTarget{}, AgentModel{}, ManagedAgent{}, AgentWorkspace{}, EnrollAgent{}, ManageAgent{}, AgentWorkspaceResult{}, Problem{}, Provider{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ModelEntry{}, CatalogKey{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, ModelProtocol{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}, LogMetrics{}, LogAttempt{}, RequestLog{}, SystemLog{}, LogQuery{}, LogPage{}, LogHealth{}, LogSettings{}, LogsResult{}, LogDetailResult{}, LogSettingsResult{}} {
 		t := reflect.TypeOf(v)
 		fmt.Fprintf(&out, "export interface %s {\n", t.Name())
 		for i := 0; i < t.NumField(); i++ {

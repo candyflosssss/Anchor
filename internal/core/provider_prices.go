@@ -2,61 +2,56 @@ package core
 
 import (
 	"context"
-	"encoding/json"
-	"github.com/candyflosssss/Anchor/internal/catalog"
-	"github.com/candyflosssss/Anchor/internal/state"
-	"io"
-	"net/http"
+	"errors"
+	"strconv"
 	"time"
+
+	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/modeldev"
+	"github.com/candyflosssss/Anchor/internal/state"
 )
 
 func (s *Server) importPrice(ctx context.Context, alias, providerID, model string) (*catalog.Price, error) {
-	if !state.ValidID(alias) || !state.ValidID(providerID) || model == "" || len(model) > 256 {
+	if !state.ValidID(alias) || providerID == "" || model == "" {
 		return nil, state.ErrInvalid
 	}
-	select {
-	case s.slots <- struct{}{}:
-		defer func() { <-s.slots }()
-	default:
-		return nil, state.ErrConflict
-	}
-	ctx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://models.dev/api.json", nil)
+	result, err := s.modelCatalog.Query(ctx, modeldev.ModelCatalogQuery{ProviderID: providerID, ModelID: model})
 	if err != nil {
-		return nil, err
+		if errors.Is(err, modeldev.ErrInvalid) {
+			return nil, state.ErrInvalid
+		}
+		if errors.Is(err, modeldev.ErrNotFound) {
+			return nil, state.ErrNotFound
+		}
+		return nil, errors.New("model reference catalog unavailable")
 	}
-	resp, err := s.upstream.Do(req)
-	if err != nil {
-		return nil, err
+	// The legacy price form cannot display catalog staleness or price tiers.
+	if result.Stale {
+		return nil, errors.New("model reference catalog refresh failed")
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, state.ErrInvalid
-	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, (16<<20)+1))
-	if err != nil || len(raw) > 16<<20 {
-		return nil, state.ErrInvalid
-	}
-	return parsePrice(raw, alias, providerID, model)
+	return referencePrice(result.Models[0], alias, result.FetchedAt)
 }
-func parsePrice(raw []byte, alias, providerID, model string) (*catalog.Price, error) {
-	var data map[string]struct {
-		Models map[string]struct {
-			Cost *struct {
-				Input      *float64 `json:"input"`
-				Output     *float64 `json:"output"`
-				CacheRead  *float64 `json:"cache_read"`
-				CacheWrite *float64 `json:"cache_write"`
-			} `json:"cost"`
-		} `json:"models"`
-	}
-	if json.Unmarshal(raw, &data) != nil {
-		return nil, state.ErrInvalid
-	}
-	cost := data[providerID].Models[model].Cost
-	if cost == nil || cost.Input == nil || cost.Output == nil {
+func referencePrice(model modeldev.CatalogModel, alias string, fetchedAt int64) (*catalog.Price, error) {
+	if model.Pricing == nil || model.Pricing.Rates.Input == nil || model.Pricing.Rates.Output == nil {
 		return nil, state.ErrNotFound
 	}
-	return &catalog.Price{Model: alias, InputUSD: *cost.Input, OutputUSD: *cost.Output, CacheReadUSD: cost.CacheRead, CacheWriteUSD: cost.CacheWrite, Source: "models.dev/" + providerID + "/" + model, UpdatedAt: time.Now().Unix()}, nil
+	r := model.Pricing.Rates
+	value := func(v *string) *float64 {
+		if v == nil {
+			return nil
+		}
+		n, _ := strconv.ParseFloat(*v, 64)
+		return &n
+	}
+	return &catalog.Price{Model: alias, InputUSD: *value(r.Input), OutputUSD: *value(r.Output), CacheReadUSD: value(r.CacheRead), CacheWriteUSD: value(r.CacheWrite), Source: "models.dev/" + model.ProviderID + "/" + model.ID, UpdatedAt: fetchedAt}, nil
+}
+func parsePrice(raw []byte, alias, providerID, model string) (*catalog.Price, error) {
+	entry, err := modeldev.ParseModel(raw, providerID, model)
+	if err != nil {
+		if errors.Is(err, modeldev.ErrNotFound) {
+			return nil, state.ErrNotFound
+		}
+		return nil, state.ErrInvalid
+	}
+	return referencePrice(entry, alias, time.Now().Unix())
 }

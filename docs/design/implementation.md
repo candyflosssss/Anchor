@@ -196,3 +196,7 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 `internal/managed` 提供有界只读发现和 workspace/enroll/sync 应用服务，`internal/core` 提供已鉴权的 `/control/v1/agents/workspace`、`/enroll` 和 action=sync。已知用户目录识别产品痕迹，仅 Codex 可托管；不执行客户端或自动推理。Codex 从本地完整 models_cache.json 提取 client_version 和 ModelInfo，操作者核对版本及能力后批准，模板及排除选择存 Binding，而非修改共享供应商模型。目标本地策略也用于网关鉴权，single 与 all-compatible 共用元数据解析。限制和完整操作见 CLI 大全 §8。
 
 桌面受限 Bridge 复用同一 client/core；前端 feature agents 按 Model、hook Controller、View 分层，不拥有文件写入或业务路由。唯一写入者仍是托管 Engine；GUI 支持识别、批准登记、同步、启停及失败后重读。宿主在 GUI 初始化前只放行精确的 `--data-dir DIR agent token ID` 内部 helper，复用已有 CLI stdout 凭据契约，不暴露任意命令执行。
+
+## models.dev 参考目录基础（2026-10-13，当前源码）
+
+新增 `internal/modeldev`，共享1小时只读目录缓存、能力／限制／原始思考选项及文本 token 费用纯函数；管理面 `POST /control/v1/model-catalog/query` 与 `/estimate` 沿用管理鉴权和实例身份，CLI／桌面复用类型化客户端。旧基础价导入改用同一缓存。没有数据库迁移，不自动修改配置，也未接入映射默认填充或日志逐请求比价。契约、价格口径与缺口见[模型参考目录](model-catalog.md)。

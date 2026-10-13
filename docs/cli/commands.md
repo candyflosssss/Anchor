@@ -25,7 +25,7 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
 推荐把全局选项放在命令之前。当前解析器也会从整条参数列表提取全局选项。值选项可写 `--name VALUE` 或 `--name=VALUE`；布尔选项关闭时用 `--name=false`，不要写 `--name false`。除表中指定的位置参数外，不添加额外位置参数。
@@ -281,7 +281,7 @@ anchor usage
 | model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1。新模型 strategy 默认 round-robin（按倍率倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（路由倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；编辑 tools/streaming 默认 false，能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
 | model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，Binding 默认模型引用时409 referenced，事务回滚 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
-| price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；固定公开目录最多8秒/16MiB，无凭据/重定向/环境代理。只返回 imported_price **预览**，不保存；核对后另行 price-put |
+| price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；共享 catalog 的1小时缓存与固定公开目录最多30秒/16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY/NO_PROXY，拒绝陈旧快照；更新时间为快照获取时间，仅基础价不含分档。只返回 imported_price **预览**，不保存；核对后另行 price-put |
 
 推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。推理项修复已随 desktop.16 dev 发布。当前源码进一步修复文本元数据误判（未发布）：测试允许文本项携带 `logprobs`、非空 `annotations`，只检查文本和元数据容器，不保存其内容；跨协议转换边界保持原有要求。测试失败时，`logs detail REQUEST_ID` / `logs export` 的 `evidence.validation_reason` 提供固定原因：`invalid_json`（无效 JSON）、`missing_response_id`（缺少响应 ID）、`upstream_error`（上游错误或 failed）、`unsupported_content`（文本结构不支持）、`unsupported_output`（输出类型不支持）、`invalid_tool_call`（工具调用不完整）、`invalid_choices`（Chat Completions choices 不符合要求）、`refusal`（拒绝回复）；未分类错误使用 `invalid_structure`。此字段不含原始错误文本或未知字段名，历史日志不会补写。命令语法、`probe.failure` 和退出码不变。
 
@@ -384,7 +384,7 @@ anchor model routing --id ID --revision N --strategy RULE --candidate PROVIDER:M
 anchor model add --id anchor-code --candidate primary:upstream-model --tools --streaming
 ```
 
-元数据含真实模型指令、reasoning 选项、工具与上下文等。应从与远端 Codex 精确版本匹配的官方目录取出与实际上游能力相符的条目；不要凭模型名字虚构能力，也不要把不同供应商的模型随意冒充同一个模板。Anchor 不下载目录、不读取供应商密钥、不执行目录中的指令。导入需 JSON models 数组、唯一源 slug 和完整必需字段；无效/缺失/重复/超限拒绝。`model list` 会返回保存的元数据，普通网关 `/v1/models` 不返回这些指令。
+元数据含真实模型指令、reasoning 选项、工具与上下文等。应从与远端 Codex 精确版本匹配的官方目录取出与实际上游能力相符的条目；不要凭模型名字虚构能力，也不要把不同供应商的模型随意冒充同一个模板。Anchor 不自动下载 Codex 的版本匹配完整目录、不读取供应商密钥、不执行目录中的指令。导入需 JSON models 数组、唯一源 slug 和完整必需字段；无效/缺失/重复/超限拒绝。`model list` 会返回保存的元数据，普通网关 `/v1/models` 不返回这些指令。
 
 ```bash
 anchor model add --id anchor-code --candidate primary:upstream-model --tools --streaming \
@@ -557,6 +557,7 @@ anchor recover [--id ID]
 | 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
 | 平台自动识别与列表余额（desktop.27） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；NewAPI 已配置系统令牌时优先读账户余额，未配置时查默认 Key billing／额度；已随 desktop.27 投放 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
+| 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射自动填充与日志逐请求比价待接入，详见§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
@@ -640,3 +641,34 @@ anchor logs detail REQUEST_ID
 anchor logs export --kind requests --since 168h > anchor-logs.jsonl
 anchor logs configure --days 14 --max-requests 100000
 ```
+
+## 13. models.dev 参考目录与本地费用估算（当前源码，未发布）
+
+```bash
+anchor catalog providers [--refresh]
+anchor catalog models --provider ID [--search TEXT] [--limit 50] [--refresh]
+anchor catalog model --provider ID --model MODEL [--refresh]
+anchor catalog estimate --provider ID --model MODEL \
+  [--input-tokens N] [--output-tokens N] \
+  [--cache-read-tokens N] [--cache-write-tokens N] [--reasoning-tokens N] [--refresh]
+```
+
+前置条件：连接已初始化、已运行的核心，使用管理凭据和所选 Context 的实例身份；本机可先建立 local Context（§9）。远端 Context 沿用既有安全连接边界。所有命令只读、输出 JSON，不写模型映射、价格或日志，不调用推理。公开目录由所选核心获取和缓存，而不是 CLI 自行抓取。
+
+- `providers` 列出 models.dev 的供应商 ID、名称与模型数量。ID 不等于 Anchor 中配置的供应商名称。
+- `models` 列出指定供应商模型，`--search` 在模型 ID／名称中做不区分大小写的子串搜索；`--limit` 默认50，范围1..100；返回 `total/truncated`。
+- `model` 精确匹配 `--provider/--model`，返回输入／输出模态、视觉／工具／思考等能力、上下文／输入／输出限制、原始思考选项、USD 单价和上下文价格分档。没有模糊映射或跨供应商兜底；未声明字段返回 null，不把0上下文当可用限制，不生成猜测的思考等级。
+- `estimate` 返回当前目录与本次用量的文本 token 估算。计数省略或 `-1` 表示未知，显式0表示观测为零，其他值须为0..9007199254740991。输入总量包含缓存读写，输出总量包含思考 token；估算分别扣除以避免重复计价。缓存计数缺失返回 `usd:null/reason:missing_cache_usage`，而非擅自按0计算。思考价格与普通输出价不同但计数缺失时同样返回未知。单位为 USD／百万 token，单价与结果使用十进制字符串；结果最多保留18位小数。分档阈值按输入总 token 严格大于 `above_tokens` 生效。调用方必须先将供应商原始用量转换为此口径。
+
+共享固定 `https://models.dev/api.json`，最多30秒／16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY／NO_PROXY。缓存1小时，并发刷新合并；`--refresh` 强制尝试更新。自动刷新失败1分钟后重试，有旧快照时返回 `stale:true/failure:refresh_failed`，没有快照则报 `catalog_unavailable`；显式刷新仍可立即重试。结果包含 `fetched_at/expires_at`（Unix秒）、`version`（内容 SHA256）、模型 `source_updated_at`，没有实时账单保证。缺失价格或用量返回未知原因；非法参数、未知供应商／模型、无可用目录失败退出，读请求不自动重放。
+
+示例（先从 `providers/models` 选出精确 ID）：
+
+```bash
+anchor catalog model --provider PROVIDER_ID --model MODEL_ID
+anchor catalog estimate --provider PROVIDER_ID --model MODEL_ID \
+  --input-tokens 1000 --output-tokens 100 \
+  --cache-read-tokens 0 --cache-write-tokens 0 --reasoning-tokens 0
+```
+
+这是能力默认值和日志参考价的共享基础。目前已提供核心、CLI、桌面桥接与前端 Model 方法；映射表单自动填充、日志逐请求比价／价格快照持久化尚未接入。仅估算文本 token，不推断音视频、图像专用费、请求费、路由倍率、折扣或平台账单。详见[模型参考目录契约](../design/model-catalog.md)。

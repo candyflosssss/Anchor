@@ -1,0 +1,207 @@
+{
+  "catalog": {
+    "source": "models.dev",
+    "fetched_at": 1791853200,
+    "expires_at": 1791856800,
+    "version": "af4fa5b633b0c0bc9a33b5dc0f0d6ec4ff8298e392261e1f2d433da61ff8b26b",
+    "stale": false,
+    "failure": "",
+    "providers": [],
+    "models": [
+      {
+        "provider_id": "lab",
+        "id": "vision-reasoner",
+        "canonical_model_id": "lab/vision-reasoner",
+        "name": "Vision Reasoner",
+        "source_updated_at": "2026-10-01",
+        "capabilities": {
+          "input_modalities": [
+            "text",
+            "image"
+          ],
+          "output_modalities": [
+            "text"
+          ],
+          "vision": true,
+          "attachment": true,
+          "tool_call": true,
+          "reasoning": true,
+          "structured_output": false,
+          "temperature": false
+        },
+        "limits": {
+          "context": 400000,
+          "input": 300000,
+          "output": 100000
+        },
+        "reasoning_options": [
+          {
+            "type": "effort",
+            "values": [
+              null,
+              "none",
+              "low",
+              "high",
+              "xhigh"
+            ],
+            "min": null,
+            "max": null
+          },
+          {
+            "type": "budget_tokens",
+            "values": [],
+            "min": -1,
+            "max": 32000
+          },
+          {
+            "type": "toggle",
+            "values": [],
+            "min": null,
+            "max": null
+          }
+        ],
+        "pricing": {
+          "currency": "USD",
+          "unit": "per_million_tokens",
+          "rates": {
+            "input": "2.5",
+            "output": "10",
+            "cache_read": "0.25",
+            "cache_write": "3",
+            "reasoning": "10",
+            "input_audio": "5",
+            "output_audio": "20"
+          },
+          "tiers": [
+            {
+              "above_tokens": 250000,
+              "rates": {
+                "input": "5",
+                "output": "15",
+                "cache_read": "0.5",
+                "cache_write": "6",
+                "reasoning": "15",
+                "input_audio": null,
+                "output_audio": null
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "total": 1,
+    "truncated": false
+  },
+  "estimate": {
+    "catalog": {
+      "source": "models.dev",
+      "fetched_at": 1791853200,
+      "expires_at": 1791856800,
+      "version": "af4fa5b633b0c0bc9a33b5dc0f0d6ec4ff8298e392261e1f2d433da61ff8b26b",
+      "stale": false,
+      "failure": "",
+      "providers": [],
+      "models": [
+        {
+          "provider_id": "lab",
+          "id": "vision-reasoner",
+          "canonical_model_id": "lab/vision-reasoner",
+          "name": "Vision Reasoner",
+          "source_updated_at": "2026-10-01",
+          "capabilities": {
+            "input_modalities": [
+              "text",
+              "image"
+            ],
+            "output_modalities": [
+              "text"
+            ],
+            "vision": true,
+            "attachment": true,
+            "tool_call": true,
+            "reasoning": true,
+            "structured_output": false,
+            "temperature": false
+          },
+          "limits": {
+            "context": 400000,
+            "input": 300000,
+            "output": 100000
+          },
+          "reasoning_options": [
+            {
+              "type": "effort",
+              "values": [
+                null,
+                "none",
+                "low",
+                "high",
+                "xhigh"
+              ],
+              "min": null,
+              "max": null
+            },
+            {
+              "type": "budget_tokens",
+              "values": [],
+              "min": -1,
+              "max": 32000
+            },
+            {
+              "type": "toggle",
+              "values": [],
+              "min": null,
+              "max": null
+            }
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "per_million_tokens",
+            "rates": {
+              "input": "2.5",
+              "output": "10",
+              "cache_read": "0.25",
+              "cache_write": "3",
+              "reasoning": "10",
+              "input_audio": "5",
+              "output_audio": "20"
+            },
+            "tiers": [
+              {
+                "above_tokens": 250000,
+                "rates": {
+                  "input": "5",
+                  "output": "15",
+                  "cache_read": "0.5",
+                  "cache_write": "6",
+                  "reasoning": "15",
+                  "input_audio": null,
+                  "output_audio": null
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "total": 1,
+      "truncated": false
+    },
+    "usage": {
+      "input_tokens": 1000,
+      "output_tokens": 100,
+      "cache_read_tokens": 400,
+      "cache_write_tokens": 100,
+      "reasoning_tokens": 30
+    },
+    "basis": "text_tokens",
+    "currency": "USD",
+    "usd": "0.00265",
+    "input_usd": "0.00125",
+    "output_usd": "0.0007",
+    "cache_read_usd": "0.0001",
+    "cache_write_usd": "0.0003",
+    "reasoning_usd": "0.0003",
+    "above_tokens": null,
+    "reason": ""
+  }
+}

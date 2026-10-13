@@ -2,6 +2,116 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface ModelCatalogQuery {
+  provider_id: string;
+  model_id: string;
+  search: string;
+  limit: number;
+  refresh: boolean;
+}
+export interface CatalogProvider {
+  id: string;
+  name: string;
+  model_count: number;
+}
+export interface CatalogCapabilities {
+  input_modalities: string[];
+  output_modalities: string[];
+  vision: boolean | null;
+  attachment: boolean | null;
+  tool_call: boolean | null;
+  reasoning: boolean | null;
+  structured_output: boolean | null;
+  temperature: boolean | null;
+}
+export interface CatalogLimits {
+  context: number | null;
+  input: number | null;
+  output: number | null;
+}
+export interface ReasoningOption {
+  type: string;
+  values: (string | null)[];
+  min: number | null;
+  max: number | null;
+}
+export interface CatalogRates {
+  input: string | null;
+  output: string | null;
+  cache_read: string | null;
+  cache_write: string | null;
+  reasoning: string | null;
+  input_audio: string | null;
+  output_audio: string | null;
+}
+export interface CatalogTier {
+  above_tokens: number;
+  rates: CatalogRates;
+}
+export interface CatalogPricing {
+  currency: string;
+  unit: string;
+  rates: CatalogRates;
+  tiers: CatalogTier[];
+}
+export interface CatalogModel {
+  provider_id: string;
+  id: string;
+  canonical_model_id: string;
+  name: string;
+  source_updated_at: string;
+  capabilities: CatalogCapabilities;
+  limits: CatalogLimits;
+  reasoning_options: ReasoningOption[];
+  pricing: CatalogPricing | null;
+}
+export interface ModelCatalog {
+  source: string;
+  fetched_at: number;
+  expires_at: number;
+  version: string;
+  stale: boolean;
+  failure: string;
+  providers: CatalogProvider[];
+  models: CatalogModel[];
+  total: number;
+  truncated: boolean;
+}
+export interface CatalogUsage {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  cache_read_tokens: number | null;
+  cache_write_tokens: number | null;
+  reasoning_tokens: number | null;
+}
+export interface CatalogEstimateInput {
+  query: ModelCatalogQuery;
+  usage: CatalogUsage;
+}
+export interface CatalogEstimate {
+  catalog: ModelCatalog;
+  usage: CatalogUsage;
+  basis: string;
+  currency: string;
+  usd: string | null;
+  input_usd: string | null;
+  output_usd: string | null;
+  cache_read_usd: string | null;
+  cache_write_usd: string | null;
+  reasoning_usd: string | null;
+  above_tokens: number | null;
+  reason: string;
+}
+export interface ModelCatalogResult {
+  contract: string;
+  data: ModelCatalog | null;
+  problem: Problem | null;
+}
+export interface CatalogEstimateResult {
+  contract: string;
+  data: CatalogEstimate | null;
+  problem: Problem | null;
+}
 export interface RouteCandidate {
   provider_id: string;
   model: string;
@@ -527,6 +637,7 @@ export interface DesktopBridge {
   DiscoverProviderModels(input1: DiscoverProviderModels): Promise<ProviderModelsResult>;
   DownloadUpdate(input1: string): Promise<UpdateResult>;
   EnrollAgent(input1: EnrollAgent): Promise<AgentWorkspaceResult>;
+  EstimateModelCost(input1: CatalogEstimateInput): Promise<CatalogEstimateResult>;
   ExitDesktop(): Promise<StopResult>;
   ExportLogs(input1: Query): Promise<StopResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
@@ -534,6 +645,7 @@ export interface DesktopBridge {
   LogSettings(): Promise<LogSettingsResult>;
   Logs(input1: Query): Promise<LogsResult>;
   ManageAgent(input1: ManageAgent): Promise<AgentWorkspaceResult>;
+  ModelCatalog(input1: ModelCatalogQuery): Promise<ModelCatalogResult>;
   ProviderAccountSettings(input1: WorkspaceQuery): Promise<AccountSettingsResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderAllowance(input1: AccountQuery): Promise<AccountObservationResult>;

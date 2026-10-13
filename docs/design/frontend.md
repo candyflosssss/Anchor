@@ -465,3 +465,5 @@ Model 接受 CNY 与 site_unit；公开元数据无法确认币种时标注「�
 该修复已随 desktop.26 投放；本轮前端 typecheck/lint、14项定向模型／展示测试，以及五包 Go 适配器／核心／客户端／CLI／桥接测试通过。默认源下载验证通过，未进行真实站点凭据或原生窗口验收。
 
 2026-10-13 sub2api Key 倍率：账户页和模型目录支持 `key_billing` 来源，倍率通过所选推理 Key 直读，无需 JWT；显示含个人覆盖和当前高峰规则的有效计费倍率。响应未披露分组名称／ID 时留空并显示「当前计费倍率」，Model 仅对此来源允许缺少分组；NewAPI 和旧站用户查询仍保留原校验。授权提示区分 Key 直读、旧站回退和显式远端 ID。查询为手动快照，不改模型路由倍率。
+
+2026-10-13 当前源码新增 models.dev 只读参考方法。`features/model-catalog/model-catalog.model.ts` 通过受限 `ModelCatalog/EstimateModelCost` 桥接复用核心，校验来源、未知字段、思考选项、精确模型身份和十进制费用；前端取消丢弃晚到响应，Go 侧有45秒方法超时。模型映射自动填充、日志逐请求比价及价格快照持久化尚未接入，无新页面或推理探测。契约见[模型参考目录](model-catalog.md)，CLI 见[指令大全 §13](../cli/commands.md#13-modelsdev-参考目录与本地费用估算当前源码未发布)。

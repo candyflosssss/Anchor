@@ -21,6 +21,7 @@ import (
 
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/managed"
+	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -36,6 +37,7 @@ type Server struct {
 	Store            *state.Store
 	Log              *slog.Logger
 	upstream         *http.Client
+	modelCatalog     *modeldev.Client
 	mu               sync.Mutex
 	active           map[string]int
 	health           map[string]*keyHealth
@@ -56,6 +58,15 @@ type Server struct {
 }
 
 func New(store *state.Store, log *slog.Logger) *Server {
+	return NewWithModelCatalog(store, log, modeldev.New())
+}
+
+// NewWithModelCatalog shares the supplied read-only catalog client across
+// metadata queries and price imports. Server owns and closes the client.
+func NewWithModelCatalog(store *state.Store, log *slog.Logger, catalogClient *modeldev.Client) *Server {
+	if catalogClient == nil {
+		catalogClient = modeldev.New()
+	}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	// Explicit provider configuration, not ambient HTTP_PROXY, determines the route.
 	tr.Proxy = nil
@@ -63,7 +74,7 @@ func New(store *state.Store, log *slog.Logger) *Server {
 	tr.MaxConnsPerHost = 64
 	tr.MaxIdleConns = 32
 	tr.ResponseHeaderTimeout = 30 * time.Second
-	return &Server{Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
+	return &Server{modelCatalog: catalogClient, Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
@@ -80,6 +91,7 @@ func (s *Server) Close() {
 			<-run.done
 		}
 		s.upstream.CloseIdleConnections()
+		s.modelCatalog.Close()
 		if s.logs != nil {
 			_ = s.logs.Close()
 		}
@@ -169,6 +181,7 @@ func (s *Server) Control() http.Handler {
 	s.initLogs()
 	mux := http.NewServeMux()
 	s.logRoutes(mux)
+	s.modelCatalogRoutes(mux)
 	mux.HandleFunc("POST /control/v1/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		if !s.identity(w, r) {
 			return

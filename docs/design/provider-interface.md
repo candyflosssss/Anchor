@@ -196,3 +196,7 @@ Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始�
 - 目录只说明 Key 可列出该模型，不保证推理或流式成功。前端目录错误／空目录禁用发起按钮；Key 切换清空选择后重新查询，不从供应商全量映射猜测 Key 权限。关闭快速测试保持列表、关闭详情测试保持详情。
 
 Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e546d8d6801f1cc1` 的 `backend/internal/handler/gateway_key_billing.go` 和 `backend/internal/server/routes/gateway.go`。隔离模拟验证不代表所有历史部署版本已提供该端点。
+
+## models.dev 模型参考方法（2026-10-13，当前源码）
+
+`ModelCatalog(ModelCatalogQuery)`／`EstimateModelCost(CatalogEstimateInput)` 是与供应商工作台独立的只读桥接方法，不要求 Anchor 供应商 ID 或 revision。使用精确 models.dev provider/model；不能将通用声明视为所选 Key 的已验证能力。基础价导入复用同一目录缓存，仍仅预览和手动保存。完整 DTO、未知／陈旧语义与计价口径见[模型参考目录](model-catalog.md)。

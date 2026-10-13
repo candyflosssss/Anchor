@@ -19,6 +19,8 @@ async function host(page: Page, rateMappings = false) {
     window.routingTest = { calls: [] };
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const api: DesktopBridge = {
+      ModelCatalog: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      EstimateModelCost: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderProbe: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderAccountSettings: async input => ({ contract, data: settings(input.provider_id), problem: null }),
       SaveProviderAccount: async input => {

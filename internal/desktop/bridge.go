@@ -229,7 +229,11 @@ func (b *Bridge) ProviderAction(in Action) WorkspaceResult {
 		out.Problem = &Problem{"invalid"}
 		return out
 	}
-	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	timeout := 15 * time.Second
+	if in.Action == "price-import" {
+		timeout = 45 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, timeout)
 	defer cancel()
 	cl, _, err := s.connection(ctx)
 	if err != nil {
@@ -239,7 +243,7 @@ func (b *Bridge) ProviderAction(in Action) WorkspaceResult {
 	defer cl.Close()
 	data, err := cl.ProviderAction(ctx, in)
 	if err != nil {
-		out.Problem = problem(err, true)
+		out.Problem = problem(err, in.Action != "price-import")
 		return out
 	}
 	out.Data = &data

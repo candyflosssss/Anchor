@@ -49,6 +49,11 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
   provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy RULE] [--source-key ID | --all-keys] [--tools] [--streaming] [--approve]
   provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
+  catalog providers [--refresh]
+  catalog models --provider ID [--search TEXT --limit 50 --refresh]
+  catalog model --provider ID --model MODEL [--refresh]
+  catalog estimate --provider ID --model MODEL [--input-tokens N --output-tokens N]
+                   [--cache-read-tokens N --cache-write-tokens N --reasoning-tokens N --refresh]
   provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
   logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
       [--cursor N] [--until N] [--status RESULT] [--source SOURCE] [--provider ID]
@@ -303,6 +308,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 			return err
 		}
 		return a.output(v)
+	case "catalog":
+		return a.modelCatalog(ctx, cl, args[1:])
 	case "logs":
 		return a.logs(ctx, cl, args[1:])
 	case "provider":

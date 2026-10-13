@@ -5,6 +5,7 @@ import (
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/managed"
+	"github.com/candyflosssss/Anchor/internal/modeldev"
 )
 
 const Contract = "anchor-desktop-v1"
@@ -271,4 +272,29 @@ type ModelRoutingResult struct {
 	Contract string             `json:"contract"`
 	Data     *ModelRoutingState `json:"data"`
 	Problem  *Problem           `json:"problem"`
+}
+
+// Model reference data is read-only, separate from actual provider availability.
+type ModelCatalogQuery = modeldev.ModelCatalogQuery
+type CatalogProvider = modeldev.CatalogProvider
+type CatalogCapabilities = modeldev.CatalogCapabilities
+type CatalogLimits = modeldev.CatalogLimits
+type ReasoningOption = modeldev.ReasoningOption
+type CatalogRates = modeldev.CatalogRates
+type CatalogTier = modeldev.CatalogTier
+type CatalogPricing = modeldev.CatalogPricing
+type CatalogModel = modeldev.CatalogModel
+type ModelCatalog = modeldev.ModelCatalog
+type CatalogUsage = modeldev.CatalogUsage
+type CatalogEstimateInput = modeldev.CatalogEstimateInput
+type CatalogEstimate = modeldev.CatalogEstimate
+type ModelCatalogResult struct {
+	Contract string        `json:"contract"`
+	Data     *ModelCatalog `json:"data"`
+	Problem  *Problem      `json:"problem"`
+}
+type CatalogEstimateResult struct {
+	Contract string           `json:"contract"`
+	Data     *CatalogEstimate `json:"data"`
+	Problem  *Problem         `json:"problem"`
 }

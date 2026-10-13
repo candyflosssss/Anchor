@@ -211,6 +211,10 @@ func (c *Client) ProviderAction(ctx context.Context, in catalog.Action) (catalog
 		return catalog.Workspace{}, state.ErrInvalid
 	}
 	var out catalog.Workspace
+	if in.Action == "price-import" {
+		err := c.catalogCall(ctx, "/control/v1/providers/"+in.ProviderID+"/action", in, &out)
+		return out, err
+	}
 	err := c.call(ctx, "POST", "/control/v1/providers/"+in.ProviderID+"/action", in, &out)
 	return out, err
 }
