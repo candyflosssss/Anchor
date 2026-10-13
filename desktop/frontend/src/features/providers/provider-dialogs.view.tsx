@@ -1,3 +1,4 @@
+import { isValidModelAlias } from './provider-features.model';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { CircleAlert, Play } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -160,9 +161,9 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
   const [strategy, setStrategy] = useState(editing?.strategy ?? 'round-robin');
   const multiplierValue = Number(multiplier);
   const multiplierError = !multiplier.trim() || !Number.isFinite(multiplierValue) || multiplierValue < 0.01 || multiplierValue > 1000 ? '倍率须为 0.01–1000。' : '';
-  const [tools, setTools] = useState(d.tools ?? false);
-  const [streaming, setStreaming] = useState(d.streaming ?? false);
-  const aliasError = !alias ? '' : !isValidId(alias) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
+  const [tools, setTools] = useState(editing?.tools ?? d.tools ?? true);
+  const [streaming, setStreaming] = useState(editing?.streaming ?? d.streaming ?? true);
+  const aliasError = !alias ? '' : !isValidModelAlias(alias) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
   const options = c.models?.models ?? [];
   return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError && !multiplierError) void run('model-put', { target: alias, model: upstream.trim(), multiplier: multiplierValue, strategy, tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>

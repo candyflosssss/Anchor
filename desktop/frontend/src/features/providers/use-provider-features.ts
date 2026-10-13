@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ProviderProblem, problemText, type Provider, type ProviderTransport } from './provider.model';
-import { actionFor, type Action, type Workspace } from './provider-features.model';
+import { actionFor, catalogImportPlan, type Action, type Workspace } from './provider-features.model';
 
 /** Reconcile after a write, conflict or detail revision mismatch; null id means deleted. */
 export type FeatureChanged = (id: string | null, action: string, from: string) => Promise<void>;
@@ -12,6 +12,7 @@ export function useProviderFeatures(p: Provider | null, transport: ProviderTrans
   const [error, setError] = useState('');
   const [needsRead, setNeedsRead] = useState(false);
   const [notice, setNotice] = useState('');
+  const [importStatus, setImportStatus] = useState('');
   const query = useRef<AbortController | null>(null); const write = useRef<AbortController | null>(null); const lock = useRef(false);
   const epoch = useRef(0); const lastId = useRef<string | null>(null);
   const recoveringConflict = useRef(false);
@@ -50,7 +51,7 @@ export function useProviderFeatures(p: Provider | null, transport: ProviderTrans
       lastId.current = id; epoch.current++;
       query.current?.abort(); query.current = null; setReading(false); write.current?.abort(); lock.current = false;
       recoveringConflict.current = false;
-      setBusy(false); setData(null); setError(''); setNotice(''); setNeedsRead(false);
+      setBusy(false); setData(null); setImportStatus(''); setError(''); setNotice(''); setNeedsRead(false);
       void refreshRef.current();
     } else if (id) void refreshRef.current();
   }, [id, revision, transport, readVersion]);
@@ -86,7 +87,47 @@ export function useProviderFeatures(p: Provider | null, transport: ProviderTrans
       if (generation === epoch.current) { lock.current = false; setBusy(false); }
     }
   }
+  async function importModels(ids: string[]) {
+    const target = current.current;
+    if (!target || !data || data.provider_id !== target.id || lock.current || query.current || needsRead) return;
+    const plan = catalogImportPlan(ids, data);
+    const skipped = `跳过 ${plan.mapped} 个已映射模型，${plan.manual.length} 个需自定义别名。`;
+    if (!plan.ready.length) { setImportStatus(`没有可快速导入的模型。${skipped}`); return; }
+    begin.current?.();
+    lock.current = true; setBusy(true); setError(''); setNotice('');
+    const abort = new AbortController(); write.current = abort;
+    const generation = epoch.current;
+    let completed = 0;
+    let snapshot = data;
+    let failure = '';
+    try {
+      if (!transport.action) throw new ProviderProblem('invalid');
+      for (const model of plan.ready) {
+        setImportStatus(`正在导入 ${completed + 1} / ${plan.ready.length}：${model}`);
+        snapshot = await transport.action(actionFor({ ...target, revision: snapshot.revision }, 'model-put', {
+          target: model, model, multiplier: 1, tools: true, streaming: true,
+        }), abort.signal);
+        if (abort.signal.aborted || generation !== epoch.current) return;
+        completed++;
+        setData(snapshot);
+      }
+    } catch (e) {
+      if (abort.signal.aborted || generation !== epoch.current) return;
+      const code = e instanceof ProviderProblem ? e.code : 'unknown';
+      setError(problemText[code]);
+      setNeedsRead(true);
+      failure = `在「${plan.ready[completed]}」处停止：${problemText[code]} 请刷新核对后继续。`;
+    } finally {
+      if (!abort.signal.aborted && generation === epoch.current) {
+        // Reconcile once for the whole batch; never replay a failed/unknown write.
+        if (!failure) await after.current(target.id, 'model-put', target.id);
+        setImportStatus(`已导入 ${completed} / ${plan.ready.length} 个。${skipped}${failure}`);
+        lock.current = false; setBusy(false);
+      }
+    }
+  }
+
   const visibleData = data && p && data.provider_id === p.id ? data : null;
-  return { data: visibleData, busy: busy || reading, isBusy: () => lock.current, error, notice, needsRead, refresh, run };
+  return { data: visibleData, busy: busy || reading, isBusy: () => lock.current, error, notice, needsRead, refresh, run, importModels, importStatus };
 }
 export type ProviderFeatures = ReturnType<typeof useProviderFeatures>;

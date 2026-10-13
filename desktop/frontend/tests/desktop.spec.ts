@@ -380,3 +380,65 @@ test('catalog pagination, themes and narrow layouts keep Key protocols accessibl
   expect(await catalog.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
+
+declare global { interface Window { catalogImportTest: { calls: import('../src/desktop/contract.generated').Action[]; fail: '' | 'unknown' | 'conflict' } } }
+for (const failure of ['', 'unknown', 'conflict'] as const) {
+  test(`catalog bulk import covers all pages and stops safely ${failure || 'success'} (simulated host)`, async ({ page }) => {
+    await host(page);
+    await page.evaluate(async failure => {
+      const api = window.go!.desktop!.Bridge!;
+      const result = await api.ProviderWorkspace({ provider_id: '摸鱼AI' });
+      const w = result.data!;
+      const mapping = { id: 'already', upstream: 'already-upstream', display_name: 'already', revision: 1, candidate_count: 1, multiplier: 2, strategy: 'priority', tools: false, streaming: false };
+      w.models = [mapping];
+      window.catalogImportTest = { calls: [], fail: failure };
+      api.ProviderWorkspace = async () => ({ contract: 'anchor-desktop-v1', data: structuredClone(w), problem: null });
+      const discover = api.DiscoverProviderModels;
+      api.DiscoverProviderModels = async input => {
+        const result = await discover(input);
+        const names = ['already-upstream', 'already', 'vendor/model', ...Array.from({ length: 10 }, (_, i) => `import-${i}`)];
+        result.data!.models = names;
+        result.data!.entries = names.map(id => ({ id, key_ids: ['anonymous'] }));
+        return result;
+      };
+      api.ProviderAction = async input => {
+        window.catalogImportTest.calls.push(input);
+        await new Promise(resolve => setTimeout(resolve, 75));
+        if (input.expected_revision !== w.revision || w.models.some(m => m.id === input.target)) return { contract: 'anchor-desktop-v1', data: null, problem: { code: 'conflict' } };
+        const failed = input.target === 'import-1' ? window.catalogImportTest.fail : '';
+        // Unknown may mean the write persisted before the response was lost.
+        if (failed === 'conflict') return { contract: 'anchor-desktop-v1', data: null, problem: { code: failed } };
+        w.models.push({ ...mapping, id: input.target, upstream: input.model, multiplier: input.multiplier, tools: input.tools, streaming: input.streaming, strategy: input.strategy });
+        if (failed === 'unknown') return { contract: 'anchor-desktop-v1', data: null, problem: { code: failed } };
+        return { contract: 'anchor-desktop-v1', data: structuredClone(w), problem: null };
+      };
+    }, failure);
+    await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+    await page.getByRole('tab', { name: /^模型/ }).click();
+    const catalog = page.getByRole('region', { name: '上游模型目录', exact: true });
+    await catalog.getByRole('button', { name: '获取模型目录', exact: true }).click();
+    await expect(catalog.getByLabel('上游模型 ID').locator(':scope > li')).toHaveCount(8);
+    await expect(catalog.getByRole('button', { name: '快速导入 vendor/model', exact: true })).toBeDisabled();
+    await catalog.getByLabel('搜索模型目录').fill('import-0');
+    await catalog.getByRole('button', { name: '全部导入（10）', exact: true }).dblclick();
+    await expect(catalog.getByRole('status')).toContainText(failure ? '已导入 1 / 10 个' : '已导入 10 / 10 个');
+    await expect(catalog.getByRole('status')).toContainText('跳过 1 个已映射模型，2 个需自定义别名');
+    const calls = await page.evaluate(() => window.catalogImportTest.calls);
+    expect(calls.map(c => c.target)).toEqual(Array.from({ length: failure ? 2 : 10 }, (_, i) => `import-${i}`));
+    for (const call of calls) expect(call).toMatchObject({ action: 'model-put', model: call.target, model_revision: 0, multiplier: 1, tools: true, streaming: true });
+    if (failure) {
+      await expect(catalog.getByRole('button', { name: /^全部导入/ })).toBeDisabled();
+      await expect(catalog.getByRole('status')).toContainText('在「import-1」处停止');
+      await page.evaluate(() => { window.catalogImportTest.fail = ''; });
+      await page.getByRole('button', { name: '重新读取', exact: true }).click();
+      const remaining = failure === 'unknown' ? 8 : 9;
+      await catalog.getByRole('button', { name: `全部导入（${remaining}）`, exact: true }).click();
+      await expect(catalog.getByRole('status')).toContainText(`已导入 ${remaining} / ${remaining} 个`);
+      if (failure === 'unknown') expect(await page.evaluate(() => window.catalogImportTest.calls.filter(c => c.target === 'import-1').length)).toBe(1);
+      expect(await page.evaluate(() => window.catalogImportTest.calls.filter(c => c.target === 'import-0').length)).toBe(1);
+    }
+    await page.getByRole('button', { name: '编辑模型 already', exact: true }).click();
+    await expect(page.getByRole('dialog').getByLabel('函数工具', { exact: true })).not.toBeChecked();
+    await expect(page.getByRole('dialog').getByLabel('此供应商的相对倍率')).toHaveValue('2');
+  });
+}

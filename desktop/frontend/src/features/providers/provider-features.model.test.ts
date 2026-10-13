@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import mapping from '../../../../contract/provider-model-mapping.json';
 import fixture from '../../../../contract/provider-workspace.json';
-import { actionFor, checkedWorkspace, type Workspace } from './provider-features.model';
+import { actionFor, catalogImportPlan, checkedWorkspace, type Workspace } from './provider-features.model';
 import { MockProviderTransport } from './provider.mock';
 describe('provider first priority contract', () => {
   it('reads the shared fixture and strips secrets from public DTOs', () => {
@@ -72,5 +72,15 @@ describe('shared public model mappings', () => {
     expect(other.models.find(m => m.id === 'shared')).toMatchObject({ revision: 3, strategy: 'priority', upstream: 'up-b', multiplier: 2 });
     await transport.action(actionFor(a, 'model-delete', { target: 'shared', model_revision: 3, approved: true }), signal);
     expect((await transport.workspace(b.id, signal)).models.find(m => m.id === 'shared')).toMatchObject({ revision: 4, candidate_count: 1, upstream: 'up-b' });
+  });
+});
+
+
+describe('catalog import planning', () => {
+  it('deduplicates and skips existing upstreams, conflicting aliases and invalid public IDs', () => {
+    const w = { ...structuredClone(fixture), models: [{ ...mapping, id: 'taken', upstream: 'mapped-upstream' }] };
+    expect(catalogImportPlan(['mapped-upstream', 'valid', 'valid', 'taken', 'vendor/model', '中文', '-bad', 'a'.repeat(129)], w)).toEqual({
+      ready: ['valid'], mapped: 1, manual: ['taken', 'vendor/model', '中文', '-bad', 'a'.repeat(129)],
+    });
   });
 });

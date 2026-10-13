@@ -367,3 +367,31 @@ test('catalog search and mapping filters preserve the import flow', async ({ pag
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('dialog').getByLabel('上游模型 ID', { exact: true })).toHaveValue('demo-model');
 });
+
+test('catalog quick import defaults capabilities on and editing preserves opt outs', async ({ page }) => {
+  await ready(page);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await page.getByRole('tab', { name: /^模型/ }).click();
+  const catalog = page.getByRole('region', { name: '上游模型目录', exact: true });
+  await catalog.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  await catalog.getByRole('button', { name: '导入 demo-model', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('函数工具', { exact: true })).toBeChecked();
+  await expect(dialog.getByLabel('流式输出', { exact: true })).toBeChecked();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await catalog.getByRole('button', { name: '快速导入 demo-model', exact: true }).dblclick();
+  await expect(catalog.getByRole('status')).toContainText('已导入 1 / 1 个');
+  await expect(dialog).toBeHidden();
+  await expect(catalog.getByRole('button', { name: /^全部导入/ })).toBeDisabled();
+  await page.getByRole('button', { name: '编辑模型 demo-model', exact: true }).click();
+  await expect(dialog.getByLabel('函数工具', { exact: true })).toBeChecked();
+  await expect(dialog.getByLabel('流式输出', { exact: true })).toBeChecked();
+  await expect(dialog.getByLabel('此供应商的相对倍率')).toHaveValue('1');
+  await dialog.getByLabel('函数工具', { exact: true }).uncheck();
+  await dialog.getByLabel('流式输出', { exact: true }).uncheck();
+  await dialog.getByRole('button', { name: '保存映射', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await page.getByRole('button', { name: '编辑模型 demo-model', exact: true }).click();
+  await expect(dialog.getByLabel('函数工具', { exact: true })).not.toBeChecked();
+  await expect(dialog.getByLabel('流式输出', { exact: true })).not.toBeChecked();
+});

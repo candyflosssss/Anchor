@@ -33,3 +33,15 @@ export function checkedWorkspace(w: Workspace): Workspace {
   }) };
 }
 export const healthText: Record<string, string> = { ready: '可调度', disabled: '已停用', cooling: '冷却中', invalid: '认证失效', 'half-open': '等待单次探测' };
+
+export const isValidModelAlias = (value: string) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value);
+
+/** Plan only new mappings; existing aliases and invalid public IDs require manual editing. */
+export function catalogImportPlan(ids: string[], w: Workspace) {
+  const unique = [...new Set(ids)];
+  const mapped = new Set(w.models.map(m => m.upstream));
+  const aliases = new Set(w.models.map(m => m.id));
+  const pending = unique.filter(id => !mapped.has(id));
+  const manual = pending.filter(id => !isValidModelAlias(id) || aliases.has(id));
+  return { ready: pending.filter(id => isValidModelAlias(id) && !aliases.has(id)), mapped: unique.length - pending.length, manual };
+}

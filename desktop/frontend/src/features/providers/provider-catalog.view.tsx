@@ -3,7 +3,7 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, Download, Layers, Loader
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { catalogFailureText, catalogProblemText, catalogRateFailureText, protocolName } from './provider.model';
-import type { Workspace } from './provider-features.model';
+import { catalogImportPlan, type Workspace } from './provider-features.model';
 import type { ProviderController } from './use-provider-controller';
 import './provider-catalog.css';
 
@@ -16,6 +16,7 @@ export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController;
   const models = c.models;
   const ids = [...new Set([...(models?.models ?? []), ...w.keys.flatMap(k => k.model_protocols.map(m => m.model))])];
   const mapped = new Map(w.models.map(m => [m.upstream, m.id]));
+  const importPlan = catalogImportPlan(ids, w);
   const filtered = ids.filter(id => id.toLowerCase().includes(query.trim().toLowerCase()) && (filter === 'all' || mapped.has(id) === (filter === 'mapped')));
   const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pages - 1);
@@ -30,8 +31,9 @@ export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController;
   return <section className="detail-card model-directory" aria-label="上游模型目录" aria-busy={c.modelsBusy}>
     <div className="card-toolbar catalog-toolbar">
       <div className="catalog-title"><h2>模型目录</h2>{models && !models.failure && <span className="catalog-count">{models.models.length}</span>}</div>
-      <Button variant="outline" disabled={disabled} onClick={() => void c.discoverModels()}>{c.modelsBusy ? <LoaderCircle className="loading-icon" /> : <Download />}{c.modelsBusy ? '正在获取目录…' : '获取模型目录'}</Button>
+      <div className="catalog-toolbar-actions">{ids.length > 0 && <Button disabled={disabled || c.features.needsRead || !importPlan.ready.length} onClick={() => void c.features.importModels(ids)}><Plus />全部导入（{importPlan.ready.length}）</Button>}<Button variant="outline" disabled={disabled} onClick={() => void c.discoverModels()}>{c.modelsBusy ? <LoaderCircle className="loading-icon" /> : <Download />}{c.modelsBusy ? '正在获取目录…' : '获取模型目录'}</Button></div>
     </div>
+    {c.features.importStatus && <p className="catalog-import-status" role="status">{c.features.importStatus}</p>}
     <div className="catalog-status">
       <span>{w.keys.length ? `${enabledKeys} 个启用 Key` : '未保存 Key · 使用匿名请求'}</span>
       <span aria-live="polite">{models ? `${models.failure ? '目录获取失败' : `已获取 ${models.models.length} 个模型${models.partial ? '（部分 Key 查询失败）' : ''}`} · ${models.elapsed_ms} ms` : '尚未获取目录'}</span>
@@ -72,7 +74,7 @@ export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController;
                 </select> : <span className="cell-hint">无需 Key 协议配置</span>}
               </div>;
             }) : <span className="cell-hint">暂无 Key 信息</span>}</div>
-            <div className="catalog-model-action">{mapped.has(id) ? <span className="catalog-mapped"><Check aria-hidden="true" />已映射</span> : <Button size="sm" variant="outline" disabled={disabled} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}><Plus />导入</Button>}</div>
+            <div className="catalog-model-action">{mapped.has(id) ? <span className="catalog-mapped"><Check aria-hidden="true" />已映射</span> : <><Button size="sm" variant="outline" disabled={disabled || c.features.needsRead || !importPlan.ready.includes(id)} aria-label={`快速导入 ${id}`} onClick={() => void c.features.importModels([id])}><Plus />快速导入</Button><Button size="sm" variant="ghost" disabled={disabled || c.features.needsRead} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}>自定义</Button>{importPlan.manual.includes(id) && <span className="cell-hint">需自定义别名</span>}</>}</div>
           </li>;
         })}</ul>
       </div> : <div className="catalog-empty"><Search aria-hidden="true" /><strong>没有匹配的模型</strong><p>试试其他名称，或清除筛选条件。</p><Button variant="outline" size="sm" onClick={() => { setQuery(''); setFilter('all'); setPage(0); }}>清除目录筛选</Button></div>}
