@@ -198,14 +198,6 @@ input[readonly] { background: hsl(var(--muted)); color: hsl(var(--muted-foregrou
 .window-controls svg { width: 14px; height: 14px; pointer-events: none; }
 @media (prefers-reduced-motion: reduce) { .window-controls button { transition: none; } }
 
-/* Read-only upstream directory; keep long catalogs within the detail panel. */
-.model-directory { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid hsl(var(--border)); }
-.model-directory h3 { font-size: .875rem; font-weight: 600; }
-.model-directory .detail-footnote { margin: .5rem 0 .75rem; font-size: .75rem; line-height: 1.6; }
-.catalog-feedback { margin-top: .75rem; font-size: .8125rem; line-height: 1.6; }
-.catalog-list { max-height: 15rem; overflow: auto; margin-top: .5rem; border: 1px solid hsl(var(--border)); border-radius: .5rem; padding: .5rem .75rem; }
-.catalog-list li + li { margin-top: .25rem; }
-
 /* Workbench: overview, provider list, full-page detail, models. */
 .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .tone-ok { color: hsl(var(--success)); }
@@ -331,13 +323,3 @@ button.metric-card:hover:not(:disabled) { border-color: hsl(var(--ring) / .6); }
 .account-numbers dt { color: hsl(var(--muted-foreground)); flex-shrink: 0; }
 .account-numbers dd { text-align: right; overflow-wrap: anywhere; }
 .account-window { border-top: 1px solid hsl(var(--border)); padding: 10px 0; font-size: 12px; overflow-wrap: anywhere; }
-
-.catalog-key-summary { list-style: none; padding: 0; display: grid; gap: 8px; margin: 12px 0; }
-.catalog-key-summary li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
-.catalog-list.catalog-merged > li { display: block; padding: 12px 0; }
-.catalog-model-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.catalog-model-keys { display: grid; gap: 8px; margin-top: 8px; }
-.catalog-model-key { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-left: 12px; }
-.catalog-model-key > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
-.catalog-model-key .select-field { flex: 0 0 auto; max-width: 50%; }
-@media (max-width: 720px) { .catalog-model-key { align-items: flex-start; flex-direction: column; } .catalog-model-key .select-field { max-width: 100%; width: 100%; } }

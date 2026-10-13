@@ -319,3 +319,64 @@ test('account unknown save clears the submitted token and requires a read before
   await expect(page.getByRole('button', { name: '刷新余额', exact: true })).toBeEnabled();
   expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
 });
+
+test('catalog pagination, themes and narrow layouts keep Key protocols accessible (simulated host)', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    const workspace = api.ProviderWorkspace;
+    api.ProviderWorkspace = async input => {
+      const result = await workspace(input);
+      if (result.data) result.data.keys = [
+        { id: 'default', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null, protocol: 'responses', model_protocols: [] },
+        { id: 'premium', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null, protocol: 'anthropic', model_protocols: [] },
+      ];
+      return result;
+    };
+    api.DiscoverProviderModels = async input => {
+      const names = ['claude-haiku-demo', 'claude-opus-demo', 'claude-sonnet-demo', 'gemini-flash-demo', 'gemini-pro-demo', 'gpt-astra-demo', 'gpt-sol-demo', 'qwen-coder-demo', ...Array.from({ length: 7 }, (_, i) => `long-model-name-for-layout-verification-${i + 9}`)];
+      return { contract: 'anchor-desktop-v1', data: {
+        provider_id: input.provider_id, key_id: '', revision: input.expected_revision, http_status: 200, elapsed_ms: 376, models: names, failure: '', partial: false,
+        entries: names.map((id, i) => ({ id, key_ids: i === 1 ? ['default', 'premium'] : ['default'] })),
+        keys: [
+          { id: 'default', enabled: true, protocol: 'responses', http_status: 200, failure: '', group: 'default', group_name: '默认组', multiplier: '1', rate_basis: 'authenticated_group', rate_failure: '' },
+          { id: 'premium', enabled: true, protocol: 'anthropic', http_status: 200, failure: '', group: 'premium', group_name: '高级组', multiplier: '0.8', rate_basis: 'authenticated_group', rate_failure: '' },
+        ],
+      }, problem: null };
+    };
+  });
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await page.getByRole('tab', { name: /^模型/ }).click();
+  const catalog = page.getByRole('region', { name: '上游模型目录', exact: true });
+  await catalog.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  const list = catalog.getByLabel('上游模型 ID');
+  await expect(list.locator(':scope > li')).toHaveCount(8);
+  await expect(catalog.getByLabel('模型目录上一页')).toBeDisabled();
+  await expect(catalog.getByLabel('claude-opus-demo · Key premium 的协议', { exact: true })).toHaveValue('inherit');
+  await catalog.getByLabel('模型目录下一页').click();
+  await expect(list.locator(':scope > li')).toHaveCount(7);
+  await expect(catalog).toContainText('9–15 / 15 个模型');
+  await expect(catalog.getByLabel('模型目录下一页')).toBeDisabled();
+  await catalog.getByLabel('搜索模型目录').fill('claude');
+  await expect(list.locator(':scope > li')).toHaveCount(3);
+  await expect(catalog).toContainText('1–3 / 3 个模型');
+  await catalog.getByLabel('搜索模型目录').fill('');
+  await page.setViewportSize({ width: 1440, height: 1400 });
+  for (const theme of ['浅色', '深色']) {
+    await page.getByRole('button', { name: theme, exact: true }).click();
+    await catalog.scrollIntoViewIfNeeded();
+    expect(await list.evaluate(el => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+    if (process.env.ANCHOR_CATALOG_CAPTURE_DIR) await catalog.screenshot({ path: `${process.env.ANCHOR_CATALOG_CAPTURE_DIR}/catalog-${theme === '浅色' ? 'light' : 'dark'}.png` });
+  }
+  await page.setViewportSize({ width: 760, height: 1800 });
+  await catalog.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const protocol = catalog.getByLabel('claude-opus-demo · Key premium 的协议', { exact: true });
+  await expect(protocol).toBeVisible();
+  await protocol.focus();
+  await expect(protocol).toBeFocused();
+  if (process.env.ANCHOR_CATALOG_CAPTURE_DIR) await catalog.screenshot({ path: `${process.env.ANCHOR_CATALOG_CAPTURE_DIR}/catalog-narrow.png` });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await catalog.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

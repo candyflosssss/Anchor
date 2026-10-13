@@ -297,7 +297,8 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await expect(defaultModel).toHaveValue('inherit');
   await expect(detail.getByText('demo-model', { exact: true })).toHaveCount(1);
   const merged = detail.getByLabel('上游模型 ID').locator('li').filter({ has: page.getByText('demo-model', { exact: true }) });
-  await expect(merged).toContainText('可选 Key：default、second');
+  await expect(merged).toContainText('2 个可用 Key');
+  await expect(merged.getByLabel('demo-model 的可选 Key')).toContainText('Key second');
   await expect(merged).toContainText('0.8×');
   await expect(merged).toContainText('1.5×');
   await expect(detail.getByLabel('Key 查询结果')).toContainText('0.8×');
@@ -323,8 +324,8 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await detail.getByRole('tab', { name: /^模型/ }).click();
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   await expect(detail).toContainText('已获取 2 个模型');
-  await expect(merged).toContainText('可选 Key：default');
-  await expect(merged).not.toContainText('可选 Key：default、second');
+  await expect(merged).toContainText('1 个可用 Key');
+  await expect(merged.getByLabel('demo-model 的可选 Key')).not.toContainText('Key second');
   await expect(detail.getByLabel('Key 查询结果')).not.toContainText('Key second');
   await detail.getByRole('tab', { name: /^Key/ }).click();
   await detail.getByRole('button', { name: '停用 Key default', exact: true }).click();
@@ -335,4 +336,34 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await expect(detail.getByLabel('Key 查询结果').locator('li')).toHaveCount(0);
   await expect(detail).not.toContainText('上游返回空目录。');
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }))).not.toContain('synthetic-browser-key');
+});
+
+
+test('catalog search and mapping filters preserve the import flow', async ({ page }) => {
+  await ready(page);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByLabel('摸鱼AI 的详情');
+  await detail.getByRole('tab', { name: /^模型/ }).click();
+  const catalog = detail.getByRole('region', { name: '上游模型目录', exact: true });
+  await expect(catalog).toContainText('获取可用模型，开始配置');
+  await catalog.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  const rows = catalog.getByLabel('上游模型 ID').locator(':scope > li');
+  await expect(rows).toHaveCount(2);
+  await catalog.getByLabel('搜索模型目录').fill('DEMO-MODEL-MINI');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('已映射');
+  await catalog.getByLabel('模型目录映射状态').selectOption('unmapped');
+  await expect(catalog).toContainText('没有匹配的模型');
+  await catalog.getByRole('button', { name: '清除目录筛选' }).click();
+  await expect(rows).toHaveCount(2);
+  await catalog.getByLabel('模型目录映射状态').selectOption('mapped');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText('demo-model-mini');
+  await catalog.getByLabel('模型目录映射状态').selectOption('unmapped');
+  await expect(rows).toHaveCount(1);
+  await catalog.getByText('Key 查询详情', { exact: false }).click();
+  await expect(catalog.getByLabel('Key 查询结果')).toBeVisible();
+  await catalog.getByRole('button', { name: '导入 demo-model', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog').getByLabel('上游模型 ID', { exact: true })).toHaveValue('demo-model');
 });
