@@ -57,7 +57,7 @@ func (a App) providerPlatform(ctx context.Context, c *client.Client, args []stri
 		return a.output(out)
 	}
 	key := f.String("key", "", "local Key ID; default is enabled default key, then first enabled key")
-	remote := f.Int64("remote-key-id", 0, "site numeric Key ID; required for OneAPI quota; effective-rate defaults to verifying the selected saved Key")
+	remote := f.Int64("remote-key-id", 0, "site numeric Key ID; required for OneAPI quota; effective-rate defaults to the selected saved Key (sub2api reads billing directly; other platforms require account authorization)")
 	scope := ""
 	page, size := 0, 0
 	if args[0] == "usage-records" {

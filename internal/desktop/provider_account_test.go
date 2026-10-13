@@ -17,6 +17,7 @@ func TestSharedAccountFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var v struct {
+		KeyBillingRate       AccountRateObservation `json:"key_billing_rate"`
 		NewAPIAccountSummary AccountObservation     `json:"newapi_account_summary"`
 		Billing              AccountObservation     `json:"billing"`
 		BillingSummary       AccountObservation     `json:"billing_summary"`
@@ -39,6 +40,9 @@ func TestSharedAccountFixture(t *testing.T) {
 	}
 	if v.NewAPIAccountSummary.Platform != "newapi" || v.NewAPIAccountSummary.Operation != "balance-summary" || v.NewAPIAccountSummary.Allowance == nil || v.NewAPIAccountSummary.Allowance.Scope != "account" {
 		t.Fatal("NewAPI account summary fixture drift")
+	}
+	if v.KeyBillingRate.Platform != "sub2api" || v.KeyBillingRate.Rate == nil || v.KeyBillingRate.Rate.Basis != "key_billing" || v.KeyBillingRate.Rate.Group != "" {
+		t.Fatal("key billing fixture drift")
 	}
 	if !reflect.DeepEqual(a, b) || v.Balance.Allowance.Remaining.Value != "12.34567890123456789" || v.Balance.Allowance.Used != nil || v.Quota.Allowance.Unlimited == nil || !*v.Quota.Allowance.Unlimited {
 		t.Fatal("account fixture drift")
@@ -250,6 +254,13 @@ func TestRateBridgeCoreUpstream(t *testing.T) {
 			calls := 0
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls++
+				if r.URL.Path == "/proxy/v1/sub2api/billing" {
+					if r.Header.Get("Authorization") != "Bearer "+key {
+						t.Error("incorrect inference authorization")
+					}
+					w.WriteHeader(404)
+					return
+				}
 				if r.Header.Get("Authorization") != "Bearer "+token {
 					t.Error("incorrect user authorization")
 				}
@@ -324,8 +335,12 @@ func TestRateBridgeCoreUpstream(t *testing.T) {
 			} else if v.Rate != nil && v.Rate.Multiplier != nil {
 				t.Fatal("failed query returned a rate")
 			}
-			if !tc.authorized && calls != 0 {
-				t.Fatal("query without auth sent upstream requests")
+			expectedUnauthorizedCalls := 0
+			if tc.platform == "sub2api" {
+				expectedUnauthorizedCalls = 1
+			}
+			if !tc.authorized && calls != expectedUnauthorizedCalls {
+				t.Fatal("unexpected key-only probe count")
 			}
 			if tc.name == "auto" && (v.Rate == nil || v.Rate.Group != "auto") {
 				t.Fatal("lost unknown group")
@@ -346,5 +361,72 @@ func TestRateBridgeCoreUpstream(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSub2KeyBillingThroughDesktopCatalogAndAccount(t *testing.T) {
+	first, second := "synthetic-billing-first", "synthetic-billing-second"
+	billingCalls := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		if r.Method != "GET" || (key != first && key != second) || r.URL.RawQuery != "" {
+			t.Error("invalid key-only request")
+		}
+		switch r.URL.Path {
+		case "/proxy/v1/models":
+			fmt.Fprint(w, `{"data":[{"id":"shared-model"}]}`)
+		case "/proxy/v1/sub2api/billing":
+			billingCalls++
+			rate := "1.2"
+			if key == second {
+				rate = "0"
+			}
+			fmt.Fprintf(w, `{"object":"sub2api.key_billing","schema_version":1,"billing_scope":"token","group_rate_multiplier":2,"resolved_rate_multiplier":0.8,"peak_rate_enabled":true,"applied_peak_multiplier":1.5,"effective_rate_multiplier":%s}`, rate)
+		default:
+			t.Error("unexpected endpoint", r.URL.Path)
+			w.WriteHeader(404)
+		}
+	}))
+	defer upstream.Close()
+	b := NewBridge(testSession(t))
+	requireReady(t, b)
+	saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "key-billing", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &first})
+	if saved.Problem != nil {
+		t.Fatal(saved)
+	}
+	added := b.ProviderAction(Action{ProviderID: "key-billing", ExpectedRevision: 1, Action: "key-put", Target: "second", Secret: second, Protocol: "responses", Enabled: true})
+	if added.Problem != nil {
+		t.Fatal(added)
+	}
+	catalog := b.DiscoverProviderModels(DiscoverProviderModels{ProviderID: "key-billing", ExpectedRevision: 2})
+	if catalog.Problem != nil || catalog.Data.Failure != "" || len(catalog.Data.Models) != 1 || len(catalog.Data.Keys) != 2 || len(catalog.Data.Entries[0].KeyIDs) != 2 || billingCalls != 2 {
+		t.Fatal(catalog, billingCalls)
+	}
+	for i, k := range catalog.Data.Keys {
+		want := "1.2"
+		if i == 1 {
+			want = "0"
+		}
+		if k.Multiplier == nil || *k.Multiplier != want || k.RateBasis != "key_billing" || k.Group != "" || k.GroupName != "" || k.RateFailure != "" {
+			t.Fatalf("invalid catalog rate %+v", k)
+		}
+	}
+	for _, id := range []string{"default", "second"} {
+		result := b.ProviderRate(AccountQuery{ProviderID: "key-billing", ExpectedRevision: 2, Operation: "effective-rate", KeyID: id})
+		want := "1.2"
+		if id == "second" {
+			want = "0"
+		}
+		if result.Problem != nil || result.Data == nil || result.Data.Failure != "" || result.Data.Platform != "sub2api" || result.Data.Rate == nil || result.Data.Rate.Multiplier == nil || *result.Data.Rate.Multiplier != want || result.Data.Rate.Basis != "key_billing" || result.Data.Rate.Group != "" {
+			t.Fatal(result)
+		}
+		raw, _ := json.Marshal(result)
+		if strings.Contains(string(raw), first) || strings.Contains(string(raw), second) {
+			t.Fatal("secret leaked")
+		}
+	}
+	settings := b.ProviderAccountSettings(WorkspaceQuery{ProviderID: "key-billing"})
+	if settings.Problem != nil || settings.Data.HasUserToken || billingCalls != 4 {
+		t.Fatal(settings, billingCalls)
 	}
 }

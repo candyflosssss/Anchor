@@ -278,6 +278,13 @@ func TestProviderModelsCLI(t *testing.T) {
 	var rootHTML atomic.Bool
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.URL.Path == "/v1/sub2api/billing" {
+			if r.Header.Get("Authorization") != "Bearer synthetic-selected" && r.Header.Get("Authorization") != "Bearer synthetic-second" {
+				t.Error("incorrect billing probe auth")
+			}
+			w.WriteHeader(404)
+			return
+		}
 		if (r.URL.Path != "/models" && !(rootHTML.Load() && r.URL.Path == "/v1/models")) || r.Method != "GET" || (calls.Load() > 1 && r.Header.Get("Authorization") != "Bearer synthetic-selected" && r.Header.Get("Authorization") != "Bearer synthetic-second") {
 			t.Error("unexpected request")
 		}
@@ -325,19 +332,19 @@ func TestProviderModelsCLI(t *testing.T) {
 	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "selected" || result.Failure != "" {
 		t.Fatal(raw, err)
 	}
-	if _, err = run("provider", "models", "--id", saved.ID, "--revision", "2", "--key", "missing"); err == nil || calls.Load() != 2 {
+	if _, err = run("provider", "models", "--id", saved.ID, "--revision", "2", "--key", "missing"); err == nil || calls.Load() != 3 {
 		t.Fatal("missing key was queried", err)
 	}
 	rootHTML.Store(true)
 	raw, err = run("provider", "models", "--id", saved.ID, "--revision", "2", "--key", "selected")
-	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "" || result.KeyID != "selected" || len(result.Models) != 1 || result.Models[0] != "cli-model" || calls.Load() != 4 {
+	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "" || result.KeyID != "selected" || len(result.Models) != 1 || result.Models[0] != "cli-model" || calls.Load() != 6 {
 		t.Fatal("CLI did not resolve root HTML through /v1/models", raw, err)
 	}
 	if err = st.MutateProvider(saved.ID, 2, "key-put", "second", "synthetic-second", "", false, false, "responses"); err != nil {
 		t.Fatal(err)
 	}
 	raw, err = run("provider", "models", "--id", saved.ID, "--revision", "3")
-	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "" || result.Failure != "" || len(result.Models) != 1 || len(result.Entries) != 1 || len(result.Entries[0].KeyIDs) != 1 || result.Entries[0].KeyIDs[0] != "selected" || len(result.Keys) != 1 || !result.Keys[0].Enabled || calls.Load() != 6 {
+	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "" || result.Failure != "" || len(result.Models) != 1 || len(result.Entries) != 1 || len(result.Entries[0].KeyIDs) != 1 || result.Entries[0].KeyIDs[0] != "selected" || len(result.Keys) != 1 || !result.Keys[0].Enabled || calls.Load() != 9 {
 		t.Fatal("CLI did not skip disabled keys", raw, err)
 	}
 	for _, keyArg := range [][]string{{"--key", "second"}, {}} {
@@ -351,7 +358,7 @@ func TestProviderModelsCLI(t *testing.T) {
 			revision = "4"
 		}
 		raw, err = run(append([]string{"provider", "models", "--id", saved.ID, "--revision", revision}, keyArg...)...)
-		if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "no_enabled_keys" || len(result.Models) != 0 || len(result.Keys) != 0 || calls.Load() != 6 {
+		if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "no_enabled_keys" || len(result.Models) != 0 || len(result.Keys) != 0 || calls.Load() != 9 {
 			t.Fatal("CLI queried disabled keys or fell back to anonymous", raw, err)
 		}
 	}

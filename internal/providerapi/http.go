@@ -27,6 +27,7 @@ func (a *Adapter) getWithAuth(ctx context.Context, path string, user, public boo
 
 // read is internal; POST is used only for NewAPI's read-only full-key lookup.
 func (a *Adapter) read(ctx context.Context, method, path string, user, public bool, query url.Values) (object, error) {
+	a.htmlResponse = false
 	a.calls++
 	if a.calls > 8 {
 		return nil, failure("too_large")
@@ -96,6 +97,8 @@ func (a *Adapter) read(ctx context.Context, method, path string, user, public bo
 	}
 	var m object
 	if json.Unmarshal(raw, &m) != nil || m == nil {
+		prefix := strings.ToLower(strings.TrimSpace(string(raw)))
+		a.htmlResponse = strings.HasPrefix(prefix, "<!doctype html") || strings.HasPrefix(prefix, "<html")
 		return nil, failure("invalid_response")
 	}
 	if v, ok := m["success"]; ok && string(v) != "true" {

@@ -39,6 +39,13 @@ func TestProviderDirectoryBoundariesAndReadOnly(t *testing.T) {
 	secret := "synthetic-catalog-secret"
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.URL.Path == "/v1/sub2api/billing" {
+			if r.Header.Get("Authorization") != "Bearer "+secret {
+				t.Error("incorrect key probe auth")
+			}
+			w.WriteHeader(404)
+			return
+		}
 		if r.Method != "GET" || r.URL.Path != "/v1/models" || r.Header.Get("Authorization") != "Bearer "+secret {
 			t.Error("unexpected upstream request")
 		}
@@ -86,7 +93,7 @@ func TestProviderDirectoryBoundariesAndReadOnly(t *testing.T) {
 	if len(mappings) != 0 {
 		t.Fatal("imported mappings")
 	}
-	if calls.Load() != 1 || strings.Contains(raw, secret) || strings.Contains(f.logs.String(), secret) {
+	if calls.Load() != 2 || strings.Contains(raw, secret) || strings.Contains(f.logs.String(), secret) {
 		t.Fatal("retry or secret leak")
 	}
 }
@@ -118,7 +125,7 @@ func TestProviderDirectoryFailures(t *testing.T) {
 			f.add(t, "p", upstream.URL+"/v1", "synthetic-catalog-secret")
 			status, raw := discover(t, f, "p", `{"provider_id":"p","expected_revision":1}`, f.owner, cfg.InstanceID)
 			var result catalog.ProviderModels
-			if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != tc.failure || result.HTTPStatus != tc.status || result.Models == nil || len(result.Models) != 0 || calls.Load() != 1 {
+			if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != tc.failure || result.HTTPStatus != tc.status || result.Models == nil || len(result.Models) != 0 || calls.Load() != 2 {
 				t.Fatal(status, raw, calls.Load())
 			}
 			if strings.Contains(raw, "synthetic-catalog-secret") || strings.Contains(raw, "raw error") {

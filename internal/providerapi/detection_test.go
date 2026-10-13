@@ -35,7 +35,7 @@ func TestAutomaticPlatformAndDefaultKeySummary(t *testing.T) {
 					body = tc.settings
 				case "/v1/usage":
 					body = tc.usage
-				case "/v1/dashboard/billing/subscription":
+				case sub2KeyBillingPath, "/v1/dashboard/billing/subscription":
 					w.WriteHeader(404)
 					return
 				case "/api/usage/token/":

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -143,7 +144,7 @@ type Rate struct {
 	GroupName  string       `json:"group_name,omitempty"`
 	Group      string       `json:"group"`
 	Multiplier *json.Number `json:"multiplier"`
-	Basis      string       `json:"basis"` // personal_override or authenticated_group
+	Basis      string       `json:"basis"` // personal_override, authenticated_group or key_billing (includes peak rules)
 }
 type Result struct {
 	ProviderID    string     `json:"provider_id"`
@@ -178,6 +179,8 @@ type Adapter struct {
 	calls        int
 	bytes        int
 	publicStatus object
+	keyBilling   object
+	htmlResponse bool
 }
 
 func (a *Adapter) root() string {
@@ -204,10 +207,10 @@ func (a *Adapter) Query(ctx context.Context, q Query) Result {
 	return a.query(ctx, q, q.Operation == "effective-rate" && q.RemoteKeyID == 0)
 }
 
-// QueryKeyRate resolves this saved inference credential against the authorized
-// account before observing its current group. It never guesses from a local ID.
+// QueryKeyRate observes the saved credential directly when the platform supports
+// it, otherwise verifies its identity against an authorized account list.
 func (a *Adapter) QueryKeyRate(ctx context.Context) Result {
-	if a.Config.Platform == "" && a.Config.UserToken == "" {
+	if a.Config.Platform == "" && a.Config.UserToken == "" && a.Key == "" {
 		return Result{Failure: "platform_required"}
 	}
 	return a.query(ctx, Query{Operation: "effective-rate", ExpectedRevision: 1}, true)
@@ -224,8 +227,23 @@ func (a *Adapter) query(ctx context.Context, q Query, resolveKey bool) Result {
 	a.calls = 0
 	a.bytes = 0
 	a.publicStatus = nil
+	a.keyBilling = nil
 	var err error
-	if q.Operation == "detect-platform" || a.Config.Platform == "" || a.Config.Platform == "auto" {
+	// An unconfigured catalog can recognize sub2api using one key-only probe.
+	// Other platforms still need an explicit platform/account configuration.
+	if resolveKey && a.Config.Platform == "" && a.Config.UserToken == "" && a.Key != "" {
+		var available bool
+		_, available, err = a.getSub2KeyBilling(ctx)
+		if err == nil {
+			if available {
+				a.Config.Platform = "sub2api"
+				out.Platform = "sub2api"
+			} else {
+				err = failure("platform_required")
+			}
+		}
+	}
+	if err == nil && (q.Operation == "detect-platform" || a.Config.Platform == "" || a.Config.Platform == "auto") {
 		a.Config.Platform, err = a.DetectPlatform(ctx)
 		out.Platform = a.Config.Platform
 	}
@@ -252,7 +270,7 @@ func (a *Adapter) query(ctx context.Context, q Query, resolveKey bool) Result {
 	}
 	if err == nil && q.Operation == "effective-rate" && out.EffectiveRate != nil && out.EffectiveRate.Multiplier != nil {
 		value, parseErr := strconv.ParseFloat(out.EffectiveRate.Multiplier.String(), 64)
-		if parseErr != nil || value < 0 {
+		if parseErr != nil || value < 0 || math.IsInf(value, 0) || math.IsNaN(value) {
 			err = failure("invalid_response")
 		}
 	}

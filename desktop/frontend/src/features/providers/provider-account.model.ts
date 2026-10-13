@@ -68,18 +68,19 @@ export function checkedAccountRate(v: AccountRateObservation, q: AccountQuery): 
     typeof v.observed_at !== 'string' || !Number.isFinite(Date.parse(v.observed_at)) || !Number.isInteger(v.http_status) || v.http_status < 0 || v.http_status > 599 ||
     typeof v.failure !== 'string' || v.failure.length > 64 || (!v.failure && ['', 'auto'].includes(v.platform))) throw new ProviderProblem('read_error');
   const r = v.rate;
-  if (r !== null && (!r || typeof r.group !== 'string' || !r.group || r.group.length > 128 || typeof r.group_name !== 'string' || r.group_name.length > 256 ||
-    !['personal_override', 'authenticated_group'].includes(r.basis) ||
+  if (r !== null && (!r || typeof r.group !== 'string' || (!r.group && r.basis !== 'key_billing') || r.group.length > 128 || typeof r.group_name !== 'string' || r.group_name.length > 256 ||
+    !['personal_override', 'authenticated_group', 'key_billing'].includes(r.basis) ||
+    (r.basis === 'key_billing' && (v.platform !== 'sub2api' || v.remote_key_id !== 0)) ||
     (r.multiplier !== null && (typeof r.multiplier !== 'string' || r.multiplier.length > 128 || !/^(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?$/.test(r.multiplier) || !Number.isFinite(Number(r.multiplier)) || Number(r.multiplier) < 0)))) throw new ProviderProblem('read_error');
   if (v.failure ? r?.multiplier != null : r?.multiplier == null) throw new ProviderProblem('read_error');
   return { provider_id: v.provider_id, revision: v.revision, platform: v.platform, operation: v.operation, key_id: v.key_id, remote_key_id: v.remote_key_id,
     observed_at: v.observed_at, http_status: v.http_status, failure: v.failure,
     rate: r === null ? null : { group: r.group, group_name: r.group_name, multiplier: r.multiplier, basis: r.basis } };
 }
-export const rateBasisText: Record<string, string> = { personal_override: '个人倍率覆盖', authenticated_group: '已认证分组倍率' };
+export const rateBasisText: Record<string, string> = { personal_override: '个人倍率覆盖', authenticated_group: '已认证分组倍率', key_billing: 'Key 当前计费倍率（含个人覆盖及高峰规则）' };
 export const rateFailureText: Record<string, string> = {
   ...accountFailureText,
-  auth_required: '查询分组倍率需要平台用户令牌及所选推理 Key；请在账户页保存授权。',
+  auth_required: '当前查询需要用户授权。sub2api 的所选 Key 优先直接读取倍率；旧站缺少此接口、指定后台 Key ID，或 NewAPI 查询时需配置用户令牌。',
   remote_key_required: '请填写该站后台的 Key ID，或留空以核对当前保存的 Key。',
   key_not_found: '平台账户中未找到所选 Key；请核对用户授权、Key 或后台 Key ID。',
   unknown: '分组倍率未知。自动分组可能按请求选择分组，无法显示一个固定倍率。',

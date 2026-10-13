@@ -97,6 +97,13 @@ func TestNewAPIModelCatalogSelectedKey(t *testing.T) {
 			var paths []string
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				paths = append(paths, r.URL.Path)
+				if r.URL.Path == "/newapi/v1/sub2api/billing" {
+					if r.Header.Get("Authorization") != "Bearer fixture-restricted-token" || r.Header.Get("x-api-key") != "" {
+						t.Error("incorrect billing probe auth")
+					}
+					w.WriteHeader(404)
+					return
+				}
 				if r.Method != http.MethodGet || r.Header.Get("New-Api-User") != "" {
 					t.Error("unexpected catalog request")
 				}
@@ -129,7 +136,7 @@ func TestNewAPIModelCatalogSelectedKey(t *testing.T) {
 			before, _ := f.store.ProviderKeys("newapi")
 			status, raw := discover(t, f, "newapi", `{"provider_id":"newapi","expected_revision":2,"key_id":"restricted"}`, f.owner, cfg.InstanceID)
 			var result catalog.ProviderModels
-			if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "" || result.HTTPStatus != 200 || result.KeyID != "restricted" || !reflect.DeepEqual(result.Models, []string{"allowed-model"}) || !reflect.DeepEqual(paths, []string{"/newapi/models", "/newapi/v1/models"}) {
+			if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "" || result.HTTPStatus != 200 || result.KeyID != "restricted" || !reflect.DeepEqual(result.Models, []string{"allowed-model"}) || !reflect.DeepEqual(paths, []string{"/newapi/models", "/newapi/v1/models", "/newapi/v1/sub2api/billing"}) {
 				t.Fatal(status, raw, paths)
 			}
 			after, _ := f.store.ProviderKeys("newapi")

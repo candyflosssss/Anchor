@@ -34,6 +34,11 @@ describe('read-only catalog model', () => {
     result.entries[0].key_ids.push('other');
     expect(value.entries[0].key_ids).toEqual(['default']);
   });
+  it('accepts key billing rates without a group identity, retaining strict legacy validation', () => {
+    const value = { ...fixture.success, keys: [{ ...fixture.success.keys[0], group: '', group_name: '', rate_basis: 'key_billing', multiplier: '1.2' }] };
+    expect(checkedCatalog(value, fixture.input).keys[0]).toMatchObject({ group: '', multiplier: '1.2', rate_basis: 'key_billing' });
+    expect(() => checkedCatalog({ ...value, keys: [{ ...value.keys[0], rate_basis: 'authenticated_group' }] }, fixture.input)).toThrow('read_error');
+  });
   it('mock skips disabled keys and preserves all enabled associations and rates', async () => {
     const transport = new MockProviderTransport(); const signal = new AbortController().signal;
     const provider = (await transport.list(signal))[0];

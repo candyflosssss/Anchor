@@ -320,6 +320,10 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.URL.Path == "/v1/sub2api/billing" {
+			w.WriteHeader(404)
+			return
+		}
 		if r.URL.Path != "/v1/models" || r.Method != "GET" || (r.Header.Get("Authorization") != "Bearer synthetic-catalog-secret" && r.Header.Get("Authorization") != "Bearer synthetic-catalog-second") {
 			t.Error("unexpected upstream request")
 		}
@@ -350,7 +354,7 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	}
 	in.ExpectedRevision++
 	conflict := b.DiscoverProviderModels(in)
-	if conflict.Problem == nil || conflict.Problem.Code != "conflict" || calls.Load() != 1 {
+	if conflict.Problem == nil || conflict.Problem.Code != "conflict" || calls.Load() != 2 {
 		t.Fatal("revision conflict or retry", conflict, calls.Load())
 	}
 	in.ExpectedRevision = MaxSafeRevision + 1
@@ -363,7 +367,7 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	}
 	in.ExpectedRevision = added.Data.Revision
 	merged := b.DiscoverProviderModels(in)
-	if merged.Problem != nil || merged.Data == nil || merged.Data.KeyID != "" || len(merged.Data.Models) != 1 || len(merged.Data.Entries) != 1 || len(merged.Data.Entries[0].KeyIDs) != 2 || len(merged.Data.Keys) != 2 || !merged.Data.Keys[1].Enabled || calls.Load() != 3 {
+	if merged.Problem != nil || merged.Data == nil || merged.Data.KeyID != "" || len(merged.Data.Models) != 1 || len(merged.Data.Entries) != 1 || len(merged.Data.Entries[0].KeyIDs) != 2 || len(merged.Data.Keys) != 2 || !merged.Data.Keys[1].Enabled || calls.Load() != 6 {
 		t.Fatal("bridge catalog associations lost", merged)
 	}
 	disabled := b.ProviderAction(Action{ProviderID: in.ProviderID, ExpectedRevision: in.ExpectedRevision, Action: "key-put", Target: "second", Enabled: false})
@@ -372,12 +376,12 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	}
 	in.ExpectedRevision = disabled.Data.Revision
 	filtered := b.DiscoverProviderModels(in)
-	if filtered.Problem != nil || filtered.Data == nil || len(filtered.Data.Keys) != 1 || !reflect.DeepEqual(filtered.Data.Entries[0].KeyIDs, []string{"default"}) || calls.Load() != 4 {
+	if filtered.Problem != nil || filtered.Data == nil || len(filtered.Data.Keys) != 1 || !reflect.DeepEqual(filtered.Data.Entries[0].KeyIDs, []string{"default"}) || calls.Load() != 8 {
 		t.Fatal("bridge queried disabled key", filtered)
 	}
 	in.KeyID = "second"
 	skipped := b.DiscoverProviderModels(in)
-	if skipped.Problem != nil || skipped.Data == nil || skipped.Data.Failure != "no_enabled_keys" || len(skipped.Data.Keys) != 0 || calls.Load() != 4 {
+	if skipped.Problem != nil || skipped.Data == nil || skipped.Data.Failure != "no_enabled_keys" || len(skipped.Data.Keys) != 0 || calls.Load() != 8 {
 		t.Fatal("bridge did not preserve disabled key result", skipped)
 	}
 }

@@ -54,7 +54,7 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 - 输入为 `provider_id`、`expected_revision`（桌面 1..MAX_SAFE_INTEGER）和 `key_id`（空字符串自动查询全部启用的已存 Key，跳过停用 Key）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
 - 后端从已存快照取地址／密钥，使用 `<base_url 去尾斜杠>/models`，保留部署前缀；未带版本的根地址或自定义前缀，仅404/405或200 HTML网页时尝试同前缀 `/v1/models`，兼容 NewAPI 代理部署（例如 `/newapi/v1/models`）；已带版本路径或版本后的 `/openai` 不重复追加 `/v1`。官方 OpenAI、Anthropic、Kimi/Moonshot 和硅基流动根地址固定 `/v1/models`；DeepSeek 根地址固定 `/models`，OpenRouter 固定 `/api/v1/models`，Gemini 根地址及 `/v1beta/openai` 目录改用 `/v1beta/models`；`/v1beta` 前缀使用 `x-goog-api-key`，其他路径沿用 Key 默认协议鉴权。所有凭据只进请求头。停用供应商也允许显式查询。复用无环境代理、禁止重定向的客户端与全局16／供应商并发上限；全部路径/分页共用 `min(timeout_seconds, 8)` 秒。每个 Key 最多10次目录 HTTP请求、每页请求1000条；全部 Key 的目录与倍率抓取共用上述期限，先读取全部目录再读取倍率，不重试失败请求、后台轮询或持久缓存；完整规则见[CLI 大全](../cli/commands.md#provider-modelsdesktop10-小步)。
 - 输出十字段：原有 provider_id、key_id、revision、http_status、elapsed_ms、models、failure，新增 partial、entries、keys。默认聚合 key_id 为空，无已存 Key 为 anonymous，显式指定时保留该 ID。全部 Key 停用或指定停用 Key 时返回 no_enabled_keys、http_status=0 和空 models/entries/keys，不回退匿名请求。models 为始终非null的模型 ID 去重排序数组；entries 为 `{id,key_ids}`，合并同一模型对应的全部启用且目录成功的可选 Key；keys 为 `{id,enabled,protocol,http_status,failure,group,group_name,multiplier,rate_basis,rate_failure}`，倍率为十进制字符串或 null。至少一个 Key 目录成功则顶层 failure 为空，partial 标记失败 Key；逐 Key 目录必须完整分页才关联模型，全部失败或聚合超限时不返回模型。接受 OpenAI/Anthropic data[].id、Gemini models[].name（去除 models/ 前缀）；全部 Key 累计目录512 KiB，最多64个 Key、每 Key 1000条原始记录、合并1000个模型、每 ID 256字节；分页循环、格式变化、后续页失败只使该 Key 失败。
-- 倍率复用 providerapi 的已存账户授权，与 Key 默认推理协议独立。自动读取账号 Key 列表并精确核对身份；NewAPI 掩码候选经固定只读 POST /api/token/{数字ID}/key 验证完整凭据后取分组与 pricing.group_ratio，Sub2API 取个人覆盖或可用组倍率和组名；OneAPI、auto 分组或缺授权不会假定1×。每 Key 最多4页账号列表（100条/页），倍率适配器最多8次请求/2 MiB响应。未知和失败用 rate_failure 标明，不写入 Anchor 映射倍率，不使目录结果丢失；多 Key 的组名也检查凭据回显。
+- 倍率复用 providerapi，与 Key 默认推理协议独立。sub2api 优先用每个推理 Key 读取 `/v1/sub2api/billing` 的当前有效倍率（含个人覆盖与高峰规则），无需用户 JWT；未配置平台时以一个 Key 专用请求识别 sub2api，缺接口才要求配置平台。该接口不返回组名／ID，`group` 与 `group_name` 留空，`rate_basis=key_billing`。仅404/405或200 HTML网页回退旧站用户授权查询，其他错误直接报告。旧 sub2api 与 NewAPI 自动读取账号 Key 列表并精确核对身份；NewAPI 掩码候选经固定只读 POST /api/token/{数字ID}/key 验证完整凭据后取分组与 pricing.group_ratio，Sub2API 取个人覆盖或可用组倍率和组名；OneAPI、auto 分组或缺授权不会假定1×。每 Key 最多4页账号列表（100条/页），倍率适配器最多8次请求/2 MiB响应。未知和失败用 rate_failure 标明，不写入 Anchor 映射倍率，不使目录结果丢失；多 Key 的组名也检查凭据回显。
 - 请求受理后目录失败仍返回 HTTP200 与固定分类：`no_enabled_keys`（无启用 Key，跳过目录和倍率请求）、`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
 - 不写配置、revision、模型映射或健康状态。一次目录成功仅说明此接口返回有效目录，不代表推理、工具、流式、余额或持续健康；404/405 不等于供应商推理不可用。
 - UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和限高模型列表；区分“目录列出”与“仅已存协议”，避免把旧覆盖当成本次 Key 目录；Key / 模型协议编辑见 §6。查询中阻止供应商切换、编辑和页面离开；选择、重读或修改供应商／Key 凭据后清空结果；模型协议保存保留当前目录，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
@@ -115,7 +115,7 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 | key-quota | Key `GET /v1/usage` | Key `GET /api/usage/token/`，兼容其布尔 `code:true` 成功封装 | 用户 `GET /api/token/{remote_key_id}` |
 | usage-records account | 用户 `GET /api/v1/usage?page=&page_size=` | 用户 `GET /api/log/self?type=2&p=&page_size=` | 用户 `GET /api/log/self?type=2&p=`，内部把页号转换成从0开始 |
 | usage-records key | 同上，加 api_key_id 筛选 | Key `GET /api/log/token`，只提供近期批次 | unsupported_key_filter，不使用可能重名的 token_name 筛选 |
-| effective-rate | 用户读取 `/api/v1/keys/{id}`、`/api/v1/groups/rates`、必要时 `/api/v1/groups/available` | 用户读取 `/api/token/{id}`、必要时 `/api/user/self`、`/api/pricing` | unsupported |
+| effective-rate | Key 直接读取 `/v1/sub2api/billing`；旧站回退或显式 remote_key_id 时用户读取 `/api/v1/keys/{id}`、`/api/v1/groups/rates`、必要时 `/api/v1/groups/available` | 用户读取 `/api/token/{id}`、必要时 `/api/user/self`、`/api/pricing` | unsupported |
 
 推理 Key 与用户令牌均放 Bearer 请求头；NewAPI 用户授权若配置 user_id 则加 `New-Api-User`。sub2api 用户令牌为登录 JWT；NewAPI/OneAPI 用户接口需用户级 access token，不把 `sk-` 推理令牌当后台授权。不要请求管理员接口或将上游原始日志转发到桌面。
 
@@ -132,6 +132,8 @@ records 的 history 区分近期批次 `recent` 和可分页保留记录 `pagina
 当前倍率按 remote_key_id 的绑定分组查询：sub2api 个人覆盖优先，再读可用分组默认倍率；NewAPI 使用用户身份下 pricing 的 group_ratio（覆盖后的倍率），空 Key 分组继承用户分组，auto 可能按请求变化因此返回 unknown。历史账单 rate_multiplier 是上游报告值，NewAPI 同时保留 group_ratio / user_group_ratio，不能据当前倍率重算历史实际扣费；OneAPI 普通用户没有可靠的当前有效倍率接口。
 
 账户查询单次最多8个 GET、累计2 MiB响应、每页最多1000条原始记录，统一供应商超时与8秒的较小值，全局与供应商并发共用现有核心限额。禁止重定向、沿用核心不使用环境代理的上游策略，不重试；登录过期、权限不足、限流、超限、格式变化或分页失败返回分类失败。模型目录沿 §4 自身更小的响应限制。未提供本轮未勾选的用量汇总、完整分组列表、模型价格目录和订阅列表；不将站点目录声明当作推理健康或自动负载均衡依据。
+
+sub2api 所选推理 Key 的倍率查询（remote_key_id=0）优先使用 `/v1/sub2api/billing`，无需 JWT；`basis=key_billing` 的 multiplier 取服务端 `effective_rate_multiplier`，包含个人覆盖和当前高峰规则，不在客户端重算。组名与 ID 未披露则为空。正整数远端 ID 查询仍需用户授权，避免将保存 Key 的倍率误当作另一远端 Key 的倍率。仅缺接口（404/405或200 HTML）回退旧查询；格式错误、拒绝授权、限流、网络和服务错误不回退。auto 探测增加 object/schema_version/billing_scope 强识别并复用本次响应，避免重复计费接口请求。
 
 ### 来源与验证边界
 
@@ -192,3 +194,5 @@ Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始�
 - 最小请求仍是「Reply OK.」、max_output_tokens=16、store=false。异步测试增加 stream=true；使用所选 Key 的实际模型协议、已有协议流转换器，以及与同步探针相同的并发、最多10秒期限、健康和累计用量。真实 SSE 文本逐段可见；上游忽略流式并返回 JSON 时，校验后显示一次完整文本。EOF 缺终止事件、非法流和 incomplete 返回固定 invalid_response，错误正文不显示。
 - 核心最多保留64次瞬态运行，开始一分钟后删除；停止取消上游 context，核心关闭取消并等待任务退出。文本只在运行内存／当前弹窗保留，不进入日志、数据库或浏览器存储。仅提取 output_text，不展示原始事件、思考内容、请求头或上游错误；所选 Key 凭据完整回显及跨片段前缀均被过滤。保留现有固定失败分类及 Probe DTO。
 - 目录只说明 Key 可列出该模型，不保证推理或流式成功。前端目录错误／空目录禁用发起按钮；Key 切换清空选择后重新查询，不从供应商全量映射猜测 Key 权限。关闭快速测试保持列表、关闭详情测试保持详情。
+
+Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e546d8d6801f1cc1` 的 `backend/internal/handler/gateway_key_billing.go` 和 `backend/internal/server/routes/gateway.go`。隔离模拟验证不代表所有历史部署版本已提供该端点。

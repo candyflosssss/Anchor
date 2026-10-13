@@ -277,3 +277,11 @@
 - 旧 → 新：NewAPI 列表余额原先忽略已保存用户令牌，现在与 balance 一样优先用系统访问令牌查账户余额（scope=account）；账户授权失败保留错误，不退回 Key 数值。未配置用户授权时沿用 billing / Key 额度兼容查询。
 - 兼容与迁移：无新增参数和数据库迁移。通过该站后台个人／安全设置生成系统访问令牌，用 --user-token-stdin 保存；用户 ID 按站点要求填写。scoped token 的账户读取需要 profile:read，自动核对 Key 分组需要 api_key:read、api_key:reveal。
 - 验证：providerapi/core/client/desktop/CLI 五包定向测试通过，覆盖已保存系统令牌、默认或缺失推理 Key、自动平台识别、用户 ID 请求头、零余额和授权失败不回退；前端类型/lint及15项定向单测通过。不使用真实凭据或付费请求。
+
+## 2026-10-13 — sub2api 推理 Key 直接查询计费倍率（未发布）
+
+- 类型：修改行为和帮助，参数不变。
+- 指令与参数：provider effective-rate、provider models；--remote-key-id 默认0沿用所选 Key，正整数仍查询该站远端 Key。
+- 旧 → 新：原先缺少用户 JWT 就结束倍率查询，现在 sub2api 优先使用推理 Key 调用 /v1/sub2api/billing，读取含个人覆盖与高峰规则的 effective_rate_multiplier；旧站缺接口（404/405或200 HTML）才回退用户授权。认证、权限、限流、服务或格式错误直接报告。未配置账户平台的模型目录以一个 Key 专用请求识别 sub2api；auto 探测复用本次响应，不重复查询。
+- 兼容与迁移：无新增命令或数据库迁移。effective_rate.basis / keys[].rate_basis 新增 key_billing，此来源允许 group/group_name 为空；旧客户端需同步升级。NewAPI、OneAPI 与显式后台 Key ID 查询的授权规则不变；只显示快照，不自动修改路由倍率。
+- 验证：providerapi/core/client/desktop/CLI 定向 Go 测试通过，覆盖 Key-only、当前有效倍率、零倍率、精度、部署前缀、旧站回退、分类失败、多 Key 目录和桌面桥接；隔离源码的前端 typecheck/lint 和账户／目录／倍率展示44项定向单测通过。未使用真实站点凭据或付费推理请求。

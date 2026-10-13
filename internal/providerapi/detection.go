@@ -33,6 +33,13 @@ func (a *Adapter) DetectPlatform(ctx context.Context) (string, error) {
 			}
 			return ""
 		}},
+		{sub2KeyBillingPath, false, func(m object) string {
+			if sub2KeyBillingSchema(m) {
+				a.keyBilling = m
+				return "sub2api"
+			}
+			return ""
+		}},
 		{"/v1/usage", false, func(m object) string {
 			if text(m, "mode") == "unrestricted" && amount(m, "balance", "USD") != nil {
 				return "sub2api"

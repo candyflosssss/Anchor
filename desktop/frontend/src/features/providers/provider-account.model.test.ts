@@ -95,6 +95,14 @@ describe('group rate contract', () => {
       expect(() => checkedAccountRate({ ...fixture.rate, ...patch }, query)).toThrow('read_error');
     }
   });
+  it('accepts key-only sub2api billing without fabricating a group', () => {
+    expect(checkedAccountRate(fixture.key_billing_rate, query)).toEqual(fixture.key_billing_rate);
+    for (const patch of [{ platform: 'newapi' }, { remote_key_id: 7 },
+      { rate: { ...fixture.key_billing_rate.rate, basis: 'authenticated_group' } }]) {
+      const observation = { ...fixture.key_billing_rate, ...patch };
+      expect(() => checkedAccountRate(observation, { ...query, remote_key_id: observation.remote_key_id })).toThrow('read_error');
+    }
+  });
   it('uses only the rate bridge and drops unexpected response properties', async () => {
     const t = new DesktopProviderTransport(() => ({ ProviderRate: async () => ({ contract: CONTRACT, data: { ...fixture.rate, secret: 'discard', rate: { ...fixture.rate.rate, secret: 'discard' } }, problem: null }) } as unknown as DesktopBridge));
     expect(await t.rate(query, signal())).toEqual(fixture.rate);

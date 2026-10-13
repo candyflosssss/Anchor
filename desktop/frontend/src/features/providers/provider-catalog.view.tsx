@@ -26,7 +26,7 @@ export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController;
     const k = models?.keys.find(k => k.id === id);
     if (!k) return '分组倍率尚未查询';
     const group = k.group_name ? `${k.group_name}（${k.group}）` : k.group;
-    return `${group ? `分组 ${group} · ` : ''}${k.multiplier !== null ? `${k.multiplier}×${k.rate_basis === 'personal_override' ? '（个人倍率）' : ''}` : `倍率未知：${catalogRateFailureText[k.rate_failure] || '上游未提供'}`}`;
+    return `${group ? `分组 ${group} · ` : ''}${k.multiplier !== null ? `${k.multiplier}×${k.rate_basis === 'personal_override' ? '（个人倍率）' : k.rate_basis === 'key_billing' ? '（当前计费）' : ''}` : `倍率未知：${catalogRateFailureText[k.rate_failure] || '上游未提供'}`}`;
   };
   return <section className="detail-card model-directory" aria-label="上游模型目录" aria-busy={c.modelsBusy}>
     <div className="card-toolbar catalog-toolbar">

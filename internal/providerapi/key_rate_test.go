@@ -14,6 +14,13 @@ func TestCatalogRateResolvesExactSub2Key(t *testing.T) {
 	for _, personal := range []bool{true, false} {
 		t.Run(fmt.Sprint(personal), func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/prefix/v1/sub2api/billing" {
+					if r.Header.Get("Authorization") != "Bearer model-rate-fixture" {
+						t.Error("incorrect key billing auth")
+					}
+					w.WriteHeader(404)
+					return
+				}
 				if r.Method != "GET" || r.Header.Get("Authorization") != "Bearer account-rate-fixture" {
 					t.Error("unexpected auth/verb")
 				}
@@ -111,9 +118,16 @@ func TestCatalogRateVerifiesMaskedNewAPIKey(t *testing.T) {
 }
 func TestCatalogRateNoAuthDoesNotGuess(t *testing.T) {
 	for _, tc := range []struct{ platform, want string }{{"", "platform_required"}, {"sub2api", "auth_required"}, {"newapi", "auth_required"}, {"oneapi", "unsupported"}} {
-		a := Adapter{Config: Config{Platform: tc.platform}, Key: "model-rate-fixture"}
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != sub2KeyBillingPath || r.Header.Get("Authorization") != "Bearer model-rate-fixture" {
+				t.Error("unexpected key probe")
+			}
+			w.WriteHeader(404)
+		}))
+		defer server.Close()
+		a := Adapter{HTTP: server.Client(), BaseURL: server.URL, Config: Config{Platform: tc.platform}, Key: "model-rate-fixture"}
 		out := a.QueryKeyRate(context.Background())
-		if out.Failure != tc.want || out.EffectiveRate != nil || len(out.Source) != 0 {
+		if out.Failure != tc.want || out.EffectiveRate != nil || ((tc.platform == "" || tc.platform == "sub2api") && len(out.Source) != 1) || ((tc.platform == "newapi" || tc.platform == "oneapi") && len(out.Source) != 0) {
 			t.Fatal(out)
 		}
 	}

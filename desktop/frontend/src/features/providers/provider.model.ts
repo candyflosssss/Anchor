@@ -113,7 +113,7 @@ export const catalogFailureText: Record<string, string> = {
 };
 export const catalogRateFailureText: Record<string, string> = {
   platform_required: '尚未配置账户平台', platform_unknown: '无法识别账户平台',
-  auth_required: '需要账户授权', authentication: '账户授权被拒绝', permission_denied: '无分组读取权限',
+  auth_required: '旧站或此查询需要账户授权', authentication: 'Key 或账户授权被拒绝', permission_denied: '无分组读取权限',
   key_not_found: '账户内未找到此 Key', remote_key_required: '缺少远端 Key 标识',
   unsupported: '此平台不支持倍率查询', unknown: '上游未提供确定倍率',
   timeout: '抓取超时', network: '网络请求失败', rate_limited: '上游限流',
@@ -136,9 +136,9 @@ export function checkedCatalog(value: ProviderModels, input: DiscoverProviderMod
   for (const k of value.keys) {
     if (!k || !safeText(k.id) || !k.id || keyIDs.has(k.id) || typeof k.enabled !== 'boolean' || !Object.hasOwn(protocolName, k.protocol) || !status(k.http_status) || !failure(k.failure) ||
       (!k.failure && k.http_status !== 200) || !safeText(k.group) || !safeText(k.group_name) ||
-      !['', 'authenticated_group', 'personal_override'].includes(k.rate_basis) ||
+      !['', 'authenticated_group', 'personal_override', 'key_billing'].includes(k.rate_basis) ||
       (k.rate_failure !== '' && !Object.hasOwn(catalogRateFailureText, k.rate_failure)) ||
-      (k.multiplier !== null && (typeof k.multiplier !== 'string' || !/^(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(k.multiplier) || !Number.isFinite(Number(k.multiplier)) || Number(k.multiplier) < 0 || !k.group || !k.rate_basis || k.rate_failure !== ''))) return invalid();
+      (k.multiplier !== null && (typeof k.multiplier !== 'string' || !/^(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(k.multiplier) || !Number.isFinite(Number(k.multiplier)) || Number(k.multiplier) < 0 || (!k.group && k.rate_basis !== 'key_billing') || !k.rate_basis || k.rate_failure !== ''))) return invalid();
     keyIDs.add(k.id);
   }
   if (!value.failure && (!value.keys.some(k => !k.failure) || value.partial !== value.keys.some(k => !!k.failure))) return invalid();

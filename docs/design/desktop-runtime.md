@@ -103,3 +103,5 @@ ProviderAllowance 增量接受 balance-summary，返回 account 或 key scope �
 
 
 2026-10-13 模型调度新增受控 `ConfigureModelRouting(ModelRouting)`，返回 ModelRoutingResult 标准 envelope，复用客户端与核心管理鉴权、实例校验和 revision。输入仅已有模型的完整候选引用及规则；不提供任意请求／配置修改入口。保存纳入前端活动锁，阻止退出／安装更新期间并发写入。Go DTO和共享样例见供应商接口 §9；旧核心不支持此方法，需同步升级，schema6不向旧程序开放。
+
+2026-10-13 sub2api Key 倍率兼容：`ProviderRate` 的 `remote_key_id=0` 优先使用推理 Key 的 `/v1/sub2api/billing`，无需 JWT；`basis=key_billing` 表示含个人覆盖和高峰规则的当前有效倍率，group/group_name 可为空。AccountRate DTO 字段不变；共享样例增加 key_billing_rate，目录 keys 同步接受 rate_basis=key_billing。旧站缺接口或显式远端 ID 沿用用户授权查询；查询不更新路由倍率。

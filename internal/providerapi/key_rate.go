@@ -24,6 +24,12 @@ func (a *Adapter) getKeyRate(ctx context.Context) (*Rate, error) {
 	if err := a.key(); err != nil {
 		return nil, err
 	}
+	if a.Config.Platform == "sub2api" {
+		rate, available, err := a.getSub2KeyBilling(ctx)
+		if available || err != nil {
+			return rate, err
+		}
+	}
 	if err := a.user(); err != nil {
 		return nil, err
 	}

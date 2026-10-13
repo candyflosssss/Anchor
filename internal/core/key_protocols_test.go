@@ -115,6 +115,13 @@ func TestDirectoryUsesSelectedKeyDefaultProtocol(t *testing.T) {
 	calls := 0
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
+		if r.URL.Path == "/v1/sub2api/billing" {
+			if r.Header.Get("Authorization") != "Bearer synthetic-second" || r.Header.Get("x-api-key") != "" {
+				t.Error("billing must use bearer independently of inference protocol")
+			}
+			w.WriteHeader(404)
+			return
+		}
 		if r.URL.Path != "/v1/models" || r.Header.Get("x-api-key") != "synthetic-second" || r.Header.Get("Authorization") != "" {
 			t.Error("wrong catalog credential/protocol")
 		}
@@ -131,11 +138,11 @@ func TestDirectoryUsesSelectedKeyDefaultProtocol(t *testing.T) {
 	before, _ := f.store.ProviderKeys("p")
 	status, raw := discover(t, f, "p", `{"provider_id":"p","expected_revision":3,"key_id":"second"}`, f.owner, cfg.InstanceID)
 	var result catalog.ProviderModels
-	if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "second" || result.Failure != "" || calls != 1 {
+	if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "second" || result.Failure != "" || calls != 2 {
 		t.Fatal(status, raw)
 	}
 	status, _ = discover(t, f, "p", `{"provider_id":"p","expected_revision":3,"key_id":"missing"}`, f.owner, cfg.InstanceID)
-	if status != 404 || calls != 1 {
+	if status != 404 || calls != 2 {
 		t.Fatal(status, calls)
 	}
 	after, _ := f.store.ProviderKeys("p")

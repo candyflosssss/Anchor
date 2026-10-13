@@ -229,6 +229,7 @@ type AccountObservationResult struct {
 
 // Platform rates are observations of a selected Key's group, independent of
 // the saved model mapping's routing multiplier. A missing rate is never 1.
+// Basis key_billing includes user/peak rules; the endpoint may omit group identity.
 type AccountRate struct {
 	Group      string  `json:"group"`
 	GroupName  string  `json:"group_name"`

@@ -70,6 +70,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
           <div className="field"><label htmlFor="account-platform">平台类型</label><select id="account-platform" className="select-field" value={platform} onChange={e => setPlatform(e.target.value)}>{Object.entries(platformLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></div>
           {newAPI && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID（按站点要求填写）</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="可先留空；该站要求时填写数字用户 ID" /><p className="card-hint">这是该站后台的账户 ID。仅当该站要求用户 ID 时填写。</p></div>}
           <details className="pricing-details"><summary>账户接口地址（可选）</summary><div className="field"><label htmlFor="account-site-url">站点根地址</label><input id="account-site-url" value={siteURL} onChange={e => setSiteURL(e.target.value)} placeholder="留空，沿用请求地址并移除末尾 /v1" /><p className="card-hint">后台与推理 API 地址不同时填写。包含站点实际使用的部署路径前缀。</p></div></details>
+          {(platform === 'sub2api' || a.observedPlatform === 'sub2api') && <p className="card-hint">sub2api 查询所选 Key 的当前计费倍率可直接使用推理 Key，无需用户 JWT。旧站缺少 Key 倍率接口，或指定后台 Key ID 时，才需要用户授权。</p>}
           {platform === 'auto' && !a.observedPlatform && <p className="card-hint">NewAPI 账户余额需要后台单独生成的系统访问令牌。选择「NewAPI」可查看获取步骤并配置。</p>}
           {newAPI && <div className="card-hint">
             <p>登录该 NewAPI 站点后台 → 个人设置／安全设置 → 系统访问令牌，生成后选择下方「输入／替换系统访问令牌」，粘贴并保存。它与调用模型的 API Key 分开配置。</p>
@@ -89,13 +90,13 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
     </section>
     <section className="detail-card">
       <div className="card-toolbar"><h2>查询使用的 Key</h2><select className="select-field" aria-label="余额查询 Key" disabled={disabled} value={keyID} onChange={e => { setKeyID(e.target.value); setRemoteID(''); a.clearObservations(); }}><option value="">默认 Key（优先 default）</option>{keys.map(k => <option key={k.id} value={k.id}>{k.id}{k.enabled ? '' : '（已停用）'}</option>)}</select></div>
-      {!oneAPI && <div className="field account-remote"><label htmlFor="account-rate-key-id">后台 Key ID（查询分组倍率时可选）</label><input id="account-rate-key-id" inputMode="numeric" value={remoteID} disabled={disabled} onChange={e => { setRemoteID(e.target.value); a.clearObservations(); }} placeholder="留空，自动核对所选 Key" /><p className="card-hint">需要平台用户授权。填写 ID 时查询该远端 Key 的分组；请在平台后台核对与所选 Key 的对应关系。</p></div>}
+      {!oneAPI && <div className="field account-remote"><label htmlFor="account-rate-key-id">后台 Key ID（查询分组倍率时可选）</label><input id="account-rate-key-id" inputMode="numeric" value={remoteID} disabled={disabled} onChange={e => { setRemoteID(e.target.value); a.clearObservations(); }} placeholder="留空，自动核对所选 Key" /><p className="card-hint">留空时查询所选 Key，sub2api 优先直接读取。填写 ID 时需要用户授权，并查询该远端 Key 的分组；请在后台核对 Key 对应关系。</p></div>}
       {oneAPI && <div className="field account-remote"><label htmlFor="account-remote-id">OneAPI 后台令牌 ID（查询 Key 额度时必填）</label><input id="account-remote-id" inputMode="numeric" value={remoteID} disabled={disabled} onChange={e => { setRemoteID(e.target.value); a.clearObservations(); }} placeholder="例如 123；请在 OneAPI 后台核对" /></div>}
     </section>
     <section className="detail-card">
       <div className="card-toolbar"><h2>分组倍率</h2><Button variant="outline" size="sm" disabled={queryDisabled} onClick={() => query('effective-rate')}><RefreshCw size={14} />刷新分组倍率</Button></div>
       <GroupRateObservation value={a.rate} />
-      <p className="card-hint">这是查询 Key 的平台分组倍率。模型映射中的路由倍率单独保存，查询不会修改路由。</p>
+      <p className="card-hint">这是平台返回的倍率快照。sub2api Key 直读显示含个人覆盖和高峰规则的当前计费倍率，未返回的分组名称留空。模型映射中的路由倍率单独保存，查询不会修改路由。</p>
     </section>
     <div className="overview-grid">
       <Observation title="余额" value={a.balance} disabled={queryDisabled} onRefresh={() => query('balance')} />

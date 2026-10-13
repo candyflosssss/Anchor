@@ -332,7 +332,7 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 
 `--user-token-stdin` 读取独立的后台用户授权（sub2api JWT、NewAPI/OneAPI 用户 access token）；NewAPI 在该站后台「个人设置／安全设置 → 系统访问令牌」生成，与推理 API Key 分开配置。支持权限选择的新版本，余额需 profile:read，自动核对 Key 分组还需 api_key:read 和 api_key:reveal。不能使用 `--secret` 参数传入。空 stdin 拒绝；与 `--clear-user-token` 互斥。未指定令牌选项时，仅平台、后台根地址和用户 ID 都不变才保留原令牌；改变其中任一项会清除。后台地址由请求地址推导时，修改请求地址也清除令牌；显式独立后台地址不受此影响。复制供应商不复制用户授权，即使指定 `--copy-keys`；改名保留，删除级联清除。凭据存于本机受限数据库，不能理解为数据库列加密。
 
-`--key` 默认优先已启用的 `default`，否则回退首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。显式指定时，调用者须确保该数字对应希望查询的站点 Key。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询在该数字为0（默认）时，通过用户账户列表核对所选保存的完整密钥后读取分组；最多4页各100条。NewAPI 的掩码需通过固定的 POST `/api/token/{id}/key` 读取完整密钥核对，掩码本身不能证明身份；找不到返回 `key_not_found`。正整数仍直接读取指定远端 Key 的绑定分组。
+`--key` 默认优先已启用的 `default`，否则回退首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。显式指定时，调用者须确保该数字对应希望查询的站点 Key。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询在该数字为0（默认）时，sub2api 优先以所选推理 Key 读取 `/v1/sub2api/billing` 的 `effective_rate_multiplier`，无需 JWT，包含个人覆盖与当前高峰规则。仅404/405或200 HTML网页说明接口缺失时回退用户账户列表；认证、权限、限流、服务和有效 JSON 格式错误直接报告。NewAPI 通过用户账户列表核对所选保存的完整密钥后读取分组；旧 sub2api 回退也沿用该身份核对，最多4页各100条。NewAPI 的掩码需通过固定的 POST `/api/token/{id}/key` 读取完整密钥核对，掩码本身不能证明身份；找不到返回 `key_not_found`。正整数仍直接读取指定远端 Key 的绑定分组。
 
 | 功能 | sub2api | NewAPI | 原版 OneAPI |
 | --- | --- | --- | --- |
@@ -341,7 +341,9 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 | Key 额度 | Key 查询总额度／滚动窗口，未限额不等于钱包无限 | Key 查询 remaining / used / limit / unlimited | 用户授权 + remote-key-id 查 Key，保留原始 quota |
 | 请求账单 | 用户授权分页；Key 范围另需 remote-key-id | 用户授权分页，或 Key 查近期批次 | 用户授权分页；Key 范围返回 unsupported_key_filter |
 | 实际扣费及 tokens | USD actual_cost、输入输出、缓存、费用分项 | quota、输入输出及已有缓存／音频等数值明细 | quota、基础字段；token 语义标记待核验 |
-| 当前有效分组倍率 | 用户授权，默认自动核对所选 Key；可显式 remote-key-id，个人覆盖优先 | 用户授权，默认自动核对所选 Key；可显式 remote-key-id，用户身份定价；auto 返回 unknown | unsupported |
+| 当前有效分组倍率 | 推理 Key 直读当前有效倍率（含个人／高峰）；旧站回退或显式 remote-key-id 需用户授权 | 用户授权，默认自动核对所选 Key；可显式 remote-key-id，用户身份定价；auto 返回 unknown | unsupported |
+
+sub2api Key 直接倍率结果的 `basis=key_billing`，`group` 和 `group_name` 可为空（接口未披露组名／ID），不可推定为默认组或1×；`multiplier` 为平台的当前有效计费倍率。显式正整数 `--remote-key-id` 保持旧的用户授权查询语义，不使用当前推理 Key 的直读结果替代该远端 Key。`provider models` 未配置账户平台时可通过一个 Key 专用接口请求识别 sub2api；其他平台仍需账户平台配置。倍率读取失败不会丢弃模型目录，也不会修改 Anchor 路由倍率。
 
 `usage-records` 的 `--scope` 默认 `account`，可选 `key`。`--page` 默认1，上限100000；`--page-size` 默认50，范围1..100。sub2api 和 NewAPI 用户日志正常分页；NewAPI Key 日志只支持第1页且批次大小由站点决定，`history=recent`、`page_size=0`、`total=null`、`has_more=false`，不表示完整历史。原版 OneAPI 使用站点固定分页大小，返回 `page_size=0`、`total=null`，非空页 `has_more=true`，需空末页确定结束。所有记录受上游默认时间范围、日志保留和站点开关限制；这不是 Anchor 本地 `usage show` 或 `logs list`。
 

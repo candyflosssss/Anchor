@@ -38,6 +38,13 @@ func TestCatalogMergesEnabledKeysAndFetchesRates(t *testing.T) {
 			return
 		}
 		calls[r.URL.Path]++
+		if r.URL.Path == "/v1/sub2api/billing" {
+			if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer catalog-") {
+				t.Error("incorrect key billing auth")
+			}
+			w.WriteHeader(404)
+			return
+		}
 		if r.Header.Get("Authorization") != "Bearer account-catalog-fixture" {
 			t.Error("incorrect billing auth")
 		}
