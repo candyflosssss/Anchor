@@ -215,3 +215,14 @@
 - `provider platform-put --platform` 改为可选，默认 auto；未配置平台的查询也自动识别，可继续指定 sub2api/newapi/oneapi 覆盖。公开探测无凭据，不依赖站点名称或域名。
 - 未指定 Key 的平台查询优先已启用 default，再回退首个启用 Key；显式 Key 保持原选择行为。summary 只用推理 Key，区分钱包和 Key 原始额度，不使用用户授权、不改 revision。
 - 桌面供应商列表复用 ProviderAllowance balance-summary；既有 balance/key-quota/账单/倍率语义不变。安装包未构建或发布。
+
+
+## 2026-10-13 — 全 Key 模型目录合并与分组倍率（当前源码，未打包）
+
+- 类型：修改默认选择行为，扩展目录 JSON；命令路径和退出码不变。
+- 指令与参数：`provider models --id ID --revision N [--key KEY]`；省略 `--key` 从首个启用 Key 改为查询全部已保存 Key（含停用 Key），显式指定仍只查询该 Key；没有 Key 时仍使用匿名请求。
+- 输出与行为：相同模型 ID 合并，保留 `models` 并新增 `entries` 的模型／Key 关联、`keys` 的逐 Key 目录状态与分组倍率、`partial` 部分失败标记；聚合 `key_id` 为空，有成功 Key 时保留目录结果，失败 Key 单独说明。倍率为十进制字符串或 null，不假定1×，不修改映射倍率、配置或 revision。
+- 倍率来源：通过已存账户授权精确匹配推理 Key，NewAPI 掩码候选须通过固定只读接口验证；Sub2API 展示组名及个人覆盖或组默认倍率。缺授权、不支持、未知分组或读取失败单独返回 `rate_failure`，保留已取得的分组信息。所有 Key 共用目录字节预算、并发槽及超时，限制模型和 Key 数量，过滤凭据回显。
+- 桌面：取消目录查询 Key 选择器；默认全部查询、每个模型一行展示对应 Key 与抓取倍率，每个模型／Key 的协议覆盖可独立编辑；同步 Go／TypeScript 契约、共享样例、CLI 帮助及最新指令大全。
+- 兼容与迁移：无数据库迁移；核心与客户端需同步升级才能使用扩展契约及默认聚合语义。当前只交付源码，尚未生成安装包或投放在线更新；目录成功不代表推理可用。
+- 验证：resource-guard 下 `GOMAXPROCS=2 go test -p 2 ./internal/core ./internal/providerapi ./internal/desktop ./internal/cli ./internal/catalog` 五包通过；前端 typecheck、lint 和28项目录单测通过；单 worker 的原型及模拟桌面浏览器共4项通过，覆盖合并、逐 Key 协议、成功及失败展示。未请求真实付费上游，未执行原生安装验收。

@@ -105,20 +105,25 @@ func TestSharedProviderModelsContract(t *testing.T) {
 		Success     ProviderModels         `json:"success"`
 		Empty       ProviderModels         `json:"empty"`
 		Unsupported ProviderModels         `json:"unsupported"`
+		Aggregate   ProviderModels         `json:"aggregate"`
+		Partial     ProviderModels         `json:"partial"`
 	}
 	if json.Unmarshal(raw, &fixture) != nil || fixture.Contract != Contract {
 		t.Fatal("catalog fixture drift")
 	}
-	for _, result := range []ProviderModels{fixture.Success, fixture.Empty, fixture.Unsupported} {
-		if result.ProviderID != fixture.Input.ProviderID || result.Revision != fixture.Input.ExpectedRevision || result.Models == nil {
+	for _, result := range []ProviderModels{fixture.Success, fixture.Empty, fixture.Unsupported, fixture.Aggregate, fixture.Partial} {
+		if result.ProviderID != fixture.Input.ProviderID || result.Revision != fixture.Input.ExpectedRevision || result.Models == nil || result.Entries == nil || result.Keys == nil {
 			t.Fatal("catalog identity drift")
 		}
 		encoded, _ := json.Marshal(result)
 		var fields map[string]any
 		_ = json.Unmarshal(encoded, &fields)
-		if len(fields) != 7 {
+		if len(fields) != 10 {
 			t.Fatal("unexpected catalog public fields")
 		}
+	}
+	if fixture.Aggregate.KeyID != "" || len(fixture.Aggregate.Entries) != 2 || len(fixture.Aggregate.Entries[0].KeyIDs) != 2 || len(fixture.Aggregate.Keys) != 2 || fixture.Aggregate.Keys[1].Multiplier == nil || *fixture.Aggregate.Keys[1].Multiplier != "1.5" || !fixture.Partial.Partial || fixture.Partial.Failure != "" || fixture.Partial.Keys[1].Failure != "authentication" {
+		t.Fatal("catalog merge/key rate semantics drift")
 	}
 	if fixture.Success.HTTPStatus != 200 || fixture.Empty.Failure != "" || len(fixture.Empty.Models) != 0 || fixture.Unsupported.Failure != "unsupported" {
 		t.Fatal("catalog semantics drift")

@@ -22,6 +22,11 @@ func (a *Adapter) get(ctx context.Context, path string, user bool, query url.Val
 }
 
 func (a *Adapter) getWithAuth(ctx context.Context, path string, user, public bool, query url.Values) (object, error) {
+	return a.read(ctx, http.MethodGet, path, user, public, query)
+}
+
+// read is internal; POST is used only for NewAPI's read-only full-key lookup.
+func (a *Adapter) read(ctx context.Context, method, path string, user, public bool, query url.Values) (object, error) {
 	a.calls++
 	if a.calls > 8 {
 		return nil, failure("too_large")
@@ -38,7 +43,7 @@ func (a *Adapter) getWithAuth(ctx context.Context, path string, user, public boo
 		return nil, failure("invalid_request")
 	}
 	u.RawQuery = query.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	req, err := http.NewRequestWithContext(ctx, method, u.String(), nil)
 	if err != nil {
 		return nil, failure("invalid_request")
 	}

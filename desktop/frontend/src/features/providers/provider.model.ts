@@ -108,19 +108,44 @@ export const catalogFailureText: Record<string, string> = {
   too_large: '目录超过大小、条数或分页上限，未返回部分列表。',
   invalid_response: '上游目录格式或分页信息不符合要求，未返回部分列表。',
 };
+export const catalogRateFailureText: Record<string, string> = {
+  platform_required: '尚未配置账户平台', platform_unknown: '无法识别账户平台',
+  auth_required: '需要账户授权', authentication: '账户授权被拒绝', permission_denied: '无分组读取权限',
+  key_not_found: '账户内未找到此 Key', remote_key_required: '缺少远端 Key 标识',
+  unsupported: '此平台不支持倍率查询', unknown: '上游未提供确定倍率',
+  timeout: '抓取超时', network: '网络请求失败', rate_limited: '上游限流',
+  too_large: '抓取超过安全上限', invalid_response: '上游数据无效', invalid_request: '账户配置无效',
+  http_error: '上游请求失败', upstream_rejected: '上游拒绝请求',
+};
 export function checkedCatalog(value: ProviderModels, input: DiscoverProviderModels): ProviderModels {
-  if (!value || value.provider_id !== input.provider_id || value.revision !== input.expected_revision || typeof value.key_id !== 'string' || (!value.key_id && !value.failure) || (input.key_id !== '' && value.key_id !== input.key_id) ||
-    !Number.isSafeInteger(value.revision) || value.revision < 1 ||
-    !Number.isInteger(value.http_status) || (value.http_status !== 0 && (value.http_status < 100 || value.http_status > 599)) ||
-    !Number.isSafeInteger(value.elapsed_ms) || value.elapsed_ms < 0 || typeof value.failure !== 'string' ||
-    (value.failure !== '' && !Object.hasOwn(catalogFailureText, value.failure)) ||
-    (value.failure === '' && value.http_status !== 200) ||
-    !Array.isArray(value.models) || value.models.length > 1000 ||
-    (value.failure !== '' && value.models.length !== 0) ||
-    value.models.some(id => typeof id !== 'string' || !id || id.trim() !== id || new TextEncoder().encode(id).length > 256 || /[\p{Cc}\p{Cf}]/u.test(id)) ||
-    new Set(value.models).size !== value.models.length) throw new ProviderProblem('read_error');
-  return { provider_id: value.provider_id, key_id: value.key_id, revision: value.revision, http_status: value.http_status,
-    elapsed_ms: value.elapsed_ms, failure: value.failure, models: [...value.models] };
+  const invalid = () => { throw new ProviderProblem('read_error'); };
+  const status = (n: number) => Number.isInteger(n) && (n === 0 || (n >= 100 && n <= 599));
+  const safeText = (s: string, limit = 512) => typeof s === 'string' && new TextEncoder().encode(s).length <= limit && !/[\p{Cc}\p{Cf}]/u.test(s);
+  const failure = (s: string) => s === '' || (typeof s === 'string' && Object.hasOwn(catalogFailureText, s));
+  if (!value || value.provider_id !== input.provider_id || value.revision !== input.expected_revision || typeof value.key_id !== 'string' || (input.key_id !== '' && value.key_id !== input.key_id) ||
+    !Number.isSafeInteger(value.revision) || value.revision < 1 || !status(value.http_status) ||
+    !Number.isSafeInteger(value.elapsed_ms) || value.elapsed_ms < 0 || !failure(value.failure) ||
+    (value.failure === '' && value.http_status !== 200) || typeof value.partial !== 'boolean' ||
+    !Array.isArray(value.models) || value.models.length > 1000 || (value.failure !== '' && (value.models.length !== 0 || value.partial)) ||
+    value.models.some(id => !safeText(id, 256) || !id || id.trim() !== id) || new Set(value.models).size !== value.models.length ||
+    !Array.isArray(value.entries) || value.entries.length !== value.models.length || !Array.isArray(value.keys) || value.keys.length > 64) return invalid();
+  const keyIDs = new Set<string>();
+  for (const k of value.keys) {
+    if (!k || !safeText(k.id) || !k.id || keyIDs.has(k.id) || typeof k.enabled !== 'boolean' || !Object.hasOwn(protocolName, k.protocol) || !status(k.http_status) || !failure(k.failure) ||
+      (!k.failure && k.http_status !== 200) || !safeText(k.group) || !safeText(k.group_name) ||
+      !['', 'authenticated_group', 'personal_override'].includes(k.rate_basis) ||
+      (k.rate_failure !== '' && !Object.hasOwn(catalogRateFailureText, k.rate_failure)) ||
+      (k.multiplier !== null && (typeof k.multiplier !== 'string' || !/^(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(k.multiplier) || !Number.isFinite(Number(k.multiplier)) || Number(k.multiplier) < 0 || !k.group || !k.rate_basis || k.rate_failure !== ''))) return invalid();
+    keyIDs.add(k.id);
+  }
+  if (!value.failure && (!value.keys.some(k => !k.failure) || value.partial !== value.keys.some(k => !!k.failure))) return invalid();
+  const entryIDs = new Set<string>();
+  for (const e of value.entries) {
+    if (!e || !value.models.includes(e.id) || entryIDs.has(e.id) || !Array.isArray(e.key_ids) || !e.key_ids.length || new Set(e.key_ids).size !== e.key_ids.length ||
+      e.key_ids.some(id => !keyIDs.has(id) || value.keys.find(k => k.id === id)?.failure !== '')) return invalid();
+    entryIDs.add(e.id);
+  }
+  return { ...value, models: [...value.models], entries: value.entries.map(e => ({ ...e, key_ids: [...e.key_ids] })), keys: value.keys.map(k => ({ ...k })) };
 }
 export function catalogProblemText(code: ProblemCode): string {
   if (code === 'conflict') return '配置版本已变化。请重新读取配置后再查询目录；没有覆盖配置。';

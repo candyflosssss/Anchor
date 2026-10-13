@@ -87,6 +87,8 @@ type UpdateResult struct {
 
 // Discovery DTOs share the core's canonical read-only contract.
 type DiscoverProviderModels = catalog.DiscoverProviderModels
+type ModelEntry = catalog.ModelEntry
+type CatalogKey = catalog.CatalogKey
 type ProviderModels = catalog.ProviderModels
 type ProviderModelsResult struct {
 	Contract string          `json:"contract"`

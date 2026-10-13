@@ -270,7 +270,7 @@ func TestProviderModelsCLI(t *testing.T) {
 	var rootHTML atomic.Bool
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if (r.URL.Path != "/models" && !(rootHTML.Load() && r.URL.Path == "/v1/models")) || r.Method != "GET" || (calls.Load() > 1 && r.Header.Get("Authorization") != "Bearer synthetic-selected") {
+		if (r.URL.Path != "/models" && !(rootHTML.Load() && r.URL.Path == "/v1/models")) || r.Method != "GET" || (calls.Load() > 1 && r.Header.Get("Authorization") != "Bearer synthetic-selected" && r.Header.Get("Authorization") != "Bearer synthetic-second") {
 			t.Error("unexpected request")
 		}
 		if rootHTML.Load() && r.URL.Path == "/models" {
@@ -325,6 +325,14 @@ func TestProviderModelsCLI(t *testing.T) {
 	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "" || result.KeyID != "selected" || len(result.Models) != 1 || result.Models[0] != "cli-model" || calls.Load() != 4 {
 		t.Fatal("CLI did not resolve root HTML through /v1/models", raw, err)
 	}
+	if err = st.MutateProvider(saved.ID, 2, "key-put", "second", "synthetic-second", "", false, false, "responses"); err != nil {
+		t.Fatal(err)
+	}
+	raw, err = run("provider", "models", "--id", saved.ID, "--revision", "3")
+	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "" || result.Failure != "" || len(result.Models) != 1 || len(result.Entries) != 1 || len(result.Entries[0].KeyIDs) != 2 || len(result.Keys) != 2 || result.Keys[0].Enabled || calls.Load() != 8 {
+		t.Fatal("CLI did not merge all keys", raw, err)
+	}
+
 }
 
 func TestKeyProtocolCLI(t *testing.T) {

@@ -331,3 +331,13 @@ button.metric-card:hover:not(:disabled) { border-color: hsl(var(--ring) / .6); }
 .account-numbers dt { color: hsl(var(--muted-foreground)); flex-shrink: 0; }
 .account-numbers dd { text-align: right; overflow-wrap: anywhere; }
 .account-window { border-top: 1px solid hsl(var(--border)); padding: 10px 0; font-size: 12px; overflow-wrap: anywhere; }
+
+.catalog-key-summary { list-style: none; padding: 0; display: grid; gap: 8px; margin: 12px 0; }
+.catalog-key-summary li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; }
+.catalog-list.catalog-merged > li { display: block; padding: 12px 0; }
+.catalog-model-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.catalog-model-keys { display: grid; gap: 8px; margin-top: 8px; }
+.catalog-model-key { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-left: 12px; }
+.catalog-model-key > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.catalog-model-key .select-field { flex: 0 0 auto; max-width: 50%; }
+@media (max-width: 720px) { .catalog-model-key { align-items: flex-start; flex-direction: column; } .catalog-model-key .select-field { max-width: 100%; width: 100%; } }

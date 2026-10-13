@@ -140,6 +140,7 @@ type Records struct {
 	Items    []Record `json:"items"`
 }
 type Rate struct {
+	GroupName  string       `json:"group_name,omitempty"`
 	Group      string       `json:"group"`
 	Multiplier *json.Number `json:"multiplier"`
 	Basis      string       `json:"basis"` // personal_override or authenticated_group
@@ -199,6 +200,19 @@ func (a *Adapter) key() error {
 
 // Query resets a bounded operation. A single adapter is owned by one query.
 func (a *Adapter) Query(ctx context.Context, q Query) Result {
+	return a.query(ctx, q, false)
+}
+
+// QueryKeyRate resolves this saved inference credential against the authorized
+// account before observing its current group. It never guesses from a local ID.
+func (a *Adapter) QueryKeyRate(ctx context.Context) Result {
+	if a.Config.Platform == "" && a.Config.UserToken == "" {
+		return Result{Failure: "platform_required"}
+	}
+	return a.query(ctx, Query{Operation: "effective-rate", ExpectedRevision: 1}, true)
+}
+
+func (a *Adapter) query(ctx context.Context, q Query, resolveKey bool) Result {
 	out := Result{ProviderID: q.ProviderID, KeyID: q.KeyID, RemoteKeyID: q.RemoteKeyID, Revision: q.ExpectedRevision, Platform: a.Config.Platform, Operation: q.Operation, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Source: []string{}}
 	if err := q.Validate(); err != nil || a.Config.Validate() != nil {
 		out.Failure = "invalid_request"
@@ -225,7 +239,11 @@ func (a *Adapter) Query(ctx context.Context, q Query) Result {
 		case "usage-records":
 			out.Records, err = a.ListUsageRecords(ctx, q)
 		case "effective-rate":
-			out.EffectiveRate, err = a.GetEffectiveRate(ctx, q.RemoteKeyID)
+			if resolveKey {
+				out.EffectiveRate, err = a.getKeyRate(ctx)
+			} else {
+				out.EffectiveRate, err = a.GetEffectiveRate(ctx, q.RemoteKeyID)
+			}
 		default:
 			err = failure("unsupported") // models uses the shared catalog reader in core
 		}
@@ -236,7 +254,11 @@ func (a *Adapter) Query(ctx context.Context, q Query) Result {
 		out.Balance = nil
 		out.KeyQuota = nil
 		out.Records = nil
-		out.EffectiveRate = nil
+		if !resolveKey {
+			out.EffectiveRate = nil
+		} else if out.EffectiveRate != nil {
+			out.EffectiveRate.Multiplier = nil
+		}
 		var f *Failure
 		if errors.As(err, &f) {
 			out.Failure = f.Code

@@ -62,10 +62,19 @@ func providerCatalogEndpoints(base string) []catalogEndpoint {
 
 // Every request shares one timeout, concurrency slot, byte budget and row
 // budget. No inference, redirects, health updates or partial lists are allowed.
+type catalogBudget struct{ bytes int }
+
 func (s *Server) readProviderCatalog(ctx context.Context, p state.Provider) ([]string, int, string) {
+	return s.readProviderCatalogBudget(ctx, p, &catalogBudget{})
+}
+
+func (s *Server) readProviderCatalogBudget(ctx context.Context, p state.Provider, budget *catalogBudget) ([]string, int, string) {
 	endpoints := providerCatalogEndpoints(p.BaseURL)
 	empty := []string{}
-	status, totalBytes, requests := 0, 0, 0
+	if budget.bytes > catalog.MaxBytes {
+		return empty, 0, "too_large"
+	}
+	status, requests := 0, 0
 	models := []string{}
 	seenCursors := map[string]bool{}
 	format := ""
@@ -123,16 +132,16 @@ func (s *Server) readProviderCatalog(ctx context.Context, p state.Provider) ([]s
 				}
 				return empty, status, failure
 			}
-			raw, readErr := io.ReadAll(io.LimitReader(resp.Body, int64(catalog.MaxBytes-totalBytes+1)))
+			raw, readErr := io.ReadAll(io.LimitReader(resp.Body, int64(catalog.MaxBytes-budget.bytes+1)))
 			resp.Body.Close()
-			totalBytes += len(raw)
+			budget.bytes += len(raw)
 			if readErr != nil {
 				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 					return empty, status, "timeout"
 				}
 				return empty, status, "network"
 			}
-			if totalBytes > catalog.MaxBytes {
+			if budget.bytes > catalog.MaxBytes {
 				return empty, status, "too_large"
 			}
 			page, parseErr := catalog.ParsePage(raw, p.Secret)

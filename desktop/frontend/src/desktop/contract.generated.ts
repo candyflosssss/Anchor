@@ -196,6 +196,22 @@ export interface DiscoverProviderModels {
   provider_id: string;
   expected_revision: number;
 }
+export interface ModelEntry {
+  id: string;
+  key_ids: string[];
+}
+export interface CatalogKey {
+  id: string;
+  enabled: boolean;
+  protocol: string;
+  http_status: number;
+  failure: string;
+  group: string;
+  group_name: string;
+  multiplier: string | null;
+  rate_basis: string;
+  rate_failure: string;
+}
 export interface ProviderModels {
   key_id: string;
   provider_id: string;
@@ -204,6 +220,9 @@ export interface ProviderModels {
   elapsed_ms: number;
   models: string[];
   failure: string;
+  partial: boolean;
+  entries: ModelEntry[];
+  keys: CatalogKey[];
 }
 export interface ProviderModelsResult {
   contract: string;

@@ -320,7 +320,7 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.URL.Path != "/v1/models" || r.Method != "GET" || r.Header.Get("Authorization") != "Bearer synthetic-catalog-secret" {
+		if r.URL.Path != "/v1/models" || r.Method != "GET" || (r.Header.Get("Authorization") != "Bearer synthetic-catalog-secret" && r.Header.Get("Authorization") != "Bearer synthetic-catalog-second") {
 			t.Error("unexpected upstream request")
 		}
 		io.WriteString(w, `{"data":[{"id":"fixture-model"}]}`)
@@ -357,6 +357,16 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	if invalid := b.DiscoverProviderModels(in); invalid.Problem == nil || invalid.Problem.Code != "invalid" {
 		t.Fatal(invalid)
 	}
+	added := b.ProviderAction(Action{ProviderID: in.ProviderID, ExpectedRevision: created.Data.Revision, Action: "key-put", Target: "second", Secret: "synthetic-catalog-second", Protocol: "responses", Enabled: false})
+	if added.Problem != nil {
+		t.Fatal(added)
+	}
+	in.ExpectedRevision = added.Data.Revision
+	merged := b.DiscoverProviderModels(in)
+	if merged.Problem != nil || merged.Data == nil || merged.Data.KeyID != "" || len(merged.Data.Models) != 1 || len(merged.Data.Entries) != 1 || len(merged.Data.Entries[0].KeyIDs) != 2 || len(merged.Data.Keys) != 2 || merged.Data.Keys[1].Enabled || calls.Load() != 3 {
+		t.Fatal("bridge catalog associations lost", merged)
+	}
+
 }
 
 func TestRealBridgeKeyProtocolSettings(t *testing.T) {

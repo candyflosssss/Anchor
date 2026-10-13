@@ -101,10 +101,15 @@ export class MockProviderTransport implements ProviderTransport {
     const current = this.rows.find(p => p.id === input.provider_id);
     if (current?.revision !== input.expected_revision) throw fixtureError('conflict');
     const w = this.detail(current);
-    const key = input.key_id ? w.keys.find(k => k.id === input.key_id) : w.keys.find(k => k.id === 'default' && k.enabled) ?? w.keys.find(k => k.enabled);
-    if (input.key_id && !key) throw new ProviderProblem('invalid');
-    if (w.keys.length && !key) return { ...catalogFixture.success, provider_id: current.id, revision: current.revision, key_id: '', failure: 'authentication', http_status: 0, models: [] };
-    return { ...catalogFixture.success, key_id: key?.id ?? 'anonymous', provider_id: current.id, revision: current.revision, models: [...catalogFixture.success.models] };
+    const keys = input.key_id ? w.keys.filter(k => k.id === input.key_id) : w.keys;
+    if (input.key_id && !keys.length) throw new ProviderProblem('invalid');
+    const observations = (keys.length ? keys : [{ id: 'anonymous', enabled: true, protocol: 'responses' }]).map((k, i) => ({
+      ...catalogFixture.success.keys[0], id: k.id, enabled: k.enabled, protocol: k.protocol,
+      ...(i ? { group: 'premium', group_name: '高级组', multiplier: '1.5' } : {}),
+    }));
+    return { ...catalogFixture.success, key_id: input.key_id || (keys.length ? '' : 'anonymous'), provider_id: current.id, revision: current.revision,
+      models: [...catalogFixture.success.models], entries: catalogFixture.success.models.map(id => ({ id, key_ids: observations.map(k => k.id) })), keys: observations };
+
   }
   private detail(p: Provider): Workspace {
     let w = this.workspaces.get(p.id);

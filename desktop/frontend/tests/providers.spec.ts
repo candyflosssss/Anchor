@@ -286,20 +286,19 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await page.getByRole('button', { name: '保存 Key', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
   await detail.getByRole('button', { name: '配置 Key second 的模型协议', exact: true }).click();
-  await expect(page.getByLabel('查询 Key', { exact: true })).toHaveValue('second');
+  await expect(page.getByLabel('查询 Key', { exact: true })).toHaveCount(0);
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
-  const model = page.getByLabel('demo-model 的协议', { exact: true });
+  const model = page.getByLabel('demo-model · Key second 的协议', { exact: true });
   await expect(model).toHaveValue('inherit');
   await model.selectOption('chat-completions');
   await expect(model).toHaveValue('chat-completions');
   await expect(detail).toContainText('已获取 2 个模型');
-  await page.getByLabel('查询 Key', { exact: true }).selectOption('default');
-  await expect(model).toBeHidden();
-  await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
-  await expect(model).toHaveValue('inherit');
-  await page.getByLabel('查询 Key', { exact: true }).selectOption('second');
-  // A saved override remains editable even before fetching this key's directory again.
-  await expect(model).toHaveValue('chat-completions');
+  const defaultModel = page.getByLabel('demo-model · Key default 的协议', { exact: true });
+  await expect(defaultModel).toHaveValue('inherit');
+  await expect(detail.getByText('demo-model', { exact: true })).toHaveCount(1);
+  await expect(detail.getByLabel('Key 查询结果')).toContainText('0.8×');
+  await expect(detail.getByLabel('Key 查询结果')).toContainText('高级组');
+  await expect(detail.getByLabel('Key 查询结果')).toContainText('1.5×');
   await detail.getByRole('tab', { name: /^Key/ }).click();
   await detail.getByRole('button', { name: '编辑 Key second', exact: true }).click();
   await expect(page.getByLabel('新的 API Key')).toHaveValue('');
@@ -310,6 +309,7 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await expect(model).toHaveValue('chat-completions');
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   await expect(detail).toContainText('已获取 2 个模型');
+  await expect(defaultModel).toHaveValue('inherit');
   await model.selectOption('inherit');
   await expect(model).toHaveValue('inherit');
   await expect(model.locator('option:checked')).toContainText('Responses');

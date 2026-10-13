@@ -129,15 +129,15 @@ func (a *Adapter) GetEffectiveRate(ctx context.Context, id int64) (*Rate, error)
 		if group == "" {
 			return nil, failure("unknown")
 		}
-		out := &Rate{Group: group, Basis: "authenticated_group"}
+		out := &Rate{Group: group, GroupName: text(dataGroup(key), "name"), Basis: "authenticated_group"}
 		raw, err = a.get(ctx, "/api/v1/groups/rates", true, nil)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
 		// A null rates map is valid and means no personal overrides.
 		rates := data(raw)
 		if v, ok := raw["data"]; !ok || (string(v) != "null" && rates == nil) {
-			return nil, failure("invalid_response")
+			return out, failure("invalid_response")
 		}
 		if v := number(rates, group); v != nil {
 			out.Multiplier = v
@@ -146,20 +146,21 @@ func (a *Adapter) GetEffectiveRate(ctx context.Context, id int64) (*Rate, error)
 		}
 		raw, err = a.get(ctx, "/api/v1/groups/available", true, nil)
 		if err != nil {
-			return nil, err
+			return out, err
 		}
 		groups, err := array(raw["data"])
 		if err != nil {
-			return nil, err
+			return out, err
 		}
 		for _, g := range groups {
 			if identifier(g, "id") == group {
 				out.Multiplier = number(g, "rate_multiplier")
+				out.GroupName = text(g, "name")
 				break
 			}
 		}
 		if out.Multiplier == nil {
-			return nil, failure("unknown")
+			return out, failure("unknown")
 		}
 		return out, nil
 	}
@@ -172,22 +173,24 @@ func (a *Adapter) GetEffectiveRate(ctx context.Context, id int64) (*Rate, error)
 		group = text(data(raw), "group")
 	}
 	// Auto-group keys can switch group per request; there is no one current rate.
+	out := &Rate{Group: group, Basis: "authenticated_group"}
 	if group == "auto" || group == "" {
-		return nil, failure("unknown")
+		return out, failure("unknown")
 	}
 	raw, err = a.get(ctx, "/api/pricing", true, nil)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 	var ratios object
 	if json.Unmarshal(raw["group_ratio"], &ratios) != nil {
-		return nil, failure("invalid_response")
+		return out, failure("invalid_response")
 	}
 	multiplier := number(ratios, group)
 	if multiplier == nil {
-		return nil, failure("unknown")
+		return out, failure("unknown")
 	}
-	return &Rate{Group: group, Multiplier: multiplier, Basis: "authenticated_group"}, nil
+	out.Multiplier = multiplier
+	return out, nil
 }
 
 func sub2KeyQuota(m object) (*Allowance, error) {

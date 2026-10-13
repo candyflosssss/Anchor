@@ -455,7 +455,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	}
 	if args[0] == "models" {
 		f := a.flags("provider models")
-		key := f.String("key", "", "saved key ID; omission uses the first enabled key")
+		key := f.String("key", "", "saved key ID; omission queries all keys and merges models with group rates")
 		id := f.String("id", "", "saved provider ID")
 		revision := f.Int64("revision", 0, "expected current provider revision (required)")
 		if err := parse(f, args[1:]); err != nil {

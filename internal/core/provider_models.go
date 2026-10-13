@@ -2,10 +2,15 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/providerapi"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -35,28 +40,41 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		apiError(w, err)
 		return
 	}
-	key := state.ProviderKey{ID: "anonymous", Enabled: true, Protocol: p.Protocol}
-	if in.KeyID != "" || len(keys) > 0 {
-		found := false
+	credentials := keys
+	if in.KeyID != "" {
+		selected := []state.ProviderKey{}
 		for _, k := range keys {
-			if k.ID == in.KeyID || (in.KeyID == "" && k.Enabled) {
-				key = k
-				found = true
-				break
+			if k.ID == in.KeyID {
+				selected = append(selected, k)
 			}
 		}
-		if !found && in.KeyID != "" && !(len(keys) == 0 && in.KeyID == "anonymous") {
+		if len(selected) == 0 && !(len(keys) == 0 && in.KeyID == "anonymous") {
 			apiError(w, state.ErrNotFound)
 			return
 		}
-		if !found && len(keys) > 0 {
-			writeJSON(w, 200, catalog.ProviderModels{ProviderID: p.ID, Revision: p.Revision, Models: []string{}, Failure: "authentication"})
-			return
-		}
+		keys = selected
 	}
-	p.Protocol = key.Protocol
-	p.Secret = key.Secret
-	out := catalog.ProviderModels{ProviderID: p.ID, KeyID: key.ID, Revision: p.Revision, Models: []string{}}
+	if len(keys) == 0 {
+		keys = []state.ProviderKey{{ID: "anonymous", Enabled: true, Protocol: p.Protocol}}
+	}
+	cfg, err := s.Store.ProviderPlatform(p.ID)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	current, err := s.Store.Provider(p.ID)
+	if err != nil {
+		apiError(w, err)
+		return
+	}
+	if current.Revision != p.Revision {
+		apiError(w, state.ErrConflict)
+		return
+	}
+	out := catalog.ProviderModels{ProviderID: p.ID, KeyID: in.KeyID, Revision: p.Revision, Models: []string{}, Entries: []catalog.ModelEntry{}, Keys: []catalog.CatalogKey{}}
+	if len(keys) == 1 && keys[0].ID == "anonymous" {
+		out.KeyID = "anonymous"
+	}
 	start := time.Now()
 	defer func() { out.ElapsedMS = time.Since(start).Milliseconds(); writeJSON(w, 200, out) }()
 	// Explicit management reads may inspect disabled providers, but never bypass
@@ -76,5 +94,90 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 	timeout := min(time.Duration(p.TimeoutSeconds)*time.Second, 8*time.Second)
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	out.Models, out.HTTPStatus, out.Failure = s.readProviderCatalog(ctx, p)
+	if len(keys) > catalog.MaxKeys {
+		out.Failure = "too_large"
+		return
+	}
+	byModel := map[string][]string{}
+	budget := &catalogBudget{}
+	successes := 0
+	for _, key := range keys {
+		provider := p
+		provider.Protocol, provider.Secret = key.Protocol, key.Secret
+		ids, status, failure := s.readProviderCatalogBudget(ctx, provider, budget)
+		// Reject echoes of any saved credential, including another Key's secret.
+		for _, id := range ids {
+			for _, k := range credentials {
+				if k.Secret != "" && strings.Contains(id, k.Secret) {
+					failure = "invalid_response"
+				}
+			}
+			if cfg.UserToken != "" && strings.Contains(id, cfg.UserToken) {
+				failure = "invalid_response"
+			}
+		}
+		out.Keys = append(out.Keys, catalog.CatalogKey{ID: key.ID, Enabled: key.Enabled, Protocol: key.Protocol, HTTPStatus: status, Failure: failure, RateFailure: "unknown"})
+		if failure != "" {
+			if out.Failure == "" {
+				out.Failure, out.HTTPStatus = failure, status
+			}
+			continue
+		}
+		successes++
+		for _, id := range ids {
+			byModel[id] = append(byModel[id], key.ID)
+		}
+	}
+	out.Partial = successes > 0 && successes < len(keys)
+	if successes > 0 {
+		out.Failure, out.HTTPStatus = "", http.StatusOK
+	}
+	if len(byModel) > catalog.MaxModels {
+		out.Failure = "too_large"
+		out.Partial = false
+		return
+	}
+	for id := range byModel {
+		out.Models = append(out.Models, id)
+	}
+	slices.Sort(out.Models)
+	for _, id := range out.Models {
+		out.Entries = append(out.Entries, catalog.ModelEntry{ID: id, KeyIDs: byModel[id]})
+	}
+	// Match the management client's 1 MiB response limit before additional reads.
+	encoded, _ := json.Marshal(out)
+	if len(encoded) > (1<<20)-(192<<10) {
+		out.Models = []string{}
+		out.Entries = []catalog.ModelEntry{}
+		out.Failure = "too_large"
+		out.Partial = false
+		return
+	}
+	// Read catalogs first so missing/slow billing permissions never hide models.
+	for i, key := range keys {
+		adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: key.Secret}
+		rate := adapter.QueryKeyRate(ctx)
+		out.Keys[i].RateFailure = rate.Failure
+		if rate.EffectiveRate != nil {
+			v := rate.EffectiveRate
+			valid := !strings.ContainsFunc(v.Group+v.GroupName, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) })
+			if v.Multiplier != nil && len(v.Multiplier.String()) > 128 {
+				valid = false
+			}
+			for _, credential := range credentials {
+				if credential.Secret != "" && (strings.Contains(v.Group, credential.Secret) || strings.Contains(v.GroupName, credential.Secret)) {
+					valid = false
+				}
+			}
+			if !valid {
+				out.Keys[i].RateFailure = "invalid_response"
+				continue
+			}
+			out.Keys[i].Group, out.Keys[i].GroupName, out.Keys[i].RateBasis = v.Group, v.GroupName, v.Basis
+			if v.Multiplier != nil {
+				value := v.Multiplier.String()
+				out.Keys[i].Multiplier = &value
+			}
+		}
+	}
 }

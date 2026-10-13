@@ -15,7 +15,36 @@
       "demo-model-mini"
     ],
     "failure": "",
-    "key_id": "default"
+    "key_id": "default",
+    "partial": false,
+    "entries": [
+      {
+        "id": "demo-model",
+        "key_ids": [
+          "default"
+        ]
+      },
+      {
+        "id": "demo-model-mini",
+        "key_ids": [
+          "default"
+        ]
+      }
+    ],
+    "keys": [
+      {
+        "id": "default",
+        "enabled": true,
+        "protocol": "responses",
+        "http_status": 200,
+        "failure": "",
+        "group": "standard",
+        "group_name": "标准组",
+        "multiplier": "0.8",
+        "rate_basis": "authenticated_group",
+        "rate_failure": ""
+      }
+    ]
   },
   "empty": {
     "provider_id": "摸鱼AI",
@@ -24,7 +53,23 @@
     "elapsed_ms": 8,
     "models": [],
     "failure": "",
-    "key_id": "default"
+    "key_id": "default",
+    "partial": false,
+    "entries": [],
+    "keys": [
+      {
+        "id": "default",
+        "enabled": true,
+        "protocol": "responses",
+        "http_status": 200,
+        "failure": "",
+        "group": "standard",
+        "group_name": "标准组",
+        "multiplier": "0.8",
+        "rate_basis": "authenticated_group",
+        "rate_failure": ""
+      }
+    ]
   },
   "unsupported": {
     "provider_id": "摸鱼AI",
@@ -33,6 +78,135 @@
     "elapsed_ms": 16,
     "models": [],
     "failure": "unsupported",
-    "key_id": "default"
+    "key_id": "default",
+    "partial": false,
+    "entries": [],
+    "keys": [
+      {
+        "id": "default",
+        "enabled": true,
+        "protocol": "responses",
+        "http_status": 404,
+        "failure": "unsupported",
+        "group": "standard",
+        "group_name": "标准组",
+        "multiplier": "0.8",
+        "rate_basis": "authenticated_group",
+        "rate_failure": ""
+      }
+    ]
+  },
+  "aggregate_input": {
+    "provider_id": "摸鱼AI",
+    "expected_revision": 3,
+    "key_id": ""
+  },
+  "aggregate": {
+    "provider_id": "摸鱼AI",
+    "revision": 3,
+    "http_status": 200,
+    "elapsed_ms": 42,
+    "models": [
+      "demo-model",
+      "demo-model-mini"
+    ],
+    "failure": "",
+    "key_id": "",
+    "partial": false,
+    "entries": [
+      {
+        "id": "demo-model",
+        "key_ids": [
+          "default",
+          "second"
+        ]
+      },
+      {
+        "id": "demo-model-mini",
+        "key_ids": [
+          "default",
+          "second"
+        ]
+      }
+    ],
+    "keys": [
+      {
+        "id": "default",
+        "enabled": true,
+        "protocol": "responses",
+        "http_status": 200,
+        "failure": "",
+        "group": "standard",
+        "group_name": "标准组",
+        "multiplier": "0.8",
+        "rate_basis": "authenticated_group",
+        "rate_failure": ""
+      },
+      {
+        "id": "second",
+        "enabled": false,
+        "protocol": "responses",
+        "http_status": 200,
+        "failure": "",
+        "group": "premium",
+        "group_name": "高级组",
+        "multiplier": "1.5",
+        "rate_basis": "authenticated_group",
+        "rate_failure": ""
+      }
+    ]
+  },
+  "partial": {
+    "provider_id": "摸鱼AI",
+    "revision": 3,
+    "http_status": 200,
+    "elapsed_ms": 42,
+    "models": [
+      "demo-model",
+      "demo-model-mini"
+    ],
+    "failure": "",
+    "key_id": "",
+    "partial": true,
+    "entries": [
+      {
+        "id": "demo-model",
+        "key_ids": [
+          "default"
+        ]
+      },
+      {
+        "id": "demo-model-mini",
+        "key_ids": [
+          "default"
+        ]
+      }
+    ],
+    "keys": [
+      {
+        "id": "default",
+        "enabled": true,
+        "protocol": "responses",
+        "http_status": 200,
+        "failure": "",
+        "group": "standard",
+        "group_name": "标准组",
+        "multiplier": "0.8",
+        "rate_basis": "authenticated_group",
+        "rate_failure": ""
+      },
+      {
+        "id": "second",
+        "enabled": false,
+        "protocol": "responses",
+        "http_status": 401,
+        "failure": "authentication",
+        "group": "",
+        "group_name": "",
+        "multiplier": null,
+        "rate_basis": "",
+        "rate_failure": "auth_required"
+      }
+    ]
   }
 }

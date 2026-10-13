@@ -223,16 +223,19 @@ anchor model add --id public-model --candidate '摸鱼AI:upstream-model'
 ### `provider models`（desktop.10 小步）
 
 ```bash
-anchor provider models --id '摸鱼AI' --revision 3 --key default
+anchor provider models --id '摸鱼AI' --revision 3
+# 仅查询一个已存 Key 时添加 --key default
 ```
 
-`--id` 必填已存供应商 ID；`--revision` 必填正整数，来自 `provider list`。使用所选 Context 的在线核心、管理鉴权与实例身份校验；不允许临时地址、密钥、协议或生成参数。revision 不匹配、未授权、实例不符或参数错误时非零退出，不发起目录请求。停用供应商也可显式查询。可用 `--key KEY` 指定已存 Key（包括停用 Key），不存在时在请求上游前失败；省略时选首个启用 Key，存在 Key 但全部停用时返回 authentication，无 Key 才匿名。目录认证由 Key 默认协议决定，不使用模型覆盖。
+`--id` 必填已存供应商 ID；`--revision` 必填正整数，来自 `provider list`。使用所选 Context 的在线核心、管理鉴权与实例身份校验；不允许临时地址、密钥、协议或生成参数。revision 不匹配、未授权、实例不符或参数错误时非零退出，不发起目录请求。停用供应商也可显式查询。可用 `--key KEY` 指定已存 Key（包括停用 Key），不存在时在请求上游前失败；省略时自动查询全部已存 Key（含停用 Key，最多64个），按模型 ID 合并并保留全部对应 Key；无 Key 才匿名。目录认证由 Key 默认协议决定，不使用模型覆盖。
 
 读取已存 Base URL 和 Key，优先 `GET <base_url>/models`；保留站点部署前缀。未带版本的根地址或自定义前缀，在 `/models` 返回404/405或200 HTML网页时，尝试同前缀的 `/v1/models`（例如 NewAPI 的 `/newapi` → `/newapi/v1/models`）；已带 `/v1`、`/v2`、`/v1beta1` 等版本路径或版本后的 `/openai` 时不再追加 `/v1`。认证失败、429、5xx、重定向及损坏 JSON 不触发路径切换。OpenAI、Anthropic、Kimi/Moonshot 和硅基流动官方根地址固定 `/v1/models`；DeepSeek 官方根地址固定 `/models`，OpenRouter 官方根地址固定 `/api/v1/models`。Gemini 官方根地址或 `/v1beta/openai` 使用原生 `/v1beta/models`；`/v1beta`（含站点自定义前缀）采用 Google 目录认证 `x-goog-api-key`，其他目录沿用 Key 默认协议的 Bearer 或 Anthropic 请求头。Key 只放请求头，不写 URL。
 
-解析 OpenAI/Anthropic `data:[{id:...}]` 与 Gemini `models:[{name:...}]`；Gemini 名称去除 `models/` 前缀，也接受兼容站返回的裸 ID。Anthropic 使用 `has_more/last_id` 和 `after_id` 继续分页，Gemini 使用 `nextPageToken/pageToken`；每页请求1000条。最多10次 HTTP请求（含路径切换），所有请求共用供应商超时与8秒的较小值、并发限额、512 KiB累计响应和1000条原始记录上限。禁止重定向和环境代理，不自动重试失败请求。每 ID 最多256字节；最终去重排序，丢弃元数据。分页循环、格式变化、后续页失败或超限时整体失败，不返回第一页或其他部分列表。
+解析 OpenAI/Anthropic `data:[{id:...}]` 与 Gemini `models:[{name:...}]`；Gemini 名称去除 `models/` 前缀，也接受兼容站返回的裸 ID。Anthropic 使用 `has_more/last_id` 和 `after_id` 继续分页，Gemini 使用 `nextPageToken/pageToken`；每页请求1000条。每个 Key 最多10次目录 HTTP请求（含路径切换），全部 Key 的目录与倍率抓取共用供应商超时与8秒的较小值和并发限额；目录累计响应最多512 KiB，每个 Key 最多1000条原始记录，合并最多1000个模型。先查全部目录，再查分组倍率。禁止重定向和环境代理，不自动重试失败请求。每 ID 最多256字节；最终去重排序，丢弃元数据。分页循环、格式变化、后续页失败或超限时该 Key 的目录整体失败；其他 Key 的完整结果可以保留，聚合超限则不返回模型列表。
 
-stdout 为 `{provider_id, key_id, revision, http_status, elapsed_ms, models, failure}`；key_id 为实际查询 Key，无 Key 时为 anonymous，所有 Key 停用且未指定时为空；成功 `failure=""`，空目录为 `models:[]`。目录层失败同样输出结构化结果并退出0，调用者必须检查 `failure`：`authentication`、`unsupported`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`；未取得 HTTP 状态为0。管理层失败仍非零退出。不会输出上游错误正文、密钥或原始网络异常。
+stdout 为 `{provider_id, key_id, revision, http_status, elapsed_ms, models, failure, partial, entries, keys}`。默认聚合查询的 key_id 为空，显式查询为指定 ID，无 Key 为 anonymous。models 为合并去重排序的字符串数组；entries 为 `{id, key_ids}`，列出该模型对应的成功 Key。keys 逐项包含 `{id, enabled, protocol, http_status, failure, group, group_name, multiplier, rate_basis, rate_failure}`；multiplier 为十进制字符串或 null（未知），不会假定为1。至少一个 Key 目录成功时顶层 failure 为空，partial 表示存在失败 Key，逐 Key failure 保留原因；所有 Key 失败时 models/entries 为空。目录层失败输出结构化结果并退出0，调用者必须检查 failure 和 partial；管理层失败仍非零退出。目录失败分类为 authentication、unsupported、rate_limited、http_error、network、timeout、busy、too_large、invalid_response。
+
+分组倍率从已存平台账户授权自动匹配推理 Key 的远端身份后抓取，支持 Sub2API 的个人覆盖／分组默认倍率、NewAPI 的确定分组倍率；OneAPI 暂不支持，auto 分组无单一倍率。NewAPI 掩码候选必须通过固定只读 `POST /api/token/{数字ID}/key` 取回完整 Key 核对，不能凭掩码判定身份；Sub2API 使用完整 Key 精确匹配。最多4页账号 Key（每页100条），每 Key 的倍率查询最多8次请求／2 MiB响应，并受上述共享期限限制。倍率缺授权、未识别平台、找不到 Key、超时等均通过 rate_failure 表示，不丢弃已查询的模型，不把抓取值写入 Anchor 映射倍率。响应不包含上游错误正文、密钥或原始网络异常。
 
 一次显式目录查询（可能包含路径切换和分页），不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。显式推理测试和映射写入使用下列独立命令，目录查询本身不自动导入。
 

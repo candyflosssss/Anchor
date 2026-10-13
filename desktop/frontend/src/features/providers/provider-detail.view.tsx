@@ -1,13 +1,14 @@
+import { ProviderCatalogView } from './provider-catalog.view';
 import { ProviderAccountView } from './provider-account.view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, Download, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RotateCcw, Trash2, TextCursorInput } from 'lucide-react';
+import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RotateCcw, Trash2, TextCursorInput } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { StatusBadge } from '../../components/shared/status-badge';
 import { ConfirmAction } from '../../components/shared/confirm-action';
 import { MenuItem, Popover } from '../../components/shared/popover-menu';
 import { ProviderPricingView } from './provider-pricing.view';
 import { healthText, type Action, type Probe, type Workspace } from './provider-features.model';
-import { catalogFailureText, catalogProblemText, protocolName, type Provider } from './provider.model';
+import { protocolName, type Provider } from './provider.model';
 import { formatAgo, type DetailTab, type ProviderSummary, type Tone } from './provider-summary.model';
 import type { ProviderController } from './use-provider-controller';
 
@@ -137,7 +138,7 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
         <td><span className={`health-label ${k.state}`}>{healthText[k.state] ?? k.state}</span>{k.failures > 0 && <span className="cell-hint">连续失败 {k.failures} 次</span>}</td>
         <td>{k.test ? <span className={k.test.failure ? 'text-destructive' : ''}>{k.test.failure ? '失败' : '成功'} · {k.test.elapsed_ms} ms · {formatAgo(k.test.at)}</span> : <span className="cell-hint">未测试</span>}</td>
         <td className="row-actions">
-          <Button size="sm" variant="ghost" disabled={disabled} aria-label={`配置 Key ${k.id} 的模型协议`} onClick={() => { c.selectCatalogKey(k.id); c.setDetailTab('models'); }}>模型协议</Button>
+          <Button size="sm" variant="ghost" disabled={disabled} aria-label={`配置 Key ${k.id} 的模型协议`} onClick={() => { c.setDetailTab('models'); }}>模型协议</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'test', keyId: k.id })}><Play />测试</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`编辑 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'key', keyId: k.id })}>编辑</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${k.enabled ? '停用' : '启用'} Key ${k.id}`} onClick={() => void f.run('key-put', { target: k.id, enabled: !k.enabled })}>{k.enabled ? '停用' : '启用'}</Button>
@@ -150,10 +151,6 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
 }
 
 function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace; disabled: boolean; ask: (a: Ask) => void }) {
-  const models = c.models;
-  const key = w.keys.find(k => k.id === c.catalogKey) ?? (!c.catalogKey ? w.keys.find(k => k.enabled) : undefined);
-  const modelIDs = [...new Set([...(models?.models ?? []), ...(key?.model_protocols.map(m => m.model) ?? [])])];
-  const mapped = new Map(w.models.map(m => [m.upstream, m.id]));
   return <div className="stack">
     <section className="detail-card">
       <div className="card-toolbar"><div><h2>模型映射</h2></div>
@@ -171,23 +168,7 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
         </tr>)}
       </tbody></table></div> : <div className="empty-state compact"><List size={24} /><p>还没有映射模型。</p></div>}
     </section>
-    <section className="detail-card model-directory" aria-label="上游模型目录" aria-busy={c.modelsBusy}>
-      <div className="card-toolbar"><div><h2>Key 的模型与协议</h2></div>
-        <div className="toolbar-actions"><label htmlFor="catalog-key">查询 Key</label><select id="catalog-key" className="select-field" value={c.catalogKey} disabled={disabled} onChange={e => c.selectCatalogKey(e.target.value)}>
-          <option value="">{w.keys.length ? '首个启用的 Key' : '匿名请求'}</option>{w.keys.map(k => <option key={k.id} value={k.id}>{k.id}{k.enabled ? '' : '（已停用）'}</option>)}
-        </select><Button variant="outline" disabled={disabled || (!!c.catalogKey && !key)} onClick={() => void c.discoverModels()}>{c.modelsBusy ? <LoaderCircle className="loading-icon" /> : <Download />}{c.modelsBusy ? '正在获取目录…' : '获取模型目录'}</Button></div></div>
-      {key && <p className="card-hint">Key {key.id} · 默认协议 {protocolName[key.protocol as keyof typeof protocolName]}</p>}
-      {c.modelsProblem && <p className="catalog-feedback" role="alert">{catalogProblemText(c.modelsProblem)}</p>}
-      <p className="catalog-feedback" aria-live="polite">{models ? `${models.failure ? '目录获取失败' : `已获取 ${models.models.length} 个模型`} · Key ${models.key_id || '—'} · HTTP ${models.http_status || '—'} · ${models.elapsed_ms} ms · revision ${models.revision}` : ''}</p>
-      {models?.failure && <p className="catalog-feedback" role="alert">{catalogFailureText[models.failure]}</p>}
-      {models && !models.failure && models.models.length === 0 && <p className="catalog-feedback">上游返回空目录。</p>}
-      {modelIDs.length > 0 && <><ul className="catalog-list" tabIndex={0} aria-label="上游模型 ID">{modelIDs.map(id => <li key={id}><span className="mono break-all">{id}</span>
-          {models && !models.failure && <span className="cell-hint">{models.models.includes(id) ? '目录列出' : '仅已存协议'}</span>}
-          {key && <select className="select-field" aria-label={`${id} 的协议`} value={key.model_protocols.find(m => m.model === id)?.protocol ?? 'inherit'} disabled={disabled || c.features.needsRead} onChange={e => void c.features.run('key-model-protocol', { target: key.id, model: id, protocol: e.target.value })}>
-            <option value="inherit">继承 Key（{protocolName[key.protocol as keyof typeof protocolName]}）</option>{Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>}
-          {mapped.has(id) ? <span className="cell-hint">已映射为 {mapped.get(id)}</span> : <Button size="sm" variant="ghost" disabled={disabled} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}><Plus />导入</Button>}</li>)}</ul></>}
-    </section>
+    <ProviderCatalogView c={c} w={w} disabled={disabled} />
   </div>;
 }
 

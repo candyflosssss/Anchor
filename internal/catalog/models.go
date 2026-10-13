@@ -12,6 +12,7 @@ import (
 
 const MaxBytes = 512 << 10
 const MaxModels = 1000
+const MaxKeys = 64
 
 // DiscoverProviderModels pins the saved configuration used for this one request.
 type DiscoverProviderModels struct {
@@ -21,15 +22,40 @@ type DiscoverProviderModels struct {
 }
 
 // ProviderModels describes a bounded directory lookup, not inference health.
-// Failure is empty on success. Models is always an array, including on failure.
+// Failure is empty when at least one complete key directory succeeds.
+// Partial indicates failed keys; each key directory remains all-or-nothing.
 type ProviderModels struct {
-	KeyID      string   `json:"key_id"`
-	ProviderID string   `json:"provider_id"`
-	Revision   int64    `json:"revision"`
-	HTTPStatus int      `json:"http_status"`
-	ElapsedMS  int64    `json:"elapsed_ms"`
-	Models     []string `json:"models"`
-	Failure    string   `json:"failure"`
+	KeyID      string       `json:"key_id"`
+	ProviderID string       `json:"provider_id"`
+	Revision   int64        `json:"revision"`
+	HTTPStatus int          `json:"http_status"`
+	ElapsedMS  int64        `json:"elapsed_ms"`
+	Models     []string     `json:"models"`
+	Failure    string       `json:"failure"`
+	Partial    bool         `json:"partial"`
+	Entries    []ModelEntry `json:"entries"`
+	Keys       []CatalogKey `json:"keys"`
+}
+
+// ModelEntry merges an actual model ID across successfully queried keys.
+type ModelEntry struct {
+	ID     string   `json:"id"`
+	KeyIDs []string `json:"key_ids"`
+}
+
+// CatalogKey exposes identifiers and observed rates, never credentials.
+// Multiplier is a decimal string; nil means unknown, never an assumed 1x.
+type CatalogKey struct {
+	ID          string  `json:"id"`
+	Enabled     bool    `json:"enabled"`
+	Protocol    string  `json:"protocol"`
+	HTTPStatus  int     `json:"http_status"`
+	Failure     string  `json:"failure"`
+	Group       string  `json:"group"`
+	GroupName   string  `json:"group_name"`
+	Multiplier  *string `json:"multiplier"`
+	RateBasis   string  `json:"rate_basis"`
+	RateFailure string  `json:"rate_failure"`
 }
 
 // Page keeps the raw row count until the complete directory has been bounded.
