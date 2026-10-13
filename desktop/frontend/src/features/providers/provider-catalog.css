@@ -1,5 +1,6 @@
 /* Model catalog: one page scroll, aligned Key/protocol pairs, bounded model pages. */
-.model-directory { margin-top: 20px; }
+.model-directory { --catalog-model-name: 215 85% 35%; margin-top: 20px; }
+.dark .model-directory { --catalog-model-name: 211 96% 78%; }
 .model-directory .catalog-toolbar { align-items: flex-start; gap: 16px; }
 .catalog-title { display: flex; align-items: center; gap: 8px; }
 .catalog-count { border-radius: 6px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); padding: 1px 7px; font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -27,7 +28,7 @@
 .catalog-model-row { border-top: 1px solid hsl(var(--border)); }
 .catalog-model-row:hover { background: hsl(var(--muted) / .2); }
 .catalog-model-heading, .catalog-key-info { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
-.catalog-model-heading > strong { font-size: 13px; line-height: 22px; }
+.catalog-model-heading > strong { color: hsl(var(--catalog-model-name)); font-size: 14px; line-height: 22px; }
 .catalog-model-keys { display: grid; gap: 12px; min-width: 0; }
 .catalog-key-info strong { font-size: 13px; font-weight: 500; }
 .catalog-key-note { margin-left: 6px; color: hsl(var(--muted-foreground)); font-size: 12px; }
