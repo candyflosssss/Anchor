@@ -92,10 +92,12 @@ func (s *Server) QueryProvider(parent context.Context, in providerapi.Query) (pr
 	selected := state.ProviderKey{ID: "anonymous", Protocol: p.Protocol, Enabled: true}
 	found := false
 	for _, key := range keys {
-		if key.ID == in.KeyID || in.KeyID == "" && key.Enabled {
+		if key.ID == in.KeyID || in.KeyID == "" && key.Enabled && (!found || key.ID == "default") {
 			selected = key
 			found = true
-			break
+			if in.KeyID != "" || key.ID == "default" {
+				break
+			}
 		}
 	}
 	if in.KeyID != "" && !found {

@@ -90,3 +90,7 @@ ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径�
 供应商详情新增「账户与余额」。受控方法 `ProviderAccountSettings` / `SaveProviderAccount` / `ProviderAllowance` 复用类型化管理客户端与已有 providerapi 核心。连接与实例身份在会话锁内校验，平台网络查询在解锁后执行，使用会话上下文和有界超时；不持有宿主锁等待上游。JS 不获得任意 upstream HTTP 方法或用户令牌读取能力。
 
 公开 DTO、令牌三态、十进制字符串、额度 scope 和冲突语义详见[供应商契约 §8](provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。共享样例同时用于 Go round-trip、前端 Model 测试和 Mock；真实桌面模式无 Mock 回退。隔离 Go 桥接→核心→模拟三平台测试覆盖读取、写入、认证、精度和冲突；浏览器模拟 Wails 只验证交互，不代替 Windows/Linux 原生窗口、安装或真实站点授权验收。没有新增数据库迁移或修改 CLI 契约。
+
+### 列表余额与自动平台（2026-10-13，当前源码未发布）
+
+ProviderAllowance 增量接受 balance-summary，返回 account 或 key scope 与本次识别的平台。缺少／auto 配置由核心探测；列表只使用默认推理 Key，保存的独立用户授权只供显式账户查询等既有用途。沿用 anchor-desktop-v1、现有管理认证、revision、宿主有界上下文和共享样例；DTO 字段不变，生成 TS 无结构变化。无新增任意网络桥接或数据迁移。

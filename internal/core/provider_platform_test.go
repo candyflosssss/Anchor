@@ -105,3 +105,53 @@ func TestUnifiedModelsUsesCatalogFallback(t *testing.T) {
 		t.Fatal(string(raw), e, calls)
 	}
 }
+
+func TestDefaultKeyPreferenceAndAutomaticSummary(t *testing.T) {
+	f := setup(t)
+	wantSecret := "default-fixture"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/prefix/api/status":
+			if r.Header.Get("Authorization") != "" {
+				t.Error("public probe carried credential")
+			}
+			io.WriteString(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false}}`)
+		case "/prefix/api/usage/token/":
+			if r.Header.Get("Authorization") != "Bearer "+wantSecret {
+				t.Error("wrong default key")
+			}
+			io.WriteString(w, `{"code":true,"data":{"total_available":123,"total_used":7,"total_granted":130}}`)
+		default:
+			t.Error("unexpected endpoint", r.URL.Path)
+			w.WriteHeader(404)
+		}
+	}))
+	defer upstream.Close()
+	f.add(t, "p", upstream.URL+"/prefix/v1", "default-fixture")
+	if err := f.store.MutateProvider("p", 1, "key-put", "a", "fallback-fixture", "", true, false); err != nil {
+		t.Fatal(err)
+	}
+	q := providerapi.Query{ProviderID: "p", ExpectedRevision: 2, Operation: "balance-summary"}
+	check := func(want string) {
+		t.Helper()
+		v, e := f.core.QueryProvider(context.Background(), q)
+		if e != nil || v.Failure != "" || v.KeyID != want || v.Platform != "newapi" || v.Balance.Scope != "key" {
+			t.Fatalf("%+v %v", v, e)
+		}
+	}
+	check("default")
+	wantSecret = "fallback-fixture"
+	q.KeyID = "a"
+	check("a")
+	if err := f.store.MutateProvider("p", 2, "key-put", "default", "", "", false, false); err != nil {
+		t.Fatal(err)
+	}
+	q.KeyID = ""
+	q.ExpectedRevision = 3
+	check("a")
+	after, _ := f.store.Provider("p")
+	cfg, _ := f.store.ProviderPlatform("p")
+	if after.Revision != 3 || cfg.Platform != "" {
+		t.Fatal("query mutated configuration")
+	}
+}

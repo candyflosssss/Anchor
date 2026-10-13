@@ -18,6 +18,10 @@ type object map[string]json.RawMessage
 // get never follows redirects or returns upstream error bodies. One operation
 // shares an eight request / 2 MiB budget and its caller's deadline.
 func (a *Adapter) get(ctx context.Context, path string, user bool, query url.Values) (object, error) {
+	return a.getWithAuth(ctx, path, user, false, query)
+}
+
+func (a *Adapter) getWithAuth(ctx context.Context, path string, user, public bool, query url.Values) (object, error) {
 	a.calls++
 	if a.calls > 8 {
 		return nil, failure("too_large")
@@ -25,6 +29,9 @@ func (a *Adapter) get(ctx context.Context, path string, user bool, query url.Val
 	secret := a.Key
 	if user {
 		secret = a.Config.UserToken
+	}
+	if public {
+		secret = ""
 	}
 	u, err := url.Parse(a.root() + path)
 	if err != nil {
@@ -93,7 +100,7 @@ func (a *Adapter) get(ctx context.Context, path string, user bool, query url.Val
 		// NewAPI's Key usage endpoint returns a boolean code; sub2api uses
 		// numeric zero. Limit that exception to the endpoint which defines it.
 		accepted := string(v) == "0"
-		if a.Config.Platform == "newapi" && path == "/api/usage/token/" {
+		if path == "/api/usage/token/" {
 			accepted = accepted || string(v) == "true"
 		}
 		if !accepted {

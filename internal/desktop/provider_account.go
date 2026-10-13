@@ -60,7 +60,7 @@ func (b *Bridge) accountSettingsCall(id string, write *providerapi.Configure) Ac
 }
 func (b *Bridge) ProviderAllowance(in AccountQuery) AccountObservationResult {
 	out := AccountObservationResult{Contract: Contract}
-	if !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 || in.ExpectedRevision > MaxSafeRevision || in.RemoteKeyID < 0 || in.RemoteKeyID > MaxSafeRevision || (in.KeyID != "" && !state.ValidID(in.KeyID)) || (in.Operation != "balance" && in.Operation != "key-quota") {
+	if !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 || in.ExpectedRevision > MaxSafeRevision || in.RemoteKeyID < 0 || in.RemoteKeyID > MaxSafeRevision || (in.KeyID != "" && !state.ValidID(in.KeyID)) || (in.Operation != "balance" && in.Operation != "balance-summary" && in.Operation != "key-quota") {
 		out.Problem = &Problem{"invalid"}
 		return out
 	}

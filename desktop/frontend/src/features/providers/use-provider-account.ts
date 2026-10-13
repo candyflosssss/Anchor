@@ -4,6 +4,7 @@ import type { AccountSettings, AccountObservation, SaveAccountSettings, AccountQ
 
 export function useProviderAccount(p: Provider | null, transport: ProviderTransport, changed: () => Promise<void>, blocked: () => boolean, readVersion: number) {
   const [settings, setSettings] = useState<AccountSettings | null>(null);
+  const [observedPlatform, setObservedPlatform] = useState('');
   const [balance, setBalance] = useState<AccountObservation | null>(null);
   const [quota, setQuota] = useState<AccountObservation | null>(null);
   const [busy, setBusy] = useState(false);
@@ -16,7 +17,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
   useEffect(() => {
     const abort = new AbortController(); abortRef.current?.abort(); abortRef.current = abort;
     const at = ++epoch.current;
-    setSettings(null); setBalance(null); setQuota(null); setError(''); setNeedsRead(false);
+    setSettings(null); setObservedPlatform(''); setBalance(null); setQuota(null); setError(''); setNeedsRead(false);
     lock.current = !!id; setBusy(!!id);
     if (id) {
       void (async () => {
@@ -54,7 +55,8 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
       if (!transport.allowance) throw new ProviderProblem('read_error');
       const v = await transport.allowance(input as AccountQuery, abort.signal);
       if (abort.signal.aborted || at !== epoch.current) return false;
-      if (v.platform !== settings?.platform) throw new ProviderProblem('read_error');
+      if (settings?.platform && settings.platform !== 'auto' && v.platform !== settings.platform) throw new ProviderProblem('read_error');
+      if (['sub2api', 'newapi', 'oneapi'].includes(v.platform)) setObservedPlatform(v.platform);
       if (operation === 'balance') setBalance(v); else setQuota(v);
       return true;
     } catch (e) {
@@ -67,7 +69,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
       if (at === epoch.current) { lock.current = false; setBusy(false); }
     }
   }
-  return { settings: matches ? settings : null, balance: matches ? balance : null, quota: matches ? quota : null, busy, error, needsRead,
+  return { observedPlatform: matches ? observedPlatform : '', settings: matches ? settings : null, balance: matches ? balance : null, quota: matches ? quota : null, busy, error, needsRead,
     isBusy: () => lock.current,
     save: (input: SaveAccountSettings) => run('save', input),
     query: (input: AccountQuery) => run(input.operation as 'balance' | 'key-quota', input),

@@ -1,5 +1,98 @@
 {
-  "settings": {"provider_id":"demo","revision":3,"platform":"sub2api","site_url":"","user_id":0,"has_user_token":false},
-  "balance": {"provider_id":"demo","revision":3,"platform":"sub2api","operation":"balance","key_id":"default","remote_key_id":0,"observed_at":"2026-10-13T02:00:00Z","http_status":200,"failure":"","allowance":{"scope":"account","remaining":{"value":"12.34567890123456789","unit":"USD"},"used":null,"limit":null,"unlimited":null,"windows":[]}},
-  "quota": {"provider_id":"demo","revision":3,"platform":"sub2api","operation":"key-quota","key_id":"default","remote_key_id":0,"observed_at":"2026-10-13T02:00:00Z","http_status":200,"failure":"","allowance":{"scope":"key","remaining":null,"used":null,"limit":null,"unlimited":true,"windows":[]}}
+  "settings": {
+    "provider_id": "demo",
+    "revision": 3,
+    "platform": "sub2api",
+    "site_url": "",
+    "user_id": 0,
+    "has_user_token": false
+  },
+  "balance": {
+    "provider_id": "demo",
+    "revision": 3,
+    "platform": "sub2api",
+    "operation": "balance",
+    "key_id": "default",
+    "remote_key_id": 0,
+    "observed_at": "2026-10-13T02:00:00Z",
+    "http_status": 200,
+    "failure": "",
+    "allowance": {
+      "scope": "account",
+      "remaining": {
+        "value": "12.34567890123456789",
+        "unit": "USD"
+      },
+      "used": null,
+      "limit": null,
+      "unlimited": null,
+      "windows": []
+    }
+  },
+  "quota": {
+    "provider_id": "demo",
+    "revision": 3,
+    "platform": "sub2api",
+    "operation": "key-quota",
+    "key_id": "default",
+    "remote_key_id": 0,
+    "observed_at": "2026-10-13T02:00:00Z",
+    "http_status": 200,
+    "failure": "",
+    "allowance": {
+      "scope": "key",
+      "remaining": null,
+      "used": null,
+      "limit": null,
+      "unlimited": true,
+      "windows": []
+    }
+  },
+  "summary": {
+    "provider_id": "demo",
+    "revision": 3,
+    "platform": "sub2api",
+    "operation": "balance-summary",
+    "key_id": "default",
+    "remote_key_id": 0,
+    "observed_at": "2026-10-13T02:00:00Z",
+    "http_status": 200,
+    "failure": "",
+    "allowance": {
+      "scope": "account",
+      "remaining": {
+        "value": "12.34567890123456789",
+        "unit": "USD"
+      },
+      "used": null,
+      "limit": null,
+      "unlimited": null,
+      "windows": []
+    }
+  },
+  "key_summary": {
+    "provider_id": "demo",
+    "revision": 3,
+    "platform": "newapi",
+    "operation": "balance-summary",
+    "key_id": "default",
+    "remote_key_id": 0,
+    "observed_at": "2026-10-13T02:00:00Z",
+    "http_status": 200,
+    "failure": "",
+    "allowance": {
+      "scope": "key",
+      "remaining": {
+        "value": "1250000",
+        "unit": "quota"
+      },
+      "used": {
+        "value": "250000",
+        "unit": "quota"
+      },
+      "limit": null,
+      "unlimited": null,
+      "windows": []
+    }
+  }
 }

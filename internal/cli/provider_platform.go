@@ -24,7 +24,7 @@ func (a App) providerPlatform(ctx context.Context, c *client.Client, args []stri
 	}
 	rev := f.Int64("revision", 0, "expected provider revision (required)")
 	if args[0] == "platform-put" {
-		platform := f.String("platform", "", "sub2api, newapi or oneapi (required)")
+		platform := f.String("platform", "auto", "auto (default), sub2api, newapi or oneapi")
 		site := f.String("site-url", "", "dashboard deployment root; empty derives from request URL")
 		userID := f.Int64("user-id", 0, "NewAPI user ID for deployments requiring New-Api-User")
 		stdin := f.Bool("user-token-stdin", false, "read dashboard user token from stdin")
@@ -33,7 +33,7 @@ func (a App) providerPlatform(ctx context.Context, c *client.Client, args []stri
 			return err
 		}
 		if !state.ValidProviderID(*id) || *rev < 1 || *platform == "" || *stdin && *clear {
-			return errors.New("platform-put requires --id, --revision and --platform; token input and clear are exclusive")
+			return errors.New("platform-put requires --id and --revision; token input and clear are exclusive")
 		}
 		in := providerapi.Configure{ProviderID: *id, ExpectedRevision: *rev, Config: providerapi.Config{Platform: *platform, SiteURL: *site, UserID: *userID}}
 		if *stdin {
@@ -56,7 +56,7 @@ func (a App) providerPlatform(ctx context.Context, c *client.Client, args []stri
 		}
 		return a.output(out)
 	}
-	key := f.String("key", "", "local Key ID; default is first enabled key")
+	key := f.String("key", "", "local Key ID; default is enabled default key, then first enabled key")
 	remote := f.Int64("remote-key-id", 0, "site numeric Key ID (OneAPI quota / effective rate)")
 	scope := ""
 	page, size := 0, 0

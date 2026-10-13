@@ -17,6 +17,13 @@ describe('account contract and precision', () => {
     expect(q.allowance!.remaining).toBeNull();
     expect(amountText({ value: '9007199254740993123', unit: 'quota' })).toBe('9007199254740993123 quota（原始额度）');
   });
+  it('accepts automatic settings and scoped default-key summaries', () => {
+    expect(checkedAccountSettings({ ...fixture.settings, platform: 'auto' }, 'demo').platform).toBe('auto');
+    const q = { ...balanceQuery, operation: 'balance-summary' };
+    expect(checkedAccountObservation(fixture.summary, q).allowance!.scope).toBe('account');
+    expect(checkedAccountObservation(fixture.key_summary, q).allowance!.scope).toBe('key');
+    expect(() => checkedAccountObservation({ ...fixture.key_summary, allowance: { ...fixture.key_summary.allowance, scope: 'subscription' } }, q)).toThrow('read_error');
+  });
   it('rejects wrong provider, revision, selected key, scope and malformed or missing amounts', () => {
     for (const changes of [ { provider_id: 'other' }, { revision: 4 }, { remote_key_id: 3 },
       { allowance: { ...fixture.balance.allowance, scope: 'key' } },

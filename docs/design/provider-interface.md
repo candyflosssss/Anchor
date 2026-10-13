@@ -92,14 +92,14 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 
 ### 身份、入口和返回
 
-平台类型 `sub2api|newapi|oneapi` 独立于 Key 的推理协议。`provider_platforms` 表按 provider_id 保存公开配置及独立 user_token，schema4→5 自动迁移；既有供应商默认未配置平台，模型目录仍可查，其他操作返回 `platform_required`。旧程序不能打开 schema5，升级需同步核心与客户端。
+平台类型 `auto|sub2api|newapi|oneapi` 独立于 Key 的推理协议。`provider_platforms` 表按 provider_id 保存公开配置及独立 user_token，schema4→5 自动迁移；既有供应商缺少平台配置或显式 `auto` 时自动探测；具体平台值仍可作为人工覆盖。旧程序不能打开 schema5，升级需同步核心与客户端。
 
 - `GET /control/v1/providers/{id}/platform`：返回 `providerapi.Settings`，仅 `has_user_token`，不返回用户授权。
 - `PUT /control/v1/providers/{id}/platform`：`providerapi.Configure`，包含 provider_id、expected_revision、完整公开 config 及可选 user_token。nil 保留同目标授权，空字符串清除；平台、site_url、user_id 或推导后台根地址改变时，不隐式迁移旧令牌。写成功递增供应商 revision。
-- `POST /control/v1/providers/{id}/query`：`providerapi.Query`，operation 为 `models|balance|key-quota|usage-records|effective-rate`；provider_id 必须与路径一致，expected_revision 必填。records 的 scope 为 account（默认）或 key；page 从1开始，默认1，page_size 默认50且最大100。remote_key_id 是用户提供的站点数字 ID，不会自动按本地 key_id 推断或证明两者对应。
+- `POST /control/v1/providers/{id}/query`：`providerapi.Query`，operation 为 `models|detect-platform|balance-summary|balance|key-quota|usage-records|effective-rate`；provider_id 必须与路径一致，expected_revision 必填。records 的 scope 为 account（默认）或 key；page 从1开始，默认1，page_size 默认50且最大100。remote_key_id 是用户提供的站点数字 ID，不会自动按本地 key_id 推断或证明两者对应。
 - 统一核心方法 `Server.QueryProvider` 负责读取供应商、授权与 Key，校验 revision、限制并发／超时和选取平台。`providerapi.Adapter` 提供 `GetBalance`、`GetKeyQuota`、`ListUsageRecords`、`GetEffectiveRate`；models 复用核心现有目录读取器。Go 客户端 `ProviderPlatform`、`ConfigureProviderPlatform`、`QueryProvider` 与 CLI 复用这些管理入口。
 
-所有管理路径沿用管理鉴权、Host／Origin 规则；PUT／POST 校验实例，不能让浏览器绕过宿主直接请求。query 虽用 POST，业务上只读；不写本地消费估算、不调整路由倍率、不自动导入目录。选定默认 Key 的规则同目录查询，用户授权查询不要求推理 Key 存在。模型仍受所选 Key 默认推理协议认证约束，不通过平台身份强行改变协议。
+所有管理路径沿用管理鉴权、Host／Origin 规则；PUT／POST 校验实例，不能让浏览器绕过宿主直接请求。query 虽用 POST，业务上只读；不写本地消费估算、不调整路由倍率、不自动导入目录。查询未指定 key_id 时优先选择已启用的 `default`，否则回退到第一个已启用 Key；用户授权查询不要求推理 Key 存在。模型仍受所选 Key 默认推理协议认证约束，不通过平台身份强行改变协议。
 
 `Result` 包含 provider_id、实际选用的本地 key_id（没有时 anonymous）、用户提供的 remote_key_id、revision、platform、operation、observed_at、source 路径、http_status，以及操作对应的 payload 或 failure。models 的 source 为 `model_catalog`（表示复用目录读取器），其他为真实请求的端点路径；不含站点 URL、查询秘密、原始错误正文。管理错误使用原管理错误响应；平台能力或上游失败作为结构化 Result，不返回部分数据。
 
@@ -147,7 +147,15 @@ records 的 history 区分近期批次 `recent` 和可分页保留记录 `pagina
 Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例为 `desktop/contract/provider-account.json`。
 
 - `ProviderAccountSettings(WorkspaceQuery)` 读取公有平台配置；`SaveProviderAccount(SaveAccountSettings)` 完整写入 platform/site_url/user_id，user_token 为 null 保留同目标授权、空字符串清除、非空替换。只返回 has_user_token，提交后清空表单令牌；清除须勾选确认，改变授权目标保留模式会明确提示旧令牌被清除。
-- `ProviderAllowance(AccountQuery)` 只接受 balance / key-quota，通过现有 client.QueryProvider 复用核心端点、鉴权、并发和超时。校验当前 provider revision；Key 留空时自动选择已启用 Key，OneAPI Key 额度需用户核对并输入远端整数令牌 ID。
+- `ProviderAllowance(AccountQuery)` 接受 balance / key-quota / balance-summary，通过现有 client.QueryProvider 复用核心端点、鉴权、并发和超时。校验当前 provider revision；Key 留空时优先已启用 default，再回退首个启用 Key，OneAPI Key 额度需用户核对并输入远端整数令牌 ID。
 - 标准桌面 envelope 的 Problem 表示管理／连接失败；AccountObservation.failure 表示平台查询失败。账户 scope=account，Key scope=key；amount.value 为十进制字符串，unit 保留 USD 或 quota，不进行价格换算；null 为未知，unlimited=true 仅说明 Key 自身无限额，不能推导账户钱包。
 - 读取、写入、额度查询共享页面操作互斥；配置或供应商变化取消／丢弃旧查询，改变 Key 或远端 ID 清空旧观察值。余额与 Key 查询各自更新对应结果，刷新失败不把旧数值当当前结果。写入结果 unknown 或 conflict 需显式重新读取，不自动重放写入。
 - 后台根地址为空时沿用核心推导；可选地址仅由用户按真实部署填写，不自动加 `/newapi` 等平台名路径。查询不发推理请求，不将余额写入路由配置，不修改倍率。
+
+### 自动探测与供应商列表余额（2026-10-13，当前源码未发布）
+
+`detect-platform` 强制重新探测，只返回观察结果，不持久化平台或递增 revision。未配置／auto 的其他查询先探测：公开 `/api/status` 以版本、quota_per_unit 和 NewAPI／OneAPI 特有字段区分；公开 `/api/v1/settings/public` 以 sub2api settings 字段识别。公开探测不发送凭据；必要时用所选推理 Key 检查 `/v1/usage` 与 `/api/usage/token/` 的结构。域名、站点名称或推理协议不作为识别依据，无法确认则 platform_unknown；网络、超时、限流和响应预算失败立即停止。沿用部署前缀、禁止重定向，全部探测与查询共享8次请求／2 MiB／8秒上限。
+
+`balance-summary` 供列表自动读取，仅用推理 Key，不使用已保存用户令牌。sub2api unrestricted 的明确 balance 返回 account 钱包；受限 Key 返回 key 额度及周期窗口。NewAPI 返回 key 的原始 quota，不换算货币；原版 OneAPI 缺少默认 Key 的明确钱包接口，返回 auth_required。原 `balance` 保持账户钱包语义，用户授权可在详情配置。缺失值保持 null，失败不伪造0。
+
+桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。

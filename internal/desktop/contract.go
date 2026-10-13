@@ -174,9 +174,10 @@ type SaveAccountSettings struct {
 type AccountQuery struct {
 	ProviderID       string `json:"provider_id"`
 	ExpectedRevision int64  `json:"expected_revision"`
-	Operation        string `json:"operation"`
-	KeyID            string `json:"key_id"`
-	RemoteKeyID      int64  `json:"remote_key_id"`
+	// Operation is balance (wallet), key-quota, or balance-summary (default-key account/key scope).
+	Operation   string `json:"operation"`
+	KeyID       string `json:"key_id"`
+	RemoteKeyID int64  `json:"remote_key_id"`
 }
 type AccountAmount struct {
 	Value string `json:"value"`

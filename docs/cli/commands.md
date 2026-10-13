@@ -290,8 +290,10 @@ GUI 在供应商详情的三个页签提供同等操作。数据库启动自动�
 
 ```text
 anchor provider platform --id ID
-anchor provider platform-put --id ID --revision N --platform sub2api|newapi|oneapi
+anchor provider platform-put --id ID --revision N [--platform auto|sub2api|newapi|oneapi]
     [--site-url URL] [--user-id N] [--user-token-stdin | --clear-user-token]
+anchor provider detect-platform --id ID --revision N [--key KEY]
+anchor provider balance-summary --id ID --revision N [--key KEY]
 anchor provider balance --id ID --revision N [--key KEY] [--remote-key-id N]
 anchor provider key-quota --id ID --revision N [--key KEY] [--remote-key-id N]
 anchor provider usage-records --id ID --revision N [--key KEY] [--remote-key-id N]
@@ -303,9 +305,13 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 
 `platform` 返回 `{provider_id, revision, config}`，配置只有平台、可选 `site_url` / `user_id` 和 `has_user_token`，不返回令牌。`platform-put` 完整替换公开配置；平台与推理协议分开，不能用 `responses` 等协议推断平台。`--site-url` 默认为空，从供应商首个请求地址去掉末尾 `/v1` 后推导后台根地址，保留真实部署前缀；若后台路径不同，显式指定 HTTP(S) 根地址，不能带查询、片段或 URL 凭据。`--user-id` 默认0，仅 NewAPI 用户接口使用，需该站点要求 `New-Api-User` 时填写。
 
+`--platform` 默认 `auto`；既有未配置平台同样自动探测。`detect-platform` 根据公开接口和必要的 Key 接口响应重新识别 sub2api／NewAPI／OneAPI，不凭域名或站点品牌猜测，不写配置。无法确认返回 `platform_unknown`，凭据被拒绝保留分类失败。人工指定平台可覆盖自动模式。
+
+`balance-summary`（本轮源码新增，未发布）使用默认推理 Key，不使用保存的用户令牌：sub2api 明确钱包返回 scope=account，受限 Key 返回 scope=key；NewAPI 返回 Key 原始 quota；原版 OneAPI 返回 auth_required。余额／额度字段为空或失败时不能当作0。查询结果的 platform 为本次识别值，key_id 为实际所选 Key。原 `balance` 的账户钱包语义保持不变。
+
 `--user-token-stdin` 读取独立的后台用户授权（sub2api JWT、NewAPI/OneAPI 用户 access token）；不能使用 `--secret` 参数传入。空 stdin 拒绝；与 `--clear-user-token` 互斥。未指定令牌选项时，仅平台、后台根地址和用户 ID 都不变才保留原令牌；改变其中任一项会清除。后台地址由请求地址推导时，修改请求地址也清除令牌；显式独立后台地址不受此影响。复制供应商不复制用户授权，即使指定 `--copy-keys`；改名保留，删除级联清除。凭据存于本机受限数据库，不能理解为数据库列加密。
 
-`--key` 默认为首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。调用者须确保该数字对应希望查询的站点 Key；兼容层不猜测二者映射。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询使用该数字读取绑定分组。
+`--key` 默认优先已启用的 `default`，否则回退首个启用的本地 Key，显式指定不存在的 Key 则管理失败。`--remote-key-id` 默认0，指站点后台的数字 Key ID，**与本地 `--key` 名称及密钥字符串不同**；需要时必须提供正整数。调用者须确保该数字对应希望查询的站点 Key；兼容层不猜测二者映射。`balance` 不使用该数字；sub2api/NewAPI 的 Key 额度直接用所选密钥，原版 OneAPI 使用该数字和用户授权；倍率查询使用该数字读取绑定分组。
 
 | 功能 | sub2api | NewAPI | 原版 OneAPI |
 | --- | --- | --- | --- |
@@ -521,6 +527,7 @@ anchor recover [--id ID]
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
+| 平台自动识别与列表余额（本轮源码） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询默认 Key；钱包／Key额度明确区分；未发布 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |

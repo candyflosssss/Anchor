@@ -59,45 +59,7 @@ func (a *Adapter) GetKeyQuota(ctx context.Context, id int64) (*Allowance, error)
 		if err != nil {
 			return nil, err
 		}
-		switch text(m, "mode") {
-		case "unrestricted":
-			// This only says the key has no own cap. Wallet/subscription funds are separate.
-			unlimited := true
-			out.Unlimited = &unlimited
-		case "quota_limited":
-			if raw, ok := m["quota"]; ok {
-				var q object
-				if json.Unmarshal(raw, &q) != nil || q == nil {
-					return nil, failure("invalid_response")
-				}
-				out.Remaining = amount(q, "remaining", "USD")
-				out.Used = amount(q, "used", "USD")
-				out.Limit = amount(q, "limit", "USD")
-				if out.Remaining == nil || out.Used == nil || out.Limit == nil {
-					return nil, failure("invalid_response")
-				}
-			}
-			if raw, ok := m["rate_limits"]; ok {
-				windows, err := array(raw)
-				if err != nil {
-					return nil, err
-				}
-				for _, w := range windows {
-					v := Window{Period: text(w, "window"), Remaining: amount(w, "remaining", "USD"), Used: amount(w, "used", "USD"), Limit: amount(w, "limit", "USD"), ResetAt: text(w, "reset_at")}
-					if v.Period == "" || v.Remaining == nil || v.Used == nil || v.Limit == nil {
-						return nil, failure("invalid_response")
-					}
-					out.Windows = append(out.Windows, v)
-				}
-			}
-			// A quota service can omit a window on transient lookup failure. Do not
-			// interpret that omission as unlimited or a zero balance.
-			if out.Limit == nil && len(out.Windows) == 0 {
-				return nil, failure("unknown")
-			}
-		default:
-			return nil, failure("invalid_response")
-		}
+		return sub2KeyQuota(m)
 	case "newapi":
 		if err := a.key(); err != nil {
 			return nil, err
@@ -226,4 +188,48 @@ func (a *Adapter) GetEffectiveRate(ctx context.Context, id int64) (*Rate, error)
 		return nil, failure("unknown")
 	}
 	return &Rate{Group: group, Multiplier: multiplier, Basis: "authenticated_group"}, nil
+}
+
+func sub2KeyQuota(m object) (*Allowance, error) {
+	out := allowance("key")
+	switch text(m, "mode") {
+	case "unrestricted":
+		// This only says the key has no own cap. Wallet/subscription funds are separate.
+		unlimited := true
+		out.Unlimited = &unlimited
+	case "quota_limited":
+		if raw, ok := m["quota"]; ok {
+			var q object
+			if json.Unmarshal(raw, &q) != nil || q == nil {
+				return nil, failure("invalid_response")
+			}
+			out.Remaining = amount(q, "remaining", "USD")
+			out.Used = amount(q, "used", "USD")
+			out.Limit = amount(q, "limit", "USD")
+			if out.Remaining == nil || out.Used == nil || out.Limit == nil {
+				return nil, failure("invalid_response")
+			}
+		}
+		if raw, ok := m["rate_limits"]; ok {
+			windows, err := array(raw)
+			if err != nil {
+				return nil, err
+			}
+			for _, w := range windows {
+				v := Window{Period: text(w, "window"), Remaining: amount(w, "remaining", "USD"), Used: amount(w, "used", "USD"), Limit: amount(w, "limit", "USD"), ResetAt: text(w, "reset_at")}
+				if v.Period == "" || v.Remaining == nil || v.Used == nil || v.Limit == nil {
+					return nil, failure("invalid_response")
+				}
+				out.Windows = append(out.Windows, v)
+			}
+		}
+		// A quota service can omit a window on transient lookup failure. Do not
+		// interpret that omission as unlimited or a zero balance.
+		if out.Limit == nil && len(out.Windows) == 0 {
+			return nil, failure("unknown")
+		}
+	default:
+		return nil, failure("invalid_response")
+	}
+	return out, nil
 }

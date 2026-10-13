@@ -54,7 +54,7 @@ export class MockProviderTransport implements ProviderTransport {
   async accountSettings(id: string, signal: AbortSignal): Promise<AccountSettings> {
     await delay(signal);
     const p = this.rows.find(p => p.id === id); if (!p) throw new ProviderProblem('invalid');
-    const saved = this.accounts.get(id) ?? { ...accountFixture.settings, provider_id: id };
+    const saved = this.accounts.get(id) ?? { ...accountFixture.settings, platform: 'auto', provider_id: id };
     return { ...saved, revision: p.revision };
   }
   async saveAccount(input: SaveAccountSettings, signal: AbortSignal): Promise<AccountSettings> {
@@ -72,13 +72,14 @@ export class MockProviderTransport implements ProviderTransport {
   async allowance(q: AccountQuery, signal: AbortSignal): Promise<AccountObservation> {
     await delay(signal);
     const p = this.rows.find(p => p.id === q.provider_id); if (!p || p.revision !== q.expected_revision) throw new ProviderProblem('conflict');
-    const settings = this.accounts.get(p.id) ?? accountFixture.settings;
-    const w = this.detail(p), key = q.key_id ? w.keys.find(k => k.id === q.key_id) : w.keys.find(k => k.enabled);
+    const saved = this.accounts.get(p.id) ?? accountFixture.settings;
+    const settings = { ...saved, platform: !saved.platform || saved.platform === 'auto' ? 'sub2api' : saved.platform };
+    const w = this.detail(p), key = q.key_id ? w.keys.find(k => k.id === q.key_id) : w.keys.find(k => k.id === 'default' && k.enabled) ?? w.keys.find(k => k.enabled);
     if (q.key_id && !key) throw new ProviderProblem('invalid');
-    const v = structuredClone(q.operation === 'balance' ? accountFixture.balance : accountFixture.quota);
-    Object.assign(v, { provider_id: p.id, revision: p.revision, platform: settings.platform, key_id: key?.id ?? 'anonymous', remote_key_id: q.remote_key_id, observed_at: new Date().toISOString() });
+    const v = structuredClone(q.operation === 'balance-summary' ? accountFixture.summary : q.operation === 'balance' ? accountFixture.balance : accountFixture.quota);
+    Object.assign(v, { provider_id: p.id, revision: p.revision, platform: settings.platform, operation: q.operation, key_id: key?.id ?? 'anonymous', remote_key_id: q.remote_key_id, observed_at: new Date().toISOString() });
     let failure = '';
-    if (!settings.platform) failure = 'platform_required';
+    if (q.operation === 'balance-summary' && (!key || settings.platform === 'oneapi')) failure = 'auth_required';
     else if (settings.platform !== 'sub2api' && !settings.has_user_token && (q.operation === 'balance' || settings.platform === 'oneapi')) failure = 'auth_required';
     else if (settings.platform === 'newapi' && settings.has_user_token && !settings.user_id && q.operation === 'balance') failure = 'auth_required';
     else if (settings.platform === 'oneapi' && q.operation === 'key-quota' && !q.remote_key_id) failure = 'remote_key_required';
@@ -100,7 +101,7 @@ export class MockProviderTransport implements ProviderTransport {
     const current = this.rows.find(p => p.id === input.provider_id);
     if (current?.revision !== input.expected_revision) throw fixtureError('conflict');
     const w = this.detail(current);
-    const key = input.key_id ? w.keys.find(k => k.id === input.key_id) : w.keys.find(k => k.enabled);
+    const key = input.key_id ? w.keys.find(k => k.id === input.key_id) : w.keys.find(k => k.id === 'default' && k.enabled) ?? w.keys.find(k => k.enabled);
     if (input.key_id && !key) throw new ProviderProblem('invalid');
     if (w.keys.length && !key) return { ...catalogFixture.success, provider_id: current.id, revision: current.revision, key_id: '', failure: 'authentication', http_status: 0, models: [] };
     return { ...catalogFixture.success, key_id: key?.id ?? 'anonymous', provider_id: current.id, revision: current.revision, models: [...catalogFixture.success.models] };

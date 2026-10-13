@@ -24,8 +24,8 @@ type Config struct {
 }
 
 func (c Config) Validate() error {
-	if c.Platform != "" && c.Platform != "sub2api" && c.Platform != "newapi" && c.Platform != "oneapi" {
-		return errors.New("platform must be sub2api, newapi or oneapi")
+	if c.Platform != "" && c.Platform != "auto" && c.Platform != "sub2api" && c.Platform != "newapi" && c.Platform != "oneapi" {
+		return errors.New("platform must be auto, sub2api, newapi or oneapi")
 	}
 	if c.UserID < 0 || len(c.UserToken) > 8192 || strings.ContainsAny(c.UserToken, "\r\n") {
 		return errors.New("invalid user authorization")
@@ -68,7 +68,7 @@ type Query struct {
 
 func (q Query) Validate() error {
 	switch q.Operation {
-	case "models", "balance", "key-quota", "usage-records", "effective-rate":
+	case "models", "detect-platform", "balance-summary", "balance", "key-quota", "usage-records", "effective-rate":
 	default:
 		return errors.New("unsupported operation")
 	}
@@ -209,23 +209,26 @@ func (a *Adapter) Query(ctx context.Context, q Query) Result {
 	a.calls = 0
 	a.bytes = 0
 	var err error
-	switch a.Config.Platform {
-	case "sub2api", "newapi", "oneapi":
-	default:
-		out.Failure = "platform_required"
-		return out
+	if q.Operation == "detect-platform" || a.Config.Platform == "" || a.Config.Platform == "auto" {
+		a.Config.Platform, err = a.DetectPlatform(ctx)
+		out.Platform = a.Config.Platform
 	}
-	switch q.Operation {
-	case "balance":
-		out.Balance, err = a.GetBalance(ctx)
-	case "key-quota":
-		out.KeyQuota, err = a.GetKeyQuota(ctx, q.RemoteKeyID)
-	case "usage-records":
-		out.Records, err = a.ListUsageRecords(ctx, q)
-	case "effective-rate":
-		out.EffectiveRate, err = a.GetEffectiveRate(ctx, q.RemoteKeyID)
-	default:
-		err = failure("unsupported") // models uses the shared catalog reader in core
+	if err == nil {
+		switch q.Operation {
+		case "detect-platform":
+		case "balance-summary":
+			out.Balance, err = a.GetBalanceSummary(ctx)
+		case "balance":
+			out.Balance, err = a.GetBalance(ctx)
+		case "key-quota":
+			out.KeyQuota, err = a.GetKeyQuota(ctx, q.RemoteKeyID)
+		case "usage-records":
+			out.Records, err = a.ListUsageRecords(ctx, q)
+		case "effective-rate":
+			out.EffectiveRate, err = a.GetEffectiveRate(ctx, q.RemoteKeyID)
+		default:
+			err = failure("unsupported") // models uses the shared catalog reader in core
+		}
 	}
 	out.Source = append(out.Source, a.paths...)
 	out.HTTPStatus = a.status

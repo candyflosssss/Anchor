@@ -17,9 +17,11 @@ func TestSharedAccountFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var v struct {
-		Settings AccountSettings    `json:"settings"`
-		Balance  AccountObservation `json:"balance"`
-		Quota    AccountObservation `json:"quota"`
+		Settings   AccountSettings    `json:"settings"`
+		Balance    AccountObservation `json:"balance"`
+		Quota      AccountObservation `json:"quota"`
+		Summary    AccountObservation `json:"summary"`
+		KeySummary AccountObservation `json:"key_summary"`
 	}
 	if err := json.Unmarshal(raw, &v); err != nil {
 		t.Fatal(err)
@@ -158,5 +160,45 @@ func TestAccountBridgeRejectsUnsafeInputs(t *testing.T) {
 	out := b.SaveProviderAccount(SaveAccountSettings{ProviderID: "p", ExpectedRevision: 1, Platform: "newapi", UserID: MaxSafeRevision + 1})
 	if out.Problem == nil || out.Problem.Code != "invalid" {
 		t.Fatal(out)
+	}
+}
+
+func TestAccountBridgeAutomaticallyDetectsSummary(t *testing.T) {
+	key := "default-summary-fixture"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/prefix/api/status":
+			if r.Header.Get("Authorization") != "" {
+				t.Error("public request credential")
+			}
+			fmt.Fprint(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false}}`)
+		case "/prefix/api/usage/token/":
+			if r.Header.Get("Authorization") != "Bearer "+key {
+				t.Error("wrong key")
+			}
+			fmt.Fprint(w, `{"code":true,"data":{"total_available":9007199254740993123,"total_used":2,"total_granted":9007199254740993125}}`)
+		default:
+			t.Error("unexpected path")
+			w.WriteHeader(404)
+		}
+	}))
+	defer upstream.Close()
+	b := NewBridge(testSession(t))
+	requireReady(t, b)
+	saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "summary", BaseURLs: []string{upstream.URL + "/prefix/v1"}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
+	if saved.Problem != nil {
+		t.Fatal(saved)
+	}
+	q := AccountQuery{ProviderID: "summary", ExpectedRevision: 1, Operation: "balance-summary"}
+	v := b.ProviderAllowance(q)
+	if v.Problem != nil || v.Data.Failure != "" || v.Data.Platform != "newapi" || v.Data.KeyID != "default" || v.Data.Allowance.Scope != "key" || v.Data.Allowance.Remaining.Value != "9007199254740993123" {
+		t.Fatalf("%+v", v)
+	}
+	settings := b.SaveProviderAccount(SaveAccountSettings{ProviderID: "summary", ExpectedRevision: 1, Platform: "auto"})
+	if settings.Problem != nil || settings.Data.Platform != "auto" {
+		t.Fatal(settings)
+	}
+	if stale := b.ProviderAllowance(q); stale.Problem == nil || stale.Problem.Code != "conflict" {
+		t.Fatal(stale)
 	}
 }

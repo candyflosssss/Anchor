@@ -30,6 +30,11 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case "/api/status":
+			if r.Header.Get("Authorization") != "" {
+				t.Error("public probe credential")
+			}
+			io.WriteString(w, `{"success":true,"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false}}`)
 		case "/api/user/self":
 			if r.Header.Get("Authorization") != "Bearer cli-user-fixture" {
 				t.Error("incorrect dashboard token")
@@ -64,6 +69,14 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	run("", false, "context", "add", "local", "--local")
 	run("", false, "context", "use", "local")
 	run("cli-model-fixture\n", false, "provider", "add", "--id", "p", "--base-url", up.URL+"/v1", "--secret-stdin")
+	gotAuto := run("", false, "provider", "detect-platform", "--id", "p", "--revision", "1")
+	if !strings.Contains(gotAuto, `"platform":"newapi"`) {
+		t.Fatal(gotAuto)
+	}
+	summary := run("", false, "provider", "balance-summary", "--id", "p", "--revision", "1")
+	if !strings.Contains(summary, `"scope":"key"`) || !strings.Contains(summary, `"value":25`) {
+		t.Fatal(summary)
+	}
 	run("", true, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-token-stdin", "--clear-user-token")
 	run("\n", true, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-token-stdin")
 	got := run("cli-user-fixture\n", false, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-id", "9", "--user-token-stdin")
@@ -92,6 +105,10 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	run("", false, "provider", "platform-put", "--id", "p", "--revision", "2", "--platform", "newapi", "--clear-user-token")
 	got = run("", false, "provider", "balance", "--id", "p", "--revision", "3")
 	if !strings.Contains(got, `"failure":"auth_required"`) {
+		t.Fatal(got)
+	}
+	got = run("", false, "provider", "platform-put", "--id", "p", "--revision", "3")
+	if !strings.Contains(got, `"platform":"auto"`) {
 		t.Fatal(got)
 	}
 }

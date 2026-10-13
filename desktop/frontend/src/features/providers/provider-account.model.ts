@@ -1,7 +1,7 @@
 import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation } from '../../desktop/contract.generated';
 import { ProviderProblem, requestURLError } from './provider.model';
 export type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation };
-export const platformLabels: Record<string, string> = { sub2api: 'sub2api', newapi: 'NewAPI', oneapi: 'OneAPI' };
+export const platformLabels: Record<string, string> = { auto: '自动探测', sub2api: 'sub2api', newapi: 'NewAPI', oneapi: 'OneAPI' };
 export interface AccountTransport {
   accountSettings?(id: string, signal: AbortSignal): Promise<AccountSettings>;
   saveAccount?(input: SaveAccountSettings, signal: AbortSignal): Promise<AccountSettings>;
@@ -27,19 +27,21 @@ function allowance(v: AccountAllowance, scope: string): AccountAllowance {
     }) };
 }
 export function checkedAccountObservation(v: AccountObservation, q: AccountQuery): AccountObservation {
-  if (!v || v.provider_id !== q.provider_id || v.revision !== q.expected_revision || v.operation !== q.operation || !['balance', 'key-quota'].includes(v.operation) ||
+  if (!v || v.provider_id !== q.provider_id || v.revision !== q.expected_revision || v.operation !== q.operation || !['balance', 'balance-summary', 'key-quota'].includes(v.operation) ||
     !['', ...Object.keys(platformLabels)].includes(v.platform) || typeof v.key_id !== 'string' || (q.key_id && v.key_id !== q.key_id) || v.remote_key_id !== q.remote_key_id ||
     typeof v.observed_at !== 'string' || !Number.isFinite(Date.parse(v.observed_at)) || !Number.isInteger(v.http_status) || v.http_status < 0 || v.http_status > 599 ||
-    typeof v.failure !== 'string' || v.failure.length > 64 || (v.failure ? v.allowance !== null : v.allowance === null)) throw new ProviderProblem('read_error');
+    (!v.failure && ['', 'auto'].includes(v.platform)) || typeof v.failure !== 'string' || v.failure.length > 64 || (v.failure ? v.allowance !== null : v.allowance === null)) throw new ProviderProblem('read_error');
   return { provider_id: v.provider_id, revision: v.revision, platform: v.platform, operation: v.operation, key_id: v.key_id, remote_key_id: v.remote_key_id,
-    observed_at: v.observed_at, http_status: v.http_status, failure: v.failure, allowance: v.allowance === null ? null : allowance(v.allowance, q.operation === 'balance' ? 'account' : 'key') };
+    observed_at: v.observed_at, http_status: v.http_status, failure: v.failure, allowance: v.allowance === null ? null : allowance(v.allowance, q.operation === 'balance-summary' ? (v.allowance.scope === 'account' ? 'account' : 'key') : q.operation === 'balance' ? 'account' : 'key') };
 }
 export function amountText(v: AccountAmount | null): string {
   return v === null ? '未知' : `${v.value} ${v.unit === 'USD' ? 'USD' : 'quota（原始额度）'}`;
 }
 export const accountFailureText: Record<string, string> = {
   unknown: '平台没有返回明确的额度或周期窗口，当前额度未知。',
-  platform_required: '请先选择并保存平台类型。',
+  platform_unknown: '无法自动识别平台，可在账户页指定平台类型。',
+  permission_denied: '该 Key 没有查询权限。',
+  upstream_rejected: '平台拒绝了查询请求。',
   auth_required: '当前查询需要额外授权。请配置平台用户令牌，或检查所选推理 Key；Key 限额不能代表账户余额。',
   remote_key_required: 'OneAPI 查询 Key 额度需要填写该站后台的令牌 ID。',
   authentication: '平台拒绝授权。请核对令牌是否有效，以及 NewAPI 的用户 ID。',

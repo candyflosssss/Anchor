@@ -29,8 +29,10 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   stop --approve                     Request graceful shutdown of selected context
   provider list
   provider platform --id ID             Read platform configuration (redacted)
-  provider platform-put --id ID --revision N --platform sub2api|newapi|oneapi
+  provider platform-put --id ID --revision N [--platform auto|sub2api|newapi|oneapi]
       [--site-url URL] [--user-id N] [--user-token-stdin | --clear-user-token]
+  provider detect-platform --id ID --revision N [--key KEY]
+  provider balance-summary --id ID --revision N [--key KEY]
   provider balance|key-quota|effective-rate --id ID --revision N [--key KEY] [--remote-key-id N]
   provider usage-records --id ID --revision N [--key KEY] [--remote-key-id N]
       [--scope account|key] [--page N] [--page-size N]
@@ -438,7 +440,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 		return errors.New("provider requires list, models, add or put")
 	}
 	switch args[0] {
-	case "platform", "platform-put", "balance", "key-quota", "usage-records", "effective-rate":
+	case "platform", "platform-put", "detect-platform", "balance-summary", "balance", "key-quota", "usage-records", "effective-rate":
 		return a.providerPlatform(ctx, c, args)
 	}
 	if args[0] == "list" {

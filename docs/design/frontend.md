@@ -399,3 +399,9 @@ Go DTO、生成 TS 和 provider-model-mapping.json 样例同步；Mock 跨平台
 页面显示发现目录、产品、适配/缓存状态，支持 Codex 默认模型和逐模型模板选择，空选择明确排除；核对缓存版本/上游能力并批准后保存应用。已登记行显示配置状态、兼容模型、同步目录、停用恢复与重新启用。失败后重读、不重放写入；写入期间阻止重复提交，实例变化卸载旧页面及异步结果。配置成功和真实链路验证分开，应用后提示重启 Codex。发现目录不等于已安装或运行；仅 Codex 可托管，其他产品说明适配缺口。
 
 实现契约见 desktop-runtime.md 的 Agent 增量；对应 discover/enroll/sync CLI 和边界见唯一指令大全 §8。原生 Windows 安装与 Codex 模型选择器仍需单独验收。
+
+### 供应商列表余额与平台自动识别（2026-10-13，当前源码未发布）
+
+供应商列表增加「余额／额度」列，列表加载与刷新使用默认推理 Key；显示实际探测平台、账户余额或 Key 额度标签，保持十进制字符串与原始单位。未知、加载、授权不足和失败分别展示，不伪造余额0。金额与 Key／查询时间悬浮提示由 View 展示，健康提示保留状态依据。账户配置默认自动探测，无需先保存平台即可查询，支持具体平台覆盖。
+
+Model 沿用类型化 ProviderAllowance；Controller `use-provider-balances.ts` 独立管理列表观察，每轮最多并发2个查询、无轮询，按供应商列表快照、revision、传输实例和导航丢弃旧结果。`provider-balance.view.tsx` 展示明确 account/key scope；平台探测和默认 Key 规则只由 Go 核心实现，前端不请求上游、不保存凭据。CLI 同步支持 detect-platform/balance-summary，契约详见 provider-interface.md §8。原生窗口与真实站点授权未验收，未构建安装包。
