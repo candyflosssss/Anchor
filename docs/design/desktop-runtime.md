@@ -77,7 +77,7 @@ ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置�
 
 ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径；创建目标目录的600权限 partial，流式写入、Sync/Close/Rename，失败清理任务自己的部分文件；取消返回 accepted=false。列偏好在前端保存，不送核心；缺桥接或读取失败不使用 mock。核心日志生命周期独立于窗口，宿主退出不停止日志采集。具体语义和边界见[日志实现](logging.md)。
 
-## Agent 托管增量（2026-10-12，源码未发布）
+## Agent 托管增量（2026-10-12 实现，desktop.21 dev 已发布）
 
 受控新增 AgentWorkspace / EnrollAgent / ManageAgent，DTO 来源为 managed 应用服务，在 contract.go 中声明并生成 TS；共享样例为 desktop/contract/agents.json。输入只允许发现目标 ID、默认公开模型、期望 revision、模板选择及明确批准，操作只允许 sync/enable/disable。前端不能指定配置路径、可执行程序或认证令牌，宿主不扫描目录、不写 Agent 文件，均复用 client 到核心的管理鉴权和实例身份校验。超时15秒；写失败按既有 problem 规则，结果未知不重放，Controller 重读状态。
 

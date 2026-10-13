@@ -191,7 +191,7 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 
 本轮仅定向检查和打包，不运行全量/race/浏览器或原生安装验收。当前价估算不包含未知用量；models.dev 只做解析样例验证，未请求线上目录；协议仅回环模拟上游，未调用真实付费服务。具体产物与提交见 release 任务记录。
 
-### 本地 Agent 发现与桌面托管（2026-10-12，源码未发布）
+### 本地 Agent 发现与桌面托管（2026-10-12 实现，desktop.21 dev 已发布）
 
 `internal/managed` 提供有界只读发现和 workspace/enroll/sync 应用服务，`internal/core` 提供已鉴权的 `/control/v1/agents/workspace`、`/enroll` 和 action=sync。已知用户目录识别产品痕迹，仅 Codex 可托管；不执行客户端或自动推理。Codex 从本地完整 models_cache.json 提取 client_version 和 ModelInfo，操作者核对版本及能力后批准，模板及排除选择存 Binding，而非修改共享供应商模型。目标本地策略也用于网关鉴权，single 与 all-compatible 共用元数据解析。限制和完整操作见 CLI 大全 §8。
 

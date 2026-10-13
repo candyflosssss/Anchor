@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-12。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.20`，北京时间 2026-10-12 20:12:14 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：更新请求实时读取对应协议的环境代理与 ALL_PROXY；Windows 通过 WinHTTP 支持手动代理和 PAC，NO_PROXY 同时适用于系统代理。GitHub API 网络失败、限流或阶段超时后尝试同仓库官方发布订阅，保留版本／平台／大小／SHA256 检查。共享模型与倍率调度沿用 `.19`。
-- 已有 `.9`～`.19`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.20`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
-- 无新 schema 迁移；从 `.15` 及更早升级仍会将 state.db schema3→4，不提供降级。
-- updater／desktop／CLI 三个 Go 包、Windows updater 测试程序编译、前端 30 项定向测试、类型检查与 lint、两平台打包、六项附件 digest 校验及真实更新下载通过。**Windows PAC、双平台原生窗口与安装未实机验收**；dev 预发行未签名。
+- 更新：2026-10-13。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.21`，北京时间 2026-10-13 10:15:34 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：Agent 托管页面与本机发现／登记／同步；sub2api / NewAPI / 原版 OneAPI 账户与计费兼容核心接口、类型化客户端及源码 CLI。余额／账单／倍率的桌面查询页面尚未接入；原版 OneAPI 倍率不支持，NewAPI 自动分组倍率未知。更新器沿用 `.20` 的代理和官方订阅回退。
+- 已有 `.9`～`.20`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.21`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 首次启动核心自动迁移 state.db schema4→5，保留既有供应商及 Key；更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
+- 功能阶段 Go 回归及定向测试通过；本轮 Go/TS 契约检查、前端类型与生产编译、两平台打包、六附件大小／digest 校验及默认源真实 Linux 更新下载通过。**Windows PAC、双平台原生窗口、安装和 apply 未验收**；dev 预发行未签名。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.20_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.21_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -39,7 +39,7 @@ sudo apt install ./anchor-desktop_0.1.0-dev.desktop.20_amd64.deb
 
 **手动安装或卸载前，先明确停止核心并等待退出，再退出全部窗口（`.12` 起使用「退出界面」）。** 应用内确认安装会正常停止核心并真正退出当前宿主，其余窗口需要先手动退出。 Windows 安装器／卸载器拒绝替换或删除正在使用的程序，不强杀、不安排重启强删。Linux 由包管理器替换文件，不会自动升级或停止旧运行进程；跳过停服可能留下旧核心。卸载不是停服操作。
 
-**从旧版升级，首次启动核心将 SQLite schema2 自动迁移到3，旧密钥保留为 default Key；`.16` 再从3迁移到4，保留 Key 的协议继承设置。旧二进制无法打开升级后的数据库，本版不提供数据库降级。**
+**从旧版升级，首次启动核心将 SQLite schema2 自动迁移到3，旧密钥保留为 default Key；`.16` 再从3迁移到4，保留 Key 的协议继承设置；`.21` 从4迁移到5，新增独立的平台身份与用户授权，保留供应商和 Key。旧二进制无法打开升级后的数据库，本版不提供数据库降级。**
 
 卸载仅移除程序和快捷入口，保留用户的状态目录、数据库、秘密和恢复材料。安装不新增 Agent 授权；打开应用后仍可能执行此前已批准的托管策略。开机自启动为独立默认关闭的需求，当前没有可用设置开关，本轮不实现。
 
@@ -84,7 +84,31 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.20`
+### 当前在线 dev 版 `.21`
+
+`0.1.0-dev.desktop.21` 于北京时间 2026-10-13 10:15:34 公开为 dev prerelease（非 latest），构建提交 `38da0ecb07a5216a6f7b9479c22444890a0903d0`，独立 worktree 的 SOURCE.json 为 dirty=false。
+
+三平台统一查询模型目录、账户余额、Key额度、逐请求账单、实际扣费、输入／输出和缓存 token、已返回的音频／图像／工具计费，以及当前分组倍率；保留原始 USD/quota 单位和未知字段。平台后台凭证独立持久化，复制供应商不复制用户授权。原版 OneAPI 分组倍率不支持，NewAPI 自动分组倍率未知；详见[平台兼容契约](../design/provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。平台查询为核心接口、客户端与源码 CLI，桌面余额／账单／倍率页面尚未接入；已安装桌面可执行程序不是通用 CLI，公开 alpha.6 CLI 不含这些命令。
+
+本版另带入此前源码中的 Agent 托管页面：本机 discover/enroll/sync、Codex 默认与逐模型模板选择、批准应用及目录同步；真实配置和原生模型选择器本轮未验收。沿用 `.20` 的更新代理与官方订阅回退。首次启动核心将 state.db schema4→5，更旧版本顺序迁移，旧二进制不能打开升级后的数据库，不支持降级。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.21-windows-amd64-setup.exe` | 7,783,576 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.21_amd64.deb` | 5,590,644 |
+
+```text
+63d83dde13dfae209beb2d71bc9723df2b0e2a78b01aa941eec53632e3a15ac8  Anchor-Desktop-0.1.0-dev.desktop.21-windows-amd64-setup.exe
+777579c36efcb1bb71c05033fd40ab3b2101ddc11326efedb7028dead45d551c  anchor-desktop_0.1.0-dev.desktop.21_amd64.deb
+```
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.21/`。六个附件包含两平台安装包、flat 更新清单、构建提交源码与 vendored Go 依赖、许可／构建元数据和 SHA256SUMS；全部远端大小／digest 与本地一致，标签指向实际构建提交。证据为 `publication/DRAFT_VERIFIED.json`、`PUBLISHED.json`、`TAG_VERIFIED.json` 与 `ONLINE_DOWNLOAD.json`。原始 BUILD.json 的未验收和未签名事实保持不变。
+
+发布后用隔离数据目录执行本轮源码 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.20 --json`，默认源发现 `.21` 并真实下载 Linux 包，大小／SHA256 通过；Windows 附件大小与 GitHub digest 核对通过。构建完成 Go→TS 契约比对、TypeScript/Vite、双平台编译、NSIS/deb。功能阶段已通过 Go 全量与补充定向测试，本轮未重复全量、race 或浏览器测试，未执行 apply、原生 GUI／PAC／安装验收，未改真实 Agent 配置或请求付费上游。
+
+首次本地包因工作区已有未跟踪缓存标为 dirty，未发布；第二次尝试因依赖软链接布局主动终止，第三次在容器收集依赖许可时失败。最终将依赖复制进干净 worktree 后成功，前三次产物保留在独立 attempt 目录，均未上传。资源重任务串行受限；构建期间 Swap 约增加100 MiB，MemAvailable 仍约7 GiB、/tmp 42 MiB，无内存压力；任务目录交付后清理。
+
+### 历史在线 dev 版 `.20`
 
 `0.1.0-dev.desktop.20` 于北京时间 2026-10-12 20:12:14 公开为 dev prerelease（非 latest），从独立干净 worktree 的提交 `c7bfd78844e1a94d8b73fa2df1cf6c4eeaf60c4a` 构建。
 
