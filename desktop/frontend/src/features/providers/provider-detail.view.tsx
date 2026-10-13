@@ -3,6 +3,7 @@ import { ProviderAccountView } from './provider-account.view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RotateCcw, Trash2, TextCursorInput } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { Switch } from '../../components/ui/switch';
 import { StatusBadge } from '../../components/shared/status-badge';
 import { ConfirmAction } from '../../components/shared/confirm-action';
 import { MenuItem, Popover } from '../../components/shared/popover-menu';
@@ -141,7 +142,10 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`配置 Key ${k.id} 的模型协议`} onClick={() => { c.setDetailTab('models'); }}>模型协议</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'test', keyId: k.id })}><Play />测试</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`编辑 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'key', keyId: k.id })}>编辑</Button>
-          <Button size="sm" variant="ghost" disabled={disabled} aria-label={`${k.enabled ? '停用' : '启用'} Key ${k.id}`} onClick={() => void f.run('key-put', { target: k.id, enabled: !k.enabled })}>{k.enabled ? '停用' : '启用'}</Button>
+          <label className="key-toggle" data-state={k.enabled ? 'checked' : 'unchecked'}>
+            <Switch className="key-toggle-switch" checked={k.enabled} disabled={disabled} aria-label={`Key ${k.id} 启用状态`} onCheckedChange={enabled => void f.run('key-put', { target: k.id, enabled })} />
+            <span>{k.enabled ? '已启用' : '已停用'}</span>
+          </label>
           {(k.failures > 0 || k.state === 'invalid' || k.state === 'cooling' || k.state === 'half-open') && <Button size="sm" variant="ghost" disabled={disabled} aria-label={`恢复 Key ${k.id}`} onClick={() => ask({ action: 'key-reset', title: `恢复 ${k.id} 的调度？`, body: '清除认证失效、失败计数及冷却；不会改变已保存密钥。', fields: { target: k.id } })}><RotateCcw />恢复</Button>}
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`删除 Key ${k.id}`} onClick={() => ask({ action: 'key-delete', title: `删除 Key ${k.id}？`, body: '删除后无法回显或恢复此密钥。最后一个 Key 被删除后会使用匿名请求。', fields: { target: k.id } })}><Trash2 /></Button>
         </td>

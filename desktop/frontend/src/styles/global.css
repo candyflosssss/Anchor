@@ -209,6 +209,13 @@ input[readonly] { background: hsl(var(--muted)); color: hsl(var(--muted-foregrou
 .clickable-row { cursor: pointer; transition: background-color 120ms; }
 .clickable-row:hover { background: hsl(var(--muted) / .5); }
 .row-actions { display: inline-flex; align-items: center; justify-content: end; gap: 2px; }
+.key-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 8px; border: 1px solid hsl(var(--input)); border-radius: 6px; font-size: 12px; white-space: nowrap; cursor: pointer; }
+.key-toggle[data-state='checked'] { color: hsl(var(--success)); border-color: hsl(var(--success) / .5); background: hsl(var(--success) / .08); }
+.key-toggle[data-state='unchecked'] { color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); }
+.key-toggle:has(button:disabled) { cursor: not-allowed; opacity: .5; }
+.key-toggle .key-toggle-switch[data-state='checked'] { background: hsl(var(--success)); }
+@media (prefers-reduced-motion: reduce) { .key-toggle-switch, .key-toggle-switch > span { transition: none; } }
+
 .row-chevron { color: hsl(var(--muted-foreground)); margin-left: 4px; }
 .provider-name { font-size: 14px; }
 .provider-name:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }

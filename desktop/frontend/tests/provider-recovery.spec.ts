@@ -37,8 +37,16 @@ test('reread resolves an unknown Key reset without a provider revision bump', as
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByLabel('Key 调度策略')).toBeEnabled();
   await expect(page.getByRole('button', { name: '恢复 Key primary', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '停用 Key primary', exact: true }).click();
-  await expect(page.getByRole('button', { name: '启用 Key primary', exact: true })).toBeVisible();
+  const toggle = page.getByRole('switch', { name: 'Key primary 启用状态', exact: true });
+  await expect(toggle).toBeChecked();
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  await expect(toggle.locator('..')).toContainText('已停用');
+  await expect(toggle).toBeEnabled();
+  await toggle.focus();
+  await page.keyboard.press('Space');
+  await expect(toggle).toBeChecked();
+  await expect(toggle.locator('..')).toContainText('已启用');
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
