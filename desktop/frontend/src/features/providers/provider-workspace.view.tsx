@@ -1,5 +1,3 @@
-import { ProviderBalanceCell } from './provider-balance.view';
-import type { ProviderBalance } from './use-provider-balances';
 import { ChevronRight, Copy, KeyRound, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RefreshCw, Search, Server, TextCursorInput, Trash2, Unplug } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Button } from '../../components/ui/button';
@@ -13,7 +11,7 @@ import { formatAgo, type ProviderSummary } from './provider-summary.model';
 import type { ProviderController } from './use-provider-controller';
 
 /** Provider list: health, keys, models and the last test are visible per row; one click opens the full detail page. */
-export function ProviderList({ c, summaries, balances, onEdit, onCreate, children }: { c: ProviderController; summaries: ProviderSummary[]; balances: Record<string, ProviderBalance>; onEdit: (p: Provider) => void; onCreate: () => void; children?: ReactNode }) {
+export function ProviderList({ c, summaries, onEdit, onCreate, children }: { c: ProviderController; summaries: ProviderSummary[]; onEdit: (p: Provider) => void; onCreate: () => void; children?: ReactNode }) {
   const enabled = c.providers.filter(p => p.enabled).length;
   const byId = new Map(summaries.map(s => [s.provider.id, s]));
   const rowClick = (e: MouseEvent, id: string) => { if (!(e.target as HTMLElement).closest('button, input, a, select')) c.openProvider(id); };
@@ -25,12 +23,11 @@ export function ProviderList({ c, summaries, balances, onEdit, onCreate, childre
     </div>
     <section className="provider-surface" aria-label="供应商列表">
       <div className="table-scroll"><Table><TableCaption className="sr-only">{c.mock ? '模拟供应商列表；健康状态来自本地 Key 与测试记录' : '供应商列表；不回传密钥，健康状态来自本地 Key 与测试记录'}</TableCaption><TableHeader><TableRow>
-        <TableHead scope="col">供应商 / 请求地址</TableHead><TableHead scope="col">健康</TableHead><TableHead scope="col">余额 / 额度</TableHead><TableHead scope="col">Key</TableHead><TableHead scope="col">模型</TableHead><TableHead scope="col" className="col-wide">最近测试</TableHead><TableHead scope="col" className="text-right">操作</TableHead>
+        <TableHead scope="col">供应商 / 请求地址</TableHead><TableHead scope="col">健康</TableHead><TableHead scope="col">Key</TableHead><TableHead scope="col">模型</TableHead><TableHead scope="col" className="col-wide">最近测试</TableHead><TableHead scope="col" className="text-right">操作</TableHead>
       </TableRow></TableHeader><TableBody>
         {c.phase === 'ready' && c.visible.map(p => { const s = byId.get(p.id); const loaded = !!s?.workspace; return <TableRow key={p.id} className="clickable-row" onClick={e => rowClick(e, p.id)}>
           <TableCell><div className="provider-cell"><span className="provider-avatar" aria-hidden="true">{Array.from(p.id)[0]}</span><div><button className="provider-name" disabled={c.blocked} onClick={() => c.openProvider(p.id)}>{p.id}</button><span className="provider-url mono" title={p.base_urls.join('\n')}>{p.base_urls[0]}{p.base_urls.length > 1 ? ` +${p.base_urls.length - 1}` : ''}</span></div></div></TableCell>
           <TableCell>{!p.enabled ? <StatusBadge enabled={false} /> : s ? <HealthPill tone={s.tone} label={s.label} /> : '—'}</TableCell>
-          <TableCell><ProviderBalanceCell value={balances[p.id]} /></TableCell>
           <TableCell><span className="secret-status"><KeyRound size={14} />{!loaded ? (p.has_secret ? '已配置' : '—') : s!.keyCount ? `${s!.enabledKeys} / ${s!.keyCount}` : '匿名'}</span></TableCell>
           <TableCell className="text-sm">{loaded ? s!.modelCount || <span className="cell-hint">未映射</span> : '—'}</TableCell>
           <TableCell className="col-wide">{s?.lastTest ? <span className={s.lastTest.failure ? 'cell-hint text-destructive' : 'cell-hint'}>{s.lastTest.failure ? '失败 · ' : ''}{formatAgo(s.lastTest.at)}</span> : <span className="cell-hint">{loaded ? '未测试' : '—'}</span>}</TableCell>

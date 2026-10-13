@@ -14,7 +14,7 @@ export function ProviderAccountView({ c }: { c: ProviderController }) {
   </div>;
 }
 function AccountContent({ c, settings: s }: { c: ProviderController; settings: AccountSettings }) {
-  const [platform, setPlatform] = useState(s.platform || 'auto');
+  const [platform, setPlatform] = useState(s.platform);
   const [siteURL, setSiteURL] = useState(s.site_url);
   const [userID, setUserID] = useState(s.user_id ? String(s.user_id) : '');
   const [tokenMode, setTokenMode] = useState<'keep' | 'replace' | 'clear'>('keep');
@@ -24,10 +24,10 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
   const [keyID, setKeyID] = useState('');
   const [remoteID, setRemoteID] = useState('');
   const a = c.account;
-  const dirty = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || (userID.trim() || '0') !== String(s.user_id) || tokenMode !== 'keep';
+  const dirty = platform !== s.platform || siteURL.trim().replace(/\/+$/, '') !== s.site_url || (userID.trim() || '0') !== String(s.user_id) || tokenMode !== 'keep';
   const disabled = c.blocked || a.needsRead;
-  const queryDisabled = disabled || dirty;
-  const authTargetChanged = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || Number(userID || '0') !== s.user_id;
+  const queryDisabled = disabled || dirty || !s.platform;
+  const authTargetChanged = platform !== s.platform || siteURL.trim().replace(/\/+$/, '') !== s.site_url || Number(userID || '0') !== s.user_id;
   const keys = c.features.data?.keys ?? [];
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -59,7 +59,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
       <h2>平台账户配置</h2>
       <form className="account-form" onSubmit={e => void save(e)} autoComplete="off">
         <fieldset disabled={disabled} className="account-fields">
-          <div className="field"><label htmlFor="account-platform">平台类型</label><select id="account-platform" className="select-field" value={platform} onChange={e => setPlatform(e.target.value)}>{Object.entries(platformLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></div>
+          <div className="field"><label htmlFor="account-platform">平台类型</label><select id="account-platform" className="select-field" value={platform} onChange={e => setPlatform(e.target.value)}><option value="">未配置</option>{Object.entries(platformLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></div>
           {platform === 'newapi' && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="该站后台的用户 ID" /><p className="card-hint">查询账户余额需要用户 access token 和正确的用户 ID。</p></div>}
           <details className="pricing-details"><summary>账户接口地址（可选）</summary><div className="field"><label htmlFor="account-site-url">站点根地址</label><input id="account-site-url" value={siteURL} onChange={e => setSiteURL(e.target.value)} placeholder="留空，沿用请求地址并移除末尾 /v1" /><p className="card-hint">后台与推理 API 地址不同时填写。包含站点实际使用的部署路径前缀。</p></div></details>
           <div className="field"><label htmlFor="account-token-mode">用户令牌 · {s.has_user_token ? '已保存' : '未配置'}</label><select id="account-token-mode" className="select-field" value={tokenMode} onChange={e => { setTokenMode(e.target.value as typeof tokenMode); setToken(''); setConfirmClear(false); }}><option value="keep">保留现有授权</option><option value="replace">输入／替换用户令牌</option><option value="clear">清除用户令牌</option></select>
@@ -74,8 +74,8 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
       {formError && <p className="feedback error-feedback" role="alert">{formError}</p>}
     </section>
     <section className="detail-card">
-      <div className="card-toolbar"><h2>查询使用的 Key</h2><select className="select-field" aria-label="余额查询 Key" disabled={disabled} value={keyID} onChange={e => { setKeyID(e.target.value); setRemoteID(''); a.clearObservations(); }}><option value="">默认 Key（优先 default）</option>{keys.map(k => <option key={k.id} value={k.id}>{k.id}{k.enabled ? '' : '（已停用）'}</option>)}</select></div>
-      {(s.platform === 'oneapi' || a.balance?.platform === 'oneapi' || a.quota?.platform === 'oneapi') && <div className="field account-remote"><label htmlFor="account-remote-id">OneAPI 后台令牌 ID（查询 Key 额度时必填）</label><input id="account-remote-id" inputMode="numeric" value={remoteID} disabled={disabled} onChange={e => { setRemoteID(e.target.value); a.clearObservations(); }} placeholder="例如 123；请在 OneAPI 后台核对" /></div>}
+      <div className="card-toolbar"><h2>查询使用的 Key</h2><select className="select-field" aria-label="余额查询 Key" disabled={disabled} value={keyID} onChange={e => { setKeyID(e.target.value); setRemoteID(''); a.clearObservations(); }}><option value="">自动选择已启用 Key</option>{keys.map(k => <option key={k.id} value={k.id}>{k.id}{k.enabled ? '' : '（已停用）'}</option>)}</select></div>
+      {s.platform === 'oneapi' && <div className="field account-remote"><label htmlFor="account-remote-id">OneAPI 后台令牌 ID（查询 Key 额度时必填）</label><input id="account-remote-id" inputMode="numeric" value={remoteID} disabled={disabled} onChange={e => { setRemoteID(e.target.value); a.clearObservations(); }} placeholder="例如 123；请在 OneAPI 后台核对" /></div>}
     </section>
     <div className="overview-grid">
       <Observation title="账户余额" value={a.balance} disabled={queryDisabled} onRefresh={() => query('balance')} />
