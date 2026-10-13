@@ -1,13 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/agents.json';
 import { CONTRACT, type AgentWorkspace, type DesktopBridge } from '../../desktop/contract.generated';
-import { checkedAgentWorkspace, createAgentService, matchingTemplate } from './agent.model';
+import { checkedAgentWorkspace, createAgentService, matchingTemplate, targetStatus } from './agent.model';
 
 function api(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   const result = { contract: CONTRACT, data: fixture.workspace, problem: null };
   return { AgentWorkspace: async () => result, EnrollAgent: async () => result, ManageAgent: async () => result, ...overrides } as DesktopBridge;
 }
 describe('Agent contract and controlled transport', () => {
+  it('distinguishes absent caches from incompatible caches without a restart loop', () => {
+    const categories = ['catalog_missing', 'catalog_unreadable', 'catalog_unsafe', 'catalog_invalid', 'catalog_version_invalid', 'catalog_empty', 'catalog_too_large', 'catalog_metadata_invalid', 'catalog_duplicate'];
+    expect(new Set(categories.map(code => targetStatus[code])).size).toBe(categories.length);
+    expect(categories.every(code => !!targetStatus[code])).toBe(true);
+    expect(targetStatus.catalog_metadata_invalid).toContain('重复重启不能解决');
+    expect(targetStatus.catalog_missing).toContain('CODEX_HOME');
+  });
   it('uses the shared DTO and removes unknown data', () => {
     expect(fixture.contract).toBe(CONTRACT);
     expect(checkedAgentWorkspace({ ...fixture.workspace, token: 'private' } as AgentWorkspace)).toEqual(fixture.workspace);

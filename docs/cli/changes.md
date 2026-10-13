@@ -199,3 +199,12 @@
 - 旧 → 新：测试复用转换用的文本解析，Responses 文本项带 `logprobs`（即使空数组）或非空 `annotations` 时会将 HTTP 200 / 有效 JSON 判为 `invalid_response`；现在测试接受这些文本元数据，仍检查文本类型和元数据容器。跨协议转换规则保持不变。失败详情/导出新增 `evidence.validation_reason` 固定码，区分缺少 ID、无效 JSON、上游错误、内容/输出不支持、工具调用不完整、choices 不符合要求或拒绝回复；不保存原始错误文本或上游未知字段名。
 - 兼容与迁移：兼容新增 evidence 项，历史记录不补写；需要升级运行中的核心才能使用，当前安装包尚未包含此修复。成功仍只证明本次最小请求可执行。
 - 验证：基于 `bc9e2bb` 加本任务改动的隔离检出，经 resource-guard 运行 `GOMAXPROCS=2 go test -p 1 -timeout 120s ./internal/protocol ./internal/core ./internal/client ./internal/cli` 全部通过；覆盖文本元数据、16 token 推理项、固定失败原因、用量/Key 状态与日志隐私。共享工作区存在其他任务进行中的供应商接口改动，首次核心编译失败，因此隔离验证；未请求真实付费上游、未生成安装包。
+
+
+## 2026-10-13 — Codex 缓存可选字段兼容与发现诊断（当前源码，未发布）
+
+- 类型：兼容性修复 / 扩展状态值；命令、参数和退出码不变。
+- 指令与参数：`agent discover`、`agent enroll`，以及 `model add/put --codex-catalog FILE --codex-model SOURCE --codex-version X.Y.Z` 共用元数据校验。
+- 旧 → 新：旧校验要求已不在当前 Codex ModelInfo 中序列化的 supports_parallel_tool_calls，且拒绝可选 context_window 缺省/null，导致有效缓存不能登记。现在允许这些合法缺省，原样保留，不猜测能力；非法类型/数值、无指令模板及其他不完整必需字段仍拒绝。发现不再把所有缓存问题归为 catalog_unavailable，新增 missing/unreadable/unsafe/invalid/version_invalid/empty/too_large/metadata_invalid/duplicate 分类，前端不再统一要求重复启动。
+- 兼容与迁移：target.status 仍为 string，新增状态值，旧 UI 可显示原状态；客户端和核心一起升级可获得中文诊断。旧元数据无需迁移。确认新版安装后重新识别；已存在有效缓存时无需重复重开来修正校验。未取得用户 Windows 缓存，未宣称该机问题已实测消失。
+- 验证：执行结果见本轮任务记录。隔离回归先复现合法条目被拒绝，再验证修复；未改用户 Agent 配置或请求付费上游；本轮未生成安装包。

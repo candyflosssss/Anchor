@@ -42,7 +42,7 @@ func TestImportCodexMetadata(t *testing.T) {
 			t.Fatal("invalid catalog accepted")
 		}
 	}
-	for _, key := range []string{"slug", "priority", "shell_type", "supported_in_api", "supported_reasoning_levels", "truncation_policy", "context_window", "base_instructions"} {
+	for _, key := range []string{"slug", "priority", "shell_type", "supported_in_api", "supported_reasoning_levels", "truncation_policy", "base_instructions"} {
 		t.Run(key, func(t *testing.T) {
 			clone := map[string]json.RawMessage{}
 			for k, v := range doc {
@@ -70,6 +70,50 @@ func TestRejectMalformedCatalogMetadata(t *testing.T) {
 		encoded, _ := json.Marshal(doc)
 		if (CodexMetadata{Version: m.Version, Entry: encoded}).Validate() == nil {
 			t.Fatal(key, "accepted malformed metadata")
+		}
+	}
+}
+
+// Modern ModelInfo omits the legacy parallel-tool flag and permits an unknown
+// context window. Preserve those omissions rather than inventing capabilities.
+func TestCodexMetadataOptionalFields(t *testing.T) {
+	original := fixtureMetadata(t, "0.159.3")
+	for _, context := range []string{"", "null", "32000"} {
+		t.Run("context="+context, func(t *testing.T) {
+			var entry map[string]json.RawMessage
+			json.Unmarshal(original.Entry, &entry)
+			delete(entry, "supports_parallel_tool_calls")
+			delete(entry, "context_window")
+			if context != "" {
+				entry["context_window"] = json.RawMessage(context)
+			}
+			raw, _ := json.Marshal(entry)
+			catalog, _ := json.Marshal(map[string]any{"models": []json.RawMessage{raw}})
+			imported, err := ImportCodexMetadata(catalog, "fixture-source", original.Version)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(imported.Entry) != string(raw) {
+				t.Fatal("metadata was rewritten")
+			}
+		})
+	}
+}
+
+func TestCodexMetadataRejectsMalformedOptionalFields(t *testing.T) {
+	original := fixtureMetadata(t, "0.159.3")
+	for field, values := range map[string][]string{
+		"supports_parallel_tool_calls": {"null", `"true"`, "1"},
+		"context_window":               {"0", "-1", `"32000"`, "1.5"},
+	} {
+		for _, value := range values {
+			var entry map[string]json.RawMessage
+			json.Unmarshal(original.Entry, &entry)
+			entry[field] = json.RawMessage(value)
+			raw, _ := json.Marshal(entry)
+			if (CodexMetadata{Version: original.Version, Entry: raw}).Validate() == nil {
+				t.Fatalf("accepted %s=%s", field, value)
+			}
 		}
 	}
 }

@@ -18,7 +18,13 @@ func discoveryFixture(t *testing.T) Environment {
 	if err := os.Mkdir(root, 0700); err != nil {
 		t.Fatal(err)
 	}
-	cache, err := json.Marshal(map[string]any{"client_version": "0.159.3", "models": []json.RawMessage{metadata(t).Entry}})
+	// Match current Codex serialization, which omits the legacy parallel flag.
+	var entry map[string]json.RawMessage
+	if err := json.Unmarshal(metadata(t).Entry, &entry); err != nil {
+		t.Fatal(err)
+	}
+	delete(entry, "supports_parallel_tool_calls")
+	cache, err := json.Marshal(map[string]any{"client_version": "0.159.3", "models": []any{entry}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,17 +55,21 @@ func TestDiscoveryBoundedAndReadOnly(t *testing.T) {
 	if !bytes.Equal(now, original) {
 		t.Fatal("discovery wrote config")
 	}
-	for _, raw := range []string{`{}`, `{"client_version":"invalid","models":[]}`, `{"client_version":"0.159.3","models":[{"slug":"partial"}]}`} {
-		os.WriteFile(filepath.Join(root, "models_cache.json"), []byte(raw), 0600)
+	for _, tc := range []struct{ raw, status string }{
+		{`{}`, "catalog_version_invalid"},
+		{`{"client_version":"invalid","models":[]}`, "catalog_version_invalid"},
+		{`{"client_version":"0.159.3","models":[{"slug":"partial"}]}`, "catalog_metadata_invalid"},
+	} {
+		os.WriteFile(filepath.Join(root, "models_cache.json"), []byte(tc.raw), 0600)
 		targets, err = Discover(env)
-		if err != nil || targets[0].Status != "catalog_unavailable" {
+		if err != nil || targets[0].Status != tc.status {
 			t.Fatal(targets, err)
 		}
 	}
 	os.Remove(filepath.Join(root, "models_cache.json"))
 	if err := os.Symlink(filepath.Join(root, "config.toml"), filepath.Join(root, "models_cache.json")); err == nil {
 		targets, err = Discover(env)
-		if err != nil || targets[0].Status != "catalog_unavailable" {
+		if err != nil || targets[0].Status != "catalog_unsafe" {
 			t.Fatal(targets, err)
 		}
 	}

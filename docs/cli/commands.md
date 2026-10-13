@@ -396,9 +396,11 @@ anchor agent sync ID --revision N
 
 作用域为所选 Context 的核心所在机器，需要本轮新版核心在线；当前 Context 仅本机。`discover` 无参数，只读返回 `{targets, bindings, models}`：目标包含路径、来源、适配状态、缓存版本与模板摘要；托管行包含 revision、默认模型、当前兼容模型及状态，不返回令牌或完整模型指令。只查 `CODEX_HOME`、`~/.codex`、`~/.claude`、`~/.gemini`、`~/.config/opencode`，Windows 另查用户 `AppData/Roaming/opencode`；同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录存在仅表示配置痕迹，不能证明程序已安装或正在运行。其他产品暂时只识别、无适配器。
 
+缓存失败现在通过 target.status 区分：`catalog_missing`（该目录无缓存）、`catalog_unreadable`（无法读取）、`catalog_unsafe`（路径或类型不安全）、`catalog_invalid`（JSON 格式无效）、`catalog_version_invalid`（缺少有效 X.Y.Z）、`catalog_empty`（无模型）、`catalog_too_large`（字节/条目超限）、`catalog_metadata_invalid`（条目不完整/不兼容）、`catalog_duplicate`（重复 slug）。旧核心可能仍返回 `catalog_unavailable`。文件缺失时核对 Codex 实际使用的 CODEX_HOME；格式或元数据校验失败不能仅靠重复重启处理。状态不返回任意 OS/解析器错误或模型指令。
+
 `enroll` 的 target/model/approve 必填。target 取 discover 返回的 ID；默认模型必须声明 tools/streaming、至少有一个启用的供应商候选，且有版本匹配的完整模板。revision 默认0，仅新目标使用；已登记目标必须传当前值，包括先前由 add 自定义 ID 登记的同一目录。重复 `--template` 指定公开别名到本地源 slug 的选择，同一别名重复拒绝；空源如 `--template other:` 显式排除此模型。未指定选择时，优先有效的共享元数据，然后精确别名或唯一上游 slug 匹配；多个源命中不猜测，需明确指定。
 
-核心重新识别目标并读取其 `models_cache.json`（最多4 MiB、128个完整条目），缓存必须含有效的 `client_version=X.Y.Z`。没有完整缓存时请先正常启动 Codex，再识别。缓存报告的版本不是可执行程序版本探测；批准前仍需核对版本和上游能力，不凭名称伪造元数据。模板快照和显式选择保存在 Binding 中，不修改供应商映射。新建凭据；更新保留原凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需重新 discover 检查，不能盲目重复提交。成功返回更新后的 workspace。
+核心重新识别目标并读取其 `models_cache.json`（最多4 MiB、128个完整条目），缓存必须含有效的 `client_version=X.Y.Z`。缓存文件缺失时先核对目录与 Codex 是否生成缓存；文件已存在但校验失败时按发现状态处理，不统一要求重复启动。Codex 可选的旧版 `supports_parallel_tool_calls` 字段允许缺省，`context_window` 允许缺省或 null；导入原样保留，不补造并行能力或上下文值，存在的字段仍校验类型。缓存报告的版本不是可执行程序版本探测；批准前仍需核对版本和上游能力，不凭名称伪造元数据。模板快照和显式选择保存在 Binding 中，不修改供应商映射。新建凭据；更新保留原凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需重新 discover 检查，不能盲目重复提交。成功返回更新后的 workspace。
 
 `sync` 必填 Binding ID 和当前 revision（≥1），仅 enabled 且网关就绪可操作；不增加 revision，也不旋转凭据。先校验新目录和配置支持范围，再条件恢复、重建当前模型快照；第三方冲突保留并报告，失败不重放。返回 `{binding_id, operation_id, status}`。模型/供应商变更立即影响网关授权，但运行中目录需显式 sync；核心重启会在核对既有日志后更新过期目录，外部覆盖和不支持配置保留并报告。模板或本地缓存升级需重新 enroll。配置更新后请完全退出并重启 Codex，包括其 app-server；配置成功不证明实际请求已经过 Anchor。
 

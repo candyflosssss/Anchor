@@ -38,7 +38,16 @@ export const agentService = createAgentService();
 
 export const targetStatus: Record<string, string> = {
   ready: '可托管', unsupported: '尚无适配器', unsafe: '目录权限或类型不支持', config_unsupported: '配置含暂不支持的覆盖或传输设置',
-  catalog_unavailable: '缺少完整模型缓存：请先启动一次 Codex，再重新识别',
+  catalog_unavailable: '无法读取模型缓存。请核对该目录的 models_cache.json，重新启动不一定能解决',
+  catalog_missing: '该目录没有 models_cache.json。请核对 Codex 使用的 CODEX_HOME；只有生成缓存后才能设置托管',
+  catalog_unreadable: 'models_cache.json 无法读取或不是普通文件，请检查文件类型与访问权限',
+  catalog_unsafe: '模型缓存路径不安全或包含链接，不能用于托管',
+  catalog_invalid: 'models_cache.json 不是有效的模型缓存 JSON，重新启动不能修复格式不兼容',
+  catalog_version_invalid: '模型缓存缺少有效的 client_version（X.Y.Z），不能确认模板版本',
+  catalog_empty: '模型缓存中没有模型条目，暂时不能设置托管',
+  catalog_too_large: '模型缓存超过 4 MiB 或 128 个模型的限制',
+  catalog_metadata_invalid: '缓存中的模型元数据不完整或格式不兼容；请核对缓存，重复重启不能解决校验失败',
+  catalog_duplicate: '模型缓存有重复的模型标识，无法确定应使用的模板',
 };
 export const managementStatus: Record<string, string> = {
   applied: '配置已应用', pending: '等待应用', unmanaged: '尚未接管', restored: '配置已恢复', needs_sync: '目录或配置已变化，需核对同步',

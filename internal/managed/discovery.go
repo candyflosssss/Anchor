@@ -106,7 +106,7 @@ func Discover(env Environment) ([]AgentTarget, error) {
 		}
 		version, catalog, err := localCatalog(root)
 		if err != nil {
-			t.Status = "catalog_unavailable"
+			t.Status = catalogStatus(err)
 		} else {
 			t.Status = "ready"
 			t.CatalogVersion = version
@@ -126,26 +126,59 @@ func Discover(env Environment) ([]AgentTarget, error) {
 	return out, nil
 }
 
+// Catalog failures are stable categories, never parser/OS messages that could
+// contain private paths or instructions. Older clients can still show status.
+type catalogFailure string
+
+func (e catalogFailure) Error() string { return string(e) }
+
+func catalogStatus(err error) string {
+	var failure catalogFailure
+	if errors.As(err, &failure) {
+		return string(failure)
+	}
+	return "catalog_unavailable"
+}
+
 func localCatalog(root string) (string, map[string]state.CodexMetadata, error) {
 	path := filepath.Join(root, "models_cache.json")
 	if err := platform.CheckManagedPath(root, path); err != nil {
-		return "", nil, err
+		return "", nil, catalogFailure("catalog_unsafe")
 	}
 	f, err := os.Open(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil, catalogFailure("catalog_missing")
+	}
 	if err != nil {
-		return "", nil, err
+		return "", nil, catalogFailure("catalog_unreadable")
 	}
 	defer f.Close()
+	st, err := f.Stat()
+	if err != nil || !st.Mode().IsRegular() {
+		return "", nil, catalogFailure("catalog_unreadable")
+	}
 	raw, err := io.ReadAll(io.LimitReader(f, (4<<20)+1))
-	if err != nil || len(raw) > 4<<20 {
-		return "", nil, ErrUnsafe
+	if err != nil {
+		return "", nil, catalogFailure("catalog_unreadable")
+	}
+	if len(raw) > 4<<20 {
+		return "", nil, catalogFailure("catalog_too_large")
 	}
 	var cache struct {
 		ClientVersion string            `json:"client_version"`
 		Models        []json.RawMessage `json:"models"`
 	}
-	if json.Unmarshal(raw, &cache) != nil || !state.ValidCodexVersion(cache.ClientVersion) || len(cache.Models) == 0 || len(cache.Models) > 128 {
-		return "", nil, state.ErrInvalid
+	if json.Unmarshal(raw, &cache) != nil {
+		return "", nil, catalogFailure("catalog_invalid")
+	}
+	if !state.ValidCodexVersion(cache.ClientVersion) {
+		return "", nil, catalogFailure("catalog_version_invalid")
+	}
+	if len(cache.Models) == 0 {
+		return "", nil, catalogFailure("catalog_empty")
+	}
+	if len(cache.Models) > 128 {
+		return "", nil, catalogFailure("catalog_too_large")
 	}
 	catalog := map[string]state.CodexMetadata{}
 	for _, entry := range cache.Models {
@@ -154,10 +187,10 @@ func localCatalog(root string) (string, map[string]state.CodexMetadata, error) {
 			Slug string `json:"slug"`
 		}
 		if json.Unmarshal(entry, &v) != nil || meta.Validate() != nil {
-			return "", nil, state.ErrInvalid
+			return "", nil, catalogFailure("catalog_metadata_invalid")
 		}
 		if _, duplicate := catalog[v.Slug]; duplicate {
-			return "", nil, state.ErrInvalid
+			return "", nil, catalogFailure("catalog_duplicate")
 		}
 		catalog[v.Slug] = meta
 	}

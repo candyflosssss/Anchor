@@ -44,9 +44,17 @@ func (c CodexMetadata) Validate() error {
 	if visibility != "list" && visibility != "hide" && visibility != "none" {
 		return bad
 	}
-	for _, k := range []string{"supported_in_api", "support_verbosity", "supports_parallel_tool_calls"} {
+	for _, k := range []string{"supported_in_api", "support_verbosity"} {
 		var v bool
 		if len(m[k]) == 0 || string(m[k]) == "null" || json.Unmarshal(m[k], &v) != nil {
+			return bad
+		}
+	}
+	// Current Codex ModelInfo no longer serializes this legacy field. Accept
+	// omission without assigning a capability; validate older entries if present.
+	if raw, ok := m["supports_parallel_tool_calls"]; ok {
+		var v *bool
+		if json.Unmarshal(raw, &v) != nil || v == nil {
 			return bad
 		}
 	}
@@ -82,9 +90,13 @@ func (c CodexMetadata) Validate() error {
 	if json.Unmarshal(m["truncation_policy"], &trunc) != nil || (trunc.Mode != "tokens" && trunc.Mode != "bytes") || trunc.Limit <= 0 {
 		return bad
 	}
-	var context int64
-	if json.Unmarshal(m["context_window"], &context) != nil || context <= 0 {
-		return bad
+	// Codex represents an unknown context window by omission or null. Preserve
+	// it exactly; Anchor does not infer or fill a context size from the alias.
+	if raw, ok := m["context_window"]; ok {
+		var context *int64
+		if json.Unmarshal(raw, &context) != nil || (context != nil && *context <= 0) {
+			return bad
+		}
 	}
 	// Complete instruction templates must be supplied by the operator, not
 	// fabricated by Anchor. Either representation is accepted by Codex.
