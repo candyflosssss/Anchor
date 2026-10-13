@@ -100,18 +100,19 @@ func TestSharedProviderModelsContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fixture struct {
-		Contract    string                 `json:"contract"`
-		Input       DiscoverProviderModels `json:"input"`
-		Success     ProviderModels         `json:"success"`
-		Empty       ProviderModels         `json:"empty"`
-		Unsupported ProviderModels         `json:"unsupported"`
-		Aggregate   ProviderModels         `json:"aggregate"`
-		Partial     ProviderModels         `json:"partial"`
+		Contract      string                 `json:"contract"`
+		Input         DiscoverProviderModels `json:"input"`
+		Success       ProviderModels         `json:"success"`
+		Empty         ProviderModels         `json:"empty"`
+		Unsupported   ProviderModels         `json:"unsupported"`
+		Aggregate     ProviderModels         `json:"aggregate"`
+		Partial       ProviderModels         `json:"partial"`
+		NoEnabledKeys ProviderModels         `json:"no_enabled_keys"`
 	}
 	if json.Unmarshal(raw, &fixture) != nil || fixture.Contract != Contract {
 		t.Fatal("catalog fixture drift")
 	}
-	for _, result := range []ProviderModels{fixture.Success, fixture.Empty, fixture.Unsupported, fixture.Aggregate, fixture.Partial} {
+	for _, result := range []ProviderModels{fixture.Success, fixture.Empty, fixture.Unsupported, fixture.Aggregate, fixture.Partial, fixture.NoEnabledKeys} {
 		if result.ProviderID != fixture.Input.ProviderID || result.Revision != fixture.Input.ExpectedRevision || result.Models == nil || result.Entries == nil || result.Keys == nil {
 			t.Fatal("catalog identity drift")
 		}
@@ -121,6 +122,9 @@ func TestSharedProviderModelsContract(t *testing.T) {
 		if len(fields) != 10 {
 			t.Fatal("unexpected catalog public fields")
 		}
+	}
+	if fixture.NoEnabledKeys.Failure != "no_enabled_keys" || len(fixture.NoEnabledKeys.Keys) != 0 || fixture.NoEnabledKeys.HTTPStatus != 0 || !fixture.Aggregate.Keys[1].Enabled {
+		t.Fatal("enabled key catalog contract drift")
 	}
 	if fixture.Aggregate.KeyID != "" || len(fixture.Aggregate.Entries) != 2 || len(fixture.Aggregate.Entries[0].KeyIDs) != 2 || len(fixture.Aggregate.Keys) != 2 || fixture.Aggregate.Keys[1].Multiplier == nil || *fixture.Aggregate.Keys[1].Multiplier != "1.5" || !fixture.Partial.Partial || fixture.Partial.Failure != "" || fixture.Partial.Keys[1].Failure != "authentication" {
 		t.Fatal("catalog merge/key rate semantics drift")

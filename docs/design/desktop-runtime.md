@@ -61,7 +61,7 @@ ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置�
 
 ## 上游模型目录增量边界（desktop.10）
 
-新增 `Bridge.DiscoverProviderModels`，输入仅已存 provider ID / revision / 可选 key_id（默认遍历所有 Key），返回独立只读目录 DTO：models 合并模型，entries 关联 Key，keys 包含目录状态与抓取的分组倍率，partial 标明部分失败，不扩展通用网络／文件能力。调用复用管理连接、实例身份和核心目录规则；POST 网络错误按只读处理，不标记写入结果未知。单次上游请求总超时最多8秒，宿主包含握手仍最多15秒，Wails 前端取消仅丢弃过期结果。细节、共享样例与无推理保证见[供应商接口 §4](provider-interface.md)。
+新增 `Bridge.DiscoverProviderModels`，输入仅已存 provider ID / revision / 可选 key_id（默认遍历所有启用 Key），返回独立只读目录 DTO：models 合并模型，entries 关联 Key，keys 包含目录状态与抓取的分组倍率，partial 标明部分失败，不扩展通用网络／文件能力。调用复用管理连接、实例身份和核心目录规则；POST 网络错误按只读处理，不标记写入结果未知。单次上游请求总超时最多8秒，宿主包含握手仍最多15秒，Wails 前端取消仅丢弃过期结果。细节、共享样例与无推理保证见[供应商接口 §4](provider-interface.md)。
 
 
 ## 第一优先工作台增量（desktop.11）

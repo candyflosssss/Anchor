@@ -329,8 +329,23 @@ func TestProviderModelsCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	raw, err = run("provider", "models", "--id", saved.ID, "--revision", "3")
-	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "" || result.Failure != "" || len(result.Models) != 1 || len(result.Entries) != 1 || len(result.Entries[0].KeyIDs) != 2 || len(result.Keys) != 2 || result.Keys[0].Enabled || calls.Load() != 8 {
-		t.Fatal("CLI did not merge all keys", raw, err)
+	if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.KeyID != "" || result.Failure != "" || len(result.Models) != 1 || len(result.Entries) != 1 || len(result.Entries[0].KeyIDs) != 1 || result.Entries[0].KeyIDs[0] != "selected" || len(result.Keys) != 1 || !result.Keys[0].Enabled || calls.Load() != 6 {
+		t.Fatal("CLI did not skip disabled keys", raw, err)
+	}
+	for _, keyArg := range [][]string{{"--key", "second"}, {}} {
+		if len(keyArg) == 0 {
+			if err = st.MutateProvider(saved.ID, 3, "key-put", "selected", "", "", false, false); err != nil {
+				t.Fatal(err)
+			}
+		}
+		revision := "3"
+		if len(keyArg) == 0 {
+			revision = "4"
+		}
+		raw, err = run(append([]string{"provider", "models", "--id", saved.ID, "--revision", revision}, keyArg...)...)
+		if err != nil || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "no_enabled_keys" || len(result.Models) != 0 || len(result.Keys) != 0 || calls.Load() != 6 {
+			t.Fatal("CLI queried disabled keys or fell back to anonymous", raw, err)
+		}
 	}
 
 }

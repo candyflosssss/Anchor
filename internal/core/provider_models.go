@@ -35,26 +35,23 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		apiError(w, state.ErrConflict)
 		return
 	}
-	keys, err := s.Store.ProviderKeys(p.ID)
+	allKeys, err := s.Store.ProviderKeys(p.ID)
 	if err != nil {
 		apiError(w, err)
 		return
 	}
-	credentials := keys
-	if in.KeyID != "" {
-		selected := []state.ProviderKey{}
-		for _, k := range keys {
-			if k.ID == in.KeyID {
-				selected = append(selected, k)
-			}
-		}
-		if len(selected) == 0 && !(len(keys) == 0 && in.KeyID == "anonymous") {
-			apiError(w, state.ErrNotFound)
-			return
-		}
-		keys = selected
+	keys := make([]state.ProviderKey, 0, len(allKeys))
+	if in.KeyID != "" && !(len(allKeys) == 0 && in.KeyID == "anonymous") &&
+		!slices.ContainsFunc(allKeys, func(k state.ProviderKey) bool { return k.ID == in.KeyID }) {
+		apiError(w, state.ErrNotFound)
+		return
 	}
-	if len(keys) == 0 {
+	for _, k := range allKeys {
+		if k.Enabled && (in.KeyID == "" || k.ID == in.KeyID) {
+			keys = append(keys, k)
+		}
+	}
+	if len(keys) == 0 && len(allKeys) == 0 {
 		keys = []state.ProviderKey{{ID: "anonymous", Enabled: true, Protocol: p.Protocol}}
 	}
 	cfg, err := s.Store.ProviderPlatform(p.ID)
@@ -77,8 +74,11 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 	}
 	start := time.Now()
 	defer func() { out.ElapsedMS = time.Since(start).Milliseconds(); writeJSON(w, 200, out) }()
-	// Explicit management reads may inspect disabled providers, but never bypass
-	// the gateway's global/provider concurrency limits or mutate their config.
+	if len(keys) == 0 {
+		out.Failure = "no_enabled_keys"
+		return
+	}
+	// Directory reads only use enabled Keys and never mutate provider configuration.
 	select {
 	case s.slots <- struct{}{}:
 		defer func() { <-s.slots }()
@@ -107,7 +107,7 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		ids, status, failure := s.readProviderCatalogBudget(ctx, provider, budget)
 		// Reject echoes of any saved credential, including another Key's secret.
 		for _, id := range ids {
-			for _, k := range credentials {
+			for _, k := range allKeys {
 				if k.Secret != "" && strings.Contains(id, k.Secret) {
 					failure = "invalid_response"
 				}
@@ -164,7 +164,7 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 			if v.Multiplier != nil && len(v.Multiplier.String()) > 128 {
 				valid = false
 			}
-			for _, credential := range credentials {
+			for _, credential := range allKeys {
 				if credential.Secret != "" && (strings.Contains(v.Group, credential.Secret) || strings.Contains(v.GroupName, credential.Secret)) {
 					valid = false
 				}

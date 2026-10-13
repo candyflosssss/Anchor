@@ -101,8 +101,13 @@ export class MockProviderTransport implements ProviderTransport {
     const current = this.rows.find(p => p.id === input.provider_id);
     if (current?.revision !== input.expected_revision) throw fixtureError('conflict');
     const w = this.detail(current);
-    const keys = input.key_id ? w.keys.filter(k => k.id === input.key_id) : w.keys;
-    if (input.key_id && !keys.length) throw new ProviderProblem('invalid');
+    const savedKeys = w.keys;
+    const selected = input.key_id ? savedKeys.filter(k => k.id === input.key_id) : savedKeys;
+    if (input.key_id && !selected.length && !(input.key_id === 'anonymous' && !savedKeys.length)) throw new ProviderProblem('invalid');
+    const keys = selected.filter(k => k.enabled);
+    if (!keys.length && savedKeys.length) {
+      return { ...catalogFixture.success, key_id: input.key_id, provider_id: current.id, revision: current.revision, http_status: 0, models: [], entries: [], keys: [], failure: 'no_enabled_keys', partial: false };
+    }
     const observations = (keys.length ? keys : [{ id: 'anonymous', enabled: true, protocol: 'responses' }]).map((k, i) => ({
       ...catalogFixture.success.keys[0], id: k.id, enabled: k.enabled, protocol: k.protocol,
       ...(i ? { group: 'premium', group_name: '高级组', multiplier: '1.5' } : {}),

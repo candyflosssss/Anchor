@@ -99,6 +99,7 @@ export function isDirty(draft: ProviderDraft, source?: Provider): boolean {
 
 export const catalogFailureText: Record<string, string> = {
   authentication: '上游拒绝目录授权（401 / 403）。请检查已存密钥与目录权限。',
+  no_enabled_keys: '没有启用的 Key，已跳过目录和分组倍率查询。',
   unsupported: '上游未提供此模型目录接口（404 / 405）；不代表模型推理不可用。',
   rate_limited: '上游限制目录请求频率。请稍后手动重试。',
   http_error: '上游目录返回非成功 HTTP 状态；未展示其错误正文。',

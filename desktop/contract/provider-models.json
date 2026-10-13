@@ -144,7 +144,7 @@
       },
       {
         "id": "second",
-        "enabled": false,
+        "enabled": true,
         "protocol": "responses",
         "http_status": 200,
         "failure": "",
@@ -197,7 +197,7 @@
       },
       {
         "id": "second",
-        "enabled": false,
+        "enabled": true,
         "protocol": "responses",
         "http_status": 401,
         "failure": "authentication",
@@ -208,5 +208,17 @@
         "rate_failure": "auth_required"
       }
     ]
+  },
+  "no_enabled_keys": {
+    "provider_id": "摸鱼AI",
+    "revision": 3,
+    "http_status": 0,
+    "elapsed_ms": 0,
+    "models": [],
+    "failure": "no_enabled_keys",
+    "key_id": "",
+    "partial": false,
+    "entries": [],
+    "keys": []
   }
 }

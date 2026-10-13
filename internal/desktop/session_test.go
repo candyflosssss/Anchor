@@ -357,16 +357,29 @@ func TestRealCoreProviderDirectory(t *testing.T) {
 	if invalid := b.DiscoverProviderModels(in); invalid.Problem == nil || invalid.Problem.Code != "invalid" {
 		t.Fatal(invalid)
 	}
-	added := b.ProviderAction(Action{ProviderID: in.ProviderID, ExpectedRevision: created.Data.Revision, Action: "key-put", Target: "second", Secret: "synthetic-catalog-second", Protocol: "responses", Enabled: false})
+	added := b.ProviderAction(Action{ProviderID: in.ProviderID, ExpectedRevision: created.Data.Revision, Action: "key-put", Target: "second", Secret: "synthetic-catalog-second", Protocol: "responses", Enabled: true})
 	if added.Problem != nil {
 		t.Fatal(added)
 	}
 	in.ExpectedRevision = added.Data.Revision
 	merged := b.DiscoverProviderModels(in)
-	if merged.Problem != nil || merged.Data == nil || merged.Data.KeyID != "" || len(merged.Data.Models) != 1 || len(merged.Data.Entries) != 1 || len(merged.Data.Entries[0].KeyIDs) != 2 || len(merged.Data.Keys) != 2 || merged.Data.Keys[1].Enabled || calls.Load() != 3 {
+	if merged.Problem != nil || merged.Data == nil || merged.Data.KeyID != "" || len(merged.Data.Models) != 1 || len(merged.Data.Entries) != 1 || len(merged.Data.Entries[0].KeyIDs) != 2 || len(merged.Data.Keys) != 2 || !merged.Data.Keys[1].Enabled || calls.Load() != 3 {
 		t.Fatal("bridge catalog associations lost", merged)
 	}
-
+	disabled := b.ProviderAction(Action{ProviderID: in.ProviderID, ExpectedRevision: in.ExpectedRevision, Action: "key-put", Target: "second", Enabled: false})
+	if disabled.Problem != nil || disabled.Data == nil {
+		t.Fatal(disabled)
+	}
+	in.ExpectedRevision = disabled.Data.Revision
+	filtered := b.DiscoverProviderModels(in)
+	if filtered.Problem != nil || filtered.Data == nil || len(filtered.Data.Keys) != 1 || !reflect.DeepEqual(filtered.Data.Entries[0].KeyIDs, []string{"default"}) || calls.Load() != 4 {
+		t.Fatal("bridge queried disabled key", filtered)
+	}
+	in.KeyID = "second"
+	skipped := b.DiscoverProviderModels(in)
+	if skipped.Problem != nil || skipped.Data == nil || skipped.Data.Failure != "no_enabled_keys" || len(skipped.Data.Keys) != 0 || calls.Load() != 4 {
+		t.Fatal("bridge did not preserve disabled key result", skipped)
+	}
 }
 
 func TestRealBridgeKeyProtocolSettings(t *testing.T) {

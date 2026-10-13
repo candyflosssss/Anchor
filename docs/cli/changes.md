@@ -226,3 +226,11 @@
 - 桌面：取消目录查询 Key 选择器；默认全部查询、每个模型一行展示对应 Key 与抓取倍率，每个模型／Key 的协议覆盖可独立编辑；同步 Go／TypeScript 契约、共享样例、CLI 帮助及最新指令大全。
 - 兼容与迁移：无数据库迁移；核心与客户端需同步升级才能使用扩展契约及默认聚合语义。当前只交付源码，尚未生成安装包或投放在线更新；目录成功不代表推理可用。
 - 验证：resource-guard 下 `GOMAXPROCS=2 go test -p 2 ./internal/core ./internal/providerapi ./internal/desktop ./internal/cli ./internal/catalog` 五包通过；前端 typecheck、lint 和28项目录单测通过；单 worker 的原型及模拟桌面浏览器共4项通过，覆盖合并、逐 Key 协议、成功及失败展示。未请求真实付费上游，未执行原生安装验收。
+
+## 2026-10-13 — 模型目录跳过停用 Key（当前源码，未打包／发布）
+
+- 类型：修改查询行为与固定失败分类，没有新增或删除命令／参数。
+- 指令与参数：`provider models --id ID --revision N [--key KEY]`，桌面模型目录复用相同核心规则。
+- 旧 → 新：省略 `--key` 从遍历全部已存 Key 改为仅遍历启用 Key；同名模型仍合并，并列出全部启用且目录成功的可选 Key 及其抓取分组倍率。指定停用 Key 或全部 Key 停用时返回 `failure=no_enabled_keys`、`http_status=0` 和空 models/entries/keys，不发起目录或倍率请求，不回退匿名；只有没有任何已存 Key 才匿名。
+- 兼容与迁移：输出字段、管理错误和退出码保持原契约，新增固定分类 `no_enabled_keys`，目录层仍输出 JSON 并退出0。需要查询某个停用 Key 的目录时先明确启用该 Key；脚本须处理新增分类。无需数据库迁移，客户端与核心应同步升级。本轮未打包／发布安装包。
+- 验证：资源保护下 `go test -p 1 -count=1 -timeout=120s ./internal/core ./internal/cli ./internal/desktop` 通过，覆盖默认跳过停用 Key、显式停用、全部停用、匿名边界、同名合并及分组倍率；前端 typecheck、lint、30 项目录单元测试和1项单 worker 浏览器定向回归通过。使用隔离状态与模拟上游，未请求真实供应商；浏览器回归不代替原生窗口验收。

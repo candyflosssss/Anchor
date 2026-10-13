@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fixture from '../../../../contract/provider-models.json';
 import { checkedCatalog, catalogProblemText } from './provider.model';
 import { MockProviderTransport } from './provider.mock';
+import { actionFor } from './provider-features.model';
 describe('read-only catalog model', () => {
   it.each([fixture.success, fixture.empty, fixture.unsupported])('accepts the shared result %#', value => {
     expect(checkedCatalog(value, fixture.input)).toEqual(value);
@@ -13,7 +14,7 @@ describe('read-only catalog model', () => {
   ])('fails closed on invalid result %#', patch => {
     expect(() => checkedCatalog({ ...fixture.success, ...patch } as typeof fixture.success, fixture.input)).toThrow('read_error');
   });
-  it.each([fixture.aggregate, fixture.partial])('accepts merged and partial results %#', value => {
+  it.each([fixture.aggregate, fixture.partial, fixture.no_enabled_keys])('accepts merged and partial results %#', value => {
     expect(checkedCatalog(value, fixture.aggregate_input)).toEqual(value);
   });
   it.each([
@@ -32,6 +33,24 @@ describe('read-only catalog model', () => {
     expect(result.keys[0].multiplier).toBe('0');
     result.entries[0].key_ids.push('other');
     expect(value.entries[0].key_ids).toEqual(['default']);
+  });
+  it('mock skips disabled keys and preserves all enabled associations and rates', async () => {
+    const transport = new MockProviderTransport(); const signal = new AbortController().signal;
+    const provider = (await transport.list(signal))[0];
+    let w = await transport.action(actionFor(provider, 'key-put', { target: 'second', secret: 'synthetic-second', enabled: true, protocol: 'anthropic' }), signal);
+    w = await transport.action(actionFor({ ...provider, revision: w.revision }, 'key-put', { target: 'disabled', secret: 'synthetic-disabled', enabled: false }), signal);
+    let input = { provider_id: provider.id, expected_revision: w.revision, key_id: '' };
+    const merged = checkedCatalog(await transport.discover(input, signal), input);
+    expect(merged.keys.map(k => k.id)).toEqual(['default', 'second']);
+    expect(merged.entries.every(e => e.key_ids.join(',') === 'default,second')).toBe(true);
+    expect(merged.keys.map(k => k.multiplier)).toEqual(['0.8', '1.5']);
+    expect(checkedCatalog(await transport.discover({ ...input, key_id: 'disabled' }, signal), { ...input, key_id: 'disabled' }).failure).toBe('no_enabled_keys');
+    for (const target of ['default', 'second']) {
+      w = await transport.action(actionFor({ ...provider, revision: w.revision }, 'key-put', { target, enabled: false }), signal);
+    }
+    input = { ...input, expected_revision: w.revision };
+    const skipped = checkedCatalog(await transport.discover(input, signal), input);
+    expect(skipped).toMatchObject({ failure: 'no_enabled_keys', http_status: 0, models: [], entries: [], keys: [], partial: false });
   });
   it('does not describe a read error as an uncertain write', () => {
     expect(catalogProblemText('unknown')).toContain('配置未改变');

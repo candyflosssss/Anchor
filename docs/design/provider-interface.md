@@ -51,11 +51,11 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 
 规范 DTO `DiscoverProviderModels` / `ProviderModels` 定义于 `internal/catalog/models.go`，经 `internal/desktop/contract.go` 别名纳入 Go → TS 单一生成源；桌面 envelope 为 `ProviderModelsResult`，继续使用 `anchor-desktop-v1`。本次 Key 协议增量扩展查询字段及工作台动作，客户端与核心须同步升级。共享合成样例为 `desktop/contract/provider-models.json`，Mock 与 Go / TS 测试共用。
 
-- 输入为 `provider_id`、`expected_revision`（桌面 1..MAX_SAFE_INTEGER）和 `key_id`（空字符串自动查询全部已存 Key，含停用 Key）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
+- 输入为 `provider_id`、`expected_revision`（桌面 1..MAX_SAFE_INTEGER）和 `key_id`（空字符串自动查询全部启用的已存 Key，跳过停用 Key）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
 - 后端从已存快照取地址／密钥，使用 `<base_url 去尾斜杠>/models`，保留部署前缀；未带版本的根地址或自定义前缀，仅404/405或200 HTML网页时尝试同前缀 `/v1/models`，兼容 NewAPI 代理部署（例如 `/newapi/v1/models`）；已带版本路径或版本后的 `/openai` 不重复追加 `/v1`。官方 OpenAI、Anthropic、Kimi/Moonshot 和硅基流动根地址固定 `/v1/models`；DeepSeek 根地址固定 `/models`，OpenRouter 固定 `/api/v1/models`，Gemini 根地址及 `/v1beta/openai` 目录改用 `/v1beta/models`；`/v1beta` 前缀使用 `x-goog-api-key`，其他路径沿用 Key 默认协议鉴权。所有凭据只进请求头。停用供应商也允许显式查询。复用无环境代理、禁止重定向的客户端与全局16／供应商并发上限；全部路径/分页共用 `min(timeout_seconds, 8)` 秒。每个 Key 最多10次目录 HTTP请求、每页请求1000条；全部 Key 的目录与倍率抓取共用上述期限，先读取全部目录再读取倍率，不重试失败请求、后台轮询或持久缓存；完整规则见[CLI 大全](../cli/commands.md#provider-modelsdesktop10-小步)。
-- 输出十字段：原有 provider_id、key_id、revision、http_status、elapsed_ms、models、failure，新增 partial、entries、keys。默认聚合 key_id 为空，无 Key 为 anonymous，显式指定时保留该 ID。models 为始终非null的模型 ID 去重排序数组；entries 为 `{id,key_ids}`，合并同一模型对应的全部成功 Key；keys 为 `{id,enabled,protocol,http_status,failure,group,group_name,multiplier,rate_basis,rate_failure}`，倍率为十进制字符串或 null。至少一个 Key 目录成功则顶层 failure 为空，partial 标记失败 Key；逐 Key 目录必须完整分页才关联模型，全部失败或聚合超限时不返回模型。接受 OpenAI/Anthropic data[].id、Gemini models[].name（去除 models/ 前缀）；全部 Key 累计目录512 KiB，最多64个 Key、每 Key 1000条原始记录、合并1000个模型、每 ID 256字节；分页循环、格式变化、后续页失败只使该 Key 失败。
+- 输出十字段：原有 provider_id、key_id、revision、http_status、elapsed_ms、models、failure，新增 partial、entries、keys。默认聚合 key_id 为空，无已存 Key 为 anonymous，显式指定时保留该 ID。全部 Key 停用或指定停用 Key 时返回 no_enabled_keys、http_status=0 和空 models/entries/keys，不回退匿名请求。models 为始终非null的模型 ID 去重排序数组；entries 为 `{id,key_ids}`，合并同一模型对应的全部启用且目录成功的可选 Key；keys 为 `{id,enabled,protocol,http_status,failure,group,group_name,multiplier,rate_basis,rate_failure}`，倍率为十进制字符串或 null。至少一个 Key 目录成功则顶层 failure 为空，partial 标记失败 Key；逐 Key 目录必须完整分页才关联模型，全部失败或聚合超限时不返回模型。接受 OpenAI/Anthropic data[].id、Gemini models[].name（去除 models/ 前缀）；全部 Key 累计目录512 KiB，最多64个 Key、每 Key 1000条原始记录、合并1000个模型、每 ID 256字节；分页循环、格式变化、后续页失败只使该 Key 失败。
 - 倍率复用 providerapi 的已存账户授权，与 Key 默认推理协议独立。自动读取账号 Key 列表并精确核对身份；NewAPI 掩码候选经固定只读 POST /api/token/{数字ID}/key 验证完整凭据后取分组与 pricing.group_ratio，Sub2API 取个人覆盖或可用组倍率和组名；OneAPI、auto 分组或缺授权不会假定1×。每 Key 最多4页账号列表（100条/页），倍率适配器最多8次请求/2 MiB响应。未知和失败用 rate_failure 标明，不写入 Anchor 映射倍率，不使目录结果丢失；多 Key 的组名也检查凭据回显。
-- 请求受理后目录失败仍返回 HTTP200 与固定分类：`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
+- 请求受理后目录失败仍返回 HTTP200 与固定分类：`no_enabled_keys`（无启用 Key，跳过目录和倍率请求）、`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
 - 不写配置、revision、模型映射或健康状态。一次目录成功仅说明此接口返回有效目录，不代表推理、工具、流式、余额或持续健康；404/405 不等于供应商推理不可用。
 - UI 详情手动触发、禁重复点击，显示目录 HTTP／耗时／失败分类和限高模型列表；区分“目录列出”与“仅已存协议”，避免把旧覆盖当成本次 Key 目录；Key / 模型协议编辑见 §6。查询中阻止供应商切换、编辑和页面离开；选择、重读或修改供应商／Key 凭据后清空结果；模型协议保存保留当前目录，取消／卸载丢弃晚到数据。Wails AbortSignal 不能保证中断后端请求，后端超时仍生效；查询错误不会显示“可能已保存”。新功能与旧核心不同步时失败关闭，不回退 Mock。
 - CLI 等价入口为 `provider models --id ID --revision N [--key KEY]`；与 `model list`（Anchor 已存公开映射）及网关 `/v1/models` 区分。测试分层沿 §3，原生两平台仍未验收。
@@ -68,7 +68,7 @@ Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/es
 
 每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。模型映射修改只增加模型 revision；配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
 
-目录查询可指定已存 Key（允许停用），不存在的 Key 返回 not_found 且不请求上游；省略时自动查询全部已存 Key（含停用 Key）并合并模型。认证使用 Key 默认协议，模型覆盖不影响目录认证。无 Key 时使用匿名目录；停用状态不阻止显式管理读取。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
+目录查询可指定启用的已存 Key，不存在的 Key 返回 not_found 且不请求上游；指定停用 Key 返回 no_enabled_keys，不抓取目录或分组倍率。省略时自动查询全部启用的已存 Key 并合并模型，列出同名模型的全部可选 Key。认证使用 Key 默认协议，模型覆盖不影响目录认证。仅无已存 Key 时使用匿名目录，全部 Key 停用时不回退匿名。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
 
 ## 6. Key / 模型协议（2026-10-11，desktop.16 dev 已发布）
 
@@ -76,7 +76,7 @@ Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/es
 
 转发先选 Key，然后按该 Key 和候选中的实际模型名解析覆盖 → Key 默认值，JSON、SSE、认证与推理测试均使用此结果。模型未设置覆盖时动态继承，以后修改 Key 默认值自动生效。供应商 protocol 仅保留为核心内部值，用于历史兼容、新 default Key 初始化与匿名请求，不再控制已有 Key，桌面不显示也不设置。schema3→4 把每个供应商旧协议复制到它的全部 Key；复制凭据时一并复制覆盖，改名/删除按外键级联。升级须同步客户端与核心；旧程序无法打开 schema4，不提供降级。
 
-UI 的 Key 编辑支持默认协议与留空保留凭据；当前源码模型页默认查询全部 Key，同一模型一行展示各 Key、分组倍率和各自独立协议。已存覆盖在目录尚未查询或不再返回该模型时仍可查看和恢复继承。切换供应商、修改 Key 凭据或删除 Key 时清理目录结果；模型协议写入保留当前目录，方便连续编辑。前端校验模型与 Key 关联、部分失败及倍率；显式 CLI 查询仍须匹配指定 Key。2026-10-13 此聚合与倍率增量尚未打包，desktop.16 原有 Key 协议功能已发布；原生安装未验收，安装包能力以[发行记录](../release/desktop.md)为准。
+UI 的 Key 编辑支持默认协议与留空保留凭据；当前源码模型页默认查询全部启用 Key，跳过停用 Key；同一模型一行展示全部可选 Key、分组倍率和各自独立协议。全部停用时提示已跳过查询，已存协议覆盖不作为目录确认的可选 Key。已存覆盖在目录尚未查询或不再返回该模型时仍可查看和恢复继承。切换供应商、修改 Key 凭据或删除 Key 时清理目录结果；模型协议写入保留当前目录，方便连续编辑。前端校验模型与 Key 关联、部分失败及倍率；显式 CLI 查询仍须匹配指定 Key。2026-10-13 此聚合与倍率增量尚未打包，desktop.16 原有 Key 协议功能已发布；原生安装未验收，安装包能力以[发行记录](../release/desktop.md)为准。
 
 
 ## 7. 共享公开模型映射与调度（2026-10-12）

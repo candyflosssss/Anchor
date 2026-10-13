@@ -36,7 +36,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   provider balance|key-quota|effective-rate --id ID --revision N [--key KEY] [--remote-key-id N]
   provider usage-records --id ID --revision N [--key KEY] [--remote-key-id N]
       [--scope account|key] [--page N] [--page-size N]
-  provider models --id ID --revision N [--key KEY]  Fetch key model directory (paths + pagination)
+  provider models --id ID --revision N [--key KEY]  Fetch enabled key directories and group rates
   provider workspace --id ID           Keys, health, mappings and usage
   provider delete|rename|copy --id ID --revision N [--target ID] [--approve] [--copy-keys]
   provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--protocol PROTOCOL]
@@ -455,7 +455,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	}
 	if args[0] == "models" {
 		f := a.flags("provider models")
-		key := f.String("key", "", "saved key ID; omission queries all keys and merges models with group rates")
+		key := f.String("key", "", "enabled saved key ID; omission queries all enabled keys and merges models with group rates")
 		id := f.String("id", "", "saved provider ID")
 		revision := f.Int64("revision", 0, "expected current provider revision (required)")
 		if err := parse(f, args[1:]); err != nil {
