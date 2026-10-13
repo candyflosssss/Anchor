@@ -5,12 +5,12 @@
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.21 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.22 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
 - Agent discover/enroll/sync 在源码 CLI 中，桌面托管入口与核心已随 desktop.21 dev 发布；alpha.6 CLI 不含，需使用兼容客户端与核心。
-- 平台兼容查询（sub2api / NewAPI / 原版 OneAPI）的核心接口已随 desktop.21 dev 发布，命令由源码 CLI 提供，alpha.6 CLI 不含，已安装桌面程序不提供通用 CLI。新增 schema5，旧程序不能打开升级后的数据库，客户端与核心需一起升级；当前源码的桌面平台配置／账户余额／Key 额度页已接入；请求账单与倍率查询页仍未接入。
+- 平台兼容查询（sub2api / NewAPI / 原版 OneAPI）的核心接口已随 desktop.21 dev 发布，命令由源码 CLI 提供，alpha.6 CLI 不含，已安装桌面程序不提供通用 CLI。新增 schema5，旧程序不能打开升级后的数据库，客户端与核心需一起升级；desktop.22 的桌面平台配置／账户余额／Key 额度页已发布；请求账单与倍率查询页仍未接入。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
 ## 1. 调用与公共约定
@@ -514,12 +514,12 @@ anchor recover [--id ID]
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
-| 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；桌面页面尚未接入；原版 OneAPI 能力缺口如上表 |
+| 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，账单与倍率页面未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
-| 平台配置、账户余额与 Key 额度 | provider platform/platform configure/balance/key-quota | 当前源码 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
+| 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |

@@ -5,7 +5,7 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.21**，可在已有 `.9`～`.20` 的在线更新中选择 dev 获取：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.22**，可在已有 `.9`～`.21` 的在线更新中选择 dev 获取：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
@@ -13,9 +13,9 @@
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.21/Anchor-Desktop-0.1.0-dev.desktop.21-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.21/anchor-desktop_0.1.0-dev.desktop.21_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.21)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.22/Anchor-Desktop-0.1.0-dev.desktop.22-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.22/anchor-desktop_0.1.0-dev.desktop.22_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.22)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -25,9 +25,9 @@ CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/inst
 SQLite 供应商与模型配置、Responses / Chat Completions / Anthropic Messages 无状态文本及函数工具转换，以及托管层/条件恢复、Codex 基础配置与模型目录、多模型绑定授权。当前版本为 `0.1.0-dev`，
 不等于整体初版已完成；SSH、其他 Agent 适配器、Codex profile 和完整协议能力仍待实现。
 
-支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.21 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，不执行浏览器、安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
+支持 Linux / Windows AMD64；alpha.6 已通过两平台原生运行门禁。alpha.6 为 CLI；另已发布 desktop.22 dev 桌面包。当前源码已加入 Wails 桌面开发宿主、供应商真实接入与独立核心生命周期，同时保留明确标记的 Mock 预览，不开发独立 Web 产品。已补齐 Windows 当前用户 NSIS 安装器和 Ubuntu24.04 AMD64 `.deb` 的受限构建入口；本轮只做受影响功能的定向检查与编译打包，已通过两项账户页面浏览器交互测试；不执行安装或原生窗口验收。构建和边界见[桌面开发版说明](docs/release/desktop.md)。
 
-供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」三页签，CLI 同步提供。实现边界和 schema3→4 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。当前源码进一步把协议设置移至 Key，并支持按实际模型覆盖、默认动态继承 Key 协议；该协议继承已随 desktop.16 发布。desktop.21 加入三平台账户与计费查询核心接口，并升级到 schema5；余额／账单／倍率查询的桌面页面尚未接入，命令由源码 CLI 提供，公开 alpha.6 CLI 不含。
+供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」「账户与余额」等页签，CLI 同步提供。实现边界和 schema3→4 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。当前源码进一步把协议设置移至 Key，并支持按实际模型覆盖、默认动态继承 Key 协议；该协议继承已随 desktop.16 发布。desktop.21 加入三平台账户与计费查询核心接口，并升级到 schema5；desktop.22 接入「供应商 → 选择供应商 → 账户与余额」，可保存独立用户授权并分别刷新账户余额／Key 额度；账单／倍率桌面页尚未接入，命令由源码 CLI 提供，公开 alpha.6 CLI 不含。
 
 **已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；desktop.14 关闭窗口隐藏到系统托盘，单击托盘图标恢复；无可用托盘时直接退出界面。「退出界面」退出宿主，均不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。桌面 dev 包已包含启动／复用与窗口生命周期实现；开机自启动设置未实现，原生安装与窗口行为未验收。
 

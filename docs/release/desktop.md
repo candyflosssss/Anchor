@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-13。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.21`，北京时间 2026-10-13 10:15:34 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：Agent 托管页面与本机发现／登记／同步；sub2api / NewAPI / 原版 OneAPI 账户与计费兼容核心接口、类型化客户端及源码 CLI。余额／账单／倍率的桌面查询页面尚未接入；原版 OneAPI 倍率不支持，NewAPI 自动分组倍率未知。更新器沿用 `.20` 的代理和官方订阅回退。
-- 已有 `.9`～`.20`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.21`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.22`，北京时间 2026-10-13 11:07:28 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：Agent 托管页面与本机发现／登记／同步；sub2api / NewAPI / 原版 OneAPI 账户与计费兼容核心接口、类型化客户端及源码 CLI。desktop.22 接入平台配置、账户余额与 Key 额度桌面查询；账单／倍率的桌面页面尚未接入；原版 OneAPI 倍率不支持，NewAPI 自动分组倍率未知。更新器沿用 `.20` 的代理和官方订阅回退。
+- 已有 `.9`～`.21`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版代理接入失败时须手动安装一次 `.22`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
 - 首次启动核心自动迁移 state.db schema4→5，保留既有供应商及 Key；更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
-- 功能阶段 Go 回归及定向测试通过；本轮 Go/TS 契约检查、前端类型与生产编译、两平台打包、六附件大小／digest 校验及默认源真实 Linux 更新下载通过。**Windows PAC、双平台原生窗口、安装和 apply 未验收**；dev 预发行未签名。
+- 功能阶段 Go 回归及定向测试通过；本轮 Go/TS 契约检查、前端类型／lint／78项单测／2项浏览器交互及生产编译、两平台打包、六附件大小／digest 校验及默认源真实 Linux 更新下载通过。**Windows PAC、双平台原生窗口、安装和 apply 未验收**；dev 预发行未签名。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.21_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.22_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -84,7 +84,29 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.21`
+### 当前在线 dev 版 `.22`
+
+`0.1.0-dev.desktop.22` 于北京时间 2026-10-13 11:07:28 发布为 dev prerelease（非 latest）。构建提交 `fbf2f2606b2b18d5d7223842602a533fbf1f418a`，干净独立 worktree 的 SOURCE.json 为 dirty=false。
+
+供应商详情新增「账户与余额」，概况页提供快捷入口。可配置 sub2api、NewAPI、OneAPI 的平台类型、独立用户授权、可选站点根地址和 NewAPI 用户 ID；手动分别刷新钱包与 Key 额度。金额以十进制字符串保留原始精度，USD 与 quota 分开展示，未返回字段为未知。失败刷新清除对应旧结果，冲突或保存结果未知需明确重新读取配置，不自动重放用户令牌。复用 Wails → 类型化客户端 → 核心兼容层，无付费推理请求。
+
+NewAPI/OneAPI 钱包需用户授权；NewAPI 另需站点用户 ID。OneAPI Key 额度需明确后台令牌数字 ID；sub2api 特定无限额 Key 可直接查钱包，受限 Key 额度不作为账户余额。账单与倍率桌面页尚未接入。沿用 schema5、更新代理和官方订阅回退，不支持数据库降级。
+
+| 平台 | 安装包 | 字节数 |
+| --- | --- | ---: |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.22-windows-amd64-setup.exe` | 7,793,243 |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.22_amd64.deb` | 5,598,068 |
+
+```text
+20e480c773e069977beb175403711c24c15849af9dea2819b2b55540e487e9d8  Anchor-Desktop-0.1.0-dev.desktop.22-windows-amd64-setup.exe
+757f488aea67ec091e9f6e6ce5a21273154365f83f13348018ba416ede55b179  anchor-desktop_0.1.0-dev.desktop.22_amd64.deb
+```
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.22/`。六附件包括两平台安装包、flat 更新清单、对应构建提交的源码及 vendored Go 依赖、许可／构建元数据、SHA256SUMS。上传后所有附件大小与 GitHub digest 均匹配本地；标签指向实际构建提交，原始 BUILD.json 未验收标记保持不变。证据为 `publication/DRAFT_VERIFIED.json`、`PUBLISHED.json`、`TAG_VERIFIED.json`、`ONLINE_DOWNLOAD.json`。
+
+默认源在隔离目录通过 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.21 --json` 发现 `.22`，真实下载 Linux 包并校验大小／SHA256。Go 桥接隔离核心与模拟三平台、契约漂移检查、前端 typecheck/lint、78项定向单测、2项浏览器交互测试通过。浏览器最初因系统 Chrome 与普通 Chromium 环境失败，改用缓存 headless shell 后通过；未下载浏览器。双平台编译与安装器生成通过；未做原生窗口、PAC、系统安装、apply、全量或 race 验收，未改真实配置或调用付费模型。开发安装包未签名。
+
+### 历史在线 dev 版 `.21`
 
 `0.1.0-dev.desktop.21` 于北京时间 2026-10-13 10:15:34 公开为 dev prerelease（非 latest），构建提交 `38da0ecb07a5216a6f7b9479c22444890a0903d0`，独立 worktree 的 SOURCE.json 为 dirty=false。
 
