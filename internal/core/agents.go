@@ -102,7 +102,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			apiError(w, e)
 			return
 		}
-		v, e := (managed.Codex{}).Inspect(b)
+		v, e := managed.AdapterFor(b.AdapterID).Inspect(b)
 		if e != nil {
 			agentError(w, e)
 			return
@@ -145,8 +145,8 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			}
 			writeJSON(w, 200, v)
 		case "set-models":
-			if !state.ValidID(in.Model) || (in.ModelScope != "single" && in.ModelScope != "all-compatible") {
-				fail(w, 400, "invalid_model_policy", "model and explicit single or all-compatible model_scope required")
+			if !state.ValidID(in.Model) || (in.ModelScope != "single" && in.ModelScope != "all-compatible" && in.ModelScope != "all-mapped") {
+				fail(w, 400, "invalid_model_policy", "model and explicit single, all-mapped or all-compatible model_scope required")
 				return
 			}
 			b, v, e := s.Agents.SetModels(id, in.ExpectedRevision, in.Model, in.ModelScope)

@@ -319,3 +319,11 @@
 - 旧 → 新：缺少 `/v1` 时可能收到 HTTP 200 的网站 HTML 并报笼统的 `invalid_response`；现在优先原地址，仅明确收到 HTML 且状态为200／404／405时补 `/v1` 重试一次，保留部署前缀与原有超时，不修改已存地址。已带版本、JSON 错误、鉴权失败、限流、网络失败及 SSE 不补路径。
 - 兼容与迁移：Probe 输出字段与退出码不变，`failure` 新增 `unexpected_html`；真实网关最终收到 HTTP 200 HTML 时返回502及同名错误码，日志保留实际上游200并记录端点解析证据。桌面新增中文地址提示。无需数据库迁移，新错误枚举需前后端同时升级。
 - 验证：本次改动在独立 worktree 中通过 core／protocol／desktop／client／cli 测试，前端15个定向测试、typecheck 与定向 lint 通过；覆盖原地址成功、三协议与部署前缀、HTML 200／404／405 补路径、已带版本不追加、JSON／鉴权／限流不重放、SSE 与超时共享、错误日志脱敏。使用隔离模拟上游，尚未打包发布或验收原生窗口。
+
+
+## 2026-10-14 — 全部映射默认选择与 Claude Code / DSH 托管（当前源码，未发布）
+
+- 新增 `agent enroll --model-scope all-mapped|all-compatible`，`agent add --adapter claude|dsh --config-root ABS_DIR`，保留 Codex `--codex-home` 别名，两个路径参数不可并用。
+- 新增 all-mapped 授权及 set-models 范围：读取全部已存模型映射，具备启用供应商即可，不以 Codex 元数据或 tools/streaming 筛掉模型。桌面登记显式使用 all-mapped；旧 Codex CLI 缺省 all-compatible、旧 single 绑定不静默扩权。发现预览对应全部映射，缺少 Codex 缓存不再阻止此范围。
+- Claude 用户 settings.json 与 DSH web cordis.patch.yml 接入统一计划、指纹、日志、同步、条件恢复及禁用凭据生命周期。供应商密钥不写入 Agent 文件；两个新适配器使用受保护配置中的网关 Binding token，管理返回与 Anchor 日志不公开凭据。
+- 客户端重载边界：Codex/Claude Code 重启，DSH 默认模型在新会话生效；项目/命令参数覆盖与真实客户端运行尚未验收。Gemini/OpenCode 仍只识别。

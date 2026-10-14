@@ -37,7 +37,7 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 	if version == "" && model.Codex != nil {
 		version = model.Codex.Version
 	}
-	if b.ModelScope == "all-compatible" {
+	if b.ModelScope == "all-compatible" || b.ModelScope == "all-mapped" {
 		found := false
 		for _, allowed := range models {
 			if allowed.ID == b.Model {
@@ -45,12 +45,22 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 			}
 		}
 		if !found {
-			return GatewayBinding{}, errors.New("default model requires enabled provider, tools, streaming and version-matched Codex metadata")
+			return GatewayBinding{}, errors.New("default model is unavailable under the selected model scope")
 		}
-	} else if model.Codex == nil {
+	} else if b.AdapterID == "codex" && model.Codex == nil {
 		models = nil
 	}
-	return GatewayBinding{Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
+	token := ""
+	if b.Revision > 0 && b.Enabled {
+		token, e = m.Store.BindingToken(b.ID)
+		if e != nil && !errors.Is(e, state.ErrNotFound) {
+			return GatewayBinding{}, e
+		}
+	}
+	if b.ModelScope == "all-mapped" {
+		version = ""
+	}
+	return GatewayBinding{Token: token, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
 }
 func (m *Manager) Add(b state.Binding) (state.Binding, error) {
 	m.mu.Lock()
@@ -58,7 +68,7 @@ func (m *Manager) Add(b state.Binding) (state.Binding, error) {
 	if m.stopping {
 		return b, errors.New("management is stopping")
 	}
-	if b.CodexVersion == "" {
+	if b.AdapterID == "codex" && b.ModelScope != "all-mapped" && b.CodexVersion == "" {
 		model, err := m.Store.Model(b.Model)
 		if err != nil {
 			return b, err
@@ -74,7 +84,7 @@ func (m *Manager) Add(b state.Binding) (state.Binding, error) {
 	if e != nil {
 		return b, e
 	}
-	if !g.Tools || !g.Streaming {
+	if b.AdapterID == "codex" && b.ModelScope != "all-mapped" && (!g.Tools || !g.Streaming) {
 		return b, errors.New("Codex model requires --tools and --streaming")
 	}
 	return m.Store.AddBinding(b)
@@ -90,7 +100,7 @@ func (m *Manager) Plan(id string) (Plan, error) {
 	if e != nil {
 		return Plan{}, e
 	}
-	return (Codex{}).Plan(b, g)
+	return AdapterFor(b.AdapterID).Plan(b, g)
 }
 func (m *Manager) Apply(id string, revision int64, fp string) (Result, error) {
 	m.mu.Lock()
@@ -124,13 +134,13 @@ func (m *Manager) apply(id string, revision int64, fp string) (Result, error) {
 		return Result{}, e
 	}
 	if current.Status == "applied" {
-		_, e = (Codex{}).Verify(b, g)
+		_, e = AdapterFor(b.AdapterID).Verify(b, g)
 		return current, e
 	}
 	if current.Status != "unmanaged" && current.Status != "restored" {
 		return current, ErrChanged
 	}
-	p, e := (Codex{}).Plan(b, g)
+	p, e := AdapterFor(b.AdapterID).Plan(b, g)
 	if e != nil {
 		return Result{}, e
 	}
@@ -139,7 +149,7 @@ func (m *Manager) apply(id string, revision int64, fp string) (Result, error) {
 	}
 	result, e := m.Engine.Apply(p)
 	if e == nil {
-		_, e = (Codex{}).Verify(b, g)
+		_, e = AdapterFor(b.AdapterID).Verify(b, g)
 	}
 	return result, e
 }
@@ -243,7 +253,7 @@ func (m *Manager) Start() ([]Result, error) {
 				// Validate current support and desired metadata before touching a
 				// healthy journal. Unsupported external changes remain repairable.
 				var g GatewayBinding
-				_, e = (Codex{}).Inspect(b)
+				_, e = AdapterFor(b.AdapterID).Inspect(b)
 				if e == nil {
 					g, e = m.gateway(b)
 				}
@@ -251,7 +261,7 @@ func (m *Manager) Start() ([]Result, error) {
 					_, _, e = buildCatalog(g.Models, g.CatalogVersion)
 				}
 				if e == nil {
-					if _, stale := (Codex{}).Verify(b, g); stale != nil {
+					if _, stale := AdapterFor(b.AdapterID).Verify(b, g); stale != nil {
 						status, e = m.Engine.Recover(b.ID)
 						if e != nil {
 							status.Status = "recovery_pending"
@@ -295,8 +305,8 @@ func (m *Manager) Stop() ([]Result, error) {
 }
 
 func (m *Manager) SetModels(id string, revision int64, model, scope string) (state.Binding, Result, error) {
-	if scope != "single" && scope != "all-compatible" {
-		return state.Binding{}, Result{}, errors.New("model_scope must explicitly be single or all-compatible")
+	if scope != "single" && scope != "all-compatible" && scope != "all-mapped" {
+		return state.Binding{}, Result{}, errors.New("model_scope must explicitly be single, all-mapped or all-compatible")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -319,7 +329,7 @@ func (m *Manager) SetModels(id string, revision int64, model, scope string) (sta
 	if err != nil {
 		return b, Result{}, err
 	}
-	if len(b.CodexCatalog) == 0 && configured.Codex != nil {
+	if b.AdapterID == "codex" && scope != "all-mapped" && len(b.CodexCatalog) == 0 && configured.Codex != nil {
 		b.CodexVersion = configured.Codex.Version
 	}
 	if err = b.Validate(); err != nil {
@@ -329,7 +339,7 @@ func (m *Manager) SetModels(id string, revision int64, model, scope string) (sta
 	if err != nil {
 		return b, Result{}, err
 	}
-	if !g.Tools || !g.Streaming {
+	if b.AdapterID == "codex" && b.ModelScope != "all-mapped" && (!g.Tools || !g.Streaming) {
 		return b, Result{}, errors.New("Codex model requires tools and streaming")
 	}
 	if len(g.Models) > 0 && g.CatalogVersion != "" {

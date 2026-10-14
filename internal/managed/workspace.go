@@ -16,6 +16,7 @@ type AgentModel struct {
 }
 type ManagedAgent struct {
 	ID              string            `json:"id"`
+	AdapterID       string            `json:"adapter_id"`
 	ConfigRoot      string            `json:"config_root"`
 	Model           string            `json:"model"`
 	Enabled         bool              `json:"enabled"`
@@ -34,6 +35,7 @@ type AgentWorkspace struct {
 }
 type EnrollAgent struct {
 	TargetID         string            `json:"target_id"`
+	ModelScope       string            `json:"model_scope"`
 	Model            string            `json:"model"`
 	ExpectedRevision int64             `json:"expected_revision"`
 	ModelTemplates   map[string]string `json:"model_templates"`
@@ -60,11 +62,7 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 		if !target.Supported || target.Status != "ready" {
 			continue
 		}
-		version, catalog, err := localCatalog(target.ConfigRoot)
-		if err != nil {
-			return out, err
-		}
-		available, err := m.Store.BindingModels(state.Binding{ModelScope: "all-compatible", CodexVersion: version, CodexCatalog: catalog})
+		available, err := m.Store.BindingModels(state.Binding{ModelScope: "all-mapped"})
 		if err != nil {
 			return out, err
 		}
@@ -99,7 +97,10 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 		return out, err
 	}
 	for _, b := range bindings {
-		row := ManagedAgent{ID: b.ID, ConfigRoot: b.ConfigRoot, Model: b.Model, Enabled: b.Enabled, Revision: b.Revision, ModelScope: b.ModelScope, CatalogVersion: b.CodexVersion, Status: statusMap[b.ID], AvailableModels: []string{}, CatalogPath: filepath.Join(b.ConfigRoot, catalogName(b.ID)), ModelTemplates: map[string]string{}}
+		row := ManagedAgent{ID: b.ID, AdapterID: b.AdapterID, ConfigRoot: b.ConfigRoot, Model: b.Model, Enabled: b.Enabled, Revision: b.Revision, ModelScope: b.ModelScope, CatalogVersion: b.CodexVersion, Status: statusMap[b.ID], AvailableModels: []string{}, CatalogPath: filepath.Join(b.ConfigRoot, catalogName(b.ID)), ModelTemplates: map[string]string{}}
+		if b.AdapterID != "codex" || b.ModelScope == "all-mapped" {
+			row.CatalogPath = ""
+		}
 		for alias, source := range b.ModelTemplates {
 			row.ModelTemplates[alias] = source
 		}
@@ -115,7 +116,7 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 			g, err := m.gateway(b)
 			if err != nil {
 				row.Status = "apply_failed"
-			} else if _, err := (Codex{}).Verify(b, g); err != nil {
+			} else if _, err := AdapterFor(b.AdapterID).Verify(b, g); err != nil {
 				row.Status = "needs_sync"
 			}
 		}
@@ -144,11 +145,29 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	if target == nil || !target.Supported || target.Status != "ready" {
 		return state.Binding{}, state.ErrInvalid
 	}
-	version, catalog, err := localCatalog(target.ConfigRoot)
-	if err != nil {
-		return state.Binding{}, err
+	scope := in.ModelScope
+	if scope == "" {
+		scope = "all-compatible"
+		if target.Agent != "codex" {
+			scope = "all-mapped"
+		}
 	}
-	b := state.Binding{ID: target.ID, AdapterID: "codex", AdapterVersion: "1", ConfigRoot: target.ConfigRoot, Model: in.Model, ModelScope: "all-compatible", CodexVersion: version, Executable: env.Executable, Enabled: true, CodexCatalog: catalog, ModelTemplates: in.ModelTemplates}
+	if scope != "all-compatible" && scope != "all-mapped" {
+		return state.Binding{}, state.ErrInvalid
+	}
+	b := state.Binding{ID: target.ID, AdapterID: target.Agent, AdapterVersion: "1", ConfigRoot: target.ConfigRoot, Model: in.Model, ModelScope: scope, Executable: env.Executable, Enabled: true}
+	if scope == "all-compatible" {
+		version, catalog, e := localCatalog(target.ConfigRoot)
+		if e != nil {
+			return b, e
+		}
+		b.CodexVersion = version
+		b.CodexCatalog = catalog
+		b.ModelTemplates = in.ModelTemplates
+	} else if len(in.ModelTemplates) > 0 {
+		return b, state.ErrInvalid
+	}
+
 	if err := ValidateTarget(&b); err != nil {
 		return b, err
 	}
@@ -164,6 +183,9 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	}
 	for _, old := range bindings {
 		if sameRoot(old.ConfigRoot, b.ConfigRoot) {
+			if old.AdapterID != b.AdapterID {
+				return b, state.ErrConflict
+			}
 			b.ID = old.ID
 			b.ConfigRoot = old.ConfigRoot
 			b.Executable = old.Executable
@@ -178,13 +200,15 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	if err != nil {
 		return b, err
 	}
-	if _, _, err := buildCatalog(g.Models, g.CatalogVersion); err != nil {
-		return b, err
+	if b.ModelScope == "all-compatible" {
+		if _, _, err := buildCatalog(g.Models, g.CatalogVersion); err != nil {
+			return b, err
+		}
 	}
 	if b.Revision == 0 {
 		b, err = m.Store.AddBinding(b)
 	} else {
-		if _, err := (Codex{}).Inspect(b); err != nil {
+		if _, err := AdapterFor(b.AdapterID).Inspect(b); err != nil {
 			return b, err
 		}
 		restored, e := m.Engine.Recover(b.ID)
@@ -241,7 +265,7 @@ func (m *Manager) Refresh(id string, revision int64) (Result, error) {
 			return Result{}, err
 		}
 	}
-	if _, err := (Codex{}).Inspect(b); err != nil {
+	if _, err := AdapterFor(b.AdapterID).Inspect(b); err != nil {
 		return Result{}, err
 	}
 	r, err := m.Engine.Recover(id)

@@ -269,6 +269,7 @@ export interface AgentModel {
 }
 export interface ManagedAgent {
   id: string;
+  adapter_id: string;
   config_root: string;
   model: string;
   enabled: boolean;
@@ -287,6 +288,7 @@ export interface AgentWorkspace {
 }
 export interface EnrollAgent {
   target_id: string;
+  model_scope: string;
   model: string;
   expected_revision: number;
   model_templates: Record<string, string>;

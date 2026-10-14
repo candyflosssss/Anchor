@@ -76,15 +76,15 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
   access list | access revoke ID      Local-owner authorization operations
   agent discover                     Read targets, mapped model availability and bindings
-  agent enroll --target ID --model MODEL --approve [--revision N]
+  agent enroll --target ID --model MODEL --approve [--revision N] [--model-scope all-mapped|all-compatible]
                [--template ALIAS:LOCAL_SOURCE ...] (empty source excludes alias)
-  agent add --id ID --adapter codex --codex-home ABS_DIR --model MODEL --approve
-            [--model-scope all-compatible|single] [--anchor-executable ABS_PATH]
+  agent add --id ID --adapter codex|claude|dsh --config-root ABS_DIR --model MODEL --approve
+            [--model-scope all-compatible|all-mapped|single] [--anchor-executable ABS_PATH]
                                             Register; apply explicitly or on next serve
   agent list | agent inspect ID | agent plan ID
   agent apply ID --revision N --fingerprint SHA256
   agent sync|restore|enable|disable ID --revision N
-  agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|single
+  agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|all-mapped|single
   agent token ID                     Credential-helper stdout (local, raw secret)
   recover [--id ID]                   Conditional recovery with core stopped
   update config | configure [--channel alpha|beta|rc|stable|dev]
@@ -98,13 +98,14 @@ Diagnostics and service logs go to stderr.
 Provider IDs accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
 init/serve/access/context/recover/update/agent token operate locally. Business commands use the selected context.
-Codex base-config/model-catalog management is available; actual Agent connection remains unverified.
-New agent add defaults to all-compatible; --model is the default, not the permission boundary.
-Catalog metadata must match the exact Codex version and actual upstream capabilities.
-Enroll reads the selected local models_cache.json; no executable or network probing.
-Restart Codex after configuration changes. Other detected agents remain unsupported.
+Codex, Claude Code user settings and DSH web profile management are available; runtime connection remains unverified.
+Codex CLI enrollment defaults to all-compatible; Claude/DSH and desktop enrollment use all-mapped.
+All-mapped reads model mappings with enabled providers, without Codex metadata/tools/streaming filters.
+All-compatible requires exact-version Codex metadata and the selected local models_cache.json for enrollment.
+--codex-home remains a Codex-only alias for --config-root. No executable or upstream probing.
+Restart Codex/Claude Code after changes; DSH defaults apply to new sessions.
 Remote Codex app-server uses the remote base config; SSH connection management,
-other Agent adapters and named profiles are not implemented.
+Gemini/OpenCode and other Agent profiles are not implemented.
 Protocol conversion supports stateless text, function tools and streaming; unsupported content is rejected.
 `
 

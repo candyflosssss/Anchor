@@ -31,6 +31,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 	case "enroll":
 		f := a.flags("agent enroll")
 		target := f.String("target", "", "discovered local target ID (required)")
+		scope := f.String("model-scope", "", "all-mapped or all-compatible; Codex defaults to all-compatible, other adapters to all-mapped")
 		model := f.String("model", "", "default public model (required)")
 		revision := f.Int64("revision", 0, "existing binding revision; 0 for new target")
 		approve := f.Bool("approve", false, "approve target-local catalog and configuration management")
@@ -53,7 +54,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		if *target == "" || *model == "" || !*approve || *revision < 0 {
 			return errors.New("--target, --model and --approve are required; revision must be nonnegative")
 		}
-		v, err := c.EnrollAgent(ctx, managed.EnrollAgent{TargetID: *target, Model: *model, ExpectedRevision: *revision, ModelTemplates: choices, Approved: *approve})
+		v, err := c.EnrollAgent(ctx, managed.EnrollAgent{ModelScope: *scope, TargetID: *target, Model: *model, ExpectedRevision: *revision, ModelTemplates: choices, Approved: *approve})
 		if err != nil {
 			return err
 		}
@@ -71,17 +72,30 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 	case "add":
 		f := a.flags("agent add")
 		id := f.String("id", "", "binding ID")
-		adapter := f.String("adapter", "codex", "adapter (codex only)")
-		root := f.String("codex-home", "", "approved absolute CODEX_HOME; must exist")
+		adapter := f.String("adapter", "codex", "adapter: codex, claude or dsh")
+		root := f.String("config-root", "", "approved absolute configuration root; DSH uses its web profile; must exist")
+		codexRoot := f.String("codex-home", "", "alias for --config-root with --adapter codex")
 		model := f.String("model", "", "default public model (tools and streaming required)")
-		scope := f.String("model-scope", "all-compatible", "model permission scope: all-compatible or single; legacy bindings stay single")
+		scope := f.String("model-scope", "", "model permission scope: all-compatible, all-mapped or single; legacy bindings stay single")
 		exe := f.String("anchor-executable", "", "stable absolute Anchor binary path")
 		approved := f.Bool("approve", false, "approve long-term configuration management; applies on next serve or agent apply")
 		if e := parse(f, args[1:]); e != nil {
 			return e
 		}
-		if *scope != "single" && *scope != "all-compatible" {
-			return errors.New("--model-scope must be all-compatible or single")
+		if *codexRoot != "" {
+			if *adapter != "codex" || *root != "" {
+				return errors.New("--codex-home is a Codex-only alias; use one root flag")
+			}
+			*root = *codexRoot
+		}
+		if *scope == "" {
+			*scope = "all-compatible"
+			if *adapter != "codex" {
+				*scope = "all-mapped"
+			}
+		}
+		if *scope != "single" && *scope != "all-compatible" && *scope != "all-mapped" {
+			return errors.New("--model-scope must be all-compatible, all-mapped or single")
 		}
 		if !*approved {
 			return errors.New("--approve is required; review the configuration root first")
@@ -108,11 +122,11 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		f := a.flags("agent set-models")
 		revision := f.Int64("revision", 0, "expected binding revision (required)")
 		model := f.String("model", "", "new default public model (required)")
-		scope := f.String("model-scope", "", "single or all-compatible (required; explicit authorization)")
+		scope := f.String("model-scope", "", "single, all-mapped or all-compatible (required; explicit authorization)")
 		if err := parse(f, args[2:]); err != nil {
 			return err
 		}
-		if *revision < 1 || *model == "" || (*scope != "single" && *scope != "all-compatible") {
+		if *revision < 1 || *model == "" || (*scope != "single" && *scope != "all-compatible" && *scope != "all-mapped") {
 			return errors.New("--revision, --model and explicit --model-scope required")
 		}
 		v, err := c.SetAgentModels(ctx, args[1], *revision, *model, *scope)

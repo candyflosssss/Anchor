@@ -73,7 +73,7 @@ func TestAgentTokenAndIndependentRecovery(t *testing.T) {
 	}
 }
 func TestAgentHelpMatchesLifecycle(t *testing.T) {
-	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version"} {
+	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version"} {
 		if !strings.Contains(help, s) {
 			t.Fatal("missing help", s)
 		}

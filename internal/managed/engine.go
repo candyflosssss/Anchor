@@ -120,7 +120,7 @@ func (e *Engine) load(id string) (journal, error) {
 	if err = json.Unmarshal(b, &j); err != nil {
 		return j, ErrUnsafe
 	}
-	if j.Schema != 1 || j.BindingID != id || j.AdapterVersion != "1" || filepath.Base(j.Path) != "config.toml" || !filepath.IsAbs(j.Path) {
+	if j.Schema != 1 || j.BindingID != id || j.AdapterVersion != "1" || !supportedConfig(j.Path) || !filepath.IsAbs(j.Path) {
 		return j, ErrUnsafe
 	}
 	if j.Catalog != nil && (filepath.Dir(j.Catalog.Path) != filepath.Dir(j.Path) || filepath.Base(j.Catalog.Path) != catalogName(id) || len(j.Catalog.Written) > maxConfig || !json.Valid(j.Catalog.Written)) {
@@ -151,6 +151,11 @@ func atomicWrite(root, path string, b []byte, expected string, check bool) error
 	defer f.Close()
 	if err = platform.PreserveManagedPermissions(path, tmp); err != nil {
 		return err
+	}
+	if filepath.Base(path) == "settings.json" || filepath.Base(path) == "cordis.patch.yml" {
+		if err = platform.SecureFile(tmp); err != nil {
+			return err
+		}
 	}
 	if _, err = f.Write(b); err != nil {
 		return err
@@ -226,7 +231,7 @@ func (e *Engine) Apply(p Plan) (Result, error) {
 				return ErrChanged
 			}
 		}
-		next, err := e.Editor.Patch(b, p.Edits)
+		next, err := e.editor(p.Path).Patch(b, p.Edits)
 		if err != nil {
 			return err
 		}
@@ -282,7 +287,7 @@ func (e *Engine) Recover(id string) (Result, error) {
 		for _, x := range j.Edits {
 			paths = append(paths, x.Path)
 		}
-		values, err := e.Editor.Values(b, paths)
+		values, err := e.editor(j.Path).Values(b, paths)
 		if err != nil {
 			return err
 		}
@@ -309,7 +314,7 @@ func (e *Engine) Recover(id string) (Result, error) {
 					roots = append(roots, r)
 				}
 			}
-			preview, err := e.Editor.Patch(b, roots)
+			preview, err := e.editor(j.Path).Patch(b, roots)
 			if err != nil {
 				return err
 			}
@@ -327,7 +332,7 @@ func (e *Engine) Recover(id string) (Result, error) {
 				i--
 			}
 		}
-		next, err := e.Editor.Patch(b, edits)
+		next, err := e.editor(j.Path).Patch(b, edits)
 		if err != nil {
 			return err
 		}
@@ -370,7 +375,7 @@ func (e *Engine) Status(id string) (Result, error) {
 	for _, x := range j.Edits {
 		paths = append(paths, x.Path)
 	}
-	values, err := e.Editor.Values(b, paths)
+	values, err := e.editor(j.Path).Values(b, paths)
 	if err != nil {
 		return out, err
 	}
@@ -469,4 +474,23 @@ func (e *Engine) recoverCatalog(j journal, out *Result) error {
 		return err
 	}
 	return platform.SyncManagedDir(root)
+}
+
+func supportedConfig(path string) bool {
+	switch filepath.Base(path) {
+	case "config.toml", "settings.json":
+		return true
+	case "cordis.patch.yml":
+		return filepath.Base(filepath.Dir(path)) == "web" && filepath.Base(filepath.Dir(filepath.Dir(path))) == "profiles"
+	}
+	return false
+}
+func (e *Engine) editor(path string) Editor {
+	switch filepath.Base(path) {
+	case "settings.json":
+		return StructuredEditor{}
+	case "cordis.patch.yml":
+		return StructuredEditor{DSH: true}
+	}
+	return e.Editor
 }

@@ -50,20 +50,20 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
               <fieldset disabled={c.busy}>
                 <div className="field"><label htmlFor={`agent-default-${row.id}`}>默认模型</label>
                   <select id={`agent-default-${row.id}`} className="select-field w-full" value={c.model} onChange={e => c.setModel(e.target.value)}>
-                    <option value="">请选择</option>{c.availableModels.map(m => <option key={m.id} value={m.id}>{m.id}</option>)}
+                    <option value="">请选择</option>{c.data!.models.map(m => { const available = c.availableModels.some(v => v.id === m.id); return <option key={m.id} value={m.id} disabled={!available}>{m.id}{available ? '' : '（无启用的供应商）'}</option>; })}
                   </select>
                 </div>
-                {!c.availableModels.length && <p className="field-error">现有模型映射中没有可供此 Codex 使用的模型。请在模型映射中核对工具、流式能力、启用的供应商与 Codex 模型信息。</p>}
+                {!c.availableModels.length && <p className="field-error">现有模型映射没有启用的候选供应商。请在模型映射中检查供应商状态。</p>}
               </fieldset>
               <div className="agent-settings-actions"><Button type="submit" disabled={c.busy || !c.availableModels.some(m => m.id === c.model)}>{binding ? '保存并应用' : '开启托管'}</Button></div>
             </form>}
-            {binding && <div className="agent-settings-actions"><Button size="sm" variant="outline" disabled={c.busy || !binding.enabled} onClick={() => void c.manage(binding, 'sync')}>同步模型目录</Button></div>}
+            {binding && <div className="agent-settings-actions"><Button size="sm" variant="outline" disabled={c.busy || !binding.enabled} onClick={() => void c.manage(binding, 'sync')}>同步模型映射</Button></div>}
           </div>}
         </article>;
       })}</section>}
     </>}
     <ConfirmAction open={!!c.disableTarget} title="停用此 Agent 的托管？" busy={c.busy} onCancel={() => c.setDisableTarget(null)} onConfirm={() => { if (c.disableTarget) void c.manage(c.disableTarget, 'disable'); }}>
-      <p className="break-all">{c.disableTarget?.config_root}</p><p>按字段恢复 Anchor 写入的配置并停用网关凭据。第三方修改会保留并报告冲突。完成后请重启 Codex。</p>
+      <p className="break-all">{c.disableTarget?.config_root}</p><p>按字段恢复 Anchor 写入的配置并停用网关凭据。第三方修改会保留并报告冲突。完成后请重启对应 Agent；DSH 请新建会话。</p>
     </ConfirmAction>
   </div>;
 }

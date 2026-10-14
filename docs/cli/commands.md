@@ -424,37 +424,40 @@ anchor access revoke ID
 ```text
 anchor agent discover
 anchor agent enroll --target ID --model MODEL --approve [--revision N]
+                    [--model-scope all-mapped|all-compatible]
                     [--template PUBLIC_ALIAS:LOCAL_SOURCE ...]
 anchor agent sync ID --revision N
 ```
 
-作用域为所选 Context 的核心所在机器，需要本轮新版核心在线；当前 Context 仅本机。`discover` 无参数，只读返回 `{targets, bindings, models}`：目标包含路径、来源、适配状态、缓存版本与模板摘要；托管行包含 revision、默认模型、当前兼容模型及状态；models 每项增加 `available_targets` 数组，列出按已有映射自动登记时可用的目标 ID，无可用目标时为 `[]`。该预览复用核心 tools/streaming、启用供应商和版本匹配元数据规则，不包含旧目标级模板覆盖；现有绑定实际授权仍看 bindings.available_models。不返回令牌或完整模型指令。只查 `CODEX_HOME`、`~/.codex`、`~/.claude`、`~/.gemini`、`~/.config/opencode`、绝对路径 `DSH_HOME` 与 `~/.dsh`，Windows 另查用户 `AppData/Roaming/opencode`；同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录存在仅表示配置痕迹，不能证明程序已安装或正在运行。其他产品暂时只识别、无适配器。
+作用域为所选 Context 的核心所在机器，需要兼容的新版核心在线。`discover` 无参数，只读返回 `{targets, bindings, models}`。目标包含路径、来源、适配状态、可选缓存版本和模板摘要；绑定包含 `adapter_id`、revision、默认模型、授权模型及恢复状态。models 的 `available_targets` 直接依据全部模型映射和至少一个启用供应商候选计算，不要求 tools、streaming 或 Codex 元数据，不做上游健康探测。接口不返回令牌或完整模型指令。
 
-缓存失败现在通过 target.status 区分：`catalog_missing`（该目录无缓存）、`catalog_unreadable`（无法读取）、`catalog_unsafe`（路径或类型不安全）、`catalog_invalid`（JSON 格式无效）、`catalog_version_invalid`（缺少有效 X.Y.Z）、`catalog_empty`（无模型）、`catalog_too_large`（字节/条目超限）、`catalog_metadata_invalid`（条目不完整/不兼容）、`catalog_duplicate`（重复 slug）。旧核心可能仍返回 `catalog_unavailable`。文件缺失时核对 Codex 实际使用的 CODEX_HOME；格式或元数据校验失败不能仅靠重复重启处理。状态不返回任意 OS/解析器错误或模型指令。
+发现范围为绝对路径 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`DSH_HOME`，以及 `~/.codex`、`~/.claude`、`~/.dsh`、`~/.gemini`、`~/.config/opencode`；Windows 另查用户 `AppData/Roaming/opencode`。同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录痕迹不证明已安装或运行。当前 Codex、Claude Code、DSH 可托管；Gemini/OpenCode 只识别。
 
-`enroll` 的 target/model/approve 必填。target 取 discover 返回的 ID；默认模型必须声明 tools/streaming、至少有一个启用的供应商候选，且有版本匹配的完整模板。revision 默认0，仅新目标使用；已登记目标必须传当前值，包括先前由 add 自定义 ID 登记的同一目录。重复 `--template` 指定公开别名到本地源 slug 的选择，同一别名重复拒绝；空源如 `--template other:` 显式排除此模型。未指定选择时，优先有效的共享元数据，然后精确别名或唯一上游 slug 匹配；多个源命中不猜测，可在共享模型元数据中明确配置；CLI 仍允许高级 `--template` 覆盖。桌面托管直接采用已有映射与自动匹配，不再提供逐模型模板表单，默认模型只从 `available_targets` 含所选目标的映射中选择。更新桌面托管会清除旧目标级模板覆盖/排除，通过折叠设置中的「开启托管」或「保存并应用」明确批准连接、默认模型和自动目录；页面不再重复展示模型清单或批准勾选框，供应商映射不变。
+`enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不读本地模型缓存、不生成 Codex 专有模型目录。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
 
-核心重新识别目标并读取其 `models_cache.json`（最多4 MiB、128个完整条目），缓存必须含有效的 `client_version=X.Y.Z`。缓存文件缺失时先核对目录与 Codex 是否生成缓存；文件已存在但校验失败时按发现状态处理，不统一要求重复启动。Codex 可选的旧版 `supports_parallel_tool_calls` 字段允许缺省，`context_window` 允许缺省或 null；导入原样保留，不补造并行能力或上下文值，存在的字段仍校验类型。缓存报告的版本不是可执行程序版本探测；批准前仍需核对版本和上游能力，不凭名称伪造元数据。模板快照和显式选择保存在 Binding 中，不修改供应商映射。新建凭据；更新保留原凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需重新 discover 检查，不能盲目重复提交。成功返回更新后的 workspace。
+仅 Codex all-compatible 要求 tools/streaming、精确版本匹配的完整 Codex 元数据与本地 `models_cache.json`（最多4 MiB、128条，有效 `client_version=X.Y.Z`）。`--template ALIAS:SOURCE` 可重复，空源排除别名；未指定时依次使用共享元数据、精确别名或唯一上游 slug 匹配。其他范围不接受非空模板覆盖。发现时缓存缺失/无效不阻止 all-mapped 托管，兼容目录登记失败则需要核对缓存和版本，不伪造元数据。
 
-`sync` 必填 Binding ID 和当前 revision（≥1），仅 enabled 且网关就绪可操作；不增加 revision，也不旋转凭据。先校验新目录和配置支持范围，再条件恢复、重建当前模型快照；第三方冲突保留并报告，失败不重放。返回 `{binding_id, operation_id, status}`。模型/供应商变更立即影响网关授权，但运行中目录需显式 sync；核心重启会在核对既有日志后更新过期目录，外部覆盖和不支持配置保留并报告。模板或本地缓存升级需重新 enroll。配置更新后请完全退出并重启 Codex，包括其 app-server；配置成功不证明实际请求已经过 Anchor。
+登记为新绑定创建凭据；更新保留凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需要重新 discover 检查。成功返回 workspace。默认开关关闭，初次点击展开平台设置；点「开启托管」才提交批准，成功后开关打开。设置、目录和同步全部收进对应平台折叠区域。
+
+`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。先校验新配置，再条件恢复和重新应用；第三方冲突保留并报告，失败不重放。网关授权按当前映射动态计算，客户端配置中的模型列表为应用时快照，模型变更后用 sync 更新。Codex/Claude Code 需要重启，DSH 默认模型在新会话生效。配置写入成功不证明真实请求已通过 Anchor。
 
 ### `agent add`
 
 ```text
-anchor agent add --id ID [--adapter codex] --codex-home ABS_DIR --model MODEL --approve
-                 [--anchor-executable ABS_PATH] [--model-scope all-compatible|single]
+anchor agent add --id ID [--adapter codex|claude|dsh] --config-root ABS_DIR --model MODEL --approve
+                 [--anchor-executable ABS_PATH] [--model-scope all-compatible|all-mapped|single]
 ```
 
 - 作用域：所选 Context 的目标实例；路径按目标机器解释。当前 Context 仍仅本机。
-- `--id` 必填，符合普通 ID 规则且最多 64 字符；`--adapter` 默认/仅支持 `codex`，适配器修订固定为 `1`。
-- `--codex-home` 必填绝对目录，必须已存在；批准修改其中的基础 `config.toml` 与本绑定专有的 `anchor_ID.models.json`（生成目录时），不依赖控制端环境变量猜测目标。
-- `--model` 必填，指定**默认公开模型**，不是 all-compatible 的权限边界；模型需显式声明 `--tools --streaming`，声明不是上游能力探测。
-- `--model-scope` 默认 `all-compatible`：凭据可使用所有 tools/streaming、具有与绑定精确版本匹配的有效 Codex 元数据、且至少一个候选供应商 enabled 的公开模型；默认模型也必须在其中。版本从默认模型元数据固定到绑定。不是供应商健康探测，也不是任意/未知模型放行。
+- `--id` 必填，符合普通 ID 规则且最多 64 字符；`--adapter` 默认 `codex`，支持 `codex|claude|dsh`，适配器修订固定为 `1`。
+- `--config-root` 必填绝对目录，必须已存在；`--codex-home` 为仅限 Codex 的旧参数别名，二者不可同时传。Codex 修改基础 `config.toml` 和可选目录；Claude 修改 `settings.json`；DSH 修改已有 `profiles/web` 下的 `cordis.patch.yml`，不创建 profile 目录。
+- `--model` 必填，指定**默认公开模型**，不是 all-mapped/all-compatible 的权限边界；仅 Codex single/all-compatible 要求 tools/streaming，声明不是上游能力探测。
+- `--model-scope` Codex 默认 `all-compatible`，Claude/DSH 默认 `all-mapped`。all-mapped 授权所有具备启用供应商候选的映射，不要求 Codex 元数据或能力标记；all-compatible 仅支持 Codex：凭据可使用所有 tools/streaming、具有与绑定精确版本匹配的有效 Codex 元数据、且至少一个候选供应商 enabled 的公开模型；默认模型也必须在其中。版本从默认模型元数据固定到绑定。不是供应商健康探测，也不是任意/未知模型放行。
 - `single` 只授权默认模型；有元数据时生成单模型目录，无元数据时保留旧的仅配置方式，Codex 需自行识别 slug 或已有目录。旧 Binding 未填 scope 时仍为单模型，升级不会静默扩权。
 - `--anchor-executable` 默认当前 CLI 可执行文件的绝对路径；必须是目标机器现存、稳定的 Anchor 二进制。**不要把 `go run` 临时二进制作为长期 helper**，源码入口使用此命令时必须显式传稳定路径。搬动/删除二进制会破坏认证；目前没有修改 helper 路径的命令。
 - `--approve` 必填显式为 true：批准长期配置管理、下次 `serve` 自动接管与正常停服恢复。只登记 SQLite/凭据，不立即改配置；当前服务中的接管需 `agent plan` + `agent apply`，或重启服务。
 - 输出 Binding 元数据，`enabled:true`、`revision:1`，无秘密；同一规范化配置根只能登记一个 Binding，禁用亦保留所有权。Linux 配置根/文件须当前用户所有且不可被组/其他用户写入；符号链接、硬链接配置文件和 Windows reparse point 拒绝。
-- 支持全局配置；已选择的 profile、WebSocket、未知/复杂的受管理 TOML 字段拒绝。不会执行 Agent、自定义脚本、修改登录凭据或启动安装流程。
+- Codex 支持基础配置，已选择 profile、WebSocket 和不支持的 TOML 结构拒绝。Claude 仅管理用户 settings 的默认模型、availableModels、Anthropic 网关/auth/default/subagent 环境字段及 apiKeyHelper；项目/策略/CLI 覆盖不探测。DSH 仅管理 web profile 的 llm-pi-ai 命名路由与 agent-default-model，使用 openai-completions 和公开映射；现有其他路由及 YAML 注释/自定义标量标签保留，insert、别名/合并和重复键拒绝。不会执行 Agent、自定义脚本或安装流程。
 
 ### `agent list` / `agent inspect` / `agent plan`
 
@@ -488,7 +491,7 @@ anchor agent disable ID --revision N
 ### `agent set-models`
 
 ```text
-anchor agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|single
+anchor agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|all-mapped|single
 ```
 
 所选 Context 核心在线；ID、当前 revision≥1、默认公开模型和明确 scope 全部必填。先校验新策略及目录，再条件恢复旧配置/目录；恢复冲突或 I/O 失败会中止策略变更，旧 revision/授权不变（无冲突的配置字段可能已恢复）。成功保存新 default/scope/精确元数据版本、revision 加一，不旋转 token、不自动接管，输出 `{binding, management, apply_required:true}`。重新审核 plan 并 apply，或下次正常启动才写新配置。旧绑定扩权需显式执行此命令；缩到 single 后非默认模型立即失去授权，已接受请求不承诺取消。
@@ -505,7 +508,7 @@ anchor agent set-models ID --revision N --model DEFAULT --model-scope all-compat
 anchor agent token ID
 ```
 
-本机操作，拒绝 `--context`；无需运行核心。成功 stdout 是**仅网关用途的原始秘密 token 加换行，不是 JSON**，供 Codex 命令认证直接读取；不要人工打印、管道到日志或分享。ID 必须是 enabled Binding。Binding 凭据在受保护 SQLite 中以秘密和鉴权摘要独立存储，非加密；普通查询、plan、日志和配置文件均不含它。只能请求 Binding 授权范围内的公开模型（single 或动态 all-compatible），不能访问管理面。disable 后鉴权与 helper 输出均拒绝；重新 enable 会恢复同一绑定授权。
+本机操作，拒绝 `--context`；无需运行核心。成功 stdout 是**仅网关用途的原始秘密 token 加换行，不是 JSON**，供 Codex 命令认证直接读取；不要人工打印、管道到日志或分享。ID 必须是 enabled Binding。Binding 凭据在受保护 SQLite 中以秘密和鉴权摘要独立存储，非加密；普通查询、plan 和 Anchor 日志不含它。Codex 配置使用 helper，不内嵌 token；Claude/DSH 的受保护配置含仅网关用途的 Binding token（Linux 0600，Windows 当前用户权限），不写供应商密钥。DSH 自定义 Authorization header 不保证客户端日志脱敏，请勿分享原始配置/客户端请求日志。只能请求 Binding 授权范围内的公开模型（single 或动态 all-mapped/all-compatible），不能访问管理面。disable 后鉴权与 helper 输出均拒绝；重新 enable 会恢复同一绑定授权。
 
 ### `recover`
 
@@ -564,7 +567,7 @@ anchor recover [--id ID]
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
-| Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 全局配置、本地发现/登记/同步及桌面入口；模型元数据导入/目录生成与默认模型/范围更新已提供；其他适配器、profile、绑定删除/路径更新仍缺失 |
+| Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH web profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、其他 profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
 | 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；desktop.16 dev 已投放且真实下载通过，原生安装未验收，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |

@@ -17,7 +17,7 @@ import (
 )
 
 // Environment is supplied by the local host, never by a remote/UI path argument.
-type Environment struct{ Home, CodexHome, DSHHome, Executable string }
+type Environment struct{ Home, CodexHome, ClaudeHome, DSHHome, Executable string }
 
 func LocalEnvironment() (Environment, error) {
 	home, err := os.UserHomeDir()
@@ -28,7 +28,7 @@ func LocalEnvironment() (Environment, error) {
 	if err != nil {
 		return Environment{}, err
 	}
-	return Environment{Home: home, CodexHome: os.Getenv("CODEX_HOME"), DSHHome: os.Getenv("DSH_HOME"), Executable: exe}, nil
+	return Environment{Home: home, CodexHome: os.Getenv("CODEX_HOME"), ClaudeHome: os.Getenv("CLAUDE_CONFIG_DIR"), DSHHome: os.Getenv("DSH_HOME"), Executable: exe}, nil
 }
 
 type CatalogTemplate struct {
@@ -66,6 +66,9 @@ func Discover(env Environment) ([]AgentTarget, error) {
 	if env.CodexHome != "" && filepath.IsAbs(env.CodexHome) {
 		candidates = append(candidates, struct{ agent, root, source string }{"codex", env.CodexHome, "CODEX_HOME"})
 	}
+	if env.ClaudeHome != "" && filepath.IsAbs(env.ClaudeHome) {
+		candidates = append(candidates, struct{ agent, root, source string }{"claude", env.ClaudeHome, "CLAUDE_CONFIG_DIR"})
+	}
 	if env.DSHHome != "" && filepath.IsAbs(env.DSHHome) {
 		candidates = append(candidates, struct{ agent, root, source string }{"dsh", env.DSHHome, "DSH_HOME"})
 	}
@@ -98,6 +101,15 @@ func Discover(env Environment) ([]AgentTarget, error) {
 			out = append(out, t)
 			continue
 		}
+		if c.agent == "claude" || c.agent == "dsh" {
+			t.Supported = true
+			t.Status = "ready"
+			if _, err := AdapterFor(c.agent).Inspect(state.Binding{ConfigRoot: root}); err != nil {
+				t.Status = "config_unsupported"
+			}
+			out = append(out, t)
+			continue
+		}
 		if c.agent != "codex" {
 			out = append(out, t)
 			continue
@@ -110,7 +122,7 @@ func Discover(env Environment) ([]AgentTarget, error) {
 		}
 		version, catalog, err := localCatalog(root)
 		if err != nil {
-			t.Status = catalogStatus(err)
+			t.Status = "ready"
 		} else {
 			t.Status = "ready"
 			t.CatalogVersion = version

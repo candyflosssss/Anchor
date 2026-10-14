@@ -331,3 +331,16 @@ Catalog 快照和 public alias → 源 slug 选择归 Binding；空源为排除�
 ### 2026-10-14 DSH 只读发现与托管页收敛（当前源码，未发布）
 
 只读发现增加核心宿主的绝对路径 DSH_HOME 和默认 ~/.dsh，去重及路径检查与已有发现保持一致；不读取凭据，不执行客户端。DSH 仍没有配置写入/恢复适配器，不能登记为可托管。平台页固定显示五个平台品牌，路径、诊断、模型和同步操作收进各自折叠区；初次开启需在该区点击「开启托管」，既有开关启停沿用核心生命周期。已有绑定即使当前没有发现目录，也保留恢复入口。CLI 变化见指令大全 §8 和指令历史。
+
+
+## 当前实现增量：2026-10-14
+
+此前仅 Codex 可写入、DSH 仅发现的描述由本节替代。AdapterFor 分派 codex/claude/dsh，管理器和 Engine 共用计划、字段日志、指纹及条件恢复，前端与 CLI 不自行编辑配置。
+
+all-mapped 将所有具有启用供应商的公开模型映射作为动态授权范围，无 tools/streaming/Codex 元数据筛选；默认值必须在范围内。桌面显式使用此范围，Codex CLI 原缺省兼容范围和旧 single 绑定保持。客户端的模型列表为应用时快照，通过同步刷新；无供应商映射可显示但不选用。
+
+Claude 仅写用户 settings.json 的 model/availableModels、Anthropic 基址、Binding auth 与模型默认环境变量，暂时禁用原 API key/helper 和云平台选项；停用按原字段恢复。基址使用网关 origin，避免 SDK 重复 /v1；自定义默认别名提供 custom model option，网关发现不能保证任意别名进入原生选择器。项目、策略、CLI 覆盖与实际程序连接不作探测。
+
+DSH 仅写已有 profiles/web 下 cordis.patch.yml：llm-pi-ai 的 Anchor 命名路由通过 openai-completions、/v1 基址和 Authorization Binding token，agent-default-model 指向公开映射。已存在路由只改本绑定字段，缺失行按整行所有权创建/恢复。保留未知插件、其他路由和 YAML 注释/标量标签，拒绝含 insert、别名/合并或重复键的复杂文档。
+
+两个新适配器的配置含受限网关 token，原子发布前设置当前用户权限；不写供应商密钥，管理 DTO 不暴露 token。DSH 自定义 header 不提供客户端日志脱敏保证。Claude/Codex 重启客户端；DSH 默认值需新会话。Gemini/OpenCode、其他 profile、真实客户端端到端和原生 Windows 仍未验收。

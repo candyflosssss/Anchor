@@ -45,7 +45,8 @@
           "public"
         ],
         "catalog_path": "C:\\Users\\Fixture\\.codex\\anchor_codex-fixture.models.json",
-        "model_templates": {}
+        "model_templates": {},
+        "adapter_id": "codex"
       }
     ]
   },
@@ -54,7 +55,8 @@
     "model": "public",
     "expected_revision": 0,
     "model_templates": {},
-    "approved": true
+    "approved": true,
+    "model_scope": "all-mapped"
   },
   "sync": {
     "binding_id": "codex-fixture",

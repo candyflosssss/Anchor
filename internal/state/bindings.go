@@ -28,6 +28,9 @@ type Binding struct {
 }
 
 func (b Binding) Validate() error {
+	if b.AdapterID != "codex" && (b.ModelScope == "all-compatible" || b.CodexVersion != "" || len(b.CodexCatalog) > 0 || len(b.ModelTemplates) > 0) {
+		return ErrInvalid
+	}
 	if len(b.CodexCatalog) > 128 || len(b.ModelTemplates) > 256 {
 		return ErrInvalid
 	}
@@ -56,14 +59,14 @@ func (b Binding) Validate() error {
 		}
 	}
 
-	if b.ModelScope != "" && b.ModelScope != "single" && b.ModelScope != "all-compatible" {
+	if b.ModelScope != "" && b.ModelScope != "single" && b.ModelScope != "all-compatible" && b.ModelScope != "all-mapped" {
 		return errors.New("invalid model scope")
 	}
 	if (b.ModelScope == "all-compatible" || b.CodexVersion != "") && !ValidCodexVersion(b.CodexVersion) {
 		return errors.New("all-compatible bindings require a Codex catalog version")
 	}
-	if !ValidID(b.ID) || len(b.ID) > 64 || b.AdapterID != "codex" || b.AdapterVersion != "1" || !ValidID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
-		return errors.New("invalid binding: codex v1, absolute approved root/executable and valid IDs required")
+	if !ValidID(b.ID) || len(b.ID) > 64 || (b.AdapterID != "codex" && b.AdapterID != "claude" && b.AdapterID != "dsh") || b.AdapterVersion != "1" || !ValidID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
+		return errors.New("invalid binding: supported adapter v1, absolute approved root/executable and valid IDs required")
 	}
 	return nil
 }
@@ -222,7 +225,7 @@ func (s *Store) SetBindingModels(id string, expected int64, model, scope, versio
 // dynamic policy restricted to declared tools/streaming, matching metadata and
 // at least one enabled provider. No network probes or secrets are returned.
 func (s *Store) BindingModels(b Binding) ([]Model, error) {
-	if b.ModelScope != "all-compatible" {
+	if b.ModelScope != "all-compatible" && b.ModelScope != "all-mapped" {
 		m, err := s.Model(b.Model)
 		if err != nil {
 			return nil, err
@@ -245,7 +248,7 @@ func (s *Store) BindingModels(b Binding) ([]Model, error) {
 	out := []Model{}
 	for _, m := range models {
 		m.Codex = BindingMetadata(b, m)
-		if !m.Tools || !m.Streaming || m.Codex == nil || m.Codex.Version != b.CodexVersion || m.Codex.Validate() != nil {
+		if b.ModelScope == "all-compatible" && (!m.Tools || !m.Streaming || m.Codex == nil || m.Codex.Version != b.CodexVersion || m.Codex.Validate() != nil) {
 			continue
 		}
 		for _, c := range m.Candidates {
@@ -258,7 +261,7 @@ func (s *Store) BindingModels(b Binding) ([]Model, error) {
 	return out, nil
 }
 func (s *Store) BindingAllows(b Binding, id string) (bool, error) {
-	if b.ModelScope != "all-compatible" {
+	if b.ModelScope != "all-compatible" && b.ModelScope != "all-mapped" {
 		return id == b.Model, nil
 	}
 	models, err := s.BindingModels(b)

@@ -44,7 +44,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
     const generation = ++epoch.current;
     try {
       const v = await action();
-      if (alive.current && epoch.current === generation) { setData(v); setTargetId(''); setNotice('托管状态已更新。配置应用或恢复后请完全退出并重新启动 Codex；配置成功仍需在 Agent 中验证实际请求。'); }
+      if (alive.current && epoch.current === generation) { setData(v); setTargetId(''); setNotice('托管状态已更新。配置应用或恢复后请完全退出并重新启动对应 Agent（DSH 请新建会话）；配置成功仍需在 Agent 中验证实际请求。'); }
     } catch (e) {
       if (alive.current && epoch.current === generation) {
         setError(agentMessage(e)); setTargetId('');
@@ -61,7 +61,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
   return { data, rows, expanded, availableModels, loading, busy, error, notice, selected, binding, model, setModel, disableTarget, setDisableTarget,
     read, select, cancel: () => { if (!busy) setTargetId(''); },
     enroll: () => selected?.supported && selected.status === 'ready' && availableModels.some(m => m.id === model) && write(() => agentService.enroll({ target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
-      model_templates: {}, approved: true })),
+      model_scope: 'all-mapped', model_templates: {}, approved: true })),
     manage: (row: ManagedAgent, action: 'sync' | 'enable' | 'disable') => write(() => agentService.manage({ binding_id: row.id, expected_revision: row.revision, action })),
   };
 }

@@ -16,8 +16,8 @@ export function checkedAgentWorkspace(value: AgentWorkspace): AgentWorkspace {
       return { id: m.id, tools: m.tools, streaming: m.streaming, upstream_models: [...m.upstream_models], available_targets: [...m.available_targets] };
     }),
     bindings: value.bindings.map(b => {
-      if (!b || ![b.id, b.config_root, b.model, b.model_scope, b.catalog_version, b.status, b.catalog_path].every(v => typeof v === 'string') || !Number.isSafeInteger(b.revision) || b.revision < 1 || typeof b.enabled !== 'boolean' || !Array.isArray(b.available_models) || b.available_models.some(v => typeof v !== 'string') || !b.model_templates || Array.isArray(b.model_templates) || typeof b.model_templates !== 'object' || Object.values(b.model_templates).some(v => typeof v !== 'string')) return bad();
-      return { id: b.id, config_root: b.config_root, model: b.model, enabled: b.enabled, revision: b.revision, model_scope: b.model_scope, catalog_version: b.catalog_version, status: b.status, catalog_path: b.catalog_path, available_models: [...b.available_models], model_templates: { ...b.model_templates } };
+      if (!b || ![b.id, b.adapter_id, b.config_root, b.model, b.model_scope, b.catalog_version, b.status, b.catalog_path].every(v => typeof v === 'string') || !Number.isSafeInteger(b.revision) || b.revision < 1 || typeof b.enabled !== 'boolean' || !Array.isArray(b.available_models) || b.available_models.some(v => typeof v !== 'string') || !b.model_templates || Array.isArray(b.model_templates) || typeof b.model_templates !== 'object' || Object.values(b.model_templates).some(v => typeof v !== 'string')) return bad();
+      return { id: b.id, adapter_id:b.adapter_id, config_root: b.config_root, model: b.model, enabled: b.enabled, revision: b.revision, model_scope: b.model_scope, catalog_version: b.catalog_version, status: b.status, catalog_path: b.catalog_path, available_models: [...b.available_models], model_templates: { ...b.model_templates } };
     }),
   };
 }
@@ -70,7 +70,7 @@ export function agentRows(data: AgentWorkspace): AgentRow[] {
   const rows: AgentRow[] = data.targets.map(target => ({ id: target.id, agent: target.agent, target,
     binding: data.bindings.find(b => sameAgentRoot(b.config_root, target.config_root)) }));
   for (const binding of data.bindings) {
-    if (!rows.some(row => row.binding?.id === binding.id)) rows.push({ id: `binding-${binding.id}`, agent: 'codex', binding });
+    if (!rows.some(row => row.binding?.id === binding.id)) rows.push({ id: `binding-${binding.id}`, agent: binding.adapter_id, binding });
   }
   const platforms = ['codex', 'claude', 'gemini', 'opencode', 'dsh'];
   for (const agent of platforms) if (!rows.some(row => row.agent === agent)) rows.push({ id: `platform-${agent}`, agent });

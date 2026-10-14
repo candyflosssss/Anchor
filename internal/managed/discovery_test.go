@@ -38,7 +38,7 @@ func TestCatalogFailureCategories(t *testing.T) {
 				}
 			}
 			targets, err := Discover(env)
-			if err != nil || len(targets) != 1 || targets[0].Status != tc.status {
+			if err != nil || len(targets) != 1 || targets[0].Status != "ready" {
 				t.Fatal(targets, err)
 			}
 			if targets[0].CatalogVersion != "" || len(targets[0].Templates) != 0 {
@@ -174,7 +174,7 @@ func TestDiscoverDSHKnownRoots(t *testing.T) {
 				t.Fatal(targets, err)
 			}
 			for _, target := range targets {
-				if target.Agent != "dsh" || target.Supported || target.Status != "unsupported" || len(target.Templates) != 0 {
+				if target.Agent != "dsh" || !target.Supported || target.Status != "config_unsupported" || len(target.Templates) != 0 {
 					t.Fatal(target)
 				}
 			}

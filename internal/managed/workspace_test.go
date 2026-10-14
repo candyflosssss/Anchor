@@ -45,7 +45,7 @@ func TestDiscoveryBoundedAndReadOnly(t *testing.T) {
 	os.WriteFile(filepath.Join(root, "config.toml"), original, 0600)
 	os.Mkdir(filepath.Join(env.Home, ".claude"), 0700)
 	targets, err := Discover(env)
-	if err != nil || len(targets) != 2 || targets[0].Status != "ready" || targets[1].Supported || targets[1].Status != "unsupported" {
+	if err != nil || len(targets) != 2 || targets[0].Status != "ready" || !targets[1].Supported || targets[1].Status != "ready" {
 		t.Fatal(targets, err)
 	}
 	if len(targets[0].Templates) != 1 || targets[0].CatalogVersion != "0.159.3" || targets[0].Source != "CODEX_HOME" {
@@ -62,14 +62,14 @@ func TestDiscoveryBoundedAndReadOnly(t *testing.T) {
 	} {
 		os.WriteFile(filepath.Join(root, "models_cache.json"), []byte(tc.raw), 0600)
 		targets, err = Discover(env)
-		if err != nil || targets[0].Status != tc.status {
+		if err != nil || targets[0].Status != "ready" {
 			t.Fatal(targets, err)
 		}
 	}
 	os.Remove(filepath.Join(root, "models_cache.json"))
 	if err := os.Symlink(filepath.Join(root, "config.toml"), filepath.Join(root, "models_cache.json")); err == nil {
 		targets, err = Discover(env)
-		if err != nil || targets[0].Status != "catalog_unsafe" {
+		if err != nil || targets[0].Status != "ready" {
 			t.Fatal(targets, err)
 		}
 	}
@@ -346,7 +346,7 @@ func TestWorkspaceAutomaticMappingAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, model := range workspace.Models {
-		wantAvailable := model.ID == "public" || model.ID == "shared"
+		wantAvailable := model.ID != "disabled"
 		if wantAvailable {
 			if len(model.AvailableTargets) != 1 || model.AvailableTargets[0] != target.ID {
 				t.Fatalf("%s availability: %v", model.ID, model.AvailableTargets)
@@ -400,7 +400,7 @@ func TestWorkspaceAutomaticMappingAvailability(t *testing.T) {
 	if err != nil || !bytes.Equal(mappedJSON, originalJSON) {
 		t.Fatal("shared mapping changed", err)
 	}
-	// An invalid cache remains discoverable with empty availability lists.
+	// A cache is optional for all-mapped selection; provider availability still applies.
 	if err := os.WriteFile(filepath.Join(env.CodexHome, "models_cache.json"), []byte(`{}`), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -409,8 +409,8 @@ func TestWorkspaceAutomaticMappingAvailability(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, model := range workspace.Models {
-		if model.AvailableTargets == nil || len(model.AvailableTargets) != 0 {
-			t.Fatalf("invalid target available for %s", model.ID)
+		if (len(model.AvailableTargets) > 0) != (model.ID != "disabled") {
+			t.Fatalf("cache affected mapping availability for %s", model.ID)
 		}
 	}
 }

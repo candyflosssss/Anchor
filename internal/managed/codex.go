@@ -19,6 +19,7 @@ type GatewayBinding struct {
 	Streaming      bool
 	Models         []state.Model
 	CatalogVersion string
+	Token          string
 }
 type Inspection struct {
 	AdapterID           string   `json:"adapter_id"`
@@ -67,7 +68,7 @@ func (Codex) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
 	if e := b.Validate(); e != nil {
 		return Plan{}, e
 	}
-	if !g.Ready || !g.Tools || !g.Streaming {
+	if !g.Ready || (b.ModelScope != "all-mapped" && (!g.Tools || !g.Streaming)) {
 		return Plan{}, errors.New("gateway must be ready and selected model must advertise tools and streaming")
 	}
 	if _, e := (Codex{}).Inspect(b); e != nil {
@@ -83,7 +84,7 @@ func (Codex) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
 	var catalog []byte
 	var modelIDs []string
 	var catalogPath string
-	if len(g.Models) > 0 && g.CatalogVersion != "" {
+	if b.ModelScope != "all-mapped" && len(g.Models) > 0 && g.CatalogVersion != "" {
 		catalog, modelIDs, e = buildCatalog(g.Models, g.CatalogVersion)
 		if e != nil {
 			return Plan{}, e
@@ -131,6 +132,11 @@ func (Codex) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
 	p := Plan{BindingID: b.ID, ExpectedRevision: b.Revision, Model: g.Model, GatewayURL: g.BaseURL, CredentialMethod: "command-backed binding token (not embedded)", AdapterVersion: "1", Path: path, Fingerprint: fingerprint(raw, exists), Fields: paths, Reload: "restart_required", Verification: "configuration_only; effective Agent connection unknown", original: raw, existed: exists}
 	p.ModelScope = b.ModelScope
 	p.AvailableModels = modelIDs
+	if b.ModelScope == "all-mapped" {
+		for _, model := range g.Models {
+			p.AvailableModels = append(p.AvailableModels, model.ID)
+		}
+	}
 	p.CatalogPath = catalogPath
 	p.CatalogVersion = g.CatalogVersion
 	if catalogPath != "" {
@@ -165,7 +171,7 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 	if m["model"] != g.Model || m["model_provider"] != provider || !ok || table["base_url"] != g.BaseURL {
 		return out, ErrChanged
 	}
-	if len(g.Models) > 0 && g.CatalogVersion != "" {
+	if b.ModelScope != "all-mapped" && len(g.Models) > 0 && g.CatalogVersion != "" {
 		path := filepath.Join(b.ConfigRoot, catalogName(b.ID))
 		if m["model_catalog_json"] != path {
 			return out, ErrChanged
@@ -194,7 +200,7 @@ func ValidateTarget(b *state.Binding) error {
 	if e = b.Validate(); e != nil {
 		return e
 	}
-	if _, e = (Codex{}).Inspect(*b); e != nil {
+	if _, e = AdapterFor(b.AdapterID).Inspect(*b); e != nil {
 		return e
 	}
 	st, e := os.Stat(b.Executable)

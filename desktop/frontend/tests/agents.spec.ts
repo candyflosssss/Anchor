@@ -15,7 +15,8 @@ test.beforeEach(async ({ page }) => {
       EnrollAgent: async (input: EnrollAgent) => {
         window.agentTest.enrolls.push(input);
         if (window.agentTest.failWrite) return { contract: f.contract, data: null, problem: { code: 'conflict' } };
-        data.bindings = [{ ...f.workspace.bindings[0], model: input.model, model_templates: input.model_templates }];
+        const target = data.targets.find(t => t.id === input.target_id)!;
+        data.bindings = [{ ...f.workspace.bindings[0], id: target.id, adapter_id: target.agent, config_root: target.config_root, model_scope: input.model_scope, model: input.model, model_templates: input.model_templates }];
         return result(data);
       },
       ManageAgent: async (input: ManageAgent) => {
@@ -55,7 +56,7 @@ test('compact platform list, inline enrollment, sync and conditional disable', a
   expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll]);
   await openSettings(page);
   await expect(page.getByText('配置已应用', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '同步模型目录' }).click();
+  await page.getByRole('button', { name: '同步模型映射' }).click();
   await expect.poll(() => page.evaluate(() => window.agentTest.actions)).toEqual([fixture.sync]);
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   const dialog = page.getByRole('alertdialog'); await expect(dialog).toBeVisible();
@@ -95,7 +96,7 @@ test('unavailable mapping is excluded from defaults without a redundant model li
     window.agentTest.data.models.push({ ...window.agentTest.data.models[0], id: 'unavailable', available_targets: [] });
     window.agentTest.data.bindings = [{ ...window.agentTest.data.bindings[0],
       id: 'codex-fixture', config_root: 'C:\\Users\\Fixture\\.codex', model: 'unavailable', enabled: true,
-      revision: 1, model_scope: 'all-compatible', catalog_version: '0.159.3', status: 'applied',
+      adapter_id: 'codex', revision: 1, model_scope: 'all-compatible', catalog_version: '0.159.3', status: 'applied',
       available_models: [], catalog_path: '', model_templates: { public: '' },
     }];
   });
@@ -112,7 +113,7 @@ test('no compatible mappings gives a reason and blocks enrollment', async ({ pag
   await page.evaluate(() => { window.agentTest.data.models[0].available_targets = []; });
   await page.getByRole('button', { name: '重新识别' }).click();
   await openSettings(page);
-  await expect(page.getByText('现有模型映射中没有可供此 Codex 使用的模型。', { exact: false })).toBeVisible();
+  await expect(page.getByText('现有模型映射没有启用的候选供应商。', { exact: false })).toBeVisible();
   await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('');
   await expect(page.getByRole('button', { name: '开启托管', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([]);
@@ -146,3 +147,29 @@ test('compact layout stays within narrow windows and dark theme', async ({ page 
   await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).toBeVisible();
   await page.screenshot({ path: process.env.ANCHOR_AGENT_DARK_PREVIEW ?? 'test-results/agents-dark.png' });
 });
+
+for (const [agent, name] of [['claude', 'Claude Code'], ['dsh', 'DSH']]) {
+  test(`${name} enrolls all mapped aliases and restores through its platform switch`, async ({ page }) => {
+    await page.evaluate(agent => {
+      const id = `${agent}-fixture`;
+      window.agentTest.data.targets.push({ id, agent, config_root: `/fixture/.${agent}`, source: 'home', supported: true, status: 'ready', catalog_version: '', templates: [] });
+      window.agentTest.data.models.push({ id: 'mapped-without-metadata', tools: false, streaming: false, upstream_models: ['upstream'], available_targets: [id] },
+        { id: 'disabled-provider', tools: true, streaming: true, upstream_models: ['unavailable'], available_targets: [] });
+    }, agent);
+    await page.getByRole('button', { name: '重新识别', exact: true }).click();
+    const toggle = page.getByRole('switch', { name: `${name} 托管`, exact: true });
+    await expect(toggle).toBeEnabled();
+    await toggle.click();
+    const select = page.getByLabel('默认模型', { exact: true });
+    await expect(select.locator('option')).toHaveCount(4);
+    await expect(select.locator('option[value="disabled-provider"]')).toBeDisabled();
+    await select.selectOption('mapped-without-metadata');
+    await page.getByRole('button', { name: '开启托管', exact: true }).click();
+    await expect(toggle).toBeChecked();
+    expect(await page.evaluate(() => window.agentTest.enrolls.at(-1))).toMatchObject({ target_id: `${agent}-fixture`, model: 'mapped-without-metadata', model_scope: 'all-mapped', approved: true });
+    await toggle.click();
+    await page.getByRole('button', { name: '确认变更', exact: true }).click();
+    await expect(toggle).not.toBeChecked();
+    expect(await page.evaluate(() => window.agentTest.actions.at(-1))).toMatchObject({ binding_id: `${agent}-fixture`, action: 'disable' });
+  });
+}
