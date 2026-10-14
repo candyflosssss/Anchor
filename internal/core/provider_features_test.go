@@ -152,3 +152,33 @@ func TestPriorityProtocolGatewayAndProbe(t *testing.T) {
 		})
 	}
 }
+
+func TestChineseModelAndKeyGatewayRouting(t *testing.T) {
+	f := setup(t)
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		if body["model"] != "upstream/model" || r.Header.Get("Authorization") != "Bearer synthetic-chinese-key" {
+			t.Error("wrong routed model or credential")
+		}
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"id":"r","output":[],"usage":{"input_tokens":10,"output_tokens":2}}`)
+	}))
+	defer upstream.Close()
+	f.add(t, "中文供应商", upstream.URL, "synthetic-unused")
+	if err := f.store.MutateProvider("中文供应商", 1, "key-put", "主力密钥", "synthetic-chinese-key", "", true, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.store.PutModel(state.Model{ID: "中文模型", Candidates: []state.Candidate{{ProviderID: "中文供应商", Model: "upstream/model", KeyIDs: []string{"主力密钥"}}}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"中文模型","input":"你好"}`)
+	body := text(t, resp)
+	if resp.StatusCode != 200 || calls.Load() != 1 {
+		t.Fatal(resp.StatusCode, body, calls.Load())
+	}
+}

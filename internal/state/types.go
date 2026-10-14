@@ -6,17 +6,17 @@ import (
 	"math"
 	"net"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
-	"unicode/utf8"
+
+	"github.com/candyflosssss/Anchor/internal/naming"
 )
 
 var ErrConflict = errors.New("revision or identity conflict")
 var ErrNotFound = errors.New("not found")
-var identifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
 
-func ValidID(s string) bool { return identifier.MatchString(s) }
+// ValidID validates user-facing Key, model, Context and binding names.
+func ValidID(s string) bool { return naming.ValidID(s) }
 
 // Instance/access IDs are base64url tokens and may start with an underscore or dash.
 func ValidOpaqueID(s string) bool {
@@ -31,13 +31,8 @@ func ValidOpaqueID(s string) bool {
 	return true
 }
 
-// Provider IDs are user-facing labels, not filesystem names or model slugs.
-// Keep the ASCII-only ValidID contract for contexts, models and bindings.
-var providerIdentifier = regexp.MustCompile(`^[\p{L}\p{Nd}][\p{L}\p{Nd}._-]{0,127}$`)
-
-func ValidProviderID(s string) bool {
-	return utf8.ValidString(s) && providerIdentifier.MatchString(s)
-}
+// Provider IDs follow the same user-facing naming rules.
+func ValidProviderID(s string) bool { return ValidID(s) }
 
 type Settings struct {
 	InstanceID     string `json:"instance_id"`

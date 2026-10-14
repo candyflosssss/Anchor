@@ -1,3 +1,4 @@
+import { isValidId } from '../../lib/identifier';
 import type { AccountTransport } from './provider-account.model';
 import type { Provider as DesktopProvider, SaveProvider, DiscoverProviderModels, ProviderModels } from "../../desktop/contract.generated";
 export type { SaveProvider, DiscoverProviderModels, ProviderModels };
@@ -48,7 +49,7 @@ export function newDraft(provider?: Provider): ProviderDraft {
 }
 export function validateDraft(draft: ProviderDraft): FieldErrors {
   const errors: FieldErrors = {};
-  if (!/^[\p{L}\p{Nd}][\p{L}\p{Nd}._-]{0,127}$/u.test(draft.id)) errors.id = '1–128 个中文／字母／数字或 ._-，以字母或数字开头。';
+  if (!isValidId(draft.id)) errors.id = '1–128 个中文／字母／数字或 ._-，以字母或数字开头。';
   const urls = draft.base_urls.map(u => u.trim());
   if (!urls.length || urls.length > MAX_PROVIDER_URLS) errors.base_urls = `请填写 1–${MAX_PROVIDER_URLS} 个请求地址。`;
   const seen = new Set<string>();

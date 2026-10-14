@@ -354,3 +354,11 @@
 - 兼容与迁移：无需调整已有默认档案；不安装缺失的远端 CLI，不修改远端 PATH／shell 配置。细分核心错误需要远端新版 CLI，旧版错误继续保留 remote_anchor；返回数据结构与凭据策略保持兼容。
 - 验证：隔离非交互 shell、用户目录含空格／shell 字符、显式路径不回退、脱敏诊断、真实 OpenSSH／内置密码 SSH 连接用例；实际执行结果见本轮任务记录。
 - 发布状态：北京时间 2026-10-14 23:12:40 随 desktop.32 dev 双平台安装包公开；本机 CLI／桌面二进制已更新，核心版本 .32 且 ready。发起连接的桌面端需更新以使用路径发现；CLI 正式预发行仍为 alpha.6，本轮未投放独立 CLI 在线发行。
+
+## 2026-10-15 — 用户名称支持中文（当前源码，未发布）
+
+- 类型：修改。
+- 指令与参数：`provider key-put/key-delete/key-reset/key-model-protocol/model-put` 的 `--target`，`model add/put/settings/routing` 的 `--id`，`context add` 的 `NAME`，`agent add` 的 `--id`，以及 `agent add/enroll/set-models` 的公开模型名和关联查询、修改指令；命令及参数名称不变。
+- 旧 → 新：原本仅供应商 ID 接受中文；现在 Key ID、公开模型 ID／别名、Context 名称、Agent Binding ID 也接受 1–128 个 Unicode 字母／十进制数字或 `._-`，首字符须为字母／数字；Binding ID 另外限制在 64 个 UTF-8 字节。拒绝空白、控制／格式字符、emoji、路径分隔符及 URL 保留符号；按原值精确匹配，不裁剪或归一化。机器错误码仍为 ASCII。
+- 兼容与迁移：既有 ASCII 名称、命令、参数、JSON 字段与 revision 不变，无需迁移。创建中文名称须同步更新 CLI／桌面与运行中的核心，旧版客户端或核心不能处理新增名称；Agent 托管仍需显式批准、按原有条件恢复。本次未构建或公开发布安装包。
+- 验证：隔离状态的 naming/state/catalog/client/core/managed/cli/desktop 八个受影响 Go 包测试通过，涵盖命名边界、中文 Key 与公开模型转发、模型设置、CLI、桌面桥接、Agent 托管恢复与 ASCII 错误码回归；前端 49 项定向测试、类型检查和 lint 通过。未验收原生窗口或真实 Agent 推理。

@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-14
+- 最近核对：2026-10-15
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
@@ -34,7 +34,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 - 正常操作 stdout 为一个 JSON 值；`logs export` 为逐条 JSONL，`logs follow` 为重复页 JSON；`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
 - 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
-- 其他 ID 和 Context 名称仍为 1..128 个 ASCII 字符，首字符为英文字母/数字，其余为英文字母/数字、`.`、`_`、`-`；Agent ID 另有 64 字符限制。
+- 当前源码中 Key 名称、公开模型 ID／别名、Context／设备连接名称和 Agent Binding ID 使用相同中文命名规则。Agent ID 另有最多 64 个 UTF-8 字节的限制（中文通常每字 3 字节），用于保持托管日志与目录文件名长度安全；其余为最多 128 个 Unicode 码点。实例／授权 ID、令牌、错误码及 SSH 技术字段不采用用户名称规则。此增量尚未打包发布，使用中文名称须同时升级客户端和运行中的核心。
 - 管理写请求不自动重试。断线、5xx、无效／超大回包可能使写入结果未知，先查询并核对 revision，不盲目重复写入。客户端以 `RequestError` 保留 HTTP 状态、受限 code 与 Unknown 标记，不把原始远端 message 或秘密写到 stderr；网络错误文案使用 `offline`，响应异常使用 `invalid_response`。退出码规则不变。
 - 密钥只从 stdin 输入；不要把真实密钥放进命令参数、历史或文档。供应商秘密目前依赖文件权限/ACL，**不是静态加密**。
 
@@ -178,7 +178,7 @@ anchor context test NAME
 anchor [--context NAME] status
 ```
 
-- **`context add`**：`NAME` 必填（安全 ASCII 标识），`--local` 与 `--ssh TARGET` 二选一。本机模式连接已初始化核心；SSH 模式登录目标账户、执行固定 bootstrap 命令、验证实例身份/API/授权后登记。重复名称失败，不覆盖，不自动设为当前 Context。JSON 仅含档案公开字段，不含密码或管理令牌。本机模式拒绝 SSH 专用选项。
+- **`context add`**：`NAME` 必填（支持中文的安全标识），`--local` 与 `--ssh TARGET` 二选一。本机模式连接已初始化核心；SSH 模式登录目标账户、执行固定 bootstrap 命令、验证实例身份/API/授权后登记。重复名称失败，不覆盖，不自动设为当前 Context。JSON 仅含档案公开字段，不含密码或管理令牌。本机模式拒绝 SSH 专用选项。
 - **`context use`**：`NAME` 必须存在；保存默认选择，返回 `current_context`。本步骤不检测在线状态。
 - **`context list`**：无专属参数，返回连接对象数组；不检测可达性，当前实现不附带“当前选中”标记。
 - **`context inspect`**：返回指定名称的已保存连接对象；不请求核心，不检测可达性。
@@ -231,7 +231,7 @@ printf '%s' "$PROVIDER_KEY" | anchor provider add \
 anchor model add --id public-model --candidate '摸鱼AI:upstream-model'
 ```
 
-中文 ID 可用于 `provider add/put/list` 以及 `model add/put --candidate` 的供应商部分。命令仍要求显式参数，不会进入交互式向导。已有 ASCII ID、JSON 字段、SQLite schema、revision 与密钥输入方式不变；无需重新初始化，但只替换 CLI、不重启旧核心仍不能创建中文供应商。公开模型 ID、Context 和 Agent ID 没有一并放开中文。
+中文 ID 可用于 `provider add/put/list` 以及 `model add/put --candidate` 的供应商部分。命令仍要求显式参数，不会进入交互式向导。已有 ASCII ID、JSON 字段、SQLite schema、revision 与密钥输入方式不变；无需重新初始化，但只替换 CLI、不重启旧核心仍不能创建中文供应商。当前源码进一步支持中文 Key、公开模型 ID／别名、Context 和 Agent Binding ID；此前发行包仅支持中文供应商名称。
 
 ### `provider models`（desktop.10 小步）
 
@@ -278,7 +278,7 @@ anchor provider price-import --id ID --revision N --target ALIAS --catalog-provi
 anchor usage
 ```
 
-上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace.models` 返回当前供应商的 `multiplier`（相对倍率）、`strategy`（公开模型策略）及 `candidate_count`（总候选数）。`workspace` 的 keys 额外返回 protocol 和 model_protocols（[{model,protocol}]，始终数组），不返回秘密。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商新 ID 沿用中文规则，Key ID/公开别名沿用 ASCII ID 规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
+上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace.models` 返回当前供应商的 `multiplier`（相对倍率）、`strategy`（公开模型策略）及 `candidate_count`（总候选数）。`workspace` 的 keys 额外返回 protocol 和 model_protocols（[{model,protocol}]，始终数组），不返回秘密。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商、Key ID 和公开别名均沿用中文命名规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
 
 | 动作 | 参数、默认值和语义 |
 | --- | --- |
@@ -487,7 +487,7 @@ anchor agent add --id ID [--adapter codex|claude|dsh] --config-root ABS_DIR --mo
 ```
 
 - 作用域：所选 Context 的目标实例；路径按目标机器解释。支持本机及已连接 SSH Context。
-- `--id` 必填，符合普通 ID 规则且最多 64 字符；`--adapter` 默认 `codex`，支持 `codex|claude|dsh`，适配器修订固定为 `1`。
+- `--id` 必填，符合中文命名规则且最多 64 个 UTF-8 字节；`--adapter` 默认 `codex`，支持 `codex|claude|dsh`，适配器修订固定为 `1`。
 - `--config-root` 必填绝对目录，必须已存在；`--codex-home` 为仅限 Codex 的旧参数别名，二者不可同时传。Codex 修改基础 `config.toml` 和可选目录；Claude 修改 `settings.json`；DSH 修改已有 `profiles/web` 下的 `cordis.patch.yml`，不创建 profile 目录。
 - `--model` 必填，指定**默认公开模型**，不是 all-mapped/all-compatible 的权限边界；仅 Codex single/all-compatible 要求 tools/streaming，声明不是上游能力探测。
 - `--model-scope` Codex 默认 `all-compatible`，Claude/DSH 默认 `all-mapped`。all-mapped 授权所有具备启用供应商候选的映射，不要求 Codex 元数据或能力标记；all-compatible 仅支持 Codex：凭据可使用所有 tools/streaming、具有与绑定精确版本匹配的有效 Codex 元数据、且至少一个候选供应商 enabled 的公开模型；默认模型也必须在其中。版本从默认模型元数据固定到绑定。不是供应商健康探测，也不是任意/未知模型放行。

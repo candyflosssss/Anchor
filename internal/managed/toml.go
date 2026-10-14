@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/candyflosssss/Anchor/internal/naming"
 )
 
 var ErrUnsafe = errors.New("unsupported or unsafe configuration; no destructive reserialization was attempted")
@@ -121,7 +122,8 @@ func tomlNumbers(v any) any {
 }
 
 // Patch keeps all unrelated bytes and verifies the entire semantic document.
-// Ambiguous/dotted/quoted/multiline owned keys are rejected, not normalized.
+// Ambiguous/dotted/quoted/multiline root keys are rejected, not normalized.
+// Unicode provider table names are emitted by the TOML encoder as quoted keys.
 func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 	original, e := document(b)
 	if e != nil {
@@ -140,8 +142,9 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 		if len(edit.Path) == 0 || !equal(at(original, edit.Path), edit.Before) {
 			return nil, ErrChanged
 		}
-		for _, p := range edit.Path {
-			if !simpleKey.MatchString(p) {
+		for i, p := range edit.Path {
+			unicodeProvider := len(edit.Path) == 2 && edit.Path[0] == "model_providers" && i == 1 && naming.ValidID(p)
+			if !simpleKey.MatchString(p) && !unicodeProvider {
 				return nil, ErrUnsafe
 			}
 		}

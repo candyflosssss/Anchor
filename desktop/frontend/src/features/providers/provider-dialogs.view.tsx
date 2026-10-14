@@ -137,7 +137,7 @@ function KeyBody({ c, d, run }: { c: ProviderController; d: Extract<ProviderDial
   const [secret, setSecret] = useState('');
   const secretRef = useRef(''); secretRef.current = secret;
   useEffect(() => () => { secretRef.current = ''; }, []);
-  const idError = existing ? '' : !isValidId(id) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : w.keys.some(k => k.id === id) ? '已存在同名 Key；如需更换请使用「编辑」。' : '';
+  const idError = existing ? '' : !isValidId(id) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头。' : w.keys.some(k => k.id === id) ? '已存在同名 Key；如需更换请使用「编辑」。' : '';
   const [protocol, setProtocol] = useState(existing?.protocol ?? 'responses');
   const trimmed = secret.trim();
   const secretError = /[\r\n]/.test(trimmed) ? '密钥不能包含换行。' : new TextEncoder().encode(trimmed).length > 8192 ? '密钥不能超过 8192 字节。' : '';
@@ -172,7 +172,7 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
   const multiplierError = !multiplier.trim() || !Number.isFinite(multiplierValue) || multiplierValue < 0.01 || multiplierValue > 1000 ? '倍率须为 0.01–1000。' : '';
   const [tools, setTools] = useState(editing?.tools ?? d.tools ?? true);
   const [streaming, setStreaming] = useState(editing?.streaming ?? d.streaming ?? true);
-  const aliasError = !alias ? '' : !isValidModelAlias(alias) ? '1–128 个字母／数字或 ._-，以字母或数字开头。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
+  const aliasError = !alias ? '' : !isValidModelAlias(alias) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
   const options = c.models?.models ?? [];
   return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError && !multiplierError) void run('model-put', { target: alias, model: upstream.trim(), key_ids: keyIDs, multiplier: multiplierValue, strategy, tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>

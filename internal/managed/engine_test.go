@@ -402,3 +402,34 @@ func TestStartupErrorsNeverReportApplied(t *testing.T) {
 		})
 	}
 }
+
+func TestChineseBindingApplyAndRecover(t *testing.T) {
+	_, b, g, e := target(t, "model = \"old\"\n")
+	b.ID = "中文助手"
+	b.Model = "中文模型"
+	g.Model = b.Model
+	p := planApply(t, b, g, e)
+	raw, err := os.ReadFile(p.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := document(raw)
+	if err != nil || doc["model"] != b.Model || doc["model_provider"] != "anchor_"+b.ID {
+		t.Fatal(doc, err)
+	}
+	if _, err := os.Stat(e.journalPath(b.ID)); err != nil {
+		t.Fatal(err)
+	}
+	result, err := e.Recover(b.ID)
+	if err != nil || result.Status != "restored" {
+		t.Fatal(result, err)
+	}
+	raw, err = os.ReadFile(p.Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err = document(raw)
+	if err != nil || doc["model"] != "old" {
+		t.Fatal(doc, err)
+	}
+}

@@ -35,8 +35,8 @@ func TestProviderIDValidation(t *testing.T) {
 			}
 		})
 	}
-	if ValidID("摸鱼AI") {
-		t.Fatal("non-provider identifier contract was broadened")
+	if !ValidID("摸鱼AI") {
+		t.Fatal("user-facing identifiers must support Chinese")
 	}
 }
 

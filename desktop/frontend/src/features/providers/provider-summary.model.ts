@@ -20,7 +20,7 @@ export interface ProviderSummary {
   usd: number; usdPartial: boolean;
 }
 export const toneLabel: Record<Tone, string> = { ok: '正常', warn: '需留意', bad: '不可用', muted: '已停用', unknown: '未知' };
-export const isValidId = (value: string) => /^[\p{L}\p{Nd}][\p{L}\p{Nd}._-]{0,127}$/u.test(value);
+export { isValidId } from '../../lib/identifier';
 
 export function latestProbe(w: Workspace | null | undefined): Probe | null {
   if (!w) return null;

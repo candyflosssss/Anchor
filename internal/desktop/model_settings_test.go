@@ -37,7 +37,7 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = st.PutModel(state.Model{ID: "mapped", Tools: true, Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "upstream"}}}, 0)
+	_, err = st.PutModel(state.Model{ID: "中文模型", Tools: true, Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "upstream"}}}, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,13 +45,13 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 	defer session.Close()
 	session.cfg = &cfg
 	b := NewBridge(session)
-	out := b.ModelSettings(ModelSettingsQuery{ModelID: "mapped"})
+	out := b.ModelSettings(ModelSettingsQuery{ModelID: "中文模型"})
 	if out.Problem != nil || out.Data == nil {
 		t.Fatal(out)
 	}
 	n := int64(272000)
 	out.Data.Configuration.Limits.Context = &n
-	input := SaveModelSettings{ModelID: "mapped", ExpectedRevision: 1, DisplayName: "Mapped", Configuration: out.Data.Configuration, ReferenceAction: "keep"}
+	input := SaveModelSettings{ModelID: "中文模型", ExpectedRevision: 1, DisplayName: "日常对话模型", Configuration: out.Data.Configuration, ReferenceAction: "keep"}
 	saved := b.SaveModelSettings(input)
 	if saved.Problem != nil || saved.Data.Revision != 2 || *saved.Data.Configuration.Limits.Context != n {
 		t.Fatal(saved)
@@ -77,9 +77,9 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 		}
 		return output.String()
 	}
-	run(false, "context", "add", "local", "--local")
-	run(false, "context", "use", "local")
-	if out := run(false, "model", "settings", "--id", "mapped"); !strings.Contains(out, `"context":272000`) {
+	run(false, "context", "add", "本机连接", "--local")
+	run(false, "context", "use", "本机连接")
+	if out := run(false, "model", "settings", "--id", "中文模型"); !strings.Contains(out, `"context":272000`) {
 		t.Fatal(out)
 	}
 	path := filepath.Join(dir, "settings.json")
@@ -87,15 +87,15 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 	if err = os.WriteFile(path, raw, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if out := run(false, "model", "settings", "--id", "mapped", "--file", path); !strings.Contains(out, `"revision":3`) {
+	if out := run(false, "model", "settings", "--id", "中文模型", "--file", path); !strings.Contains(out, `"revision":3`) {
 		t.Fatal(out)
 	}
-	run(true, "model", "settings", "--id", "mapped", "--file", path)
+	run(true, "model", "settings", "--id", "中文模型", "--file", path)
 	run(true, "model", "settings", "--id", "other", "--file", path)
 	if err = os.WriteFile(path, append(raw, []byte(` {}`)...), 0600); err != nil {
 		t.Fatal(err)
 	}
-	run(true, "model", "settings", "--id", "mapped", "--file", path)
+	run(true, "model", "settings", "--id", "中文模型", "--file", path)
 }
 
 func TestSharedModelSettingsFixture(t *testing.T) {

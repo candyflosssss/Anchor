@@ -19,13 +19,15 @@ func TestStructuredMutationErrorsNeverReplayOrLeak(t *testing.T) {
 		status  int
 		body    string
 		unknown bool
+		code    string
 	}{
-		{401, `{"error":{"code":"unauthorized","message":"secret-details"}}`, false},
-		{409, `{"error":{"code":"conflict"}}`, false},
-		{500, `{"error":{"code":"internal_error","message":"secret-details"}}`, true},
-		{200, `not-json-secret-details`, true},
-		{200, `{"accepted":false}`, true},
-		{200, strings.Repeat("x", (1<<20)+1), true},
+		{401, `{"error":{"code":"unauthorized","message":"secret-details"}}`, false, "unauthorized"},
+		{409, `{"error":{"code":"conflict"}}`, false, "conflict"},
+		{500, `{"error":{"code":"internal_error","message":"secret-details"}}`, true, "internal_error"},
+		{400, `{"error":{"code":"中文错误","message":"secret-details"}}`, false, "request_failed"},
+		{200, `not-json-secret-details`, true, "invalid_response"},
+		{200, `{"accepted":false}`, true, "invalid_response"},
+		{200, strings.Repeat("x", (1<<20)+1), true, "invalid_response"},
 	} {
 		t.Run(fmt.Sprintf("%d-%d", tc.status, len(tc.body)), func(t *testing.T) {
 			var writes atomic.Int32
@@ -49,7 +51,7 @@ func TestStructuredMutationErrorsNeverReplayOrLeak(t *testing.T) {
 			defer cl.Close()
 			err = cl.Stop(context.Background())
 			var request *RequestError
-			if !errors.As(err, &request) || request.Unknown != tc.unknown {
+			if !errors.As(err, &request) || request.Unknown != tc.unknown || request.Code != tc.code {
 				t.Fatalf("classification: %v", err)
 			}
 			if writes.Load() != 1 || strings.Contains(err.Error(), "secret-details") {

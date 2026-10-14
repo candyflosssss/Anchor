@@ -13,6 +13,7 @@ import (
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/managed"
+	"github.com/candyflosssss/Anchor/internal/naming"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -95,7 +96,7 @@ func (c *Client) call(ctx context.Context, method, path string, in, out any) err
 		}
 		_ = json.Unmarshal(b, &e)
 		code := e.Error.Code
-		if !state.ValidID(code) {
+		if !naming.ValidCode(code) {
 			code = "request_failed"
 		}
 		return &RequestError{Status: response.StatusCode, Code: code, Unknown: method != http.MethodGet && response.StatusCode >= 500}

@@ -100,7 +100,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   version
 Normal output is JSON; logs export is JSONL, logs follow emits repeated JSON pages, agent token is raw secret.
 Diagnostics and service logs go to stderr.
-Provider IDs accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
+Provider, Key, public model and Context names accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
+Agent binding names use the same characters, with a 64 UTF-8 byte limit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
 init/serve/access/context/recover/update/agent token operate locally. Business commands use the selected context.
 Codex, Claude Code user settings and DSH web profile management are available; runtime connection remains unverified.
@@ -626,7 +627,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 
 	if args[0] == "settings" {
 		f := a.flags("model settings")
-		id := f.String("id", "", "public model ID")
+		id := f.String("id", "", "public model ID (Chinese supported)")
 		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); omitted reads current settings")
 		if err := parse(f, args[1:]); err != nil {
 			return err
@@ -668,7 +669,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	}
 	if args[0] == "routing" {
 		f := a.flags("model routing")
-		id := f.String("id", "", "public model ID")
+		id := f.String("id", "", "public model ID (Chinese supported)")
 		revision := f.Int64("revision", 0, "expected model revision")
 		strategy := f.String("strategy", "", "priority, round-robin, cache-priority, lowest-price or lowest-latency")
 		var order repeated
@@ -694,7 +695,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 		return errors.New("unknown model command")
 	}
 	f := a.flags("model " + args[0])
-	id := f.String("id", "", "public model ID")
+	id := f.String("id", "", "public model ID (Chinese supported)")
 	strategy := f.String("strategy", "priority", "model routing strategy")
 	display := f.String("display-name", "", "display name")
 	tools := f.Bool("tools", false, "advertise function tools")
@@ -787,7 +788,7 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	catalogProvider := f.String("catalog-provider", "", "models.dev provider ID")
 	id := f.String("id", "", "saved provider ID")
 	revision := f.Int64("revision", 0, "current provider revision")
-	target := f.String("target", "", "new provider ID, key ID, or model alias")
+	target := f.String("target", "", "new provider ID, key ID, or model alias (Chinese supported)")
 	approve := f.Bool("approve", false, "confirm destructive operation or inference cost")
 	copyKeys := f.Bool("copy-keys", false, "explicitly copy credentials")
 	disabled := f.Bool("disabled", false, "disable key")

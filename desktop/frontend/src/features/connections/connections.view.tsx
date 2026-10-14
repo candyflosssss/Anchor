@@ -1,3 +1,4 @@
+import { identifierPattern } from '../../lib/identifier';
 import { Monitor, Server, LoaderCircle } from 'lucide-react';
 import type { SessionInfo } from '../../desktop/contract.generated';
 import { desktopMessages } from '../../desktop/use-desktop-session';
@@ -27,7 +28,7 @@ export function ConnectionsView({ onConnected, onActivity }: { onConnected: (inf
       <p className="text-muted-foreground">使用 SSH 密码、密钥或已有 SSH 配置连接。Anchor 会完成鉴权、核心启动和管理隧道连接，关闭界面后远端核心继续运行。</p>
       <form onSubmit={event => { event.preventDefault(); void c.connect(); }}>
         <fieldset disabled={busy} className="connection-fields">
-          <label>连接名称<Input required pattern="[A-Za-z0-9][A-Za-z0-9._-]{0,127}" placeholder="dev-server" value={c.draft.name} onChange={e => c.setDraft({ ...c.draft, name: e.target.value })} /><small>字母、数字、点、下划线或连字符</small></label>
+          <label>连接名称<Input required pattern={identifierPattern} placeholder="开发服务器" value={c.draft.name} onChange={e => c.setDraft({ ...c.draft, name: e.target.value })} /><small>1–128 个中文／字母／数字或 ._-，以字母或数字开头</small></label>
           <label>SSH 目标<Input required placeholder="user@192.168.1.20 或 SSH 别名" value={c.draft.target} onChange={e => c.setDraft({ ...c.draft, target: e.target.value })} /></label>
           <label className="connection-trust"><input type="checkbox" checked={c.usePassword} onChange={e => { c.setUsePassword(e.target.checked); c.setDraft({ ...c.draft, password: '' }); }} /><span>使用密码登录</span></label>
           {c.usePassword && <label>SSH 密码<Input aria-label="SSH 密码" type="password" required autoComplete="off" value={c.draft.password} onChange={e => c.setDraft({ ...c.draft, password: e.target.value })} /><small>只用于本次登录，不保存；密码模式使用 user@主机地址，不读取 SSH 别名。</small></label>}

@@ -249,14 +249,16 @@ func TestVersionWithoutInitializedInstance(t *testing.T) {
 	}
 }
 
-func TestHelpDocumentsChineseProviderIDs(t *testing.T) {
+func TestHelpDocumentsChineseNames(t *testing.T) {
 	var out bytes.Buffer
 	a := App{In: strings.NewReader(""), Out: &out, Err: io.Discard}
 	if err := a.Run(context.Background(), []string{"help"}); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "including Chinese") {
-		t.Fatal("provider ID help missing")
+	for _, hint := range []string{"including Chinese", "Key, public model and Context names", "64 UTF-8 byte limit"} {
+		if !strings.Contains(out.String(), hint) {
+			t.Fatal("name help missing", hint)
+		}
 	}
 }
 
@@ -389,25 +391,25 @@ func TestKeyProtocolCLI(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	raw, err := run("synthetic-selected", "provider", "key-put", "--id", "p", "--revision", "1", "--target", "selected", "--secret-stdin", "--protocol", "anthropic")
+	raw, err := run("synthetic-selected", "provider", "key-put", "--id", "p", "--revision", "1", "--target", "主力密钥", "--secret-stdin", "--protocol", "anthropic")
 	var w catalog.Workspace
 	if err != nil || json.Unmarshal([]byte(raw), &w) != nil || len(w.Keys) != 1 || w.Keys[0].Protocol != "anthropic" || strings.Contains(raw, "synthetic-selected") {
 		t.Fatal(raw, err)
 	}
-	raw, err = run("", "provider", "key-model-protocol", "--id", "p", "--revision", "2", "--target", "selected", "--model", "actual/model", "--protocol", "chat-completions")
+	raw, err = run("", "provider", "key-model-protocol", "--id", "p", "--revision", "2", "--target", "主力密钥", "--model", "actual/model", "--protocol", "chat-completions")
 	if err != nil || json.Unmarshal([]byte(raw), &w) != nil || len(w.Keys[0].ModelProtocols) != 1 || w.Keys[0].ModelProtocols[0].Model != "actual/model" {
 		t.Fatal(raw, err)
 	}
 	for _, args := range [][]string{
-		{"provider", "key-model-protocol", "--id", "p", "--revision", "2", "--target", "selected", "--model", "actual/model", "--protocol", "inherit"},
-		{"provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "selected", "--model", "actual/model", "--protocol", "bad"},
+		{"provider", "key-model-protocol", "--id", "p", "--revision", "2", "--target", "主力密钥", "--model", "actual/model", "--protocol", "inherit"},
+		{"provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "主力密钥", "--model", "actual/model", "--protocol", "bad"},
 		{"provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "missing", "--model", "actual/model"},
 	} {
 		if _, err = run("", args...); err == nil {
 			t.Fatal("invalid write succeeded", args)
 		}
 	}
-	raw, err = run("", "provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "selected", "--model", "actual/model", "--protocol", "inherit")
+	raw, err = run("", "provider", "key-model-protocol", "--id", "p", "--revision", "3", "--target", "主力密钥", "--model", "actual/model", "--protocol", "inherit")
 	if err != nil || json.Unmarshal([]byte(raw), &w) != nil || len(w.Keys[0].ModelProtocols) != 0 || w.Keys[0].Protocol != "anthropic" {
 		t.Fatal(raw, err)
 	}

@@ -81,7 +81,7 @@ describe('catalog import planning', () => {
   it('deduplicates and skips existing upstreams, conflicting aliases and invalid public IDs', () => {
     const w = { ...structuredClone(fixture), models: [{ ...mapping, id: 'taken', upstream: 'mapped-upstream' }] };
     expect(catalogImportPlan(['mapped-upstream', 'valid', 'valid', 'taken', 'vendor/model', '中文', '-bad', 'a'.repeat(129)], w)).toEqual({
-      ready: ['valid'], mapped: 1, manual: ['taken', 'vendor/model', '中文', '-bad', 'a'.repeat(129)],
+      ready: ['valid', '中文'], mapped: 1, manual: ['taken', 'vendor/model', '-bad', 'a'.repeat(129)],
     });
   });
 });

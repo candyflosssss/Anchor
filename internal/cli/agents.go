@@ -71,7 +71,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		return a.output(v)
 	case "add":
 		f := a.flags("agent add")
-		id := f.String("id", "", "binding ID")
+		id := f.String("id", "", "binding ID: Chinese supported, at most 64 UTF-8 bytes")
 		adapter := f.String("adapter", "codex", "adapter: codex, claude or dsh")
 		root := f.String("config-root", "", "approved absolute configuration root; DSH uses its web profile; must exist")
 		codexRoot := f.String("codex-home", "", "alias for --config-root with --adapter codex")

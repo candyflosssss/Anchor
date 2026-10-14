@@ -39,7 +39,7 @@ func TestPriorityWorkspaceBridgeReadWrite(t *testing.T) {
 	if r.Problem != nil || r.Data == nil || len(r.Data.Keys) != 1 {
 		t.Fatal(r)
 	}
-	result := b.ProviderAction(Action{ProviderID: "p", ExpectedRevision: 1, Action: "key-put", Target: "second", Secret: "synthetic-second", Enabled: true})
+	result := b.ProviderAction(Action{ProviderID: "p", ExpectedRevision: 1, Action: "key-put", Target: "备用密钥", Secret: "synthetic-second", Enabled: true})
 	if result.Problem != nil || result.Data == nil || result.Data.Revision != 2 || len(result.Data.Keys) != 2 {
 		t.Fatal(result)
 	}

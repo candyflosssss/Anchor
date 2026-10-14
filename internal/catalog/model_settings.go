@@ -3,10 +3,8 @@ package catalog
 import (
 	"github.com/candyflosssss/Anchor/internal/modelconfig"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
-	"regexp"
+	"github.com/candyflosssss/Anchor/internal/naming"
 )
-
-var modelSettingsID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
 
 type ModelSettingsQuery struct {
 	ModelID string `json:"model_id"`
@@ -33,7 +31,7 @@ type SaveModelSettings struct {
 }
 
 func (in SaveModelSettings) Validate() error {
-	if !modelSettingsID.MatchString(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= modeldev.MaxSafeInteger || len(in.DisplayName) > 256 {
+	if !naming.ValidID(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= modeldev.MaxSafeInteger || len(in.DisplayName) > 256 {
 		return modeldev.ErrInvalid
 	}
 	switch in.ReferenceAction {

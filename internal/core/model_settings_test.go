@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -21,7 +22,7 @@ import (
 func TestModelSettingsScopedSaveAndSnapshot(t *testing.T) {
 	f := setup(t)
 	f.add(t, "p", "http://127.0.0.1:1/v1", "synthetic")
-	m, e := f.store.PutModel(state.Model{ID: "mapped", Tools: true, Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "actual", Multiplier: 2, KeyIDs: []string{"default"}}}}, 0)
+	m, e := f.store.PutModel(state.Model{ID: "中文模型", Tools: true, Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "actual", Multiplier: 2, KeyIDs: []string{"default"}}}}, 0)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -46,7 +47,7 @@ func TestModelSettingsScopedSaveAndSnapshot(t *testing.T) {
 	}
 	n := int64(272000)
 	current.Configuration.Limits.Context = &n
-	in := catalog.SaveModelSettings{ModelID: m.ID, ExpectedRevision: 1, DisplayName: "Mapped", Configuration: current.Configuration, ReferenceAction: "set", ReferenceProviderID: "lab", ReferenceModelID: "vision-reasoner"}
+	in := catalog.SaveModelSettings{ModelID: m.ID, ExpectedRevision: 1, DisplayName: "日常对话模型", Configuration: current.Configuration, ReferenceAction: "set", ReferenceProviderID: "lab", ReferenceModelID: "vision-reasoner"}
 	out, e := cl.SaveModelSettings(context.Background(), in)
 	if e != nil || out.Revision != 2 || out.Reference == nil || out.Reference.Models[0].Pricing == nil || calls.Load() != 1 {
 		t.Fatal(out, e, calls.Load())
@@ -91,9 +92,12 @@ func TestModelSettingsScopedSaveAndSnapshot(t *testing.T) {
 		status                int
 	}{
 		{"", settings.InstanceID, "{}", 401}, {f.token, settings.InstanceID, "{}", 401}, {f.owner, "wrong", "{}", 409},
-		{f.owner, settings.InstanceID, `{"model_id":"mapped","expected_revision":5,"reference_action":"keep","reference":{"source":"models.dev"}}`, 400},
+		{f.owner, settings.InstanceID, `{"model_id":"中文模型","expected_revision":5,"reference_action":"keep","reference":{"source":"models.dev"}}`, 400},
 	} {
-		req, _ := http.NewRequest("POST", f.control.URL+"/control/v1/models/mapped/settings", strings.NewReader(tc.body))
+		req, e := http.NewRequest("POST", f.control.URL+"/control/v1/models/"+url.PathEscape(m.ID)+"/settings", strings.NewReader(tc.body))
+		if e != nil {
+			t.Fatal(e)
+		}
 		req.Header.Set("Authorization", "Bearer "+tc.token)
 		req.Header.Set("X-Anchor-Instance", tc.identity)
 		resp, e := http.DefaultClient.Do(req)
