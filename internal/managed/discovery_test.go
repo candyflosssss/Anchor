@@ -144,3 +144,43 @@ func mustJSON(t *testing.T, v any) json.RawMessage {
 	}
 	return raw
 }
+
+func TestDiscoverDSHKnownRoots(t *testing.T) {
+	for _, tc := range []struct{ name, override string }{
+		{"default", ""}, {"override", "custom"}, {"deduplicated", ".dsh"}, {"relative-ignored", "relative"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			home := t.TempDir()
+			root := filepath.Join(home, ".dsh")
+			if err := os.Mkdir(root, 0700); err != nil {
+				t.Fatal(err)
+			}
+			env := Environment{Home: home}
+			if tc.override != "" {
+				env.DSHHome = tc.override
+				if tc.override != "relative" {
+					env.DSHHome = filepath.Join(home, tc.override)
+					if err := os.MkdirAll(env.DSHHome, 0700); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			targets, err := Discover(env)
+			want := 1
+			if tc.name == "override" {
+				want = 2
+			}
+			if err != nil || len(targets) != want {
+				t.Fatal(targets, err)
+			}
+			for _, target := range targets {
+				if target.Agent != "dsh" || target.Supported || target.Status != "unsupported" || len(target.Templates) != 0 {
+					t.Fatal(target)
+				}
+			}
+			if tc.name == "override" && (targets[0].Source != "DSH_HOME" || targets[0].ConfigRoot != env.DSHHome) {
+				t.Fatal(targets)
+			}
+		})
+	}
+}

@@ -1,13 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/agents.json';
 import { CONTRACT, type AgentWorkspace, type DesktopBridge } from '../../desktop/contract.generated';
-import { checkedAgentWorkspace, createAgentService, availableAgentModels, targetStatus } from './agent.model';
+import { checkedAgentWorkspace, createAgentService, availableAgentModels, targetStatus, agentRows } from './agent.model';
 
 function api(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   const result = { contract: CONTRACT, data: fixture.workspace, problem: null };
   return { AgentWorkspace: async () => result, EnrollAgent: async () => result, ManageAgent: async () => result, ...overrides } as DesktopBridge;
 }
 describe('Agent contract and controlled transport', () => {
+  it('keeps five platforms and matches Windows binding paths without duplicate targets', () => {
+    const data = { ...fixture.workspace, bindings: [{ ...fixture.workspace.bindings[0], config_root: 'c:/users/fixture/.codex' }] };
+    const rows = agentRows(data);
+    expect(rows.map(row => row.agent)).toEqual(['codex', 'claude', 'gemini', 'opencode', 'dsh']);
+    expect(rows[0].binding?.id).toBe('codex-fixture');
+    expect(rows[4].target).toBeUndefined();
+  });
+  it('retains multiple roots and recovery when a bound directory disappears', () => {
+    const data = { ...fixture.workspace, targets: [{ ...fixture.workspace.targets[0], id: 'another', config_root: '/isolated/codex' }] };
+    const rows = agentRows(data);
+    expect(rows.filter(row => row.agent === 'codex')).toHaveLength(2);
+    expect(rows.find(row => row.binding)?.target).toBeUndefined();
+    expect(rows.find(row => row.binding)?.binding?.id).toBe('codex-fixture');
+  });
   it('distinguishes absent caches from incompatible caches without a restart loop', () => {
     const categories = ['catalog_missing', 'catalog_unreadable', 'catalog_unsafe', 'catalog_invalid', 'catalog_version_invalid', 'catalog_empty', 'catalog_too_large', 'catalog_metadata_invalid', 'catalog_duplicate'];
     expect(new Set(categories.map(code => targetStatus[code])).size).toBe(categories.length);

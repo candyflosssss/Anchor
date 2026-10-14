@@ -1,0 +1,27 @@
+.agent-list { border: 1px solid hsl(var(--border)); border-radius: 14px; background: hsl(var(--card)); overflow: hidden; }
+.agent-platform + .agent-platform { border-top: 1px solid hsl(var(--border)); }
+.agent-platform-header { display: flex; align-items: center; gap: 20px; padding: 0 24px 0 8px; min-height: 88px; }
+.agent-platform-heading { display: flex; align-items: center; gap: 18px; flex: 1; min-width: 0; padding: 20px 16px; text-align: left; border-radius: 8px; }
+.agent-platform-heading:hover { background: hsl(var(--muted) / .45); }
+.agent-platform-heading:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -3px; }
+.agent-platform-heading:disabled { cursor: wait; }
+.agent-brand { display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 44px; border-radius: 12px; background: hsl(var(--background)); border: 1px solid hsl(var(--border) / .65); }
+.agent-brand img { width: 28px; height: 28px; object-fit: contain; }
+.dark .agent-brand-monochrome { filter: invert(1); }
+.agent-platform-name { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+.agent-chevron { margin-left: auto; color: hsl(var(--muted-foreground)); transition: transform .15s ease; }
+.agent-platform-heading[aria-expanded=true] .agent-chevron { transform: rotate(180deg); }
+.agent-settings { padding: 8px 24px 24px 86px; border-top: 1px solid hsl(var(--border) / .5); background: hsl(var(--muted) / .18); }
+.agent-details { display: grid; gap: 12px; margin: 16px 0 24px; font-size: 13px; }
+.agent-details > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 16px; }
+.agent-details dt { color: hsl(var(--muted-foreground)); }
+.agent-details dd { overflow-wrap: anywhere; }
+.agent-settings form { max-width: 560px; }
+.agent-settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+@media (max-width: 640px) {
+  .agent-platform-header { padding-right: 16px; gap: 12px; }
+  .agent-platform-heading { gap: 12px; padding: 16px 8px; }
+  .agent-settings { padding: 8px 16px 20px; }
+  .agent-details > div { grid-template-columns: 64px minmax(0, 1fr); gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .agent-chevron { transition: none; } }

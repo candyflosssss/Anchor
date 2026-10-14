@@ -1,5 +1,5 @@
 import { bridge, call, DesktopProblem } from '../../desktop/transport';
-import type { DesktopBridge, AgentWorkspace, AgentTarget, AgentModel, EnrollAgent, ManageAgent } from '../../desktop/contract.generated';
+import type { DesktopBridge, AgentWorkspace, AgentTarget, AgentModel, EnrollAgent, ManageAgent, ManagedAgent } from '../../desktop/contract.generated';
 export type { AgentWorkspace, AgentTarget, AgentModel, ManagedAgent } from '../../desktop/contract.generated';
 
 export function checkedAgentWorkspace(value: AgentWorkspace): AgentWorkspace {
@@ -61,4 +61,23 @@ export function agentMessage(error: unknown): string {
     offline: '本机核心连接中断，请重新连接。', read_error: '无法读取托管结果，请重新读取。',
   };
   return messages[code] ?? 'Agent 托管操作失败，请重新读取状态。';
+}
+
+export interface AgentRow { id: string; agent: string; target?: AgentTarget; binding?: ManagedAgent }
+
+/** Keep unavailable platforms visible, and retain recovery for undiscovered bindings. */
+export function agentRows(data: AgentWorkspace): AgentRow[] {
+  const rows: AgentRow[] = data.targets.map(target => ({ id: target.id, agent: target.agent, target,
+    binding: data.bindings.find(b => sameAgentRoot(b.config_root, target.config_root)) }));
+  for (const binding of data.bindings) {
+    if (!rows.some(row => row.binding?.id === binding.id)) rows.push({ id: `binding-${binding.id}`, agent: 'codex', binding });
+  }
+  const platforms = ['codex', 'claude', 'gemini', 'opencode', 'dsh'];
+  for (const agent of platforms) if (!rows.some(row => row.agent === agent)) rows.push({ id: `platform-${agent}`, agent });
+  return rows.sort((a, b) => (platforms.indexOf(a.agent) < 0 ? platforms.length : platforms.indexOf(a.agent)) -
+    (platforms.indexOf(b.agent) < 0 ? platforms.length : platforms.indexOf(b.agent)));
+}
+
+export function sameAgentRoot(a: string, b: string) {
+  return a === b || (/^[A-Za-z]:[\\/]/.test(a) && a.replaceAll('/', '\\').toLowerCase() === b.replaceAll('/', '\\').toLowerCase());
 }

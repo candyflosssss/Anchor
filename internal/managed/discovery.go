@@ -17,7 +17,7 @@ import (
 )
 
 // Environment is supplied by the local host, never by a remote/UI path argument.
-type Environment struct{ Home, CodexHome, Executable string }
+type Environment struct{ Home, CodexHome, DSHHome, Executable string }
 
 func LocalEnvironment() (Environment, error) {
 	home, err := os.UserHomeDir()
@@ -28,7 +28,7 @@ func LocalEnvironment() (Environment, error) {
 	if err != nil {
 		return Environment{}, err
 	}
-	return Environment{Home: home, CodexHome: os.Getenv("CODEX_HOME"), Executable: exe}, nil
+	return Environment{Home: home, CodexHome: os.Getenv("CODEX_HOME"), DSHHome: os.Getenv("DSH_HOME"), Executable: exe}, nil
 }
 
 type CatalogTemplate struct {
@@ -66,9 +66,13 @@ func Discover(env Environment) ([]AgentTarget, error) {
 	if env.CodexHome != "" && filepath.IsAbs(env.CodexHome) {
 		candidates = append(candidates, struct{ agent, root, source string }{"codex", env.CodexHome, "CODEX_HOME"})
 	}
+	if env.DSHHome != "" && filepath.IsAbs(env.DSHHome) {
+		candidates = append(candidates, struct{ agent, root, source string }{"dsh", env.DSHHome, "DSH_HOME"})
+	}
 	candidates = append(candidates,
 		struct{ agent, root, source string }{"codex", filepath.Join(env.Home, ".codex"), "home"},
 		struct{ agent, root, source string }{"claude", filepath.Join(env.Home, ".claude"), "home"},
+		struct{ agent, root, source string }{"dsh", filepath.Join(env.Home, ".dsh"), "home"},
 		struct{ agent, root, source string }{"gemini", filepath.Join(env.Home, ".gemini"), "home"},
 		struct{ agent, root, source string }{"opencode", filepath.Join(env.Home, ".config", "opencode"), "home"},
 	)
