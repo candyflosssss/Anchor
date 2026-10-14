@@ -204,7 +204,7 @@ func sshError(stderr, fallback string) error {
 	case strings.Contains(text, "connection refused"), strings.Contains(text, "timed out"), strings.Contains(text, "could not resolve"), strings.Contains(text, "no route to host"):
 		return failure("ssh_unreachable")
 	default:
-		return failure(fallback)
+		return remoteBootstrapError(stderr, fallback)
 	}
 }
 func sshArgs(c state.Context) []string {
@@ -250,7 +250,7 @@ func Enroll(ctx context.Context, c state.Context) (state.Context, string, error)
 	if err != nil {
 		return state.Context{}, "", err
 	}
-	command := c.RemoteExecutable + " context bootstrap --control-port " + strconv.Itoa(c.RemoteControlPort) + " --show-once"
+	command := bootstrapCommand(c)
 	args := append(sshArgs(c), "--", c.SSHTarget, command)
 	cmd := exec.CommandContext(ctx, path, args...)
 	hideWindow(cmd)

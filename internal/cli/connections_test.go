@@ -3,6 +3,10 @@ package cli
 import (
 	"bytes"
 	"context"
+	"errors"
+	"flag"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -42,5 +46,18 @@ func TestContextAddRequiresOneTransport(t *testing.T) {
 	profiles, _ := s.Contexts()
 	if len(profiles) != 0 {
 		t.Fatal("invalid add persisted a profile")
+	}
+}
+
+func TestBootstrapCapabilityProbeDoesNotCreateState(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "not-created")
+	var out bytes.Buffer
+	app := App{Out: &out, Err: &out}
+	err := app.Run(t.Context(), []string{"--data-dir", dir, "context", "bootstrap", "--help"})
+	if !errors.Is(err, flag.ErrHelp) || !strings.Contains(out.String(), "-control-port") || !strings.Contains(out.String(), "-show-once") {
+		t.Fatalf("capability help: %v", err)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("capability probe created state: %v", err)
 	}
 }

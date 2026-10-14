@@ -88,6 +88,17 @@ func isolatedSSH(t *testing.T) (SSHConnectionInput, *state.Store) {
 	}
 	_, portText, _ := net.SplitHostPort(cfg.ControlAddress)
 	controlPort, _ := strconv.Atoi(portText)
+	// Reproduce SSH's noninteractive PATH: Anchor exists only in the remote
+	// account's user-local directory, including spaces in HOME.
+	remoteHome := filepath.Join(dir, "remote home")
+	remoteBin := filepath.Join(remoteHome, ".local", "bin")
+	if err := os.MkdirAll(remoteBin, 0700); err != nil {
+		t.Fatal(err)
+	}
+	remoteScript := "#!/bin/sh\nif [ \"$*\" = 'context bootstrap --help' ]; then exit 0; fi\nprintf '%s\\n' \"$@\"\n"
+	if err := os.WriteFile(filepath.Join(remoteBin, "anchor"), []byte(remoteScript), 0700); err != nil {
+		t.Fatal(err)
+	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -135,7 +146,10 @@ func isolatedSSH(t *testing.T) (SSHConnectionInput, *state.Store) {
 								}
 								var command struct{ Command string }
 								_ = ssh.Unmarshal(request.Payload, &command)
-								if command.Command != fmt.Sprintf("anchor context bootstrap --control-port %d --show-once", controlPort) {
+								probe := exec.Command("/bin/sh", "-c", command.Command)
+								probe.Env = []string{"HOME=" + remoteHome, "PATH=/usr/bin:/bin"}
+								args, probeErr := probe.Output()
+								if probeErr != nil || string(args) != fmt.Sprintf("context\nbootstrap\n--control-port\n%d\n--show-once\n", controlPort) {
 									request.Reply(false, nil)
 									return
 								}

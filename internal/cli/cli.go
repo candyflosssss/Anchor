@@ -427,7 +427,7 @@ func (a App) contexts(ctx context.Context, s *state.Store, args []string) error 
 		ssh := f.String("ssh", "", "SSH target or alias")
 		sshPort := f.Int("ssh-port", 0, "SSH port; 0 uses SSH config")
 		identity := f.String("identity-file", "", "SSH identity path")
-		executable := f.String("remote-anchor", "anchor", "remote Anchor executable")
+		executable := f.String("remote-anchor", "anchor", "remote Anchor executable; default discovers PATH, ~/.local/bin and ~/bin")
 		controlPort := f.Int("remote-control-port", 17861, "remote loopback control port")
 		trust := f.Bool("trust-new-host", false, "accept first-seen host keys; changed keys still fail")
 		if err := parse(f, args[2:]); err != nil {

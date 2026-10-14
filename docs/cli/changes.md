@@ -345,3 +345,11 @@
 - 兼容与迁移：远端须已安装支持 bootstrap 的新 CLI 且允许 SSH 回环转发；密码不保存，重开应用需重新输入；自动安装尚未实现。schema7 自动迁移，旧程序不可打开，升级前备份。
 - 验证：隔离 state/client/connection/cli/desktop 定向 Go 测试通过，真实 OpenSSH 与内置密码 SSH 用本地隔离 SSH 服务／核心验证；前端类型检查、lint、22 项单测通过。发行／浏览器结果见本轮 release 记录。
 - 发布状态：北京时间 2026-10-14 22:34:21 随 desktop.31 dev 两平台安装包和同版更新清单公开；本机 CLI／桌面已更新到 0.1.0-dev.desktop.31。CLI 正式预发行仍为 alpha.6，远程连接使用本轮新版源码 CLI；本轮未投放 CLI 在线发行。
+
+## 2026-10-14 — SSH 非交互环境发现 Anchor 与错误细分（未发布）
+
+- 类型：修改。
+- 指令与参数：context add --ssh、--remote-anchor；context bootstrap。
+- 旧 → 新：默认仅执行 PATH 中的 anchor → 按 PATH、~/.local/bin、~/bin 与系统常见路径发现可执行 CLI；自定义路径不回退，支持 ~/。密钥与密码模式共享受控命令；先用 bootstrap --help 检查能力。不存在、版本不支持、管理端口不匹配、核心未就绪分别返回固定错误码，原始 stderr 不回显。
+- 兼容与迁移：无需调整已有默认档案；不安装缺失的远端 CLI，不修改远端 PATH／shell 配置。细分核心错误需要远端新版 CLI，旧版错误继续保留 remote_anchor；返回数据结构与凭据策略保持兼容。
+- 验证：隔离非交互 shell、用户目录含空格／shell 字符、显式路径不回退、脱敏诊断、真实 OpenSSH／内置密码 SSH 连接用例；实际执行结果见本轮任务记录。

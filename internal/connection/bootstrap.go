@@ -56,7 +56,7 @@ func EnsureLocal(ctx context.Context, dir string, port int) (*state.Store, error
 		return fail(err)
 	}
 	if cfg.ControlAddress != net.JoinHostPort("127.0.0.1", strconv.Itoa(port)) {
-		return fail(failure("remote_anchor"))
+		return fail(failure("remote_control_port"))
 	}
 	token, err := s.OwnerToken()
 	if err != nil {
@@ -74,7 +74,7 @@ func EnsureLocal(ctx context.Context, dir string, port int) (*state.Store, error
 				return e
 			}
 			if status["core"] != "ready" {
-				return failure("remote_anchor")
+				return failure("remote_core_not_ready")
 			}
 		}
 		return err
@@ -100,7 +100,7 @@ func EnsureLocal(ctx context.Context, dir string, port int) (*state.Store, error
 				return s, nil
 			}
 		}
-		return fail(failure("remote_anchor"))
+		return fail(failure("remote_core_not_ready"))
 	}
 	instance.Close()
 	executable, err := os.Executable()
@@ -126,12 +126,12 @@ func EnsureLocal(ctx context.Context, dir string, port int) (*state.Store, error
 		case <-ctx.Done():
 			return fail(ctx.Err())
 		case <-exited:
-			return fail(failure("remote_anchor"))
+			return fail(failure("remote_core_not_ready"))
 		case <-time.After(100 * time.Millisecond):
 		}
 		if probe() == nil {
 			return s, nil
 		}
 	}
-	return fail(failure("remote_anchor"))
+	return fail(failure("remote_core_not_ready"))
 }

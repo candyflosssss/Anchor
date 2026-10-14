@@ -19,7 +19,11 @@ export const desktopMessages: Record<ProblemCode, string> = {
   ssh_host_key: '主机密钥尚未信任或已变化。首次连接可勾选信任首次主机密钥；已有密钥变化时请核实目标机器。',
   ssh_auth: 'SSH 鉴权失败，请检查用户名、密码、密钥或 SSH Agent。已保存的密码连接需在设备连接页重新填写密码。',
   ssh_unreachable: '无法访问 SSH 目标，请检查地址、端口和网络。',
-  remote_anchor: '远端 Anchor 未安装、版本不支持连接引导，或核心未就绪。请检查远端 Anchor 路径与管理端口。',
+  remote_anchor: '远端连接引导失败或返回数据无效，请核对远端 Anchor 路径及管理端口。',
+  remote_anchor_missing: 'SSH 已登录，但该账号下找不到可执行的 Anchor。已检查 PATH、~/.local/bin 和 ~/bin；请安装 Anchor，或在高级选项填写正确路径。',
+  remote_anchor_unsupported: '已找到远端程序，但它不支持设备连接引导。请将远端 Anchor CLI 更新到支持 context bootstrap 的版本，并确认路径指向 CLI。',
+  remote_control_port: '远端 Anchor 已配置的管理端口与本次连接不一致。请在高级选项填写远端实际管理端口。',
+  remote_core_not_ready: '已找到支持连接引导的远端 Anchor，但核心启动或就绪检查失败。请检查远端端口占用及核心状态后重试。',
   tunnel_failed: 'SSH 管理隧道未建立或已断开，请重新连接。',
   permission: '本机文件或安装器权限不足。',
 };

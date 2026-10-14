@@ -96,9 +96,9 @@ func passwordBootstrap(ctx context.Context, sshClient *ssh.Client, c state.Conte
 	stderr := &boundedBuffer{limit: 16384}
 	session.Stdout = stdout
 	session.Stderr = stderr
-	command := c.RemoteExecutable + " context bootstrap --control-port " + strconv.Itoa(c.RemoteControlPort) + " --show-once"
+	command := bootstrapCommand(c)
 	if err = session.Run(command); err != nil {
-		return state.Context{}, "", failure("remote_anchor")
+		return state.Context{}, "", remoteBootstrapError(stderr.String(), "remote_anchor")
 	}
 	var output Bootstrap
 	decoder := json.NewDecoder(bytes.NewBufferString(stdout.String()))

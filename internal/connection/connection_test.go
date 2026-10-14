@@ -73,5 +73,10 @@ func TestLocalConnectorAndBootstrapPreserveIdentity(t *testing.T) {
 	}
 	if _, err := EnsureLocal(t.Context(), s.Dir, port+1); err == nil {
 		t.Fatal("mismatched port accepted")
+	} else {
+		var diagnostic *Error
+		if !errors.As(err, &diagnostic) || diagnostic.Code != "remote_control_port" {
+			t.Fatalf("wrong port diagnostic: %v", err)
+		}
 	}
 }
