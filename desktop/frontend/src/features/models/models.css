@@ -1,32 +1,54 @@
 .workspace .model-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.mapping-candidate { border: 1px solid hsl(var(--border)); border-radius: 8px; overflow: hidden; }
-.mapping-candidate .candidate { border: 0; border-radius: 0; width: 100%; flex-wrap: wrap; }
-.mapping-candidate .candidate strong { flex-shrink: 0; }
-.mapping-candidate .candidate .mono { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; }
-.mapping-rates { padding: 8px 12px; border-top: 1px solid hsl(var(--border)); display: grid; gap: 6px; }
-.mapping-route-rate, .mapping-key-rate { font-size: 12px; margin: 0; overflow-wrap: anywhere; }
-.mapping-route-rate strong, .mapping-platform-rate strong { color: hsl(var(--foreground)); font-weight: 500; }
-.mapping-rate-actions { display: flex; flex-wrap: wrap; gap: 4px; }
-.mapping-rates .feedback { font-size: 12px; padding: 8px; margin: 0; }
-.mapping-source-header { display: flex; align-items: center; gap: 2px; }
-.mapping-candidate.can-reorder .mapping-source-header { background: hsl(var(--muted) / .4); }
-.mapping-candidate.can-reorder:hover, .mapping-candidate:has(.route-grip:focus-visible) { border-color: hsl(var(--muted-foreground) / .65); }
-.mapping-source-header .candidate { flex: 1; min-width: 0; }
-.route-grip { display: grid; place-items: center; flex: 0 0 26px; align-self: stretch; min-height: 28px; margin: 4px 0 4px 4px; border: 1px dashed hsl(var(--muted-foreground) / .5); border-radius: 4px; background: hsl(var(--muted)); padding: 0; cursor: grab; color: hsl(var(--muted-foreground)); }
-.route-grip:hover:not(:disabled), .route-grip:active:not(:disabled) { border-color: hsl(var(--foreground)); background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+.model-card { padding: 16px; }
+.model-card > header { align-items: center; margin-bottom: 12px; }
+.model-card h2 { min-width: 0; line-height: 1.5; }
+.model-card .model-settings-trigger { flex-shrink: 0; height: 30px; padding: 0 8px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.model-card-summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: hsl(var(--muted-foreground)); margin-bottom: 14px; }
+.model-strategy { border-radius: 4px; background: hsl(var(--muted)); padding: 3px 7px; color: hsl(var(--foreground)); }
+.model-sources { border-top: 1px solid hsl(var(--border)); }
+.model-sources > summary { display: flex; align-items: center; gap: 6px; list-style: none; cursor: pointer; font-size: 12px; color: hsl(var(--muted-foreground)); padding-top: 12px; }
+.model-sources > summary::-webkit-details-marker, .mapping-keys > summary::-webkit-details-marker { display: none; }
+.model-sources > summary:hover, .mapping-keys > summary:hover { color: hsl(var(--foreground)); }
+.model-sources > summary:focus-visible, .mapping-keys > summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; border-radius: 3px; }
+.model-sources > summary > svg, .mapping-keys > summary > svg { transition: transform 140ms ease; transform: rotate(-90deg); flex-shrink: 0; }
+.model-sources[open] > summary > svg, .mapping-keys[open] > summary > svg { transform: rotate(0); }
+.source-count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.model-sources-body { padding-top: 14px; }
+.route-settings-body { display: grid; gap: 8px; font-size: 12px; padding-bottom: 12px; }
+.route-settings-body > .card-hint { margin: 0; }
+.route-sort-hint { font-size: 11px; line-height: 1.6; color: hsl(var(--muted-foreground)); margin: 0 0 10px; }
+.mapping-candidate { border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--surface)); min-width: 0; }
+.mapping-source-header { display: flex; align-items: center; gap: 2px; padding: 5px 6px; }
+.mapping-source-header .candidate { border: 0; border-radius: 4px; flex: 1; min-width: 0; padding: 4px; display: grid; gap: 3px; text-align: left; }
+.mapping-source-header .candidate strong { font-size: 12px; }
+.mapping-source-header .candidate .mono { font-size: 11px; white-space: normal; overflow-wrap: anywhere; }
+.route-position { color: hsl(var(--muted-foreground)); font-size: 11px; font-variant-numeric: tabular-nums; padding: 0 3px; }
+.route-grip { display: grid; place-items: center; flex: 0 0 24px; height: 30px; border: 0; border-radius: 4px; background: transparent; padding: 0; touch-action: none; cursor: grab; color: hsl(var(--muted-foreground)); }
+.route-grip:hover:not([aria-disabled="true"]) { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
 .route-grip:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
-.route-grip:disabled { cursor: default; opacity: .35; }
-.route-grip:active { cursor: grabbing; }
+.route-grip[aria-disabled="true"] { cursor: default; opacity: .4; }
+.route-grip:active:not([aria-disabled="true"]) { cursor: grabbing; }
 .route-move { display: flex; flex-shrink: 0; }
-.route-move button { padding: 4px; height: 30px; }
-.route-settings { margin: 10px 0; font-size: 12px; }
-.route-settings summary { cursor: pointer; display: flex; gap: 6px; align-items: center; color: hsl(var(--muted-foreground)); }
-.route-settings-body { display: grid; gap: 8px; padding: 12px 0; }
-.route-save { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
-.mapping-key-rate { display: grid; gap: 5px; border-left: 2px solid hsl(var(--border)); padding-left: 8px; min-width: 0; }
-.mapping-key-name { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
-.mapping-key-name > span, .mapping-platform-rate { color: hsl(var(--muted-foreground)); }
-.mapping-key-name strong { font-weight: 500; }
-
+.route-move button { padding: 4px; height: 28px; }
+.mapping-source-meta { border-top: 1px solid hsl(var(--border)); padding: 8px 10px; font-size: 12px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 8px; color: hsl(var(--muted-foreground)); }
+.mapping-source-meta strong, .mapping-platform-rate strong { color: hsl(var(--foreground)); font-weight: 500; }
+.mapping-keys { min-width: 0; }
+.mapping-keys > summary { display: flex; align-items: center; justify-content: flex-end; gap: 4px; cursor: pointer; list-style: none; }
+.mapping-rates { display: grid; gap: 10px; padding-top: 10px; }
+.mapping-key-rate { display: grid; gap: 4px; border-left: 2px solid hsl(var(--border)); padding-left: 8px; min-width: 0; overflow-wrap: anywhere; }
+.mapping-key-name { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
+.mapping-rates .feedback { font-size: 12px; padding: 6px; margin: 0; }
+.mapping-rate-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.route-save-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: hsl(var(--muted-foreground)); margin-top: 12px; padding-top: 10px; border-top: 1px solid hsl(var(--border)); }
+.route-save-state > span { display: inline-flex; align-items: center; gap: 5px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.route-save-state button { height: 26px; padding: 0 6px; font-size: 12px; }
+.route-save-state.phase-failed, .route-save-state.phase-uncertain { color: hsl(var(--destructive)); }
+.route-spinner { animation: route-spin 1s linear infinite; }
+@keyframes route-spin { to { transform: rotate(360deg); } }
+.is-sorting .candidate-list { user-select: none; }
+.is-drag-placeholder { opacity: .3; border: 1px dashed hsl(var(--ring)); background: hsl(var(--accent)); }
+.route-drag-preview { position: fixed; z-index: 60; pointer-events: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px; border: 1px solid hsl(var(--ring)); border-radius: 6px; background: hsl(var(--surface)); color: hsl(var(--foreground)); box-shadow: 0 8px 24px hsl(var(--foreground) / .15); font-size: 12px; cursor: grabbing; }
+.route-drag-preview .mono { color: hsl(var(--muted-foreground)); font-size: 11px; overflow-wrap: anywhere; }
 @media (max-width: 1400px) { .workspace .model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1000px) { .workspace .model-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .model-sources > summary > svg, .mapping-keys > summary > svg { transition: none; } .route-spinner { animation: none; } }

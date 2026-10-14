@@ -36,8 +36,63 @@ func buildCatalog(models []state.Model, version string) ([]byte, []string, error
 		if model.DisplayName != "" {
 			set("display_name", model.DisplayName)
 		}
-		// Only gateway-owned transport/selection properties are adjusted. Model
-		// instructions, reasoning options, context sizes and tools are preserved.
+		// Apply explicit portable overrides to fields understood by the matched
+		// Codex catalog. Instruction templates remain operator-supplied.
+		if model.Settings != nil {
+			cfg := model.Settings.Configuration
+			if err := cfg.Validate(); err != nil {
+				return nil, nil, err
+			}
+			if cfg.Limits.Context != nil {
+				set("context_window", *cfg.Limits.Context)
+			}
+			if len(cfg.Capabilities.InputModalities) > 0 {
+				modalities := []string{}
+				for _, v := range cfg.Capabilities.InputModalities {
+					if v == "text" || v == "image" {
+						modalities = append(modalities, v)
+					}
+				}
+				if len(modalities) > 0 {
+					set("input_modalities", modalities)
+				}
+			} else if cfg.Capabilities.Vision != nil {
+				modalities := []string{"text"}
+				if *cfg.Capabilities.Vision {
+					modalities = append(modalities, "image")
+				}
+				set("input_modalities", modalities)
+			}
+			if cfg.ParallelToolCalls != nil {
+				set("supports_parallel_tool_calls", *cfg.ParallelToolCalls)
+			}
+			if cfg.Capabilities.Reasoning != nil && !*cfg.Capabilities.Reasoning {
+				set("supported_reasoning_levels", []any{})
+				set("default_reasoning_level", nil)
+			}
+			for _, option := range cfg.SupportedReasoning {
+				if option.Type != "effort" {
+					continue
+				}
+				levels := []map[string]string{}
+				for _, value := range option.Values {
+					if value == nil {
+						return nil, nil, errors.New("Codex catalog cannot represent null reasoning effort")
+					}
+					switch *value {
+					case "none", "minimal", "low", "medium", "high", "xhigh":
+					default:
+						return nil, nil, errors.New("reasoning effort is not supported by Codex export")
+					}
+					levels = append(levels, map[string]string{"effort": *value, "description": *value})
+				}
+				set("supported_reasoning_levels", levels)
+				set("default_reasoning_level", nil)
+				if cfg.DefaultReasoning != nil && cfg.DefaultReasoning.Type == "effort" {
+					set("default_reasoning_level", cfg.DefaultReasoning.Value)
+				}
+			}
+		}
 		set("upgrade", nil)
 		set("visibility", "list")
 		set("supported_in_api", true)

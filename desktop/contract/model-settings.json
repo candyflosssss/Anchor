@@ -1,0 +1,19 @@
+{
+  "model_id": "mapped",
+  "revision": 2,
+  "display_name": "Mapped",
+  "candidate_count": 2,
+  "configuration": {
+    "limits": { "context": 272000, "input": null, "output": 32000 },
+    "capabilities": {
+      "input_modalities": ["text", "image"], "output_modalities": ["text"],
+      "vision": true, "attachment": null, "tool_call": true, "reasoning": true,
+      "structured_output": null, "temperature": null
+    },
+    "streaming": true, "parallel_tool_calls": null,
+    "supported_reasoning": [{ "type": "effort", "values": ["low", "high"], "min": null, "max": null }],
+    "default_reasoning": { "type": "effort", "value": "high", "budget_tokens": null, "enabled": null },
+    "default_output_tokens": null, "default_temperature": null
+  },
+  "reference": null
+}

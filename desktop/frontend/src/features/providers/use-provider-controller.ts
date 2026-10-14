@@ -52,13 +52,15 @@ export function useProviderController(environment: ProviderEnvironment) {
     setPhase('loading');
     try {
       const result = await transport.list(abort.signal);
-      if (abort.signal.aborted || epoch !== generation.current) return;
+      if (abort.signal.aborted || epoch !== generation.current) return false;
       setProviders(result); setReadVersion(value => value + 1); setPhase('ready'); setProblem(null);
       setSelectedId(old => { const want = prefer !== undefined ? prefer : old; return result.some(p => p.id === want) ? want : null; });
+      return true;
     } catch (error) {
-      if (abort.signal.aborted || epoch !== generation.current) return;
+      if (abort.signal.aborted || epoch !== generation.current) return false;
       setProviders([]); setPhase('error');
       setProblem(error instanceof ProviderProblem ? error.code : 'read_error');
+      return false;
     }
   }, [transport, cancelCatalog]);
   useEffect(() => {

@@ -1,14 +1,15 @@
+import modelSettingsFixture from '../../contract/model-settings.json' with { type: 'json' };
 import accountFixture from '../../contract/provider-account.json' with { type: 'json' };
 import { expect, test, type Page } from '@playwright/test';
 import fixture from '../../contract/providers.json' with { type: 'json' };
 import updateFixture from '../../contract/updates.json' with { type: 'json' };
-import { CONTRACT, type AccountSettings, type DesktopBridge, type Provider } from '../src/desktop/contract.generated';
+import { CONTRACT, type AccountSettings, type DesktopBridge, type ModelSettingsState, type Provider } from '../src/desktop/contract.generated';
 
-declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
+declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | 'invalid' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
 async function host(page: Page, rateMappings = false) {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows, update, account, rateMappings }) => {
+  await page.addInitScript(({ contract, rows, update, account, modelSettings, rateMappings }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     window.accountTest = { saves: 0, queries: 0, failure: '' };
@@ -18,6 +19,7 @@ async function host(page: Page, rateMappings = false) {
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
     window.routingTest = { calls: [] };
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
+    const modelStates: Record<string, ModelSettingsState> = {};
     const api: DesktopBridge = {
       ModelCatalog: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       EstimateModelCost: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
@@ -50,11 +52,22 @@ async function host(page: Page, rateMappings = false) {
       Logs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogDetail: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogSettings: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ModelSettings: async input => ({ contract, data: modelStates[input.model_id] ?? { ...modelSettings, model_id: input.model_id, revision: routingState[input.model_id]?.revision ?? 1 }, problem: null }),
+      SaveModelSettings: async input => {
+        const old = modelStates[input.model_id] ?? { ...modelSettings, revision: routingState[input.model_id]?.revision ?? 1 };
+        if (old.revision !== input.expected_revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
+        const saved = { ...old, model_id: input.model_id, revision: old.revision + 1, display_name: input.display_name, configuration: input.configuration };
+        modelStates[input.model_id] = saved;
+        if (routingState[input.model_id]) routingState[input.model_id].revision = saved.revision;
+        counters.saves++;
+        return { contract, data: saved, problem: null };
+      },
       ConfigureModelRouting: async input => {
         window.routingTest.calls.push(input);
         await new Promise(resolve => setTimeout(resolve, 150));
         const m = routingState[input.model_id];
         if (!m || input.expected_revision !== m.revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
+        if (counters.writeError === 'invalid') return { contract, data: null, problem: { code: 'invalid' } };
         m.revision++; m.strategy = input.strategy; m.order = input.order;
         if (counters.writeError === 'unknown') return { contract, data: null, problem: { code: 'unknown' } };
         return { contract, data: { model_id: input.model_id, ...m }, problem: null };
@@ -98,7 +111,7 @@ async function host(page: Page, rateMappings = false) {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, rateMappings });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, rateMappings });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -301,12 +314,12 @@ test('account page configures authorization and keeps wallet and key quota indep
   await page.getByRole('tab', { name: '账户与余额' }).click();
   await page.getByLabel('平台类型', { exact: true }).selectOption('newapi');
   await page.getByLabel('NewAPI 用户 ID').fill('7');
-  await page.getByLabel('用户令牌 · 未配置', { exact: true }).selectOption('replace');
-  await page.getByLabel('平台用户令牌', { exact: true }).fill('synthetic-account-private-token');
+  await page.getByLabel('NewAPI 系统访问令牌 · 未配置', { exact: true }).selectOption('replace');
+  await page.getByLabel('NewAPI 系统访问令牌', { exact: true }).fill('synthetic-account-private-token');
   await expect(page.getByRole('button', { name: '刷新余额', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '保存平台配置' }).click();
-  await expect(page.getByLabel('用户令牌 · 已保存', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('平台用户令牌', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('NewAPI 系统访问令牌 · 已保存', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('NewAPI 系统访问令牌', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '刷新余额', exact: true }).click();
   const wallet = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: '余额', exact: true }) });
   const quota = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: 'Key 额度', exact: true }) });
@@ -484,6 +497,8 @@ test('group rate mappings distinguish routing and platform values and deduplicat
   await host(page, true);
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'shared-one', exact: true })).toBeVisible();
+  for (const summary of await page.locator('.model-sources > summary').all()) await summary.click();
+  for (const summary of await page.locator('.mapping-keys > summary').all()) await summary.click();
   await expect(page.getByText('路由倍率', { exact: false }).filter({ hasText: '2.5×' })).toHaveCount(2);
   const before = await page.evaluate(() => window.accountTest.queries);
   await page.getByRole('button', { name: '刷新分组倍率', exact: true }).dblclick();
@@ -515,6 +530,7 @@ test('group rate mappings distinguish routing and platform values and deduplicat
     await expect(page.getByRole('article', { name: '模型 claude-opus-4-6', exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1789, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
+    await page.getByRole('article', { name: '模型 claude-opus-4-6', exact: true }).locator('.model-sources > summary').click();
     await page.getByRole('button', { name: '拖动 备用供应商 claude-opus-4-6', exact: true }).hover();
     await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/model-mappings-light.png` });
     await page.setViewportSize({ width: 820, height: 1000 });
@@ -524,34 +540,164 @@ test('group rate mappings distinguish routing and platform values and deduplicat
 
 
 declare global { interface Window { routingTest: { calls: import('../src/desktop/contract.generated').ModelRouting[] } } }
-test('model routing supports source Keys, real drag ordering and saved rules (simulated host)', async ({ page }) => {
-  await host(page, true);
-  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+
+test('model cards collapse providers and Keys with a consistent default layout (simulated host)', async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
+    api.ProviderWorkspace = async input => {
+      const result = await read(input);
+      if (result.data) result.data.models = result.data.models.flatMap(m => m.id === 'shared-two' ? input.provider_id === '摸鱼AI' ? [{ ...m, candidate_count: 1, candidate_index: 0 }] : [] : [m]);
+      return result;
+    };
+  });
+  await page.getByRole('button', { name: '刷新配置', exact: true }).click();
+  const single = page.getByRole('article', { name: '模型 shared-two', exact: true });
+  await expect(single).toContainText('1 个来源 · 1 个 Key');
+  await expect(single.locator('.route-grip')).toHaveCount(0);
+
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await expect(card.locator('.mapping-key-name')).toHaveCount(3);
-  const sources = card.locator('li.mapping-candidate');
-  await card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true }).dragTo(sources.nth(1));
-  await expect(sources.nth(1)).toContainText('摸鱼AI');
-  await card.getByText('调度设置', { exact: true }).click();
-  await card.getByLabel('调度规则').selectOption('lowest-price');
-  await expect(card).toContainText('倍率不等于实际单价');
-  await card.getByRole('button', { name: '保存顺序与规则', exact: true }).dblclick();
-  await expect(page.getByRole('status').filter({ hasText: '顺序与调度规则已保存' })).toBeVisible();
-  await expect(card.getByRole('button', { name: '保存顺序与规则', exact: true })).toHaveCount(0);
-  const calls = await page.evaluate(() => window.routingTest.calls);
-  expect(calls).toHaveLength(1); expect(calls[0].strategy).toBe('lowest-price'); expect(calls[0].order[1].provider_id).toBe('摸鱼AI');
-  await page.getByRole('button', { name: '供应商', exact: true }).click();
-  await page.getByRole('button', { name: '模型映射', exact: true }).click();
-  await expect(card.locator('li.mapping-candidate').nth(1)).toContainText('摸鱼AI');
-  await expect(card).toContainText('低价优先');
+  await expect(card).toContainText('3 个来源 · 3 个 Key');
+  await expect(card.locator('.model-sources')).not.toHaveAttribute('open', '');
+  const shape = (node: Element) => { const style = getComputedStyle(node); return [style.padding, style.backgroundColor, style.borderRadius, node.getBoundingClientRect().height]; };
+  expect(await single.evaluate(shape)).toEqual(await card.evaluate(shape));
+  if (process.env.ANCHOR_MAPPING_CAPTURE_DIR) {
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/models-default.png` });
+    await page.getByRole('button', { name: '深色', exact: true }).click();
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/models-default-dark.png` });
+    await page.getByRole('button', { name: '浅色', exact: true }).click();
+  }
+
+  await expect(card.locator('li.mapping-candidate').first()).not.toBeVisible();
+  await card.locator('.model-sources > summary').click();
+  await expect(card.locator('li.mapping-candidate').first()).toBeVisible();
+  await expect(card.locator('.mapping-keys[open]')).toHaveCount(0);
+  await card.locator('.mapping-keys > summary').first().click();
+  await expect(card.getByLabel('来源 Key default', { exact: true }).first()).toBeVisible();
+  await card.locator('.model-sources > summary').click();
+  await expect(card.locator('li.mapping-candidate').first()).not.toBeVisible();
+  await expect(card.getByRole('button', { name: '模型设置 shared-one', exact: true })).toBeVisible();
 });
-test('model routing conflict refreshes without replaying the draft (simulated host)', async ({ page }) => {
+
+test('model routing previews pointer sorting and automatically saves rules with undo (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.locator('.model-sources > summary').click();
+  const sources = card.locator('li.mapping-candidate');
+  const handle = await card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true }).boundingBox();
+  const target = await sources.nth(1).boundingBox();
+  expect(handle).toBeTruthy(); expect(target).toBeTruthy();
+  await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
+  await page.mouse.down(); await page.mouse.move(target!.x + 40, target!.y + target!.height / 2, { steps: 8 });
+  await expect(card.locator('.route-drag-preview')).toBeVisible();
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
+  await page.mouse.up();
+  await expect(card.locator('.route-save-state')).toContainText('已自动保存');
+  await expect(sources.nth(1)).toContainText('摸鱼AI');
+  await card.getByLabel('调度规则').selectOption('lowest-price');
+  await expect(card).toContainText('倍率不等于实际单价');
+  await expect(card.locator('.route-save-state')).toContainText('已自动保存');
+  const calls = await page.evaluate(() => window.routingTest.calls);
+  expect(calls).toHaveLength(2); expect(calls[1].expected_revision).toBe(2); expect(calls[1].strategy).toBe('lowest-price'); expect(calls[1].order[1].provider_id).toBe('摸鱼AI');
+  await card.getByRole('button', { name: '撤销', exact: true }).click();
+  await expect(card.locator('.route-save-state')).toContainText('已撤销并保存');
+  await expect(card.getByLabel('调度规则')).toHaveValue('round-robin');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(3);
+  await page.getByRole('button', { name: '供应商', exact: true }).click();
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await card.locator('.model-sources > summary').click();
+  await expect(card.locator('li.mapping-candidate').nth(1)).toContainText('摸鱼AI');
+});
+
+test('model routing cancels pointer sorting and supports keyboard ordering (simulated host)', async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.locator('.model-sources > summary').click();
+  const grip = card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true });
+  const box = await grip.boundingBox();
+  await page.mouse.move(box!.x + 10, box!.y + 10); await page.mouse.down(); await page.mouse.move(box!.x + 10, box!.y + 130, { steps: 6 });
+  await expect(card.locator('.route-drag-preview')).toBeVisible();
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  await expect(card.locator('.route-drag-preview')).toHaveCount(0);
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
+  await grip.focus(); await page.keyboard.press('ArrowDown');
+  await expect(card.locator('.route-save-state')).toContainText('已自动保存');
+  await expect(card.locator('li.mapping-candidate').nth(1)).toContainText('摸鱼AI');
+  await expect(grip).toBeFocused();
+});
+
+for (const failure of ['conflict', 'unknown'] as const) test(`model routing ${failure} requires a read without replaying (simulated host)`, async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.locator('.model-sources > summary').click();
+  await page.evaluate(value => { window.desktopTest.writeError = value; }, failure);
   await card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }).click();
-  await page.evaluate(() => { window.desktopTest.writeError = 'conflict'; });
-  await card.getByRole('button', { name: '保存顺序与规则', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('未覆盖新版本');
+  await expect(card.getByRole('alert')).toContainText(failure === 'conflict' ? '未覆盖新版本' : '结果未知');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
-  await expect(card.getByRole('button', { name: '保存顺序与规则', exact: true })).toHaveCount(0);
+  await expect(card.getByLabel('调度规则')).toBeDisabled();
+  await page.evaluate(() => { window.desktopTest.writeError = null; });
+  await card.getByRole('button', { name: '重新读取配置', exact: true }).click();
+  await expect(card.getByLabel('调度规则')).toBeEnabled();
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
+  await expect(card.locator('li.mapping-candidate').nth(failure === 'unknown' ? 1 : 0)).toContainText('摸鱼AI');
+});
+
+test('model settings opens from each card, saves context and reasoning and survives reopening (simulated host)', async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('上下文窗口（tokens）')).toBeVisible();
+  await dialog.getByLabel('上下文窗口（tokens）').fill('300000');
+  await dialog.getByLabel('默认思考等级').selectOption('"low"');
+  expect(await dialog.locator('input:invalid').count()).toBe(0);
+  await dialog.getByRole('button', { name: '保存模型设置', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
+  await dialog.getByRole('button', { name: '关闭编辑面板', exact: true }).click();
+  await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('300000');
+  await expect(dialog.getByLabel('默认思考等级')).toHaveValue('"low"');
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
+});
+
+
+test('model routing keeps a failed draft for explicit retry or discard (simulated host)', async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.locator('.model-sources > summary').click();
+  await page.evaluate(() => { window.desktopTest.writeError = 'invalid'; });
+  await card.getByLabel('调度规则').selectOption('priority');
+  await expect(card.getByRole('button', { name: '重试保存', exact: true })).toBeVisible();
+  await expect(card.getByLabel('调度规则')).toBeDisabled();
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
+  await card.getByRole('button', { name: '放弃修改', exact: true }).click();
+  await expect(card.getByLabel('调度规则')).toHaveValue('round-robin');
+  await card.getByLabel('调度规则').selectOption('priority');
+  await expect(card.getByRole('button', { name: '重试保存', exact: true })).toBeVisible();
+  await page.evaluate(() => { window.desktopTest.writeError = null; });
+  await card.getByRole('button', { name: '重试保存', exact: true }).dblclick();
+  await expect(card.locator('.route-save-state')).toContainText('已自动保存');
+  await expect(card.getByLabel('调度规则')).toHaveValue('priority');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(3);
+});
+
+test('model routing does not retry an acknowledged write when reloading fails (simulated host)', async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.locator('.model-sources > summary').click();
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.Providers;
+    api.Providers = async () => ({ contract: 'anchor-desktop-v1', data: [], problem: { code: 'read_error' } });
+    Object.assign(window, { restoreModelRead: () => { api.Providers = read; } });
+  });
+  await card.getByLabel('调度规则').selectOption('priority');
+  await expect(page.getByRole('alert').filter({ hasText: '修改已保存' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '重试保存', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
+  await page.evaluate(() => { (window as unknown as { restoreModelRead: () => void }).restoreModelRead(); });
+  await page.getByRole('button', { name: '重新读取配置', exact: true }).click();
+  await expect(card).toBeVisible();
+  await expect(card.locator('.route-save-state')).toContainText('已自动保存');
+  await expect(card.locator('.model-strategy')).toContainText('固定顺序');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
 });

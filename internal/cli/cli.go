@@ -68,6 +68,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
                 [--secret-stdin] [--revision N] [--protocol responses|chat-completions|anthropic]
                 [--timeout 120] [--max-concurrent 4] [--disabled]
   model list
+  model settings --id ID [--file FILE]
   model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL...
   RULE: priority|round-robin|cache-priority|lowest-price|lowest-latency
   model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...] [--strategy RULE] [--candidate-key INDEX:KEY]
@@ -544,7 +545,7 @@ func (r *repeated) String() string     { return strings.Join(*r, ",") }
 func (r *repeated) Set(v string) error { *r = append(*r, v); return nil }
 func (a App) models(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("model requires list, add, put or routing")
+		return errors.New("model requires list, add, put, settings or routing")
 	}
 	if args[0] == "list" {
 		if len(args) != 1 {
@@ -555,6 +556,48 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 			return err
 		}
 		return a.output(v)
+	}
+	if args[0] == "settings" {
+		f := a.flags("model settings")
+		id := f.String("id", "", "public model ID")
+		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); omitted reads current settings")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		if *file == "" {
+			out, err := c.ModelSettings(ctx, catalog.ModelSettingsQuery{ModelID: *id})
+			if err != nil {
+				return err
+			}
+			return a.output(out)
+		}
+		fh, err := os.Open(*file)
+		if err != nil {
+			return errors.New("cannot read model settings file")
+		}
+		defer fh.Close()
+		raw, err := io.ReadAll(io.LimitReader(fh, (1<<20)+1))
+		if err != nil || len(raw) > 1<<20 {
+			return errors.New("model settings file exceeds 1 MiB")
+		}
+		var in catalog.SaveModelSettings
+		decoder := json.NewDecoder(strings.NewReader(string(raw)))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&in); err != nil {
+			return errors.New("invalid model settings JSON")
+		}
+		var extra any
+		if decoder.Decode(&extra) != io.EOF {
+			return errors.New("model settings file must contain one JSON object")
+		}
+		if in.ModelID != *id {
+			return errors.New("--id and model_id must agree")
+		}
+		out, err := c.SaveModelSettings(ctx, in)
+		if err != nil {
+			return err
+		}
+		return a.output(out)
 	}
 	if args[0] == "routing" {
 		f := a.flags("model routing")

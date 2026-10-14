@@ -29,7 +29,7 @@ export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivit
   const summaries = useProviderSummaries(c.providers, c.phase === 'ready', environment.transport, c.features.data);
   const balances = useProviderBalances(c.providers, c.phase === 'ready' && page === 'providers' && !c.selected, environment.transport);
   const rates = useMappingRates(c.providers, c.phase === 'ready' && page === 'models', environment.transport);
-  const routing = useModelRouting(aggregateModels(summaries), page === 'models', environment.transport, async () => { await c.load(); });
+  const routing = useModelRouting(aggregateModels(summaries), page === 'models', environment.transport, async () => { if (!await c.load()) throw new Error('配置读取失败'); });
   const opener = useRef<HTMLElement | null>(null);
   const busy = routing.busy || rates.busy || c.busy || !!c.editor || !!c.toggle || !!c.dialog;
   useEffect(() => { onActivity(busy); }, [busy, onActivity]);

@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-13
+- 最近核对：2026-10-14
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
@@ -80,7 +80,8 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `logs settings` | 查询日志保留设置 | 所选 Context 核心在线 |
 | `logs configure` | 校验并持久化保留设置 | 所选 Context 管理授权 |
 | `usage` | 持久用量汇总 | 所选 Context 的核心在线 |
-| `model routing` | 原子保存已有候选的完整顺序与调度规则 | 核心在线、当前模型 revision；来源和元数据保留 |
+| `model settings` | 读取或保存模型能力、限制、思考默认值与参考快照 | 所选 Context；模型已存在，保存需当前 revision |
+| `model routing` | 原子保存已有候选的完整顺序与调度规则；GUI 松手／改规则自动保存并可撤销 | 核心在线、当前模型 revision；来源和元数据保留 |
 | `model list` | 列出公开模型映射 | 所选 Context 的核心在线 |
 | `model add` | 新增公开模型 | 核心在线；候选供应商已配置 |
 | `model put` | 条件更新公开模型 | 核心在线；当前 revision |
@@ -396,6 +397,33 @@ anchor model add --id anchor-code --candidate primary:upstream-model --tools --s
 
 删除使用 `provider model-delete`（见 §5），核对供应商和模型 revision，只移除该供应商候选；删除最后一个候选时阻止删除 Binding 默认模型。这里的示例不会证明真实供应商或 Codex 已兼容。
 
+### 模型能力与默认值设置（2026-10-14，源码未发布）
+
+```text
+anchor model settings --id ID
+anchor model settings --id ID --file FILE
+```
+
+前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、configuration、reference。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
+
+写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
+
+`reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照）。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
+
+从读取结果整理写入文件的示例（`jq` 是外部工具）：
+
+```sh
+anchor model settings --id public > current-settings.json
+jq '{model_id, expected_revision: .revision, display_name, configuration,
+     reference_action: "keep", reference_provider_id: "", reference_model_id: ""}
+    | .configuration.limits.context = 272000' current-settings.json > model-settings.json
+anchor model settings --id public --file model-settings.json
+```
+
+正整数限制不超过安全整数，上下文不小于已声明输入/输出，默认输出不超过最大输出；temperature 默认值须声明支持且在0..2。保存不改变候选、倍率、Key 范围、调度或版本匹配 Codex 模板。普通 `model put` 保留本节 settings/reference（但其他旧字段仍按其完整替换语义）；供应商编辑同步 tools/streaming。返回的新模型 revision 也用于后续路由/供应商映射编辑。
+
+Codex 同步导出可应用上下文、text/image 输入、并行调用及可表示的 effort/default；其他能力/默认调用值仅保存元数据，当前不自动改写请求。版本匹配完整模板仍必需，不支持的 effort（如 max/default/null）会使同步失败。`agent sync` 后重启 Agent 才读取新目录，现有会话不热更新。详见[模型参考目录契约](../design/model-catalog.md)。
+
 ## 7. 本机授权
 
 ```text
@@ -560,9 +588,9 @@ anchor recover [--id ID]
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 多 Key 与恢复 | provider workspace/key-put/key-delete/key-reset/strategy | GUI 同等操作；冷却/熔断为内部机制 |
-| 平台自动识别与列表余额（desktop.27） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；NewAPI 已配置系统令牌时优先读账户余额，未配置时查默认 Key billing／额度；已随 desktop.27 投放 |
+| 平台自动识别与列表余额（desktop.27） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；NewAPI 已配置系统令牌时优先读账户余额，未配置时查默认 Key billing／额度；已随 desktop.27 投放。当前源码 GUI 切页先显示同实例／同配置的会话缓存并刷新，失败保留旧值标注「余额未刷新」，支持单行刷新按钮；仅桌面展示行为，沿用既有 balance-summary，无新增 CLI 契约 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
-| 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射自动填充与日志逐请求比价待接入，详见§13 |
+| 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
@@ -676,4 +704,4 @@ anchor catalog estimate --provider PROVIDER_ID --model MODEL_ID \
   --cache-read-tokens 0 --cache-write-tokens 0 --reasoning-tokens 0
 ```
 
-这是能力默认值和日志参考价的共享基础。目前已提供核心、CLI、桌面桥接与前端 Model 方法；映射表单自动填充、日志逐请求比价／价格快照持久化尚未接入。仅估算文本 token，不推断音视频、图像专用费、请求费、路由倍率、折扣或平台账单。详见[模型参考目录契约](../design/model-catalog.md)。
+这是能力默认值和日志参考价的共享基础。目前已提供核心、CLI、桌面桥接与前端 Model 方法；映射表单显式导入与模型参考快照已接入当前源码（§6）；日志逐请求比价及逐请求价格快照尚未接入。仅估算文本 token，不推断音视频、图像专用费、请求费、路由倍率、折扣或平台账单。详见[模型参考目录契约](../design/model-catalog.md)。

@@ -177,6 +177,7 @@ type Model struct {
 	Candidates  []Candidate    `json:"candidates"` // Ordered, explicit priority.
 	Revision    int64          `json:"revision"`
 	Codex       *CodexMetadata `json:"codex,omitempty"`
+	Settings    *ModelSettings `json:"settings,omitempty"`
 }
 
 func (m Model) RoutingStrategy() string {
@@ -193,6 +194,11 @@ func ValidModelStrategy(v string) bool {
 func (m Model) Validate() error {
 	if !ValidModelStrategy(m.Strategy) {
 		return errors.New("invalid model strategy")
+	}
+	if m.Settings != nil {
+		if err := m.Settings.Validate(); err != nil {
+			return err
+		}
 	}
 	if m.Codex != nil {
 		if err := m.Codex.Validate(); err != nil {

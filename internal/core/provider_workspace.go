@@ -225,6 +225,13 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 				m.Candidates[index].Multiplier = in.Multiplier
 			}
 			m.Tools, m.Streaming = in.Tools, in.Streaming
+			if m.Settings != nil {
+				m.Settings.Configuration.Capabilities.ToolCall = &m.Tools
+				m.Settings.Configuration.Streaming = &m.Streaming
+				if !m.Tools {
+					m.Settings.Configuration.ParallelToolCalls = nil
+				}
+			}
 		}
 		// Joining an existing public model preserves its shared strategy/capabilities.
 		// Editing an existing mapping can explicitly change the shared strategy.

@@ -281,6 +281,8 @@ func (s *Server) Control() http.Handler {
 	mux.HandleFunc("POST /control/v1/providers/{id}/discover-models", s.discoverProviderModels)
 	mux.HandleFunc("POST /control/v1/providers/{id}/probe", s.providerProbe)
 	mux.HandleFunc("POST /control/v1/models/{id}/routing", s.configureModelRouting)
+	mux.HandleFunc("GET /control/v1/models/{id}/settings", s.getModelSettings)
+	mux.HandleFunc("POST /control/v1/models/{id}/settings", s.saveModelSettings)
 	mux.HandleFunc("GET /control/v1/models", func(w http.ResponseWriter, r *http.Request) {
 		m, err := s.Store.Models()
 		if err != nil {
@@ -302,6 +304,25 @@ func (s *Server) Control() http.Handler {
 		}
 		if in.Model.ID != r.PathValue("id") {
 			fail(w, 400, "invalid_id", "path and object ID must agree")
+			return
+		}
+		// Scoped settings writes own the metadata and server-captured reference.
+		if in.ExpectedRevision > 0 {
+			current, err := s.Store.Model(in.Model.ID)
+			if err != nil {
+				apiError(w, err)
+				return
+			}
+			in.Model.Settings = current.Settings
+			if in.Model.Settings != nil {
+				in.Model.Settings.Configuration.Capabilities.ToolCall = &in.Model.Tools
+				in.Model.Settings.Configuration.Streaming = &in.Model.Streaming
+				if !in.Model.Tools {
+					in.Model.Settings.Configuration.ParallelToolCalls = nil
+				}
+			}
+		} else if in.Model.Settings != nil {
+			apiError(w, state.ErrInvalid)
 			return
 		}
 		if err := in.Model.Validate(); err != nil {

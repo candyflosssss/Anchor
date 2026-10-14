@@ -6,6 +6,7 @@ import (
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
+	"github.com/candyflosssss/Anchor/internal/state"
 )
 
 const Contract = "anchor-desktop-v1"
@@ -297,4 +298,16 @@ type CatalogEstimateResult struct {
 	Contract string           `json:"contract"`
 	Data     *CatalogEstimate `json:"data"`
 	Problem  *Problem         `json:"problem"`
+}
+
+// Mapping settings use a scoped revision-controlled write.
+type ReasoningDefault = state.ReasoningDefault
+type ModelConfiguration = state.ModelConfiguration
+type ModelSettingsQuery = catalog.ModelSettingsQuery
+type ModelSettingsState = catalog.ModelSettingsState
+type SaveModelSettings = catalog.SaveModelSettings
+type ModelSettingsResult struct {
+	Contract string              `json:"contract"`
+	Data     *ModelSettingsState `json:"data"`
+	Problem  *Problem            `json:"problem"`
 }

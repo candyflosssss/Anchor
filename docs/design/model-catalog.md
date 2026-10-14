@@ -1,6 +1,6 @@
 # models.dev 模型参考目录契约
 
-状态：2026-10-13 实现，随 desktop.29 dev 已交付。已实现共享目录、核心管理 API、Go 客户端、CLI、桌面桥接及前端 Model 方法。模型映射自动填充、日志逐请求参考价／实际费用对比和价格快照持久化待接入。
+状态：2026-10-13 实现，随 desktop.29 dev 已交付。已实现共享目录、核心管理 API、Go 客户端、CLI、桌面桥接及前端 Model 方法。2026-10-14 源码新增映射设置、显式目录默认值导入与参考价格快照保存，未打包。日志逐请求参考价／实际费用对比仍待接入。
 
 ## 数据与身份
 
@@ -55,3 +55,23 @@ models.dev 元数据是用户可核对的默认参考，不能证明某个中转
 管理路由仍要求 management scope、实例 X-Anchor-Instance 和受限 Host／Origin，不能由浏览器直接跨源调用。invalid=400、not_found=404、catalog_unavailable=502；对外不泄露远端错误内容。桌面将目录不可用映射 read_error、传输断开 offline；纯读失败无需写入结果未知确认。前端取消只停止消费，不能取消已发到 Wails 的调用；调用取消只停止等待共享下载；核心退出和30秒抓取超时负责终止下载。
 
 DTO 由 Go 生成到 `desktop/contract.generated.ts`，共享离线样例 `desktop/contract/model-catalog.json` 在 Go 与前端验证。默认测试均离线；公开目录兼容检查显式 opt-in，不涉及凭据和付费推理。原生窗口／安装包和后续消费界面不在本轮验收范围。
+
+## 模型映射设置（2026-10-14，源码未发布）
+
+每个公开模型新增可空 `settings`，沿用模型 JSON 存储，不改变数据库 schema。`configuration` 是人工确认后的模型声明，`reference` 是核心从 models.dev 获取的单模型快照，包含版本、抓取/过期时间、模型更新时间、完整 nullable 报价和分档。
+
+设置支持：`limits.context/input/output`；`capabilities` 中的模态、视觉、附件、工具调用、思考、结构化输出与 temperature；`streaming`、`parallel_tool_calls`；`supported_reasoning`；`default_reasoning`；`default_output_tokens` 与 `default_temperature`。未知保持 null/空数组，正整数上限为 JavaScript safe integer。上下文不能小于已声明的输入/输出上限，默认输出不能超过模型最大输出。Temperature 默认值需声明支持，范围 0..2 仅作配置验证，不代表每个上游都接受整个范围。
+
+思考支持范围保留原生 effort/toggle/budget_tokens。默认值分别使用 `value`（可为 JSON null）、`enabled`、`budget_tokens`；其他两项必须为 null。默认值须位于对应已声明范围；预算 -1 只有范围允许时有效。reasoning=false 时不能留下选项或默认值。模态已声明时视觉必须与 image 输入一致。旧映射的 tools/streaming 布尔继续权威，设置读取始终返回现有声明；未知写入保留旧值。已有供应商编辑与 `model put` 同步这两项，同时保留其他设置及参考快照。
+
+受管理凭据、Origin/Host 和实例身份保护的接口：
+
+- `GET /control/v1/models/{id}/settings` 返回 `ModelSettingsState`：model_id、revision、display_name、candidate_count、configuration、reference。
+- `POST /control/v1/models/{id}/settings` 接收 `SaveModelSettings`：model_id、expected_revision、display_name、configuration、reference_action、reference_provider_id、reference_model_id。只替换显示名/设置，保留候选顺序、来源 Key、倍率、调度策略和 Codex 指令模板；乐观版本校验阻止覆盖其他操作。
+- `reference_action=keep` 保留旧快照，`clear` 清除；两者来源 ID 必须为空。`set` 需精确目录 provider/model ID，由核心抓取当前缓存/刷新后的单模型快照，拒绝陈旧失败快照，前端不能传入报价或伪造来源。客户端与桥接保存方法45秒超时，断线/异常回包仍按写入结果未知处理，无自动重放。
+
+桌面通过 Model → Controller → View 使用这组方法。目录读取和显式刷新仅改变表单草稿：补充未设置值保留人工字段/默认值；替换草稿替换目录包含的声明并清除可能不再适用的默认思考值。保存才持久化。多个候选使用同一份设置，页面提示核对所有候选；单目录导入不能证明所有渠道真实能力。参考价格不是候选实际费用，目录刷新不后台覆盖已保存设置。
+
+Codex 的完整版本匹配目录模板仍是必要前提。生成目录时应用显式 context、text/image 输入模态/视觉、并行工具调用；effort 可以导出 none/minimal/low/medium/high/xhigh，其他或 null effort 会阻止同步，避免伪造/静默降级。非思考模型清空目录中的思考等级和默认值。模板指令与截断策略保留。toggle/budget 思考、输出预算、temperature、结构化输出等保存为能力/默认值元数据，目前不自动改写推理请求。更新目录需 `agent sync`，并重启 Agent；保存映射不热更新正在运行的会话。Agent 自动压缩策略没有添加到通用模型设置。
+
+CLI 使用 `model settings --id ID [--file FILE]`，详见[指令大全](../cli/commands.md)。本轮验证使用隔离状态和模拟目录，没有修改真实 Agent 配置或调用真实付费上游。

@@ -313,6 +313,15 @@
 - 验证：隔离目录测试覆盖 DSH 默认根、环境覆盖、去重和相对路径忽略；前端验证结果见本轮任务记录。
 
 
+## 2026-10-14 — 模型映射能力与默认值设置（当前源码，未发布）
+
+- 类型：新增。
+- 指令与参数：新增 `model settings --id ID` 读取当前设置；`model settings --id ID --file FILE` 从本机 JSON 文件保存完整设置，文件至多 1 MiB。
+- 旧 → 新：模型映射现在可保存上下文／输入／输出限制、能力声明、原生 effort／toggle／budget_tokens 思考范围与默认值、默认输出预算、Temperature 和并行工具调用；`reference_action=keep|set|clear` 独立控制 models.dev 参考快照，set 由核心按精确 provider/model 身份获取。
+- 兼容与迁移：目标模型必须已存在，写入携带当前 expected_revision；版本冲突拒绝保存，结果未知需先重新读取。旧 `model put` 保留已有 settings/reference，候选顺序、倍率、Key 范围和 Codex 模板不变。需同步升级 CLI 与核心；当前源码尚未打包发布。Codex 只导出可表示的配置，保存后需同步并重启 Agent；日志逐请求比价尚未接入。
+- 验证：`go test -p 2 ./internal/modelconfig ./internal/state ./internal/catalog ./internal/core ./internal/client ./internal/desktop ./internal/cli ./internal/managed` 通过；覆盖 CLI 读写、文件／身份校验、revision 冲突、目录快照、桌面桥接和 Codex 导出。前端 typecheck、相关 lint 和模型设置／目录／供应商汇总／传输共 37 个定向测试通过；29 项 desktop 浏览器回归通过（模拟宿主）。验证使用隔离状态与模拟目录，未修改真实 Agent 配置或请求付费推理。
+
+
 ## 2026-10-14 — 推理基址自动补路径与 HTML 错误提示（当前源码，未发布）
 
 - 类型：修改 `provider test` 与真实转发行为，无新增命令或参数。

@@ -2,6 +2,47 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface ReasoningDefault {
+  type: string;
+  value: string | null;
+  budget_tokens: number | null;
+  enabled: boolean | null;
+}
+export interface ModelConfiguration {
+  limits: CatalogLimits;
+  capabilities: CatalogCapabilities;
+  streaming: boolean | null;
+  parallel_tool_calls: boolean | null;
+  supported_reasoning: ReasoningOption[];
+  default_reasoning: ReasoningDefault | null;
+  default_output_tokens: number | null;
+  default_temperature: number | null;
+}
+export interface ModelSettingsQuery {
+  model_id: string;
+}
+export interface ModelSettingsState {
+  model_id: string;
+  revision: number;
+  display_name: string;
+  candidate_count: number;
+  configuration: ModelConfiguration;
+  reference: ModelCatalog | null;
+}
+export interface SaveModelSettings {
+  model_id: string;
+  expected_revision: number;
+  display_name: string;
+  configuration: ModelConfiguration;
+  reference_action: string;
+  reference_provider_id: string;
+  reference_model_id: string;
+}
+export interface ModelSettingsResult {
+  contract: string;
+  data: ModelSettingsState | null;
+  problem: Problem | null;
+}
 export interface ModelCatalogQuery {
   provider_id: string;
   model_id: string;
@@ -648,6 +689,7 @@ export interface DesktopBridge {
   Logs(input1: Query): Promise<LogsResult>;
   ManageAgent(input1: ManageAgent): Promise<AgentWorkspaceResult>;
   ModelCatalog(input1: ModelCatalogQuery): Promise<ModelCatalogResult>;
+  ModelSettings(input1: ModelSettingsQuery): Promise<ModelSettingsResult>;
   ProviderAccountSettings(input1: WorkspaceQuery): Promise<AccountSettingsResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderAllowance(input1: AccountQuery): Promise<AccountObservationResult>;
@@ -655,6 +697,7 @@ export interface DesktopBridge {
   ProviderRate(input1: AccountQuery): Promise<AccountRateObservationResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;
+  SaveModelSettings(input1: SaveModelSettings): Promise<ModelSettingsResult>;
   SaveProvider(input1: SaveProvider): Promise<SaveResult>;
   SaveProviderAccount(input1: SaveAccountSettings): Promise<AccountSettingsResult>;
   Start(): Promise<SessionResult>;
