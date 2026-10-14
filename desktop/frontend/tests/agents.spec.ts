@@ -136,7 +136,10 @@ test('compact layout stays within narrow windows and dark theme', async ({ page 
   await page.screenshot({ path: process.env.ANCHOR_AGENT_PREVIEW ?? 'test-results/agents-collapsed.png' });
   await openSettings(page);
   await page.screenshot({ path: process.env.ANCHOR_AGENT_DETAILS_PREVIEW ?? 'test-results/agents-expanded.png' });
-  await page.evaluate(() => document.documentElement.classList.add('dark'));
+  await page.getByRole('button', { name: '深色', exact: true }).click();
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await expect(page.locator('.agent-platform-name').first()).toHaveCSS('color', 'rgb(250, 250, 250)');
+  await expect(page.getByRole('heading', { name: 'Agent 托管', exact: true })).toHaveCSS('color', 'rgb(250, 250, 250)');
   await page.setViewportSize({ width: 760, height: 900 });
   const workspace = page.locator('.agent-workspace');
   expect(await workspace.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
