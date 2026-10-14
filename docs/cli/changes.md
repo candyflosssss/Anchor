@@ -337,10 +337,11 @@
 - Claude 用户 settings.json 与 DSH web cordis.patch.yml 接入统一计划、指纹、日志、同步、条件恢复及禁用凭据生命周期。供应商密钥不写入 Agent 文件；两个新适配器使用受保护配置中的网关 Binding token，管理返回与 Anchor 日志不公开凭据。
 - 客户端重载边界：Codex/Claude Code 重启，DSH 默认模型在新会话生效；项目/命令参数覆盖与真实客户端运行尚未验收。Gemini/OpenCode 仍只识别。
 
-## 2026-10-14 — UI 与 CLI 共用 SSH 设备连接（desktop dev 新修订）
+## 2026-10-14 — UI 与 CLI 共用 SSH 设备连接（desktop.31 dev）
 
 - 类型：新增／修改。
 - 指令与参数：context add --ssh、--ssh-port、--identity-file、--remote-anchor、--remote-control-port、--trust-new-host；context bootstrap --control-port --show-once；全局 --ssh-password-stdin。
 - 旧 → 新：仅本机 Context → SSH 密钥／Agent 与本次密码连接；管理动作复用连接层，不需手动建立隧道。bootstrap 在目标账户核验／启动核心并签发 720 小时 manage 授权。列表不含管理秘密；桌面选择不改 CLI 默认 Context。
 - 兼容与迁移：远端须已安装支持 bootstrap 的新 CLI 且允许 SSH 回环转发；密码不保存，重开应用需重新输入；自动安装尚未实现。schema7 自动迁移，旧程序不可打开，升级前备份。
 - 验证：隔离 state/client/connection/cli/desktop 定向 Go 测试通过，真实 OpenSSH 与内置密码 SSH 用本地隔离 SSH 服务／核心验证；前端类型检查、lint、22 项单测通过。发行／浏览器结果见本轮 release 记录。
+- 发布状态：北京时间 2026-10-14 22:34:21 随 desktop.31 dev 两平台安装包和同版更新清单公开；本机 CLI／桌面已更新到 0.1.0-dev.desktop.31。CLI 正式预发行仍为 alpha.6，远程连接使用本轮新版源码 CLI；本轮未投放 CLI 在线发行。

@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-14。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.30`，北京时间 2026-10-14 14:18:14 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：推理请求先使用配置地址，仅未带版本路径收到明确 HTML 200／404／405 时同源追加 `/v1` 重试一次，不改已保存地址；仍返回网页时测试卡片、快速测试与日志显示 `unexpected_html` 和中文 API 地址提示。包含 `.29` 后已提交的 Agent 管理简化与 DSH 发现，沿用 schema6，无新增数据库迁移。
-- 已有 `.9`～`.29`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版无法检查更新时可手动安装一次 `.30`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
-- 首次启动核心自动迁移 state.db schema5→6，保留既有模型与 Key；旧模型未指定来源时继续允许所有启用 Key。更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
-- 双平台生产编译与安装包构建、六附件大小／digest 核对、默认源 Linux 实际更新下载及大小／SHA256通过；Windows 远端 digest 与本地一致。定向 Go 测试、前端类型检查、15项定向测试及受影响文件 lint 结果复用本轮构建提交的已有验证。未执行原生窗口、安装器或 apply 验收。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.31`，北京时间 2026-10-14 22:34:21 已发布到 GitHub Releases，Windows／Linux 安装包与清单同版投放。
+- 范围：新增“设备连接”：在 UI 内使用 SSH 密码／密钥添加、保存、重连与切换远端实例，自动核验／启动远端核心并建立管理连接，无需手动隧道。密码不保存，首次主机信任明确确认，主机密钥变化拒绝；桌面当前连接独立于 CLI。远端须预装支持 context bootstrap 的新版 CLI 且启用 SSH，自动安装尚未实现。包含已提交的模型设置与 Claude Code／DSH 托管更新。
+- 已有 `.9`～`.30`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.31`，先停止本机核心并退出界面。
+- 首次启动 state.db schema6→7，新增连接凭据和桌面当前设备选择，旧二进制不能打开升级后数据库，不支持数据库降级；更旧数据库按顺序迁移。
+- 验证：定向 Go 测试、前端 typecheck／lint、22 项单元测试、2 项连接浏览器测试、隔离核心 detached bootstrap 验证通过。双平台生产编译与安装包构建、六附件大小／SHA256 digest 核对、默认源 Linux 实际下载通过；Windows 远端 digest 与本地一致。本机 CLI／桌面二进制已升级，核心 ready，状态库已备份并迁移到 schema7。本轮执行环境未提供图形显示，未运行原生窗口、安装器或应用内 apply 验收。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.30_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.31_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -633,3 +633,12 @@ dist/desktop/0.1.0-dev.desktop.7/
 ## 5. 在线更新清单生成
 
 `package-desktop.sh --version X.Y.Z-dev.desktop.N --update-base-url <HTTPS版本目录>` 可在成功打包后生成根目录 `update-desktop.json`，URL 对应 `版本目录/target/安装包名`。不传参数保持旧打包输出；参数会先验证，不联网上传。已有最终文件可用 `scripts/update_manifest.py` 生成清单；默认 GitHub Release 附件路径一般使用 flat 布局，自建站点可使用 target。先上传包与许可证／对应源码，校验后再切换渠道清单，保留旧版，不覆盖已发布安装包。首次必须人工安装含更新入口的新包；旧 desktop.8 不支持更新检查。当前已本地生成 `.11` 功能安装包（`.9` 为首次包含更新入口的历史启动版），但未提供真实更新源地址，未生成 `update-desktop.json`、部署测试更新源或发布 Release。
+
+
+## 当前在线 dev 版 .31
+
+- 发布：北京时间 2026-10-14 22:34:21，GitHub `v0.1.0-dev.desktop.31`，prerelease／非 latest，六附件完整；标签与源码 revision 为 `1c5c9104e0d232749f1caf122d3b5fd2f4f133de`，SOURCE.json dirty=false。
+- 新增“设备连接”：在 UI 内使用 SSH 密码／密钥添加、保存、重连与切换远端实例，自动核验／启动远端核心并建立管理连接，无需手动隧道。密码不保存，首次主机信任明确确认，主机密钥变化拒绝；桌面当前连接独立于 CLI。远端须预装支持 context bootstrap 的新版 CLI 且启用 SSH，自动安装尚未实现。包含已提交的模型设置与 Claude Code／DSH 托管更新。
+- 使用：侧栏“设备连接” → “添加远程设备”，输入名称、user@主机、密码或密钥，确认首次信任，点击“添加并连接”；保存后可切换、重连或返回本机。密码连接重开应用后需重输，密钥模式支持 SSH 配置／Agent。
+- 定向 Go 测试、前端 typecheck／lint、22 项单元测试、2 项连接浏览器测试、隔离核心 detached bootstrap 验证通过。双平台生产编译与安装包构建、六附件大小／SHA256 digest 核对、默认源 Linux 实际下载通过；Windows 远端 digest 与本地一致。本机 CLI／桌面二进制已升级，核心 ready，状态库已备份并迁移到 schema7。本轮执行环境未提供图形显示，未运行原生窗口、安装器或应用内 apply 验收。
+- 本机沿用用户目录安装方式，以包中 ELF 替换 `~/.local/bin/anchor-desktop`，同步替换 CLI 并正常重启 `anchor-core.service`；没有执行 apt／NSIS 安装或打开窗口。
