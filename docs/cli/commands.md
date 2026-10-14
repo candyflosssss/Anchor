@@ -34,7 +34,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 - 正常操作 stdout 为一个 JSON 值；`logs export` 为逐条 JSONL，`logs follow` 为重复页 JSON；`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
 - 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
-- 当前源码中 Key 名称、公开模型 ID／别名、Context／设备连接名称和 Agent Binding ID 使用相同中文命名规则。Agent ID 另有最多 64 个 UTF-8 字节的限制（中文通常每字 3 字节），用于保持托管日志与目录文件名长度安全；其余为最多 128 个 Unicode 码点。实例／授权 ID、令牌、错误码及 SSH 技术字段不采用用户名称规则。此增量尚未打包发布，使用中文名称须同时升级客户端和运行中的核心。
+- 当前源码中 Key 名称、公开模型 ID／别名、Context／设备连接名称和 Agent Binding ID 使用相同中文命名规则。Agent ID 另有最多 64 个 UTF-8 字节的限制（中文通常每字 3 字节），用于保持托管日志与目录文件名长度安全；其余为最多 128 个 Unicode 码点。实例／授权 ID、令牌、错误码及 SSH 技术字段不采用用户名称规则。此增量已随 desktop.33 桌面 dev 安装包发布；独立 CLI 正式预发行仍为 alpha.6，源码 CLI 需重新构建。使用中文名称须同时升级客户端和运行中的核心。
 - 管理写请求不自动重试。断线、5xx、无效／超大回包可能使写入结果未知，先查询并核对 revision，不盲目重复写入。客户端以 `RequestError` 保留 HTTP 状态、受限 code 与 Unknown 标记，不把原始远端 message 或秘密写到 stderr；网络错误文案使用 `offline`，响应异常使用 `invalid_response`。退出码规则不变。
 - 密钥只从 stdin 输入；不要把真实密钥放进命令参数、历史或文档。供应商秘密目前依赖文件权限/ACL，**不是静态加密**。
 
@@ -231,7 +231,7 @@ printf '%s' "$PROVIDER_KEY" | anchor provider add \
 anchor model add --id public-model --candidate '摸鱼AI:upstream-model'
 ```
 
-中文 ID 可用于 `provider add/put/list` 以及 `model add/put --candidate` 的供应商部分。命令仍要求显式参数，不会进入交互式向导。已有 ASCII ID、JSON 字段、SQLite schema、revision 与密钥输入方式不变；无需重新初始化，但只替换 CLI、不重启旧核心仍不能创建中文供应商。当前源码进一步支持中文 Key、公开模型 ID／别名、Context 和 Agent Binding ID；此前发行包仅支持中文供应商名称。
+中文 ID 可用于 `provider add/put/list` 以及 `model add/put --candidate` 的供应商部分。命令仍要求显式参数，不会进入交互式向导。已有 ASCII ID、JSON 字段、SQLite schema、revision 与密钥输入方式不变；无需重新初始化，但只替换 CLI、不重启旧核心仍不能创建中文供应商。当前源码进一步支持中文 Key、公开模型 ID／别名、Context 和 Agent Binding ID；desktop.33 已支持上述中文名称；独立 CLI alpha.6 发行包仅支持中文供应商名称。
 
 ### `provider models`（desktop.10 小步）
 

@@ -5,7 +5,7 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.31**，可在已有 `.9`～`.30` 的在线更新中选择 dev 获取：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.33**，可在已有 `.9`～`.32` 的在线更新中选择 dev 获取：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
@@ -13,9 +13,9 @@
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.31/Anchor-Desktop-0.1.0-dev.desktop.31-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.31/anchor-desktop_0.1.0-dev.desktop.31_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.31)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.33/Anchor-Desktop-0.1.0-dev.desktop.33-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.33/anchor-desktop_0.1.0-dev.desktop.33_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.33)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -98,8 +98,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.31 已投放 dev 渠道）
+### 在线更新（desktop.33 已投放 dev 渠道）
 
-已有 desktop.9～.30：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.31` 的 Windows / Ubuntu24.04 安装包与同版清单。新增“设备连接”：在 UI 内使用 SSH 密码／密钥添加、保存、重连与切换远端实例，自动核验／启动远端核心并建立管理连接，无需手动隧道。密码不保存，首次主机信任明确确认，主机密钥变化拒绝；桌面当前连接独立于 CLI。远端须预装支持 context bootstrap 的新版 CLI 且启用 SSH，自动安装尚未实现。包含已提交的模型设置与 Claude Code／DSH 托管更新。state.db 自动迁移到 schema7，旧程序不能打开；升级前备份。旧版无法检查更新时可手动安装 `.31` 一次，安装前先停止本机核心并退出界面。已保存渠道保持不变，开发更新请选择 dev。Linux 默认源实际下载及大小／SHA256检查通过，Windows 远端 digest 与本地一致；原生窗口与安装器未验收。旧 desktop.8 无更新入口。
+已有 desktop.9～.32：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.33` 的 Windows / Ubuntu24.04 安装包与同版清单。本版让 Key 名称、公开模型 ID／别名、设备连接名称与 Agent Binding ID 支持中文，与供应商名称共用命名规则；已有 ASCII 名称兼容，创建中文名称需同步升级客户端与核心。继承 SSH 密码／密钥设备连接和用户目录 CLI 自动发现能力；远端须预装新版 CLI 且启用 SSH，自动安装尚未实现。state.db 自动迁移到 schema7，旧程序不能打开；升级前备份。旧版无法检查更新时可手动安装 `.33` 一次，安装前先停止本机核心并退出界面。已保存渠道保持不变，开发更新请选择 dev。Linux 默认源实际下载及大小／SHA256检查通过，Windows 远端 digest 与本地一致；原生窗口与安装器未验收。旧 desktop.8 无更新入口。
 
 桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、数据库迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。

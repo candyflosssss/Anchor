@@ -362,3 +362,4 @@
 - 旧 → 新：原本仅供应商 ID 接受中文；现在 Key ID、公开模型 ID／别名、Context 名称、Agent Binding ID 也接受 1–128 个 Unicode 字母／十进制数字或 `._-`，首字符须为字母／数字；Binding ID 另外限制在 64 个 UTF-8 字节。拒绝空白、控制／格式字符、emoji、路径分隔符及 URL 保留符号；按原值精确匹配，不裁剪或归一化。机器错误码仍为 ASCII。
 - 兼容与迁移：既有 ASCII 名称、命令、参数、JSON 字段与 revision 不变，无需迁移。创建中文名称须同步更新 CLI／桌面与运行中的核心，旧版客户端或核心不能处理新增名称；Agent 托管仍需显式批准、按原有条件恢复。本次未构建或公开发布安装包。
 - 验证：隔离状态的 naming/state/catalog/client/core/managed/cli/desktop 八个受影响 Go 包测试通过，涵盖命名边界、中文 Key 与公开模型转发、模型设置、CLI、桌面桥接、Agent 托管恢复与 ASCII 错误码回归；前端 49 项定向测试、类型检查和 lint 通过。未验收原生窗口或真实 Agent 推理。
+- 发布状态：北京时间 2026-10-15 01:18:46 随 desktop.33 dev 双平台安装包及同版更新清单公开，默认源 Linux 实际下载与六附件大小／SHA256 digest 核对通过。本次未安装本机；独立 CLI 正式预发行仍为 alpha.6，CLI 中文名称使用新版源码构建及核心。

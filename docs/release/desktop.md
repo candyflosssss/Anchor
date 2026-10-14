@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-14。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.32`，北京时间 2026-10-14 23:12:40 已发布到 GitHub Releases，Windows／Linux 安装包与清单同版投放。
-- 范围：修复 SSH 非交互环境无法发现用户目录 Anchor：默认路径按 PATH、~/.local/bin、~/bin 与系统常见路径发现；显式路径保持优先且不回退。连接前检查 bootstrap 能力，UI 区分未安装、版本不支持、端口不匹配与核心未就绪。继承 .31 的 UI 密码／密钥设备连接；远端须预装新版 CLI 并启用 SSH，自动安装尚未实现。发起连接的桌面端也须更新到 .32 才使用新发现逻辑。
-- 已有 `.9`～`.31`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.32`，先停止本机核心并退出界面。
+- 更新：2026-10-15。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.33`，北京时间 2026-10-15 01:18:46 已发布到 GitHub Releases，Windows／Linux 安装包与清单同版投放。
+- 范围：Key 名称、公开模型 ID／别名、Context／设备连接名称及 Agent Binding ID 支持中文，与供应商名称共用命名规则；桌面表单、CLI、核心及 Codex 托管统一处理。既有 ASCII 名称兼容，无需迁移；创建中文名称须同步升级客户端和运行中的核心。继承 .32 的 SSH 路径发现和设备连接能力。
+- 已有 `.9`～`.32`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.33`，先停止本机核心并退出界面。
 - 本轮保持 state.db schema7，无新增迁移；从 .30 及更旧版本升级按已有规则顺序迁移，旧程序不能打开新数据库，不支持数据库降级。
-- 验证：connection／cli／desktop 定向 Go 测试、前端 typecheck／lint、22 项单元测试通过；隔离真实 SSH／密码连接覆盖最小 PATH 与 bootstrap。双平台生产编译与安装包构建、六附件大小／SHA256 digest 核对、默认源 Linux 实际下载通过。已备份本机状态、替换 CLI／桌面二进制并重启核心，版本 .32、core/gateway ready、schema7。桌面窗口未启动；本轮未执行浏览器、原生窗口、安装器或 apply 验收。
+- 验证：中文功能的八个受影响 Go 包测试、前端 49 项定向测试、typecheck／lint 已通过；本次双平台生产编译与安装包构建、六附件大小／SHA256 digest 核对、默认源 Linux 实际下载通过。构建 revision 为 `72ed6e9c429bec7d1c246a51c0e3062720ff1668`，SOURCE.json dirty=false。本次未安装到本机，未执行浏览器、原生窗口、安装器或 apply 验收。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.32_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.33_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -643,10 +643,17 @@ dist/desktop/0.1.0-dev.desktop.7/
 - 定向 Go 测试、前端 typecheck／lint、22 项单元测试、2 项连接浏览器测试、隔离核心 detached bootstrap 验证通过。双平台生产编译与安装包构建、六附件大小／SHA256 digest 核对、默认源 Linux 实际下载通过；Windows 远端 digest 与本地一致。本机 CLI／桌面二进制已升级，核心 ready，状态库已备份并迁移到 schema7。本轮执行环境未提供图形显示，未运行原生窗口、安装器或应用内 apply 验收。
 - 本机沿用用户目录安装方式，以包中 ELF 替换 `~/.local/bin/anchor-desktop`，同步替换 CLI 并正常重启 `anchor-core.service`；没有执行 apt／NSIS 安装或打开窗口。
 
-## 当前在线 dev 版 .32
+## 历史在线 dev 版 .32
 
 - 发布：北京时间 2026-10-14 23:12:40，GitHub `v0.1.0-dev.desktop.32`，prerelease／非 latest；六附件齐全且大小、SHA256 digest 与本地一致。标签与实际构建 revision 均为 `b69d8b8f38006703ff700a2e8b673d99778ef168`，SOURCE.json dirty=false。
 - 修复：SSH 非交互 PATH 缺少 ~/.local/bin 时，默认远端路径自动发现用户目录 CLI；密钥与密码模式共享发现命令，自定义路径不回退。bootstrap --help 先检查能力；固定脱敏错误区分未安装、版本不支持、管理端口不匹配及核心未就绪。用户须更新发起连接的桌面端，远端自动安装尚未实现。
 - 验证：定向 Go 测试、前端 typecheck／lint、22 项 Vitest 单测通过；隔离真实 SSH／密码连接及 shell 路径、显式路径、诊断脱敏、能力检查不创建状态等用例通过。双平台安装包构建成功；对应源码、vendored 依赖与元数据 ZIP 核对通过；默认 GitHub 源实际下载 Linux .deb 并验证大小与 SHA256。
 - 本机：CLI 与桌面 ELF 均更新为 .32，正常重启 anchor-core.service，实际运行核心与新二进制一致，core/gateway ready；状态备份位于 ~/.config/anchor/backups/pre-desktop32-20261014-230950，schema7 保持不变。无图形显示，桌面窗口未启动，未执行浏览器、原生 GUI、apt／NSIS 或 apply 验收。
 - 过程：初次打包因隔离源码依赖软链接超出容器挂载而在许可收集失败；改为实际复制依赖后复用原打包脚本重试成功，失败产物未安装或发布。上传附件成功后草稿按 tag 查询返回404，改用 release ID 核验草稿并发布；发布后的 tag revision 已核验，没有重复上传或替换资产。
+
+## 当前在线 dev 版 .33
+
+- 发布：北京时间 2026-10-15 01:18:46，GitHub `v0.1.0-dev.desktop.33`，prerelease／非 latest；两平台安装包、更新清单、对应源码、许可／构建元数据及 SHA256SUMS 六附件完整。全部附件大小及远端 digest 与本地一致，标签指向实际构建 revision `72ed6e9c429bec7d1c246a51c0e3062720ff1668`，SOURCE.json dirty=false。
+- 中文：Key 名称、公开模型 ID／别名、Context／设备连接名称和 Agent Binding ID 支持中文。用户名称允许 1–128 个 Unicode 字母／十进制数字或 `._-`，首字符须为字母／数字；Binding ID 另限 64 个 UTF-8 字节。令牌、实例／授权 ID、错误码和 SSH 技术字段继续使用各自技术约束；Codex TOML 中文供应商表名正确编码与恢复。
+- 验证：复用已提交功能的八个 Go 包测试、49 项前端定向测试、typecheck／lint 结果；本次执行双平台生产构建、安装包校验、源码及 vendored 依赖／元数据核对。隔离源码 CLI 从默认 GitHub dev 源以 .32 为当前版本发现 .33，实际下载 Linux .deb（6,009,304 字节）并验证 SHA256；Windows 远端 digest 与本地一致。
+- 边界：独立 CLI 正式预发行仍为 alpha.6；使用中文名称须更新桌面／源码 CLI 及核心。本次仅打包并在线投放，没有替换本机程序、停止真实核心或改动 Agent 配置；未执行原生窗口、apt／NSIS 或 apply 验收，开发安装器未签名。工作区未提交的余额相关改动未包含在构建中。
