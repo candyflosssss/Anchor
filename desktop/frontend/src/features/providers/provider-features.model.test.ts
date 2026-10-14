@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import probeFixture from '../../../../contract/provider-probe.json';
 import mapping from '../../../../contract/provider-model-mapping.json';
 import fixture from '../../../../contract/provider-workspace.json';
 import { actionFor, catalogImportPlan, checkedWorkspace, type Workspace } from './provider-features.model';
@@ -83,4 +84,9 @@ describe('catalog import planning', () => {
       ready: ['valid'], mapped: 1, manual: ['taken', 'vendor/model', '中文', '-bad', 'a'.repeat(129)],
     });
   });
+});
+
+it('preserves the shared HTML failure in persisted workspace results', () => {
+  const value = { ...structuredClone(fixture), probe: probeFixture.html_failure.result };
+  expect(checkedWorkspace(value).probe?.failure).toBe('unexpected_html');
 });

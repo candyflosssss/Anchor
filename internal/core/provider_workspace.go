@@ -404,7 +404,7 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 	authorizeUpstream(req, p, key.Secret)
 	attempted = true
 	stage = "upstream_connect"
-	resp, err := s.upstream.Do(req)
+	resp, err := s.inferenceResponse(req, p.BaseURL, p.Protocol, row.Evidence)
 	if err != nil {
 		out.Failure = "network"
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -428,6 +428,12 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 		out.Failure = "http_error"
 	}
 	if out.Failure != "" {
+		return out, nil
+	}
+	if row.Evidence["response_kind"] == "html" {
+		stage = "response_validate"
+		out.Failure = "unexpected_html"
+		row.Evidence["validation_reason"] = "html_instead_of_api"
 		return out, nil
 	}
 	if notify != nil {

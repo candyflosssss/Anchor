@@ -8,7 +8,7 @@ export function requestLog(row: Request): RequestLog {
   return { id: row.id, ageMinutes: Math.max(0, Math.floor((Date.now() - row.started_at_ms) / 60000)), time: new Date(row.started_at_ms).toLocaleString(),
     status: row.status as LogStatus, source: row.source as LogSource, model: row.model || '未知', upstreamModel: row.upstream_model || undefined,
     protocol: row.protocol, elapsed: row.elapsed_ms, http: row.http, provider: row.provider || '未知', key: row.key || '未知', revision: row.revision,
-    delivery: row.delivery || '未知', summary: row.code || statusLabels[row.status as LogStatus], stage: row.stage, code: row.code || undefined,
+    delivery: row.delivery || '未知', summary: row.code === 'unexpected_html' ? '上游返回了 HTML 网页，而不是模型响应。请检查 API 请求地址（通常以 /v1 结尾）。' : row.code || statusLabels[row.status as LogStatus], stage: row.stage, code: row.code || undefined,
     input: row.input, output: row.output, reasoningEffort: row.reasoning_observed ? row.reasoning_effort : undefined,
     stream: row.stream ?? undefined, generationStatus: row.generation_status || undefined, attemptCount: row.attempt_count, attemptsTruncated: row.attempts_truncated,
     metrics: { timeToFirstTextMs: row.metrics.time_to_first_text_ms, generationMs: row.metrics.generation_ms, outputTextTokens: row.metrics.output_text_tokens,

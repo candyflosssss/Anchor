@@ -192,7 +192,7 @@ Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始�
 - 输入固定字段为 provider_id、expected_revision、action、key_id、model、run_id、approved。`start` 要求 approved=true、非空模型和明确的启用 Key；无已存 Key 可指定 anonymous，已存 Key 全停用时禁止匿名回退。`read` / `cancel` 使用开始返回的不可猜测 run_id；仅允许同供应商及 revision 读取，冲突在操作前失败。重复 start 是另一请求，前端同步锁禁止连点，不自动重放未知开始结果。
 - 输出固定字段为 provider_id、revision、run_id、key_id、model、status、phase、text、elapsed_ms、result。status 为 running / completed / cancelled；phase 为 connecting / receiving / complete；运行中 result=null，终态 result 为原有 Probe。耗时是毫秒；输出文本累计快照至多 16 KiB。前端运行中每150ms串行读取一次，终态／关闭／卸载停止轮询；迟到的开始结果取得 run_id 后仍发取消，取消不确认时由核心硬超时兜底。
 - 最小请求仍是「Reply OK.」、max_output_tokens=16、store=false。异步测试增加 stream=true；使用所选 Key 的实际模型协议、已有协议流转换器，以及与同步探针相同的并发、最多10秒期限、健康和累计用量。真实 SSE 文本逐段可见；上游忽略流式并返回 JSON 时，校验后显示一次完整文本。EOF 缺终止事件、非法流和 incomplete 返回固定 invalid_response，错误正文不显示。
-- 核心最多保留64次瞬态运行，开始一分钟后删除；停止取消上游 context，核心关闭取消并等待任务退出。文本只在运行内存／当前弹窗保留，不进入日志、数据库或浏览器存储。仅提取 output_text，不展示原始事件、思考内容、请求头或上游错误；所选 Key 凭据完整回显及跨片段前缀均被过滤。保留现有固定失败分类及 Probe DTO。
+- 核心最多保留64次瞬态运行，开始一分钟后删除；停止取消上游 context，核心关闭取消并等待任务退出。文本只在运行内存／当前弹窗保留，不进入日志、数据库或浏览器存储。仅提取 output_text，不展示原始事件、思考内容、请求头或上游错误；所选 Key 凭据完整回显及跨片段前缀均被过滤。保留现有 Probe DTO 字段；新增的网页响应失败分类见下方推理地址兼容说明。
 - 目录只说明 Key 可列出该模型，不保证推理或流式成功。前端目录错误／空目录禁用发起按钮；Key 切换清空选择后重新查询，不从供应商全量映射猜测 Key 权限。关闭快速测试保持列表、关闭详情测试保持详情。
 
 Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e546d8d6801f1cc1` 的 `backend/internal/handler/gateway_key_billing.go` 和 `backend/internal/server/routes/gateway.go`。隔离模拟验证不代表所有历史部署版本已提供该端点。
@@ -200,3 +200,12 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 ## models.dev 模型参考方法（2026-10-13，当前源码）
 
 `ModelCatalog(ModelCatalogQuery)`／`EstimateModelCost(CatalogEstimateInput)` 是与供应商工作台独立的只读桥接方法，不要求 Anchor 供应商 ID 或 revision。使用精确 models.dev provider/model；不能将通用声明视为所选 Key 的已验证能力。基础价导入复用同一目录缓存，仍仅预览和手动保存。完整 DTO、未知／陈旧语义与计价口径见[模型参考目录](model-catalog.md)。
+
+
+## 推理地址兼容与网页响应诊断（2026-10-14，当前源码）
+
+同步 `provider test`、桌面实时 Probe 和真实三协议转发共用端点解析：优先按配置基址追加协议端点，仅在无版本后缀的基址返回 HTML 且 HTTP 为 200／404／405 时，在原部署前缀后追加 `/v1` 重试一次。结合 Content-Type 与最多512字节正文前缀识别网页；即使响应头为 HTML，也须确认正文前缀，避免重放标错类型的 JSON 响应；正常 JSON 遇到首个可判定字符即停止嗅探，所有已读字节保留给后续解析。不会无条件追加版本、跨域探测、修改数据库或缓存猜测结果；每次调用独立判断。
+
+重试沿用原方法、正文、Key、请求头、context 截止时间和并发名额。已带版本后缀、JSON 错误、鉴权失败、限流、重定向、网络失败、超时和已标识的 SSE 不自动重放。补路径仍是同一次逻辑推理，累计用量和日志 attempt 计数保持1，`endpoint_requests` 单独记录实际端点请求数1或2。
+
+若最终 HTTP 200 正文仍为 HTML，Probe `failure` 与网关错误码新增 `unexpected_html`；Probe 保留 `http_status=200`，网关向调用方返回502，并提示检查 API 基址（通常以 `/v1` 结尾）。其他 HTTP 错误保留原分类。日志 Evidence 增加 `endpoint_resolution=configured|v1_fallback`、`endpoint_requests`、`response_kind=html|api_or_unknown`、受限的 `upstream_content_type`；执行补路径时增加 `initial_response_kind=html`、`initial_http`。这些字段不保存 URL、凭据、页面或错误正文。共享样例 `desktop/contract/provider-probe.json` 覆盖 HTTP 200 的 HTML 失败；DTO 字段结构未变，Go／TS 需共同接受新错误枚举。

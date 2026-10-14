@@ -142,14 +142,18 @@ func TestProbeProgressSharedContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fixture struct {
-		Request  catalog.ProbeRequest  `json:"request"`
-		Progress catalog.ProbeProgress `json:"progress"`
+		Request     catalog.ProbeRequest  `json:"request"`
+		Progress    catalog.ProbeProgress `json:"progress"`
+		HTMLFailure catalog.ProbeProgress `json:"html_failure"`
 	}
 	if err = json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatal(err)
 	}
 	if fixture.Request.ProviderID != fixture.Progress.ProviderID || fixture.Progress.Status != "running" || fixture.Progress.Result != nil {
 		t.Fatal("fixture drift")
+	}
+	if fixture.HTMLFailure.Status != "completed" || fixture.HTMLFailure.Result == nil || fixture.HTMLFailure.Result.Failure != "unexpected_html" || fixture.HTMLFailure.Result.HTTPStatus != 200 {
+		t.Fatal("HTML failure fixture drift")
 	}
 	encoded, _ := json.Marshal(fixture.Progress)
 	var got, want any

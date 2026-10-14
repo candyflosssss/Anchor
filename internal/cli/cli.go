@@ -47,6 +47,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
   provider key-delete|key-reset --id ID --revision N --target KEY --approve
   provider strategy --id ID --revision N --strategy round-robin|priority
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
+      HTML at an unversioned base permits one /v1 fallback; still HTML returns unexpected_html.
   provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy RULE] [--source-key ID | --all-keys] [--tools] [--streaming] [--approve]
   provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
   catalog providers [--refresh]

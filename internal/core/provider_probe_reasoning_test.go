@@ -19,7 +19,8 @@ func TestProbeResponsesReasoning(t *testing.T) {
 		{"token-limited", `{"id":"r","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[{"type":"reasoning","id":"rs","summary":[]}],"usage":{"input_tokens":3,"output_tokens":16}}`, ""},
 		{"text-metadata", `{"id":"r","status":"completed","output":[{"type":"reasoning","id":"rs","summary":[],"encrypted_content":"private reasoning"},{"type":"message","content":[{"type":"output_text","text":"OK","annotations":[],"logprobs":[]}]}],"usage":{"input_tokens":3,"output_tokens":16}}`, ""},
 		{"failed", `{"id":"r","status":"failed","output":[{"type":"reasoning","id":"rs","summary":[]}],"error":{"message":"private upstream detail"}}`, "invalid_response"},
-		{"invalid-json", `<html>upstream proxy</html>`, "invalid_response"},
+		{"html", `<html>upstream proxy</html>`, "unexpected_html"},
+		{"invalid-json", `not-json`, "invalid_response"},
 		{"missing-id", `{"output":[{"type":"reasoning","id":"rs","summary":[]}]}`, "invalid_response"},
 		{"unsupported-output", `{"id":"r","output":[{"type":"reasoning","id":"rs","summary":[]},{"type":"unknown"}]}`, "invalid_response"},
 	} {
@@ -65,7 +66,7 @@ func TestProbeResponsesReasoning(t *testing.T) {
 			if tc.failure == "" && (row.Status != "succeeded" || row.Evidence["validation"] != "passed" || row.Evidence["validation_reason"] != "") {
 				t.Fatalf("valid response has failure diagnosis: %+v", row)
 			}
-			reasons := map[string]string{"failed": "upstream_error", "invalid-json": "invalid_json", "missing-id": "missing_response_id", "unsupported-output": "unsupported_output"}
+			reasons := map[string]string{"failed": "upstream_error", "invalid-json": "invalid_json", "html": "html_instead_of_api", "missing-id": "missing_response_id", "unsupported-output": "unsupported_output"}
 			if tc.failure != "" && row.Evidence["validation_reason"] != reasons[tc.name] {
 				t.Fatalf("failure reason=%q want=%q", row.Evidence["validation_reason"], reasons[tc.name])
 			}

@@ -1,3 +1,4 @@
+import { probeFailureText } from './provider-test.model';
 import { ProviderCatalogView } from './provider-catalog.view';
 import { ProviderAccountView } from './provider-account.view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
@@ -25,7 +26,7 @@ export function ProbeCard({ probe }: { probe: Probe }) {
     <strong>{probe.failure ? '推理测试失败' : '推理测试成功'}</strong>
     <span> · HTTP {probe.http_status || '—'} · {probe.elapsed_ms} ms · Key {probe.key_id || '匿名'}</span>
     <div className="mono break-all">{probe.model} · revision {probe.revision} · {formatAgo(probe.at)}</div>
-    {probe.failure && <div>失败原因：{probe.failure}</div>}
+    {probe.failure && <div>失败原因：{probeFailureText(probe.failure)}{probe.failure === 'unexpected_html' && `（${probe.failure}）`}</div>}
   </div>;
 }
 

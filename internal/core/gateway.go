@@ -336,7 +336,8 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		fail(w, 400, "unsupported_conversion", "candidate protocol cannot represent a request field or content")
 		return false
 	}
-	target := strings.TrimRight(s.pickURL(p), "/") + protocol.Endpoint(p.Protocol)
+	base := s.pickURL(p)
+	target := strings.TrimRight(base, "/") + protocol.Endpoint(p.Protocol)
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.TimeoutSeconds)*time.Second)
 	defer cancel()
 	var connected atomic.Bool
@@ -356,7 +357,17 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	authorizeUpstream(up, p, key.Secret)
 	attempted = true
 	setLogStage(r, "dispatch")
-	resp, err := s.upstream.Do(up)
+	evidence := map[string]string{}
+	resp, err := s.inferenceResponse(up, base, p.Protocol, evidence)
+	if t := trace(r); t != nil {
+		// Endpoint evidence describes the current candidate, not an earlier retry.
+		for _, name := range []string{"endpoint_resolution", "endpoint_requests", "initial_response_kind", "initial_http", "response_kind", "upstream_content_type"} {
+			delete(t.row.Evidence, name)
+		}
+		for name, value := range evidence {
+			t.row.Evidence[name] = value
+		}
+	}
 	if err != nil {
 		if r.Context().Err() != nil {
 			return false
@@ -396,6 +407,11 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		return false
 	}
 	setLogStage(r, "response_validate")
+	if evidence["response_kind"] == "html" {
+		code = "unexpected_html"
+		fail(w, 502, code, "upstream returned an HTML page instead of an API response; check the API base URL (usually ending in /v1)")
+		return false
+	}
 	media, _, e := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	expected := "application/json"
 	if stream {

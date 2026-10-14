@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../../../../contract/provider-probe.json';
 import catalog from '../../../../contract/provider-models.json';
-import { checkedProgress, modelsForKey } from './provider-test.model';
+import { checkedProgress, modelsForKey, probeFailureText } from './provider-test.model';
 
 describe('Key-scoped inference diagnostics', () => {
   it('offers only models returned for the selected Key', () => {
@@ -19,4 +19,12 @@ describe('Key-scoped inference diagnostics', () => {
     }
     expect(() => checkedProgress(fixture.progress, { ...fixture.request, action: 'read', run_id: 'another-run' })).toThrow('read_error');
   });
+});
+
+it('accepts the shared HTML diagnostic and explains HTTP 200 with a webpage body', () => {
+  const result = checkedProgress(fixture.html_failure, fixture.request);
+  expect(result.result).toMatchObject({ http_status: 200, failure: 'unexpected_html' });
+  expect(probeFailureText(result.result!.failure)).toContain('/v1');
+  expect(probeFailureText(result.result!.failure)).toContain('HTML');
+  expect(probeFailureText('timeout')).toBe('timeout');
 });

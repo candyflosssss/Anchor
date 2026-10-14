@@ -11,7 +11,7 @@ const milliseconds = (value: number | null | undefined) => value == null ? '未�
 export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
   switch (id) {
     case 'time': return <div className="log-time"><span className="mono">{row.time}</span><small>{row.ageMinutes} 分钟前</small></div>;
-    case 'status': return <><span className={`log-result log-result-${row.status}`}><span className="mini-dot" />{row.status === 'failed' && row.code === 'invalid_response' ? '校验失败' : statusLabels[row.status]}</span>{(row.attemptCount ?? row.attempts.length) > 1 && <small className="log-subtext">{(row.attemptCount ?? row.attempts.length)} 次尝试</small>}</>;
+    case 'status': return <><span className={`log-result log-result-${row.status}`}><span className="mini-dot" />{row.status === 'failed' && ['invalid_response', 'unexpected_html'].includes(row.code ?? '') ? '校验失败' : statusLabels[row.status]}</span>{(row.attemptCount ?? row.attempts.length) > 1 && <small className="log-subtext">{(row.attemptCount ?? row.attempts.length)} 次尝试</small>}</>;
     case 'model': return <span className="mono font-medium">{row.model}</span>;
     case 'requestId': return <span className="mono">{row.id}</span>;
     case 'source': return <>{sourceLabels[row.source]}</>;

@@ -469,3 +469,8 @@ Model 接受 CNY 与 site_unit；公开元数据无法确认币种时标注「�
 2026-10-13 sub2api Key 倍率：账户页和模型目录支持 `key_billing` 来源，倍率通过所选推理 Key 直读，无需 JWT；显示含个人覆盖和当前高峰规则的有效计费倍率。响应未披露分组名称／ID 时留空并显示「当前计费倍率」，Model 仅对此来源允许缺少分组；NewAPI 和旧站用户查询仍保留原校验。授权提示区分 Key 直读、旧站回退和显式远端 ID。查询为手动快照，不改模型路由倍率。
 
 2026-10-13 新增 models.dev 只读参考方法，随 desktop.29 dev 交付。`features/model-catalog/model-catalog.model.ts` 通过受限 `ModelCatalog/EstimateModelCost` 桥接复用核心，校验来源、未知字段、思考选项、精确模型身份和十进制费用；前端取消丢弃晚到响应，Go 侧有45秒方法超时。模型映射自动填充、日志逐请求比价及价格快照持久化尚未接入，无新页面或推理探测。契约见[模型参考目录](model-catalog.md)，CLI 见[指令大全 §13](../cli/commands.md#13-modelsdev-参考目录与本地费用估算desktop29-dev)。
+
+
+### 供应商测试的 HTML 诊断（2026-10-14，当前源码）
+
+供应商同步测试卡片、实时快速测试结果与日志摘要接受 `unexpected_html`：显示“上游返回了 HTML 网页，而不是模型响应”，提示检查 API 请求地址（通常以 `/v1` 结尾），同时保留 HTTP 状态及固定错误码。日志表归入“校验失败”。HTTP 200 不能单独视为推理成功。补 `/v1` 由核心在明确 HTML 条件下执行，前端不拼接或保存猜测地址；契约及重试边界见 [provider-interface.md](provider-interface.md)。本次仅调整错误文案与校验，不改变弹窗生命周期或新增操作入口。
