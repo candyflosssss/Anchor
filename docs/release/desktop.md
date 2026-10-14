@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-13。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.29`，北京时间 2026-10-13 23:51:11 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
-- 范围：模型映射恢复原有上下分区，仅常驻供应商、完整模型名、Key 名称和倍率；卡片收紧为三／二／一列，增加六点拖动把手、虚线边框与抓取提示。包含窄窗口滚动修复，以及 models.dev 参考目录和文本 token 费用估算基础接口／CLI；尚无模型参考目录新页面，沿用 .28 的 sub2api Key 计费倍率修复，无新增数据库迁移。
-- 已有 `.9`～`.28`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版无法检查更新时可手动安装一次 `.29`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
+- 更新：2026-10-14。
+- 当前桌面 dev 版：`0.1.0-dev.desktop.30`，北京时间 2026-10-14 14:18:14 已发布到 GitHub Releases。Windows / Linux 安装包与 `update-desktop.json` 同版投放。
+- 范围：推理请求先使用配置地址，仅未带版本路径收到明确 HTML 200／404／405 时同源追加 `/v1` 重试一次，不改已保存地址；仍返回网页时测试卡片、快速测试与日志显示 `unexpected_html` 和中文 API 地址提示。包含 `.29` 后已提交的 Agent 管理简化与 DSH 发现，沿用 schema6，无新增数据库迁移。
+- 已有 `.9`～`.29`：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。旧版无法检查更新时可手动安装一次 `.30`，先停止核心并退出界面；旧 `.8` 无更新入口。见[在线更新](../design/online-updates.md)。
 - 首次启动核心自动迁移 state.db schema5→6，保留既有模型与 Key；旧模型未指定来源时继续允许所有启用 Key。更旧数据库按顺序升级。旧二进制不能打开升级后的数据库，不支持降级。
-- 模型映射前端 typecheck、Lint 及倍率查询、实际拖动排序／保存、冲突刷新三项模拟宿主浏览器测试通过；双平台生产编译与安装包构建、六附件大小／digest核对、默认源 Linux 实际更新下载及大小／SHA256通过。未执行原生窗口、安装器或 apply 验收。
+- 双平台生产编译与安装包构建、六附件大小／digest 核对、默认源 Linux 实际更新下载及大小／SHA256通过；Windows 远端 digest 与本地一致。定向 Go 测试、前端类型检查、15项定向测试及受影响文件 lint 结果复用本轮构建提交的已有验证。未执行原生窗口、安装器或 apply 验收。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.29_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.30_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -84,7 +84,27 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.29`
+### 当前在线 dev 版 `.30`
+
+`0.1.0-dev.desktop.30` 于北京时间 2026-10-14 14:18:14 发布为 dev prerelease（非 latest）。构建提交 `010bc0a44805995967fc0868c82d60ac816f3ea7`，干净隔离 worktree 的 SOURCE.json 为 dirty=false。
+
+推理请求先使用配置地址，仅未带版本路径收到明确 HTML 200／404／405 时同源追加 `/v1` 重试一次，不改已保存地址；仍返回网页时测试卡片、快速测试与日志显示 `unexpected_html` 和中文 API 地址提示。包含 `.29` 后已提交的 Agent 管理简化与 DSH 发现，沿用 schema6，无新增数据库迁移。 JSON、鉴权失败、限流、网络错误、重定向与 SSE 不触发补路径；已带版本的地址不再次追加版本。HTTP 200 不能单独代表模型响应有效，受限端点证据不保存 URL、Key 或网页正文。
+
+| 平台 | 安装包 | bytes |
+| --- | --- | ---: |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.30_amd64.deb` | 5,681,216 |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.30-windows-amd64-setup.exe` | 7,879,308 |
+
+```text
+50d1b7571df94c3f710c139324f2161f2319b0f19ecaf0384d13cde47a8c82c6  anchor-desktop_0.1.0-dev.desktop.30_amd64.deb
+3de876fd5c14f7c11bf354a0b769ec933afca6e304ac643f842e0916de0f9819  Anchor-Desktop-0.1.0-dev.desktop.30-windows-amd64-setup.exe
+```
+
+六附件完整投放，GitHub 附件大小／digest 及正式 URL 与本地清单一致，标签指向实际构建提交。源码归档含 vendored Go 依赖，go.mod／go.sum及本轮推理端点与测试提示源码与构建提交一致；元数据 ZIP CRC 通过，原始 BUILD.json 的原生／安装／签名状态保留。发布及下载证据位于 `dist/desktop/0.1.0-dev.desktop.30/publication/`。
+
+隔离数据目录从本轮源码运行 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.29 --json`，默认源发现 `.30` 并实际下载 Linux 包，大小与 SHA256 通过；Windows 附件 digest 与本地一致。双平台生产编译及安装包构建通过；定向 Go 测试、前端类型检查、15项定向测试及受影响文件 lint 结果复用本轮构建提交的已有验证。未执行原生窗口、安装器或 apply 验收。
+
+### 历史在线 dev 版 `.29`
 
 `0.1.0-dev.desktop.29` 于北京时间 2026-10-13 23:51:11 发布为 dev prerelease（非 latest）。构建提交 `ea3196bc45b3b30b45d17d8c7ce8b7b9af53f832`，干净隔离工作区的 SOURCE.json 为 dirty=false。
 

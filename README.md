@@ -5,7 +5,7 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.23**，可在已有 `.9`～`.22` 的在线更新中选择 dev 获取：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.30**，可在已有 `.9`～`.29` 的在线更新中选择 dev 获取：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
@@ -13,9 +13,9 @@
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.23/Anchor-Desktop-0.1.0-dev.desktop.23-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.23/anchor-desktop_0.1.0-dev.desktop.23_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.23)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.30/Anchor-Desktop-0.1.0-dev.desktop.30-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.30/anchor-desktop_0.1.0-dev.desktop.30_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.30)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -98,8 +98,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.27 已投放 dev 渠道）
+### 在线更新（desktop.30 已投放 dev 渠道）
 
-已有 desktop.9～.26：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.27` 的 Windows / Ubuntu24.04 安装包与同版清单。修复 NewAPI 列表余额忽略系统访问令牌的问题，列表与详情均优先查询账户余额；「账户与余额」补充后台令牌的生成、输入／替换及权限说明。未配置系统令牌时沿用 billing / Key 额度查询。保留来源 Key、逐 Key 分组倍率、拖动排序与五种调度规则。账单桌面页尚未接入，源码 CLI 提供。沿用 schema6，本轮不新增迁移，旧版不能打开升级后的数据库；不支持降级。旧版无法接入更新代理时可手动安装 `.27` 一次，安装前先停止核心并退出界面。已保存渠道保持不变，开发更新请选择 dev。Linux 默认源实际下载及大小／SHA256 检查通过，Windows 远端 digest 与本地一致；未使用真实站点凭据，未执行原生窗口和安装验收。旧 desktop.8 无更新入口。
+已有 desktop.9～.29：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.30` 的 Windows / Ubuntu24.04 安装包与同版清单。推理请求先使用配置地址，仅未带版本路径收到明确 HTML 200／404／405 时同源追加 `/v1` 重试一次，不改已保存地址；仍返回网页时测试卡片、快速测试与日志显示 `unexpected_html` 和中文 API 地址提示。包含 `.29` 后已提交的 Agent 管理简化与 DSH 发现，沿用 schema6，无新增数据库迁移。旧版无法检查更新时可手动安装 `.30` 一次，安装前先停止核心并退出界面。已保存渠道保持不变，开发更新请选择 dev。Linux 默认源实际下载及大小／SHA256 检查通过，Windows 远端 digest 与本地一致；未使用真实站点凭据，未执行原生窗口和安装验收。旧 desktop.8 无更新入口。
 
 桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、数据库迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。
