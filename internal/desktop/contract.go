@@ -13,7 +13,7 @@ const Contract = "anchor-desktop-v1"
 const MaxSafeRevision int64 = 9007199254740991
 
 // ProblemCodes is the sole source for generated TypeScript error literals.
-var ProblemCodes = []string{"offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced"}
+var ProblemCodes = []string{"offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "tunnel_failed"}
 
 type Problem struct {
 	Code string `json:"code"`
@@ -34,10 +34,13 @@ type SaveProvider struct {
 	Secret           *string  `json:"secret"`
 }
 type SessionInfo struct {
-	InstanceID string `json:"instance_id"`
-	Phase      string `json:"phase"`
-	Source     string `json:"source"`
-	CanStop    bool   `json:"can_stop"`
+	ProfileName string `json:"profile_name"`
+	Transport   string `json:"transport"`
+	Target      string `json:"target"`
+	InstanceID  string `json:"instance_id"`
+	Phase       string `json:"phase"`
+	Source      string `json:"source"`
+	CanStop     bool   `json:"can_stop"`
 }
 type ConfirmStop struct {
 	InstanceID string `json:"instance_id"`
@@ -309,5 +312,34 @@ type SaveModelSettings = catalog.SaveModelSettings
 type ModelSettingsResult struct {
 	Contract string              `json:"contract"`
 	Data     *ModelSettingsState `json:"data"`
+	Problem  *Problem            `json:"problem"`
+}
+
+// Connection DTOs contain only public profile data; credentials stay in Go.
+type ConnectionProfile struct {
+	Authentication string `json:"authentication"`
+	Name           string `json:"name"`
+	Transport      string `json:"transport"`
+	Target         string `json:"target"`
+	InstanceID     string `json:"instance_id"`
+	Active         bool   `json:"active"`
+}
+type SSHConnectionInput struct {
+	Password          string `json:"password"`
+	Name              string `json:"name"`
+	Target            string `json:"target"`
+	Port              int    `json:"port"`
+	IdentityFile      string `json:"identity_file"`
+	RemoteExecutable  string `json:"remote_executable"`
+	RemoteControlPort int    `json:"remote_control_port"`
+	TrustNewHost      bool   `json:"trust_new_host"`
+}
+type SelectConnection struct {
+	Password string `json:"password"`
+	Name     string `json:"name"`
+}
+type ConnectionProfilesResult struct {
+	Contract string              `json:"contract"`
+	Data     []ConnectionProfile `json:"data"`
 	Problem  *Problem            `json:"problem"`
 }

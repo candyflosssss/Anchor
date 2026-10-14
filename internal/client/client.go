@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -32,11 +33,19 @@ type Instance struct {
 }
 
 func Connect(ctx context.Context, c state.Context, token string) (*Client, Instance, error) {
+	return ConnectWithDialer(ctx, c, token, nil)
+}
+
+// ConnectWithDialer allows a host-owned authenticated transport without exposing a local listener.
+func ConnectWithDialer(ctx context.Context, c state.Context, token string, dial func(context.Context, string, string) (net.Conn, error)) (*Client, Instance, error) {
 	if err := c.Validate(); err != nil {
 		return nil, Instance{}, err
 	}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	tr.Proxy = nil
+	if dial != nil {
+		tr.DialContext = dial
+	}
 	cl := &Client{endpoint: c.Endpoint, token: token, instance: c.InstanceID, http: &http.Client{Timeout: 15 * time.Second, Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 	var instance Instance
 	if err := cl.call(ctx, http.MethodGet, "/control/v1/instance", nil, &instance); err != nil {

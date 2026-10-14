@@ -8,6 +8,7 @@ import { AppSidebar, type Page } from '../components/shared/app-sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '../components/ui/breadcrumb';
 import { Separator } from '../components/ui/separator';
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '../components/ui/sidebar';
+import { ConnectionsView } from '../features/connections/connections.view';
 import { AgentsView } from '../features/agents/agents.view';
 import { UpdateSettings } from '../features/updates/update-settings.view';
 import { LogsPreview } from '../features/logs/log-workspace.view';
@@ -18,12 +19,13 @@ import { useWindowController } from '../features/window/use-window-controller';
 import { WindowControls } from '../features/window/window-controls.view';
 import { cn } from '../lib/utils';
 
-const pageTitle: Record<Page, string> = { overview: '概览', providers: '供应商', models: '模型映射', logs: '日志', agents: 'Agent 托管', settings: '设置 / 在线更新' };
+const pageTitle: Record<Page, string> = { connections: '设备连接', overview: '概览', providers: '供应商', models: '模型映射', logs: '日志', agents: 'Agent 托管', settings: '设置 / 在线更新' };
 
 export function App() {
   const { appearance, setAppearance } = useAppearance();
   const environment = useMemo(createEnvironment, []);
   const session = useDesktopSession();
+  const instanceId = session.info?.instance_id ?? (prototype ? 'prototype' : '');
   const windowController = useWindowController(!prototype);
   const [page, setPage] = useState<Page>('providers');
   const [navSeq, setNavSeq] = useState(0);
@@ -50,13 +52,13 @@ export function App() {
         </div>
       </header>
       {windowController.error && <p role="status" className="border-b px-4 py-2 text-xs text-destructive">{windowController.error}</p>}
-      {page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage environment={environment} page={page === 'agents' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
-        <h1 className="text-xl font-semibold">{session.phase === 'starting' ? '正在连接本机核心…' : session.phase === 'stopped' ? '停服请求已接受' : '本机核心暂不可用'}</h1>
+      {page === 'connections' ? <ConnectionsView onConnected={session.select} onActivity={setBusy} /> : page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage key={instanceId} environment={environment} page={page === 'agents' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
+        <h1 className="text-xl font-semibold">{session.phase === 'starting' ? '正在连接核心…' : session.phase === 'stopped' ? '停服请求已接受' : '当前设备暂不可用'}</h1>
         {(session.error || session.phase === 'stopped') && <p className="my-4 text-sm text-muted-foreground">{session.error ? desktopMessages[session.error] : '核心正在处理退出与配置恢复。'}</p>}
-        {session.phase !== 'starting' && <Button onClick={() => void session.connect()}>重新连接本机核心</Button>}
+        {session.phase !== 'starting' && <Button onClick={() => void session.connect()}>重新连接当前设备</Button>}
       </section>}
-      <ConfirmAction open={confirmStop} title="停止本机核心？" busy={session.stopping} onCancel={() => setConfirmStop(false)} onConfirm={() => { void session.stop().finally(() => setConfirmStop(false)); }}>
-        <p className="break-all">实例：{session.info?.instance_id}</p><p>连接来源：{session.info?.source === 'started' ? '本次由桌面宿主启动' : '核验后复用的已有核心'}。</p><p>这会停止代理服务并按既有规则恢复托管配置，可能影响使用该实例的其他程序。仅关闭窗口不需要停止核心。</p>
+      <ConfirmAction open={confirmStop} title={session.info?.transport === 'ssh' ? `停止远程设备 ${session.info.target} 的核心？` : '停止本机核心？'} busy={session.stopping} onCancel={() => setConfirmStop(false)} onConfirm={() => { void session.stop().finally(() => setConfirmStop(false)); }}>
+        <p className="break-all">实例：{session.info?.instance_id}</p><p>连接来源：{session.info?.transport === 'ssh' ? `远程设备 ${session.info.target}` : session.info?.source === 'started' ? '本次由桌面宿主启动' : '核验后复用的已有核心'}。</p><p>这会停止代理服务并按既有规则恢复托管配置，可能影响使用该实例的其他程序。仅关闭窗口不需要停止核心。</p>
       </ConfirmAction>
     </SidebarInset>
   </SidebarProvider>;

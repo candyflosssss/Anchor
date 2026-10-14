@@ -1,0 +1,48 @@
+{
+  "contract": "anchor-desktop-v1",
+  "input": {
+    "name": "dev-server",
+    "target": "developer@192.0.2.10",
+    "port": 22,
+    "identity_file": "",
+    "remote_executable": "anchor",
+    "remote_control_port": 17861,
+    "trust_new_host": false,
+    "password": ""
+  },
+  "profiles": {
+    "contract": "anchor-desktop-v1",
+    "data": [
+      {
+        "name": "@local",
+        "transport": "local",
+        "target": "本机",
+        "instance_id": "local-fixture",
+        "active": false,
+        "authentication": "owner"
+      },
+      {
+        "name": "dev-server",
+        "transport": "ssh",
+        "target": "developer@192.0.2.10",
+        "instance_id": "remote-fixture",
+        "active": true,
+        "authentication": "key"
+      }
+    ],
+    "problem": null
+  },
+  "session": {
+    "contract": "anchor-desktop-v1",
+    "data": {
+      "profile_name": "dev-server",
+      "transport": "ssh",
+      "target": "developer@192.0.2.10",
+      "instance_id": "remote-fixture",
+      "phase": "ready",
+      "source": "remote",
+      "can_stop": true
+    },
+    "problem": null
+  }
+}

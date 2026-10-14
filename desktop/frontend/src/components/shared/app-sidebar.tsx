@@ -1,10 +1,10 @@
 // Adapted from official sidebar-07 (MIT); see SHADCN_SOURCES.md.
-import { Anchor, ArrowLeftRight, Bot, FileText, LayoutDashboard, Monitor, Moon, PlugZap, Settings2, Sun } from 'lucide-react';
+import { Anchor, ArrowLeftRight, Bot, FileText, LayoutDashboard, Monitor, Moon, PlugZap, Settings2, Sun, Server } from 'lucide-react';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '../ui/sidebar';
 import { prototype } from '../../desktop/environment';
 import type { Appearance } from '../../app/use-appearance';
 
-export type Page = 'overview' | 'providers' | 'models' | 'logs' | 'agents' | 'settings';
+export type Page = 'overview' | 'providers' | 'models' | 'logs' | 'agents' | 'settings' | 'connections';
 
 export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }: { page: Page; onNavigate: (page: Page) => void; busy: boolean; appearance: Appearance; setAppearance: (value: Appearance) => void }) {
   const { isMobile, setOpenMobile } = useSidebar();
@@ -17,7 +17,7 @@ export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }
     </SidebarMenuItem></SidebarMenu></SidebarHeader>
     <SidebarContent><SidebarGroup><SidebarGroupLabel>工作空间</SidebarGroupLabel><SidebarGroupContent><SidebarMenu>
       {([
-        [LayoutDashboard, '概览', 'overview'], [PlugZap, '供应商', 'providers'], [ArrowLeftRight, '模型映射', 'models'], [Bot, 'Agent 托管', 'agents'], [FileText, '日志', 'logs'],
+        [Server, '设备连接', 'connections'], [LayoutDashboard, '概览', 'overview'], [PlugZap, '供应商', 'providers'], [ArrowLeftRight, '模型映射', 'models'], [Bot, 'Agent 托管', 'agents'], [FileText, '日志', 'logs'],
       ] as const).map(([Icon, title, target]) => <SidebarMenuItem key={title}>
         <SidebarMenuButton tooltip={target ? title : `${title}：不在本版范围`} disabled={!target || busy} isActive={!!target && page === target} aria-current={target && page === target ? 'page' : undefined} aria-label={title} onClick={() => { if (!target) return; onNavigate(target); if (isMobile) setOpenMobile(false); }}>
           <Icon /><span>{title}</span>{!target && <span className="ml-auto text-xs text-muted-foreground">后续</span>}

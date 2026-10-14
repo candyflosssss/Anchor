@@ -56,7 +56,7 @@ func (b *Bridge) Status() SessionResult {
 		r.Problem = &Problem{"offline"}
 		return r
 	}
-	r.Data = &SessionInfo{InstanceID: info.InstanceID, Phase: "ready", Source: s.source(info), CanStop: slices.Contains(info.Capabilities, "graceful_stop")}
+	r.Data = s.sessionInfo(info)
 	return r
 }
 func provider(p state.Provider) (Provider, bool) {
@@ -166,6 +166,10 @@ func (b *Bridge) StopCore(in ConfirmStop) StopResult {
 	}
 	r.Data = &StopInfo{Accepted: true}
 	s.cfg = nil
+	if s.remote != nil {
+		s.remote.Close()
+		s.remote = nil
+	}
 	return r
 }
 

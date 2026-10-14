@@ -15,16 +15,20 @@ import (
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/client"
+	"github.com/candyflosssss/Anchor/internal/connection"
 	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
 const help = `Anchor — headless model gateway (development milestone)
-Usage: anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
+Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
   init [--control-address 127.0.0.1:17861] [--gateway-address 127.0.0.1:17860]
   serve                              Run the local foreground core
   context add NAME --local           Authenticate and bind a local instance
+  context add NAME --ssh TARGET [--ssh-port N] [--identity-file PATH]
+      [--remote-anchor anchor] [--remote-control-port 17861] [--trust-new-host]
+  context bootstrap [--control-port 17861] --show-once  SSH account bootstrap (local only)
   context use NAME | context list | context inspect NAME | context test NAME
   status                             Query selected context
   stop --approve                     Request graceful shutdown of selected context
@@ -105,14 +109,15 @@ All-mapped reads model mappings with enabled providers, without Codex metadata/t
 All-compatible requires exact-version Codex metadata and the selected local models_cache.json for enrollment.
 --codex-home remains a Codex-only alias for --config-root. No executable or upstream probing.
 Restart Codex/Claude Code after changes; DSH defaults apply to new sessions.
-Remote Codex app-server uses the remote base config; SSH connection management,
-Gemini/OpenCode and other Agent profiles are not implemented.
+Remote Codex app-server uses the remote base config. SSH contexts share the typed management API;
+Gemini, OpenCode and other Agent profiles remain unsupported.
 Protocol conversion supports stateless text, function tools and streaming; unsupported content is rejected.
 `
 
 type App struct {
-	In       io.Reader
-	Out, Err io.Writer
+	In          io.Reader
+	Out, Err    io.Writer
+	sshPassword string
 }
 
 func (a App) output(v any) error { return json.NewEncoder(a.Out).Encode(v) }
@@ -165,6 +170,34 @@ func globals(args []string) (dir, target string, rest []string, err error) {
 	return
 }
 func (a App) Run(ctx context.Context, args []string) error {
+	passwordInput := false
+	filtered := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg == "--ssh-password-stdin" {
+			passwordInput = true
+		} else {
+			filtered = append(filtered, arg)
+		}
+	}
+	args = filtered
+	if passwordInput {
+		if a.In == nil {
+			return errors.New("SSH password requires stdin")
+		}
+		for _, arg := range args {
+			if arg == "--secret-stdin" {
+				return errors.New("SSH and provider secrets cannot share stdin")
+			}
+		}
+		raw, err := io.ReadAll(io.LimitReader(a.In, 8193))
+		if err != nil || len(raw) > 8192 {
+			return errors.New("invalid SSH password input")
+		}
+		a.sshPassword = strings.TrimRight(string(raw), "\r\n")
+		if a.sshPassword == "" {
+			return errors.New("empty SSH password input")
+		}
+	}
 	dir, target, args, err := globals(args)
 	if err != nil {
 		return err
@@ -230,6 +263,12 @@ func (a App) Run(ctx context.Context, args []string) error {
 		defer store.Close()
 		return core.New(store, slog.New(slog.NewJSONHandler(a.Err, nil))).Run(ctx)
 	}
+	if args[0] == "context" && len(args) > 1 && args[1] == "bootstrap" {
+		if target != "" {
+			return errors.New("context bootstrap is local-only; omit --context")
+		}
+		return a.bootstrap(ctx, dir, args[2:])
+	}
 	store, err := state.Open(dir, false)
 	if err != nil {
 		return err
@@ -268,11 +307,12 @@ func (a App) Run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	token, err := store.OwnerToken()
+	live, err := connection.OpenWithPassword(ctx, store, c, a.sshPassword)
 	if err != nil {
 		return err
 	}
-	cl, _, err := client.Connect(ctx, c, token)
+	defer live.Close()
+	cl, _, err := live.Connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -384,12 +424,37 @@ func (a App) contexts(ctx context.Context, s *state.Store, args []string) error 
 		}
 		f := a.flags("context add")
 		local := f.Bool("local", false, "local core")
+		ssh := f.String("ssh", "", "SSH target or alias")
+		sshPort := f.Int("ssh-port", 0, "SSH port; 0 uses SSH config")
+		identity := f.String("identity-file", "", "SSH identity path")
+		executable := f.String("remote-anchor", "anchor", "remote Anchor executable")
+		controlPort := f.Int("remote-control-port", 17861, "remote loopback control port")
+		trust := f.Bool("trust-new-host", false, "accept first-seen host keys; changed keys still fail")
 		if err := parse(f, args[2:]); err != nil {
 			return err
 		}
-		if !*local {
-			return errors.New("only --local contexts are implemented in this milestone")
+		if *local == (*ssh != "") {
+			return errors.New("choose exactly one of --local or --ssh")
 		}
+		if *ssh != "" {
+			if _, err := s.Context(args[1]); !errors.Is(err, state.ErrNotFound) {
+				return errors.New("context already exists or cannot be read")
+			}
+			live, token, err := connection.EnrollConnection(ctx, state.Context{Name: args[1], SSHTarget: *ssh, SSHPort: *sshPort, SSHIdentityFile: *identity, RemoteExecutable: *executable, RemoteControlPort: *controlPort, TrustNewHost: *trust}, a.sshPassword)
+			if err != nil {
+				return err
+			}
+			profile := live.Profile
+			live.Close()
+			if err := s.PutContextWithCredential(profile, token); err != nil {
+				return err
+			}
+			return a.output(profile)
+		}
+		if *sshPort != 0 || *identity != "" || *executable != "anchor" || *controlPort != 17861 || *trust {
+			return errors.New("SSH options require --ssh")
+		}
+
 		cfg, err := s.Settings()
 		if err != nil {
 			return err
@@ -436,11 +501,12 @@ func (a App) contexts(ctx context.Context, s *state.Store, args []string) error 
 		if args[0] == "inspect" {
 			return a.output(c)
 		}
-		token, err := s.OwnerToken()
+		live, err := connection.OpenWithPassword(ctx, s, c, a.sshPassword)
 		if err != nil {
 			return err
 		}
-		cl, i, err := client.Connect(ctx, c, token)
+		defer live.Close()
+		cl, i, err := live.Connect(ctx)
 		if err != nil {
 			return err
 		}
@@ -557,6 +623,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 		}
 		return a.output(v)
 	}
+
 	if args[0] == "settings" {
 		f := a.flags("model settings")
 		id := f.String("id", "", "public model ID")

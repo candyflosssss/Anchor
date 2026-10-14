@@ -118,8 +118,9 @@ export class DesktopProviderTransport implements ProviderTransport {
 }
 export function checkedSession(info: SessionInfo): SessionInfo {
   if (!info || typeof info.instance_id !== 'string' || !info.instance_id || info.phase !== 'ready' ||
-    !['started', 'reused'].includes(info.source) || typeof info.can_stop !== 'boolean') throw new DesktopProblem('read_error');
-  return { instance_id: info.instance_id, phase: info.phase, source: info.source, can_stop: info.can_stop };
+    !['started', 'reused', 'remote'].includes(info.source) || typeof info.can_stop !== 'boolean') throw new DesktopProblem('read_error');
+  if (info.transport !== undefined && !['local', 'ssh'].includes(info.transport)) throw new DesktopProblem('read_error');
+  return { instance_id: info.instance_id, phase: info.phase, source: info.source, can_stop: info.can_stop, profile_name: info.profile_name ?? '@local', transport: info.transport ?? 'local', target: info.target ?? '本机' };
 }
 export const desktopSession = {
   start: async () => checkedSession(await call(() => bridge().Start())),

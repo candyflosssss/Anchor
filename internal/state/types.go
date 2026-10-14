@@ -18,6 +18,19 @@ var identifier = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$`)
 
 func ValidID(s string) bool { return identifier.MatchString(s) }
 
+// Instance/access IDs are base64url tokens and may start with an underscore or dash.
+func ValidOpaqueID(s string) bool {
+	if s == "" || len(s) > 128 {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && r != '_' && r != '-' && r != '.' {
+			return false
+		}
+	}
+	return true
+}
+
 // Provider IDs are user-facing labels, not filesystem names or model slugs.
 // Keep the ASCII-only ValidID contract for contexts, models and bindings.
 var providerIdentifier = regexp.MustCompile(`^[\p{L}\p{Nd}][\p{L}\p{Nd}._-]{0,127}$`)
@@ -240,21 +253,62 @@ func (m Model) Validate() error {
 }
 
 type Context struct {
-	Name          string `json:"name"`
-	Endpoint      string `json:"endpoint"`
-	InstanceID    string `json:"expected_instance_id"`
-	CredentialRef string `json:"credential_ref"`
+	SSHAuth           string `json:"ssh_auth,omitempty"`
+	SSHHostKey        string `json:"ssh_host_key,omitempty"`
+	Name              string `json:"name"`
+	Transport         string `json:"transport,omitempty"`
+	Endpoint          string `json:"endpoint,omitempty"`
+	InstanceID        string `json:"expected_instance_id"`
+	CredentialRef     string `json:"credential_ref"`
+	SSHTarget         string `json:"ssh_target,omitempty"`
+	SSHPort           int    `json:"ssh_port,omitempty"`
+	SSHIdentityFile   string `json:"ssh_identity_file,omitempty"`
+	RemoteControlPort int    `json:"remote_control_port,omitempty"`
+	RemoteExecutable  string `json:"remote_executable,omitempty"`
+	TrustNewHost      bool   `json:"trust_new_host,omitempty"`
+	AccessID          string `json:"access_id,omitempty"`
 }
 
 func (c Context) Validate() error {
-	if !ValidID(c.Name) || c.InstanceID == "" || c.CredentialRef != "local-owner" {
-		return fmt.Errorf("invalid local context")
+	if !ValidID(c.Name) || !ValidOpaqueID(c.InstanceID) {
+		return errors.New("invalid context identity")
 	}
-	u, err := url.Parse(c.Endpoint)
-	if err != nil || u.Scheme != "http" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
-		return errors.New("invalid local management endpoint")
+	if c.Transport == "" || c.Transport == "local" {
+		if c.CredentialRef != "local-owner" {
+			return fmt.Errorf("invalid local context")
+		}
+		u, err := url.Parse(c.Endpoint)
+		if err != nil || u.Scheme != "http" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+			return errors.New("invalid local management endpoint")
+		}
+		return ValidateListen(u.Host)
 	}
-	return ValidateListen(u.Host)
+	if (c.SSHAuth != "" && c.SSHAuth != "password") || len(c.SSHHostKey) > 8192 {
+		return errors.New("invalid SSH authentication")
+	}
+	if c.Transport != "ssh" || c.CredentialRef != "ssh-manage" || !ValidOpaqueID(c.AccessID) {
+		return errors.New("invalid SSH context")
+	}
+	if c.Endpoint != "" || c.SSHTarget == "" || strings.HasPrefix(c.SSHTarget, "-") || strings.ContainsAny(c.SSHTarget, "\x00\r\n\t ") {
+		return errors.New("invalid SSH target")
+	}
+	for _, r := range c.SSHTarget {
+		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && !strings.ContainsRune("_.@:%[]-", r) {
+			return errors.New("invalid SSH target")
+		}
+	}
+	if c.SSHPort < 0 || c.SSHPort > 65535 || c.RemoteControlPort < 1 || c.RemoteControlPort > 65535 {
+		return errors.New("invalid SSH port")
+	}
+	if strings.ContainsAny(c.SSHIdentityFile, "\x00\r\n") || c.RemoteExecutable == "" || strings.HasPrefix(c.RemoteExecutable, "-") || len(c.RemoteExecutable) > 512 {
+		return errors.New("invalid SSH option")
+	}
+	for _, r := range c.RemoteExecutable {
+		if !(r >= 'a' && r <= 'z') && !(r >= 'A' && r <= 'Z') && !(r >= '0' && r <= '9') && !strings.ContainsRune("_./~:-", r) {
+			return errors.New("invalid remote executable")
+		}
+	}
+	return nil
 }
 
 type Access struct {

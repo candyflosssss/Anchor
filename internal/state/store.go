@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 6 {
+	if version > 7 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -144,6 +144,18 @@ COMMIT;`)
 	// Candidate Key restrictions must never be silently ignored by older cores.
 	if version < 6 {
 		if _, err = db.Exec(`PRAGMA user_version=6`); err != nil {
+			return fail(err)
+		}
+	}
+	if version < 7 {
+		_, err = db.Exec(`BEGIN IMMEDIATE;
+CREATE TABLE IF NOT EXISTS context_credentials (
+ name TEXT PRIMARY KEY REFERENCES contexts(name) ON DELETE CASCADE,
+ secret TEXT NOT NULL
+);
+PRAGMA user_version=7;
+COMMIT;`)
+		if err != nil {
 			return fail(err)
 		}
 	}
@@ -575,6 +587,58 @@ func (s *Store) PutContext(c Context) error {
 	}
 	b, _ := json.Marshal(c)
 	_, err := s.db.Exec(`INSERT INTO contexts(name,document) VALUES(?,?)`, c.Name, string(b))
+	return err
+}
+func (s *Store) PutContextWithCredential(c Context, secret string) error {
+	if err := c.Validate(); err != nil || c.Transport != "ssh" || secret == "" || len(secret) > 8192 {
+		if err != nil {
+			return err
+		}
+		return errors.New("invalid context credential")
+	}
+	b, _ := json.Marshal(c)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err = tx.Exec(`INSERT INTO contexts(name,document) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET document=excluded.document`, c.Name, string(b)); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`INSERT INTO context_credentials(name,secret) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET secret=excluded.secret`, c.Name, secret); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+func (s *Store) ContextCredential(name string) (string, error) {
+	var secret string
+	err := s.db.QueryRow(`SELECT secret FROM context_credentials WHERE name=?`, name).Scan(&secret)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return secret, err
+}
+
+// DesktopSelection is separate from the CLI's current_context preference.
+func (s *Store) DesktopSelection() (string, error) {
+	var name string
+	err := s.db.QueryRow(`SELECT value FROM meta WHERE key='desktop_context'`).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "@local", nil
+	}
+	return name, err
+}
+func (s *Store) SelectDesktop(name string) error {
+	if name != "@local" {
+		c, err := s.Context(name)
+		if err != nil {
+			return err
+		}
+		if c.Transport != "ssh" {
+			return ErrInvalid
+		}
+	}
+	_, err := s.db.Exec(`INSERT INTO meta(key,value) VALUES('desktop_context',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`, name)
 	return err
 }
 func (s *Store) Context(name string) (Context, error) {

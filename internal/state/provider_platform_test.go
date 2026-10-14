@@ -152,7 +152,7 @@ func TestPlatformSchemaFourMigration(t *testing.T) {
 	}
 	var v int
 	s.db.QueryRow(`PRAGMA user_version`).Scan(&v)
-	if v != 6 {
+	if v != 7 {
 		t.Fatal(v)
 	}
 }

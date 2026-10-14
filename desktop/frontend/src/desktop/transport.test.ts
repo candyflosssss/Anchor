@@ -6,11 +6,12 @@ import { bridge, call, checkedProvider, checkedSession, DesktopProviderTransport
 
 const signal = () => new AbortController().signal;
 const publicRow = fixture.providers[0];
-const session = { instance_id: 'synthetic-instance', phase: 'ready', source: 'started', can_stop: true };
+const session = { instance_id: 'synthetic-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
 const input = { provider: publicRow, expected_revision: publicRow.revision, secret: 'synthetic-secret' };
 function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   return {
-    Start: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
+    Connections: vi.fn(), ConnectSSH: vi.fn(), UseConnection: vi.fn(),
+ Start: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
     Status: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
     Logs: vi.fn(), LogDetail: vi.fn(), LogSettings: vi.fn(), ConfigureLogs: vi.fn(), ExportLogs: vi.fn(),
     ProviderAccountSettings: vi.fn(), SaveProviderAccount: vi.fn(), ProviderAllowance: vi.fn(), ProviderRate: vi.fn(),

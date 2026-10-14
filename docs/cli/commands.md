@@ -19,13 +19,14 @@
 下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。公开 Release 是安装源；实际公开版本及平台附件见发行页。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
 
 ```text
-anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
+anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 ```
 
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
 | `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--ssh-password-stdin` | 从 stdin 读取本次 SSH 密码（最多 8192 bytes，去掉末尾 CR/LF，非空），仅本次使用，不保存；SSH add 时选择密码模式，已保存密码 Context 每次管理请求重新提供。不能与供应商 `--secret-stdin` 同用 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
 推荐把全局选项放在命令之前。当前解析器也会从整条参数列表提取全局选项。值选项可写 `--name VALUE` 或 `--name=VALUE`；布尔选项关闭时用 `--name=false`，不要写 `--name false`。除表中指定的位置参数外，不添加额外位置参数。
@@ -52,7 +53,8 @@ anchor [--data-dir DIR] [--context NAME] COMMAND [--json]
 | `update apply --approve` | 原位更新本机 CLI，保留上一版 | 已下载、核心已退出、用户可写安装路径；不自动重启 |
 | `init` | 初始化本机状态 | 本机；核心不应占用该状态目录 |
 | `serve` | 前台运行核心 | 本机已初始化 |
-| `context add` | 登记并验证本机实例 | 本机已初始化；核心在线 |
+| `context add` | 登记本机或 SSH 实例 | 本机已初始化；SSH 目标已安装支持 bootstrap 的 Anchor |
+| `context bootstrap` | 远端账户初始化／启动核心并签发管理授权 | 本机操作；明确 `--show-once`；输出含秘密 |
 | `context use` | 选择默认 Context | 本机；名称已登记 |
 | `context list` | 列出 Context | 本机已初始化 |
 | `context inspect` | 查看已保存连接信息 | 本机；名称已登记 |
@@ -165,6 +167,10 @@ anchor [--context NAME] stop --approve
 
 ```text
 anchor context add NAME --local
+anchor context add NAME --ssh TARGET [--ssh-port N] [--identity-file PATH]
+  [--remote-anchor anchor] [--remote-control-port 17861] [--trust-new-host]
+anchor [--ssh-password-stdin] context add NAME --ssh TARGET [SSH_OPTIONS]
+anchor context bootstrap [--control-port 17861] --show-once
 anchor context use NAME
 anchor context list
 anchor context inspect NAME
@@ -172,14 +178,18 @@ anchor context test NAME
 anchor [--context NAME] status
 ```
 
-- **`context add`**：`NAME` 必填，`--local` 必填。连接本机初始化的管理地址，核验实例身份/API 主版本后登记；重复名称失败，不覆盖既有 Context。返回连接对象（名称、endpoint、期望实例 ID、凭据引用），不输出拥有者令牌，不自动设为当前 Context。
+- **`context add`**：`NAME` 必填（安全 ASCII 标识），`--local` 与 `--ssh TARGET` 二选一。本机模式连接已初始化核心；SSH 模式登录目标账户、执行固定 bootstrap 命令、验证实例身份/API/授权后登记。重复名称失败，不覆盖，不自动设为当前 Context。JSON 仅含档案公开字段，不含密码或管理令牌。本机模式拒绝 SSH 专用选项。
 - **`context use`**：`NAME` 必须存在；保存默认选择，返回 `current_context`。本步骤不检测在线状态。
 - **`context list`**：无专属参数，返回连接对象数组；不检测可达性，当前实现不附带“当前选中”标记。
 - **`context inspect`**：返回指定名称的已保存连接对象；不请求核心，不检测可达性。
 - **`context test`**：连接指定实例并验证身份/API 主版本；返回实例信息，包括版本、平台、用户、监听地址和能力；新版核心另返回 process_id，旧核心没有该字段。不按 PID 判断授权或强杀进程。失败不重新绑定或切换目标。
 - **`status`**：无专属参数，查询显式或默认 Context，返回 `core`、`gateway`、`upstream_health`、`agent_management`；`core` / `gateway` 在运行生命周期中为 `starting`、`ready` 或 `stopping`，就绪前不接受管理写入或网关调用（可请求正常停服）；不会附带实例 ID、配置 revision 或网关地址；缺少 Context、不可达、认证失败或身份不一致均失败，不回退。
 
-Context 目前仅支持本机 `--local`，没有 SSH、远程凭据或 Context 删除/重绑定入口。
+SSH 参数：`--ssh-port` 默认 0（密钥模式使用 SSH 配置，密码模式为 22），范围 0..65535；`--identity-file` 默认为空（系统默认密钥／SSH Agent），`--remote-anchor` 默认 `anchor`（只允许安全可执行路径，禁止 shell 语法），`--remote-control-port` 默认 17861、范围 1..65535，仅转发远端 IPv4 回环。`--trust-new-host` 默认 false；显式同意后记录首次主机密钥，变化时始终拒绝。密钥模式使用系统 OpenSSH，可用 Host 别名／SSH Agent；密码模式内置 SSH，使用 user@地址，不读取 SSH 配置／别名，密码不保存。失败分类包括 ssh_missing、ssh_host_key、ssh_auth、ssh_unreachable、remote_anchor、tunnel_failed，不输出原始 SSH stderr。
+
+**`context bootstrap`** 是执行所在机器的本机操作，不接受 `--context`。远端必须已安装支持此命令的 Anchor。安全初始化当前账户缺失状态；管理地址必须等于指定的 `127.0.0.1:PORT`，保留既有身份和配置；核心未运行时启动独立后台 `serve`，已运行则核验复用。默认新建网关为 127.0.0.1:17860；端口冲突／身份不符不会强杀或覆盖。成功 JSON 含 settings、access、token（manage，720 小时），必须显式 `--show-once`，只通过已认证 SSH 接收，不应打印或记录秘密。
+
+已保存 SSH 管理授权过期／撤销时，经重新 SSH 登录可以重新签发，但仍核验原实例身份。桌面选择独立于 CLI `context use`；关闭 CLI／UI 只关闭本次管理连接，远端核心继续运行。Context 支持本机和 SSH，尚无删除／重绑定入口。schema7 迁移后旧版不能打开本机状态，升级前备份并同步客户端／核心。
 
 ## 5. 供应商
 
@@ -476,7 +486,7 @@ anchor agent add --id ID [--adapter codex|claude|dsh] --config-root ABS_DIR --mo
                  [--anchor-executable ABS_PATH] [--model-scope all-compatible|all-mapped|single]
 ```
 
-- 作用域：所选 Context 的目标实例；路径按目标机器解释。当前 Context 仍仅本机。
+- 作用域：所选 Context 的目标实例；路径按目标机器解释。支持本机及已连接 SSH Context。
 - `--id` 必填，符合普通 ID 规则且最多 64 字符；`--adapter` 默认 `codex`，支持 `codex|claude|dsh`，适配器修订固定为 `1`。
 - `--config-root` 必填绝对目录，必须已存在；`--codex-home` 为仅限 Codex 的旧参数别名，二者不可同时传。Codex 修改基础 `config.toml` 和可选目录；Claude 修改 `settings.json`；DSH 修改已有 `profiles/web` 下的 `cordis.patch.yml`，不创建 profile 目录。
 - `--model` 必填，指定**默认公开模型**，不是 all-mapped/all-compatible 的权限边界；仅 Codex single/all-compatible 要求 tools/streaming，声明不是上游能力探测。
@@ -528,7 +538,7 @@ anchor agent set-models ID --revision N --model DEFAULT --model-scope all-compat
 
 桌面端 SSH 运行远端 Codex 时，Anchor 应配置在**远端**，CLI 操作目标也是远端已批准 CODEX_HOME。基础配置提供统一 Anchor provider、默认模型、模型目录与认证 helper；无需额外 profile。Codex 客户端可以从目录选其他公开模型，或者显式 `--model`/app-server model 参数选择；所有这些模型请求仍经 Anchor 路由到各自候选供应商。模型目录不是授权凭据，网关仍单独校验模型范围。
 
-本实现不生成/选择 profile、不实现 Anchor 自己的 SSH Connector、不接管 Codex 所有网络出口、工具外网或登录状态。更高优先级配置/策略/命令参数可能改变供应商，inspect 不把配置写入当成运行连接证明。基础 provider/目录改动后重启远端 app-server；本轮隔离验证覆盖后台协议，不代表桌面模型选择器 UI 已验收。
+本实现不生成/选择 profile、SSH Connector 仅负责目标 Anchor 的管理连接，不接管 Codex 所有网络出口、工具外网或登录状态。更高优先级配置/策略/命令参数可能改变供应商，inspect 不把配置写入当成运行连接证明。基础 provider/目录改动后重启远端 app-server；本轮隔离验证覆盖后台协议，不代表桌面模型选择器 UI 已验收。
 
 ### `agent token`（认证 helper）
 
@@ -594,7 +604,7 @@ anchor recover [--id ID]
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
-| SSH 连接与远程凭据 | 未实现 | 用户管理能力，后续实现需同步提供 CLI |
+| SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH web profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、其他 profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
 | 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；desktop.16 dev 已投放且真实下载通过，原生安装未验收，见 [在线更新](../design/online-updates.md) |

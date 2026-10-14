@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/client"
+	"github.com/candyflosssss/Anchor/internal/connection"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
 	"github.com/candyflosssss/Anchor/internal/updater"
@@ -31,6 +32,7 @@ type Session struct {
 	cancel      context.CancelFunc
 	options     Options
 	cfg         *state.Settings
+	remote      *connection.Live
 	launchedPID int
 }
 
@@ -49,12 +51,23 @@ func NewSession(o Options) *Session {
 }
 
 // Close releases the host's lifetime only; it deliberately never kills the core.
-func (s *Session) Close() { s.cancel() }
+func (s *Session) Close() {
+	s.cancel()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.remote != nil {
+		s.remote.Close()
+		s.remote = nil
+	}
+}
 
 // An authenticated process identity prevents a concurrently started CLI core
 // from being mislabelled as our child. Missing IDs on old cores mean reused.
 // This is attribution only; shutdown always needs fresh auth/identity + approval.
 func (s *Session) source(info client.Instance) string {
+	if s.remote != nil {
+		return "remote"
+	}
 	if s.launchedPID > 0 && info.ProcessID == s.launchedPID {
 		return "started"
 	}
@@ -67,6 +80,10 @@ func problem(err error, writing bool) *Problem {
 	}
 	if errors.Is(err, client.ErrIdentity) {
 		return &Problem{"identity"}
+	}
+	var transport *connection.Error
+	if errors.As(err, &transport) {
+		return &Problem{transport.Code}
 	}
 	var r *client.RequestError
 	if errors.As(err, &r) {
@@ -122,6 +139,9 @@ func connect(ctx context.Context, cfg state.Settings, token string) (*client.Cli
 	return client.Connect(ctx, state.Context{Name: "desktop", CredentialRef: "local-owner", Endpoint: "http://" + cfg.ControlAddress, InstanceID: cfg.InstanceID}, token)
 }
 func (s *Session) connection(ctx context.Context) (*client.Client, client.Instance, error) {
+	if s.remote != nil {
+		return s.remote.Connect(ctx)
+	}
 	if s.cfg == nil {
 		return nil, client.Instance{}, &client.RequestError{Code: "offline"}
 	}
@@ -134,7 +154,7 @@ func (s *Session) connection(ctx context.Context) (*client.Client, client.Instan
 	}
 	return connect(ctx, cfg, token)
 }
-func (s *Session) start() SessionResult {
+func (s *Session) startLocal() SessionResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	result := SessionResult{Contract: Contract}
@@ -142,6 +162,18 @@ func (s *Session) start() SessionResult {
 		result.Problem = &Problem{"conflict"}
 		return result
 	}
+	previous := s.remote
+	// Restore the active remote if local startup fails; the old tunnel stays live.
+	var oldCfg *state.Settings = s.cfg
+	oldPID := s.launchedPID
+	defer func() {
+		if s.cfg == nil && previous != nil {
+			s.cfg = oldCfg
+			s.remote = previous
+			s.launchedPID = oldPID
+		}
+	}()
+	s.remote = nil
 	s.cfg = nil
 	s.launchedPID = 0
 	if s.ctx.Err() != nil {
@@ -205,7 +237,14 @@ func (s *Session) start() SessionResult {
 			done()
 			if statusErr == nil && status["core"] == "ready" {
 				s.cfg = &cfg
-				result.Data = &SessionInfo{InstanceID: cfg.InstanceID, Phase: "ready", Source: s.source(info), CanStop: slices.Contains(info.Capabilities, "graceful_stop")}
+				if st, e := state.Open(s.options.Dir, false); e == nil {
+					_ = st.SelectDesktop("@local")
+					st.Close()
+				}
+				result.Data = s.sessionInfo(info)
+				if previous != nil {
+					previous.Close()
+				}
 				return result
 			}
 			if !pause(ctx) {
@@ -248,7 +287,14 @@ func (s *Session) start() SessionResult {
 				done()
 				if e == nil && status["core"] == "ready" {
 					s.cfg = &cfg
-					result.Data = &SessionInfo{InstanceID: cfg.InstanceID, Phase: "ready", Source: s.source(info), CanStop: slices.Contains(info.Capabilities, "graceful_stop")}
+					if st, e := state.Open(s.options.Dir, false); e == nil {
+						_ = st.SelectDesktop("@local")
+						st.Close()
+					}
+					result.Data = s.sessionInfo(info)
+					if previous != nil {
+						previous.Close()
+					}
 					return result
 				}
 			} else {
@@ -266,4 +312,31 @@ func (s *Session) start() SessionResult {
 			}
 		}
 	}
+}
+
+func (s *Session) sessionInfo(info client.Instance) *SessionInfo {
+	out := &SessionInfo{InstanceID: info.InstanceID, Phase: "ready", Source: s.source(info), CanStop: slices.Contains(info.Capabilities, "graceful_stop"), ProfileName: "@local", Transport: "local", Target: "本机"}
+	if s.remote != nil {
+		out.ProfileName = s.remote.Profile.Name
+		out.Transport = "ssh"
+		out.Target = s.remote.Profile.SSHTarget
+	}
+	return out
+}
+func (s *Session) start() SessionResult {
+	s.mu.Lock()
+	if s.remote != nil {
+		name := s.remote.Profile.Name
+		s.mu.Unlock()
+		return NewBridge(s).UseConnection(SelectConnection{Name: name})
+	}
+	s.mu.Unlock()
+	if st, err := state.Open(s.options.Dir, false); err == nil {
+		name, e := st.DesktopSelection()
+		st.Close()
+		if e == nil && name != "@local" {
+			return NewBridge(s).UseConnection(SelectConnection{Name: name})
+		}
+	}
+	return s.startLocal()
 }

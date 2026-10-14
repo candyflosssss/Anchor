@@ -16,11 +16,14 @@ async function host(page: Page, rateMappings = false) {
     const accounts: Record<string, AccountSettings> = {};
     const settings = (id: string): AccountSettings => ({ ...(accounts[id] ?? { ...account.settings, platform: '' }), provider_id: id, revision: providers.find(p => p.id === id)?.revision ?? 1 });
     let providers: Provider[] = rows;
-    const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', can_stop: true };
+    const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
     window.routingTest = { calls: [] };
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const modelStates: Record<string, ModelSettingsState> = {};
     const api: DesktopBridge = {
+ Connections: async () => ({ contract, data: [], problem: null }),
+ ConnectSSH: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+ UseConnection: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ModelCatalog: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       EstimateModelCost: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderProbe: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
@@ -117,7 +120,7 @@ async function host(page: Page, rateMappings = false) {
 }
 test('desktop browser without Wails bindings fails closed instead of showing mock data', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: '本机核心暂不可用' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '当前设备暂不可用' })).toBeVisible();
   await expect(page.getByText('桌面接口不可用或版本不兼容。', { exact: false })).toBeVisible();
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toHaveCount(0);
   await expect(page.getByLabel('原型场景')).toHaveCount(0);
@@ -162,7 +165,7 @@ test('disconnect clears open secret drafts and never silently restarts the core'
   await page.getByRole('button', { name: '替换密钥', exact: true }).click();
   await page.getByLabel('新的 API 密钥').fill('disconnect-synthetic-secret');
   await page.evaluate(() => { window.desktopTest.status = false; });
-  await expect(page.getByRole('heading', { name: '本机核心暂不可用' })).toBeVisible({ timeout: 8000 });
+  await expect(page.getByRole('heading', { name: '当前设备暂不可用' })).toBeVisible({ timeout: 8000 });
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(await page.evaluate(() => ({ starts: window.desktopTest.starts, saves: window.desktopTest.saves }))).toEqual({ starts: 1, saves: 0 });
   expect(await page.content()).not.toContain('disconnect-synthetic-secret');
@@ -185,7 +188,7 @@ test('polling refreshes the authenticated source and stop capability without res
     const previous = api.Status;
     api.Status = async () => {
       const result = await previous();
-      return { ...result, data: result.data ? { ...result.data, source: 'reused', can_stop: false } : null };
+      return { ...result, data: result.data ? { ...result.data, source: 'reused', profile_name: '@local', transport: 'local', target: '本机', can_stop: false } : null };
     };
   });
   await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();

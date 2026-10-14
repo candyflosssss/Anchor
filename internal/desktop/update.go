@@ -157,7 +157,7 @@ func (b *Bridge) InstallUpdate(in ConfirmUpdate) UpdateResult {
 			r.Problem = problem(err, false)
 			return r
 		}
-		if s.cfg != nil && s.cfg.InstanceID != cfg.InstanceID {
+		if s.remote == nil && s.cfg != nil && s.cfg.InstanceID != cfg.InstanceID {
 			r.Problem = &Problem{"identity"}
 			return r
 		}
@@ -175,7 +175,9 @@ func (b *Bridge) InstallUpdate(in ConfirmUpdate) UpdateResult {
 			r.Problem = problem(err, true)
 			return r
 		}
-		s.cfg = nil
+		if s.remote == nil {
+			s.cfg = nil
+		}
 		for coreLock == nil {
 			if !pause(ctx) {
 				r.Problem = &Problem{"conflict"}

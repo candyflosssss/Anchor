@@ -6,7 +6,7 @@
 
 ## 1. 宿主接口
 
-规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Providers、SaveProvider、StopCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
+规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Connections、ConnectSSH、UseConnection、Providers、SaveProvider、StopCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
 
 每个结果带 `contract=anchor-desktop-v1`、data 与 problem；problem 仅含白名单 code，不返回原始错误、路径、管理令牌或供应商秘密。列表始终为数组。返回 Provider revision 为 1..Number.MAX_SAFE_INTEGER；写入 expected_revision 为 0..MAX_SAFE_INTEGER-1，且等于输入 provider.revision，超范围拒绝。SaveProvider 的 secret=null 保留、空字符串清除、非空替换；只入不出。写入发生网络/响应异常时返回 unknown，不自动重试；409 为 conflict、认证失败为 unauthorized。
 
@@ -107,3 +107,11 @@ ProviderAllowance 增量接受 balance-summary，返回 account 或 key scope �
 2026-10-13 sub2api Key 倍率兼容：`ProviderRate` 的 `remote_key_id=0` 优先使用推理 Key 的 `/v1/sub2api/billing`，无需 JWT；`basis=key_billing` 表示含个人覆盖和高峰规则的当前有效倍率，group/group_name 可为空。AccountRate DTO 字段不变；共享样例增加 key_billing_rate，目录 keys 同步接受 rate_basis=key_billing。旧站缺接口或显式远端 ID 沿用用户授权查询；查询不更新路由倍率。
 
 2026-10-13 当前源码增加受限 `ModelCatalog`／`EstimateModelCost` 方法（见[参考目录契约](model-catalog.md)），沿用当前本机实例、管理权限和标准 Result 包装。方法是只读请求，失败不标记写入结果未知，不自动重放；核心负责有界公开抓取、缓存和估算，桌面不传推理凭据。新方法尚无界面入口，不影响核心独立运行生命周期。
+
+## SSH 会话与设备切换（2026-10-14）
+
+Connections 仅返回公开档案（name、transport、authentication、target、instance_id、active），包括内置 @local。ConnectSSH 输入安全连接字段和可选瞬时 password；UseConnection 输入名称与可选本次密码。SessionInfo 增加 profile_name、transport、target。规范 DTO 由 Go 生成 TS，共享样例为 desktop/contract/connections.json。
+
+宿主复用 internal/connection 与 CLI 相同的身份／授权／连接策略。密钥模式使用受限 OpenSSH 的 stdio 转发（ssh -W），不开放临时本机管理端口；密码模式使用内置 SSH 通道，首次明确同意后保存公开主机密钥，变化即拒绝。固定 bootstrap 命令只允许已验证 executable／端口；管理令牌保存在受权限保护 SQLite 凭据表，密码不保存。认证错误只返回白名单 code，不暴露 stderr／令牌。
+
+切换先核验目标 ready 并保存独立 desktop_context，再替换当前连接；失败不破坏已有连接，不改 CLI current_context。保存的密码连接在下次启动要求重新输入。关闭宿主只关闭本次 SSH，不停止目标核心；StopCore 明确停止当前选中目标，升级安装则只停止本机核心，即使当前 UI 连接远端。旧授权失效后重新 SSH 签发仍必须匹配已绑定实例。远端必须预先安装支持 context bootstrap 的 Anchor，自动安装尚未实现。

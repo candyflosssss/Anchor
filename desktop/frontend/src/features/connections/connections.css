@@ -1,0 +1,18 @@
+.connection-workspace { max-width: 1100px; }
+.connection-workspace h1 { font-size: 24px; font-weight: 600; margin-bottom: 6px; }
+.connection-profiles { display: grid; gap: 12px; margin-bottom: 28px; }
+.connection-profile { display: flex; gap: 16px; align-items: center; border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 18px; }
+.connection-create { padding: 24px; border: 1px solid hsl(var(--border)); border-radius: 8px; }
+.connection-create h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.connection-create form { max-width: 680px; margin-top: 24px; }
+.connection-fields, .connection-advanced { display: grid; gap: 18px; }
+.connection-fields label { display: grid; gap: 7px; }
+.connection-fields small { color: hsl(var(--muted-foreground)); font-size: 12px; }
+.connection-fields > button { justify-self: start; }
+.connection-fields summary { cursor: pointer; color: hsl(var(--muted-foreground)); }
+.connection-advanced { margin-top: 18px; }
+.connection-fields .connection-trust { display: flex; gap: 10px; align-items: flex-start; }
+.connection-trust input { margin-top: 3px; }
+.connection-trust small { display: block; margin-top: 4px; }
+.connection-error { margin-bottom: 20px; color: hsl(var(--destructive)); }
+@media (max-width: 760px) { .connection-profile { flex-wrap: wrap; } .connection-create { padding: 18px; } }
