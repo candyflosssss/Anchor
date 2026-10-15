@@ -33,13 +33,14 @@ func (c *Client) Resolve(ctx context.Context, id string) (ModelCatalog, error) {
 	if len(qualified) > 0 {
 		selected = qualified
 	} else if len(canonical) > 0 {
-		// Only accept a canonical owner if every matching listing declares that
-		// same identity. Never infer the owner from model-name prefixes.
+		// A directory-declared canonical owner wins over unannotated reseller
+		// listings. Explicitly conflicting identities still block inference;
+		// never infer an owner from model-name prefixes.
 		if len(canonical) != 1 {
 			return ModelCatalog{}, ErrNotFound
 		}
 		for _, m := range matches {
-			if m.CanonicalModelID != canonical[0].CanonicalModelID {
+			if m.CanonicalModelID != "" && m.CanonicalModelID != canonical[0].CanonicalModelID {
 				return ModelCatalog{}, ErrNotFound
 			}
 		}

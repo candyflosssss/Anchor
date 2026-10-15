@@ -10,6 +10,8 @@ type ModelSettingsQuery struct {
 	ModelID string `json:"model_id"`
 }
 type ModelSettingsState struct {
+	// Read-only draft provenance; reading never persists defaults or increments revision.
+	DefaultsStatus string                         `json:"defaults_status"`
 	ModelID        string                         `json:"model_id"`
 	Revision       int64                          `json:"revision"`
 	DisplayName    string                         `json:"display_name"`

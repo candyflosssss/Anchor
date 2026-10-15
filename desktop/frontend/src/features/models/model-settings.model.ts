@@ -51,13 +51,20 @@ export function checkedModelSettings(value: unknown, id: string): ModelSettingsS
   if (revision === null || candidate_count === null || candidate_count > 16) return bad();
   const reference = s.reference === null ? null : checkedModelCatalog(s.reference);
   if (reference && reference.models.length !== 1) return bad();
-  return { model_id: id, revision, candidate_count, display_name: s.display_name, configuration: checkedConfiguration(s.configuration), reference };
+  const defaults_status = s.defaults_status ?? 'saved';
+  if (typeof defaults_status !== 'string' || !['saved', 'reference', 'matched', 'unmatched', 'unavailable', 'incompatible'].includes(defaults_status)) return bad();
+  return { defaults_status, model_id: id, revision, candidate_count, display_name: s.display_name, configuration: checkedConfiguration(s.configuration), reference };
 }
 // Import is explicit. Fill mode protects configured values; replacement mode
 // resets defaults that may not exist in the new provider's reasoning range.
 export function importConfiguration(old: ModelConfiguration, catalog: ModelCatalog, replace: boolean): ModelConfiguration {
   if (catalog.models.length !== 1) return bad();
   const m = catalog.models[0], caps = structuredClone(old.capabilities);
+  if (!replace) {
+    if (caps.vision === null && caps.input_modalities.length) caps.vision = caps.input_modalities.includes('image');
+    if (caps.reasoning === null && old.supported_reasoning.length) caps.reasoning = true;
+    if (caps.tool_call === null && old.parallel_tool_calls === true) caps.tool_call = true;
+  }
   for (const key of ['vision', 'attachment', 'tool_call', 'reasoning', 'structured_output', 'temperature'] as const) if (replace || caps[key] === null) caps[key] = m.capabilities[key];
   for (const key of ['input_modalities', 'output_modalities'] as const) if (replace || !caps[key].length) caps[key] = [...m.capabilities[key]];
   // A manual vision declaration is authoritative in fill mode.
@@ -83,3 +90,19 @@ export const settingsError = (error: unknown): string => {
   const code = error instanceof DesktopProblem ? error.code : 'read_error';
   return code === 'conflict' ? '配置已被其他操作修改，请重新读取后编辑。' : code === 'unknown' ? '保存结果未知，请重新读取并核对；不会自动重试。' : code === 'invalid' ? '设置无效，请核对限制与默认思考值。' : code === 'unsupported' ? '当前桌面核心不支持模型设置，请升级后重试。' : '读取或保存失败，请检查连接与输入后重试。';
 };
+
+// The core returns a read-only defaults preview. Only new automatic references
+// require an explicit set action at save; pinned snapshots must remain pinned.
+export function settingsReadDraft(state: ModelSettingsState) {
+  const source = state.reference?.models[0];
+  const notices: Record<string, string> = {
+    matched: source
+      ? '已自动从 models.dev 匹配并补充未设置的默认值；手工设置保持不变，点击「保存模型设置」后生效。'
+      : '已自动从 models.dev 补充基础模型默认值；速度变体不套用标准参考价格，点击「保存模型设置」后生效。',
+    reference: '已按保存的 models.dev 参考快照补充未设置的默认值；不会覆盖手工设置，修改需保存后生效。',
+    unmatched: '未找到唯一且一致的 models.dev 模型；请在下方选择准确的参考模型，不会猜测参数。',
+    unavailable: 'models.dev 目录暂不可用或查询超时，已保留当前设置；可点击「重新读取并自动补全」重试。',
+    incompatible: '目录默认值与手工配置不兼容，已保留当前设置；请在下方核对参考模型。',
+  };
+  return { provider: source?.provider_id ?? '', model: source?.id ?? '', referenceAction: state.defaults_status === 'matched' && source ? 'set' as const : 'keep' as const, notice: notices[state.defaults_status] ?? '' };
+}

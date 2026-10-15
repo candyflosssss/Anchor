@@ -66,7 +66,7 @@ DTO 由 Go 生成到 `desktop/contract.generated.ts`，共享离线样例 `deskt
 
 受管理凭据、Origin/Host 和实例身份保护的接口：
 
-- `GET /control/v1/models/{id}/settings` 返回 `ModelSettingsState`：model_id、revision、display_name、candidate_count、configuration、reference。
+- `GET /control/v1/models/{id}/settings` 返回 `ModelSettingsState`：model_id、revision、display_name、candidate_count、configuration、reference、defaults_status。
 - `POST /control/v1/models/{id}/settings` 接收 `SaveModelSettings`：model_id、expected_revision、display_name、configuration、reference_action、reference_provider_id、reference_model_id。只替换显示名/设置，保留候选顺序、来源 Key、倍率、调度策略和 Codex 指令模板；乐观版本校验阻止覆盖其他操作。
 - `reference_action=keep` 保留旧快照，`clear` 清除；两者来源 ID 必须为空。`set` 需精确目录 provider/model ID，由核心抓取当前缓存/刷新后的单模型快照，拒绝陈旧失败快照，前端不能传入报价或伪造来源。客户端与桥接保存方法45秒超时，断线/异常回包仍按写入结果未知处理，无自动重放。
 
@@ -81,4 +81,12 @@ CLI 使用 `model settings --id ID [--file FILE]`，详见[指令大全](../cli/
 
 共享核心在两条创建入口（model add、provider model-put 创建新别名，含桌面批量导入）尝试精确解析；每个创建操作最多等待 3 秒，共享目录抓取仍由既有 30 秒超时和 Close 生命周期约束。无目录、陈旧、未匹配、歧义、多候选不一致或导入配置无效时保留未设置，不阻止创建；编辑/追加已有映射不重填。候选使用上游 ID，不拿 Anchor 供应商名称当 models.dev provider。手工 tools/streaming 标记仍权威，目录没有声明的默认值不猜测。
 
-手动 `reference_action=set` 在核心捕获参考快照时同时补齐未声明的配置，保留显式值；目录输入/输出超过手工上下文、或输出低于已有默认预算时跳过，避免生成无法保存的配置。前端“补充”采用同一冲突规则；“替换”清除超限输出预算和不受支持的 Temperature 默认值。参考快照包含完整价格、来源与版本；未知和零价区别保留。参考价格**不覆盖**供应商 `prices` 计费表，也不自动改写 Agent 配置。已有映射不会在只读查询时悄悄迁移，须显式导入并保存。
+手动 `reference_action=set` 在核心捕获参考快照时同时补齐未声明的配置，保留显式值；目录输入/输出超过手工上下文、或输出低于已有默认预算时跳过，避免生成无法保存的配置。前端“补充”采用同一冲突规则；“替换”清除超限输出预算和不受支持的 Temperature 默认值。参考快照包含完整价格、来源与版本；未知和零价区别保留。参考价格**不覆盖**供应商 `prices` 计费表，也不自动改写 Agent 配置。已有映射不会在只读查询时悄悄迁移；自动补全草稿仍须显式保存（见下节）。
+
+### 2026-10-15 已有映射读取自动补全（源码未发布）
+
+`GET /control/v1/models/{id}/settings` 现在返回只读设置草稿。优先使用已保存参考快照（不触网、不更新来源版本），否则共享目录匹配所有上游候选，最多等待 8 秒；空字段以 FillCatalog 补充，手工值、tools/streaming 保留。未匹配、下载失败、目录陈旧或超时不阻止读取，也不修改状态；GET 不落库、不递增 revision、不触发 Agent 同步。参考快照与配置仍需显式 POST 保存。
+
+`defaults_status` 是新增的只读字符串：`saved` 为 POST 保存后的实际设置；`reference` 为按已存快照补值；`matched` 为新匹配；`unmatched` 为没有唯一一致来源（含多个候选冲突）；`unavailable` 为目录失败、陈旧或超时；`incompatible` 为合并结果无法通过现有配置校验。旧桌面数据缺字段时前端按 saved 兼容。新匹配且 reference 非空时，前端保存使用 set + provider/model ID；已存来源保持 keep。clear 仅清除已保存来源，不关闭后续读取的自动建议；新建议仍需确认保存。速度映射保留基础能力补值，但不自动附加标准价格来源。
+
+精确裸 ID 消歧允许使用目录中自声明的唯一 canonical 所属记录；其他同名第三方条目缺少 canonical 不再使匹配失败。任何非空冲突 canonical 仍拒绝匹配，没有所属记录时不根据模型名前缀或本地供应商名猜测。显式 provider/model 仍优先。CLI 查询、输出字段、示例和错误行为同步见[指令大全](../cli/commands.md)。

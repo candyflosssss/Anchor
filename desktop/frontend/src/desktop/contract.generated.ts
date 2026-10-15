@@ -49,6 +49,7 @@ export interface ModelSettingsQuery {
   model_id: string;
 }
 export interface ModelSettingsState {
+  defaults_status: string;
   model_id: string;
   revision: number;
   display_name: string;

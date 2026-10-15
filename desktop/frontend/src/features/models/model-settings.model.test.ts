@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/model-settings.json';
 import type { ModelCatalog, ModelConfiguration } from '../../desktop/contract.generated';
-import { checkedConfiguration, checkedModelSettings, createModelSettingsService, importConfiguration } from './model-settings.model';
+import { checkedConfiguration, checkedModelSettings, settingsReadDraft, createModelSettingsService, importConfiguration } from './model-settings.model';
 import { DesktopProblem } from '../../desktop/transport';
 import { CONTRACT } from '../../desktop/contract.generated';
 const config = () => checkedConfiguration(structuredClone(fixture.configuration));
@@ -64,4 +64,34 @@ describe('model mapping settings', () => {
     await expect(service.read('mapped', new AbortController().signal)).rejects.toBeInstanceOf(DesktopProblem);
     await expect(service.save({ model_id: 'mapped', expected_revision: 1, display_name: '', configuration: config(), reference_action: 'keep', reference_provider_id: '', reference_model_id: '' }, new AbortController().signal)).rejects.toMatchObject({ code: 'unknown' });
   });
+});
+
+describe('automatic catalog defaults draft', () => {
+  it('requires an explicit reference save only for newly matched defaults', () => {
+    const state = checkedModelSettings(fixture, 'mapped');
+    state.reference = catalog(); state.defaults_status = 'matched';
+    expect(settingsReadDraft(state)).toMatchObject({ provider: 'lab', model: 'm', referenceAction: 'set' });
+    expect(settingsReadDraft(state).notice).toContain('保存模型设置');
+    state.defaults_status = 'reference';
+    expect(settingsReadDraft(state).referenceAction).toBe('keep');
+  });
+  it('does not import standard pricing for speed defaults and explains failures', () => {
+    const state = checkedModelSettings(fixture, 'mapped'); state.defaults_status = 'matched';
+    expect(settingsReadDraft(state).referenceAction).toBe('keep');
+    expect(settingsReadDraft(state).notice).toContain('速度变体');
+    state.defaults_status = 'unavailable'; expect(settingsReadDraft(state).notice).toContain('重试');
+    state.defaults_status = 'unmatched'; expect(settingsReadDraft(state).notice).toContain('不会猜测参数');
+    expect(() => checkedModelSettings({ ...fixture, defaults_status: 'invented' }, 'mapped')).toThrow();
+    expect(checkedModelSettings({ ...fixture, defaults_status: undefined }, 'mapped').defaults_status).toBe('saved');
+  });
+});
+
+it('keeps explicit modalities and reasoning when their boolean flags are unknown', () => {
+  const c = config(), source = catalog();
+  c.capabilities.vision = null; c.capabilities.reasoning = null; c.capabilities.tool_call = null; c.parallel_tool_calls = true;
+  source.models[0].capabilities.reasoning = false; source.models[0].reasoning_options = [];
+  const result = importConfiguration(c, source, false);
+  expect(result.capabilities.vision).toBe(true); expect(result.capabilities.reasoning).toBe(true); expect(result.capabilities.tool_call).toBe(true);
+  expect(result.capabilities.input_modalities).toEqual(c.capabilities.input_modalities);
+  expect(result.supported_reasoning).toEqual(c.supported_reasoning);
 });

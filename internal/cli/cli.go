@@ -644,7 +644,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	if args[0] == "settings" {
 		f := a.flags("model settings")
 		id := f.String("id", "", "public model ID (Chinese supported)")
-		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); omitted reads current settings")
+		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); omitted previews settings with models.dev defaults (no write)")
 		if err := parse(f, args[1:]); err != nil {
 			return err
 		}

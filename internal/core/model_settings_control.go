@@ -9,7 +9,7 @@ import (
 )
 
 func modelSettingsState(m state.Model) catalog.ModelSettingsState {
-	out := catalog.ModelSettingsState{ModelID: m.ID, Revision: m.Revision, DisplayName: m.DisplayName, CandidateCount: len(m.Candidates)}
+	out := catalog.ModelSettingsState{DefaultsStatus: "saved", ModelID: m.ID, Revision: m.Revision, DisplayName: m.DisplayName, CandidateCount: len(m.Candidates)}
 	if m.Settings != nil {
 		out.Configuration = m.Settings.Configuration
 		out.Reference = m.Settings.Reference
@@ -46,7 +46,7 @@ func (s *Server) getModelSettings(w http.ResponseWriter, r *http.Request) {
 		apiError(w, err)
 		return
 	}
-	writeJSON(w, 200, modelSettingsState(m))
+	writeJSON(w, 200, s.previewModelCatalog(r.Context(), m))
 }
 func (s *Server) saveModelSettings(w http.ResponseWriter, r *http.Request) {
 	if !s.identity(w, r) {

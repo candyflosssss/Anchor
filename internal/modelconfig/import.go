@@ -1,6 +1,9 @@
 package modelconfig
 
-import "github.com/candyflosssss/Anchor/internal/modeldev"
+import (
+	"github.com/candyflosssss/Anchor/internal/modeldev"
+	"slices"
+)
 
 // FillCatalog fills undeclared metadata without replacing explicit settings.
 // Prices remain in the reference snapshot, never in upstream billing rates.
@@ -14,6 +17,20 @@ func FillCatalog(c ModelConfiguration, m modeldev.CatalogModel) ModelConfigurati
 	}
 	if c.Limits.Output == nil && within(m.Limits.Output, c.Limits.Context) && within(c.DefaultOutputTokens, m.Limits.Output) {
 		c.Limits.Output = m.Limits.Output
+	}
+	// Explicit related declarations outrank directory booleans too. Otherwise
+	// filling an unknown vision flag could silently remove a manual image input.
+	if c.Capabilities.Vision == nil && len(c.Capabilities.InputModalities) > 0 {
+		vision := slices.Contains(c.Capabilities.InputModalities, "image")
+		c.Capabilities.Vision = &vision
+	}
+	if c.Capabilities.Reasoning == nil && len(c.SupportedReasoning) > 0 {
+		yes := true
+		c.Capabilities.Reasoning = &yes
+	}
+	if c.Capabilities.ToolCall == nil && c.ParallelToolCalls != nil && *c.ParallelToolCalls {
+		yes := true
+		c.Capabilities.ToolCall = &yes
 	}
 	pairs := [][2]**bool{{&c.Capabilities.Vision, &m.Capabilities.Vision}, {&c.Capabilities.Attachment, &m.Capabilities.Attachment}, {&c.Capabilities.ToolCall, &m.Capabilities.ToolCall}, {&c.Capabilities.Reasoning, &m.Capabilities.Reasoning}, {&c.Capabilities.StructuredOutput, &m.Capabilities.StructuredOutput}, {&c.Capabilities.Temperature, &m.Capabilities.Temperature}}
 	for _, p := range pairs {

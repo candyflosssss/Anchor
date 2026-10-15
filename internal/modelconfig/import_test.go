@@ -37,3 +37,15 @@ func TestFillCatalogSkipsConflictingLimits(t *testing.T) {
 		t.Fatal(cfg)
 	}
 }
+
+func TestFillCatalogPreservesExplicitRelatedDeclarations(t *testing.T) {
+	no, yes := false, true
+	cfg := ModelConfiguration{Capabilities: modeldev.CatalogCapabilities{InputModalities: []string{"text", "image"}}, SupportedReasoning: []modeldev.ReasoningOption{{Type: "toggle"}}, ParallelToolCalls: &yes}
+	out := FillCatalog(cfg, modeldev.CatalogModel{Capabilities: modeldev.CatalogCapabilities{Vision: &no, Reasoning: &no, ToolCall: &no}})
+	if err := out.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if !*out.Capabilities.Vision || !*out.Capabilities.Reasoning || !*out.Capabilities.ToolCall || len(out.Capabilities.InputModalities) != 2 || len(out.SupportedReasoning) != 1 {
+		t.Fatal(out)
+	}
+}

@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ModelCatalog, ModelConfiguration, ModelSettingsState, SaveModelSettings } from '../../desktop/contract.generated';
 import { DesktopProblem } from '../../desktop/transport';
 import { modelCatalogService } from '../model-catalog/model-catalog.model';
-import { importConfiguration, modelSettingsService, settingsError } from './model-settings.model';
+import { importConfiguration, modelSettingsService, settingsError, settingsReadDraft } from './model-settings.model';
 
 export function useModelSettings(id: string, active: boolean, saved: () => Promise<void>) {
   const [state, setState] = useState<ModelSettingsState | null>(null), [error, setError] = useState(''), [notice, setNotice] = useState(''), [busy, setBusy] = useState(false), [needsRead, setNeedsRead] = useState(false);
@@ -16,17 +16,23 @@ export function useModelSettings(id: string, active: boolean, saved: () => Promi
     try { await work(request.signal); } catch (e) { if (!request.signal.aborted && at === epoch.current) { setError(settingsError(e)); if (e instanceof DesktopProblem && ['conflict', 'unknown'].includes(e.code)) setNeedsRead(true); } }
     finally { if (at === epoch.current) { lock.current = false; setBusy(false); } }
   }
-  async function read() { await run(async signal => { const v = await modelSettingsService.read(id, signal); setState(v); setNeedsRead(false); setReferenceAction('keep'); setNotice(''); }); }
+  const acceptRead = useCallback((value: ModelSettingsState) => {
+    const draft = settingsReadDraft(value);
+    setState(value); setNeedsRead(false); setReferenceAction(draft.referenceAction); setNotice(draft.notice);
+    setProvider(draft.provider); setModel(draft.model); setModels([]);
+    referenceID.current = { provider: draft.provider, model: draft.model };
+  }, []);
+  async function read() { await run(async signal => { acceptRead(await modelSettingsService.read(id, signal)); }); }
   useEffect(() => {
     const lifecycle = { epoch, abort, lock };
     lifecycle.epoch.current++; lifecycle.abort.current?.abort(); lifecycle.lock.current = false;
     setState(null); setError(''); setNotice(''); setBusy(false); setNeedsRead(false); setProviders([]); setModels([]); setProvider(''); setModel(''); setReferenceAction('keep');
     if (active) {
       const request = new AbortController(); lifecycle.abort.current = request; lifecycle.lock.current = true; setBusy(true);
-      void modelSettingsService.read(id, request.signal).then(v => { if (!request.signal.aborted) { setState(v); const source = v.reference?.models[0]; if (source) { setProvider(source.provider_id); setModel(source.id); } } }).catch(e => { if (!request.signal.aborted) setError(settingsError(e)); }).finally(() => { if (!request.signal.aborted) { lifecycle.lock.current = false; setBusy(false); } });
+      void modelSettingsService.read(id, request.signal).then(v => { if (!request.signal.aborted) { acceptRead(v); } }).catch(e => { if (!request.signal.aborted) setError(settingsError(e)); }).finally(() => { if (!request.signal.aborted) { lifecycle.lock.current = false; setBusy(false); } });
     }
     return () => { lifecycle.epoch.current++; lifecycle.abort.current?.abort(); lifecycle.lock.current = false; };
-  }, [id, active]);
+  }, [id, active, acceptRead]);
   function change(configuration: ModelConfiguration) { if (active && !lock.current && !needsRead) { setState(v => v && ({ ...v, configuration })); setNotice(''); } }
   function displayName(value: string) { if (!lock.current && !needsRead) setState(v => v && ({ ...v, display_name: value })); }
   async function loadProviders() { await run(async signal => { const v = await modelCatalogService.query({ provider_id: '', model_id: '', search: '', limit: 0, refresh: false }, signal); setProviders(v.providers); }); }
