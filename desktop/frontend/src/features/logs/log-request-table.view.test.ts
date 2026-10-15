@@ -23,6 +23,13 @@ describe('grouped request log values', () => {
       expect(unknown.match(/未知/g)).toHaveLength(2);
     }
   });
+  it('shows tool first output while keeping text duration and TPS unknown', () => {
+    const html = render('timing', { ...row, metrics: { ...row.metrics!, timeToFirstOutputMs: 250, timeToFirstTextMs: null, generationMs: null, outputTextTokens: null, textIntervalComplete: false } });
+    expect(html).toContain('250 ms');
+    expect(html.match(/未知/g)).toHaveLength(2);
+    expect(html).not.toContain('500 ms');
+    expect(render('timing', { ...row, metrics: { ...row.metrics!, timeToFirstOutputMs: 0 } })).toContain('>0 ms<');
+  });
   it('groups exact token counts without adding cache or reasoning to the total', () => {
     const html = render('tokens');
     for (const value of ['输入', '输出', '缓存命中', '思考', '合计', '1,200', '300', '400', '60', '1,500']) expect(html).toContain(value);

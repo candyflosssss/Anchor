@@ -4,16 +4,27 @@ import "time"
 
 // Observation retains timing and structural facts only, never generated content.
 type Observation struct {
-	FirstText time.Time
-	Terminal  time.Time
-	Status    string
-	NonText   bool
-	Reasoning bool
+	FirstOutput time.Time
+	FirstText   time.Time
+	Terminal    time.Time
+	Status      string
+	NonText     bool
+	Reasoning   bool
+}
+
+// output records usable generated content, not stream envelopes or reasoning.
+func (o *Observation) output() {
+	if o != nil && o.FirstOutput.IsZero() {
+		o.FirstOutput = time.Now()
+	}
 }
 
 func (o *Observation) text() {
 	if o != nil && o.FirstText.IsZero() {
 		o.FirstText = time.Now()
+		if o.FirstOutput.IsZero() {
+			o.FirstOutput = o.FirstText
+		}
 	}
 }
 func (o *Observation) event(m Object, p string) {
@@ -27,7 +38,12 @@ func (o *Observation) event(m Object, p string) {
 			if str(m["delta"]) != "" {
 				o.text()
 			}
-		case "response.function_call_arguments.delta", "response.audio.delta":
+		case "response.function_call_arguments.delta", "response.custom_tool_call_input.delta":
+			o.NonText = true
+			if str(m["delta"]) != "" {
+				o.output()
+			}
+		case "response.audio.delta":
 			o.NonText = true
 		case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
 			o.Reasoning = true
@@ -63,6 +79,11 @@ func (o *Observation) event(m Object, p string) {
 			}
 			if len(arr(d["tool_calls"])) > 0 {
 				o.NonText = true
+				for _, call := range arr(d["tool_calls"]) {
+					if str(obj(obj(call)["function"])["arguments"]) != "" {
+						o.output()
+					}
+				}
 			}
 			if str(d["reasoning_content"]) != "" {
 				o.Reasoning = true
@@ -100,6 +121,9 @@ func (o *Observation) event(m Object, p string) {
 				o.Reasoning = true
 			case "input_json_delta":
 				o.NonText = true
+				if str(d["partial_json"]) != "" {
+					o.output()
+				}
 			}
 		case "message_delta":
 			o.Status = "completed"

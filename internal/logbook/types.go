@@ -12,6 +12,7 @@ var ErrUnavailable = errors.New("log storage unavailable")
 
 // All optional measurements are pointers: an absent observation is not zero.
 type Metrics struct {
+	TimeToFirstOutputMS  *int64 `json:"time_to_first_output_ms"`
 	TimeToFirstTextMS    *int64 `json:"time_to_first_text_ms"`
 	GenerationMS         *int64 `json:"generation_ms"`
 	OutputTextTokens     *int64 `json:"output_text_tokens"`

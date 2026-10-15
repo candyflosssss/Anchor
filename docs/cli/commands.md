@@ -642,7 +642,7 @@ anchor [--data-dir DIR] update apply --approve
 桌面宿主配置入口为 `anchor-desktop [--data-dir DIR] [--update-channel CHANNEL] [--update-manifest HTTPS_URL]`，首次 GUI 启动时只在指定参数后保存配置；当前用户已有 GUI 时再次启动只恢复已有窗口，不切换其 `--data-dir` 或保存新更新参数。已有宿主未响应时有界等待后退出1，不再开第二个 GUI。核心 `--core` 和内部安装 helper 不受 GUI 锁限制。窗口连接和供应商功能仍走原会话规则。桌面 GUI 只接收受控渠道和已检查版本，不提供任意 URL/路径/命令执行。Linux 安装权限交由系统安装器，不能等同于 CLI apply 原位替换 `/usr/bin`。
 
 
-## 12. 请求与系统日志（当前源码／desktop.16 dev）
+## 12. 请求与系统日志（当前源码；基础能力自 desktop.16 dev）
 
 需要升级并正常重启到支持日志的核心；旧版不会补采历史。使用所选 Context、owner 管理授权及实例身份核验。日志独立于累计 usage，配置日志保留不删除累计用量。
 
@@ -671,6 +671,8 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts/evidence 大字段，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
+
+2026-10-15 当前源码（未发布）：请求 `metrics` 新增可空的 `time_to_first_output_ms`，表示从根请求开始到首个非空正文或工具调用参数增量（含 Responses 自定义工具输入）；角色、心跳、空增量、工具空壳与单独思考不计入。`time_to_first_text_ms` 继续只表示正文首字，正文生成耗时与 TPS 口径不变。旧历史缺少新字段时不补算；升级正在处理请求的核心后仅对新请求采集，旧桌面可忽略新增字段。
 
 2026-10-13 当前源码（未发布）：`list/detail/follow/export` 的请求结果在协议正常结束且响应写入成功后保留 `succeeded` / `complete`，客户端在日志或用量收尾期间断开不再改记为 `client_cancelled`；未完成或写入失败时的取消仍为 `cancelled`。历史记录不自动重判，须升级正在处理请求的核心后才能影响新记录。TPS 仅在完整正文区间及正文 Token 可确认时计算；工具／非文本输出、缺少用量或 reasoning Token、非流式及中断区间保持未知。命令、参数及 JSON 字段不变。
 

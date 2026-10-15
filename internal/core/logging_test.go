@@ -134,7 +134,7 @@ func TestStreamMeasurementsAreIndependentOfDisplay(t *testing.T) {
 	io.Copy(io.Discard, resp.Body)
 	f.core.logs.Flush(t.Context())
 	r, err := f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
-	if err != nil || r.Status != "succeeded" || r.Metrics.TimeToFirstTextMS == nil || r.Metrics.GenerationMS == nil || r.Metrics.OutputTextTokens == nil || *r.Metrics.OutputTextTokens != 9 {
+	if err != nil || r.Status != "succeeded" || r.Metrics.TimeToFirstOutputMS == nil || r.Metrics.TimeToFirstTextMS == nil || r.Metrics.GenerationMS == nil || r.Metrics.OutputTextTokens == nil || *r.Metrics.OutputTextTokens != 9 {
 		t.Fatalf("%+v %v", r, err)
 	}
 	if r.Metrics.CacheReadTokens != nil {
@@ -403,5 +403,50 @@ func TestGatewayLoggingLoad(t *testing.T) {
 	}
 	if logged.p95 > baseline.p95*2+10*time.Millisecond {
 		t.Fatal("logging substantially regressed first-output latency", baseline, logged)
+	}
+}
+
+func TestToolStreamFirstOutputIsPersistedAndExportedWithoutTextTPS(t *testing.T) {
+	f := setup(t)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		io.WriteString(w, "data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"name\":\"exec\"}}\n\n")
+		w.(http.Flusher).Flush()
+		io.WriteString(w, "data: {\"type\":\"response.function_call_arguments.delta\",\"delta\":\"DO_NOT_STORE\"}\n\n")
+		io.WriteString(w, "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"status\":\"completed\",\"usage\":{\"input_tokens\":12,\"output_tokens\":9,\"output_tokens_details\":{\"reasoning_tokens\":0}}}}\n\n")
+	}))
+	defer up.Close()
+	f.add(t, "p", up.URL, "synthetic")
+	f.model(t, state.Candidate{ProviderID: "p", Model: "up"})
+	resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"private","stream":true}`)
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	if err := f.core.logs.Flush(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	c := logClient(t, f)
+	r, err := c.LogDetail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
+	if err != nil || r.Status != "succeeded" || r.Metrics.TimeToFirstOutputMS == nil || *r.Metrics.TimeToFirstOutputMS < 0 {
+		t.Fatalf("tool stream must have a first output: %+v %v", r, err)
+	}
+	if r.Metrics.TimeToFirstTextMS != nil || r.Metrics.GenerationMS != nil || r.Metrics.OutputTextTokens != nil || r.Metrics.TextIntervalComplete {
+		t.Fatalf("tool arguments must not become text measurements: %+v", r.Metrics)
+	}
+	var export bytes.Buffer
+	if err := c.ExportLogs(t.Context(), logbook.Query{}, &export); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(export.String(), `"time_to_first_output_ms":`) || strings.Contains(export.String(), "DO_NOT_STORE") {
+		t.Fatal("export must include timing, not tool arguments")
+	}
+}
+
+func TestFirstOutputAndTextMetricsRemainIndependent(t *testing.T) {
+	start := time.Now()
+	tr := &requestTrace{start: start}
+	setLogMetrics(tr, protocol.Observation{FirstOutput: start.Add(time.Second), FirstText: start.Add(2 * time.Second), Terminal: start.Add(3 * time.Second), Status: "completed", NonText: true}, protocol.Usage{Known: true, Output: 9, ReasoningKnown: true}, "responses", true)
+	m := tr.row.Metrics
+	if m.TimeToFirstOutputMS == nil || *m.TimeToFirstOutputMS != 1000 || m.TimeToFirstTextMS == nil || *m.TimeToFirstTextMS != 2000 || m.GenerationMS == nil || *m.GenerationMS != 1000 || m.OutputTextTokens != nil {
+		t.Fatalf("first output must not shift text interval or synthesize text tokens: %+v", m)
 	}
 }

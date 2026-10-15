@@ -152,7 +152,7 @@ func TestSharedLogContract(t *testing.T) {
 		t.Fatal("log contract drift")
 	}
 	failed, ok := fixture.Page.Requests[0], fixture.Page.Requests[1]
-	if failed.HTTP == nil || *failed.HTTP != 200 || failed.Code != "invalid_response" || failed.Input != nil || failed.Metrics.TimeToFirstTextMS != nil || ok.Metrics.CacheReadTokens == nil || *ok.Metrics.CacheReadTokens != 0 {
+	if failed.HTTP == nil || *failed.HTTP != 200 || failed.Code != "invalid_response" || failed.Input != nil || failed.Metrics.TimeToFirstOutputMS != nil || failed.Metrics.TimeToFirstTextMS != nil || ok.Metrics.TimeToFirstOutputMS == nil || *ok.Metrics.TimeToFirstOutputMS != 584 || ok.Metrics.CacheReadTokens == nil || *ok.Metrics.CacheReadTokens != 0 {
 		t.Fatal("log null/zero semantics drift")
 	}
 	encoded, _ := json.Marshal(failed)

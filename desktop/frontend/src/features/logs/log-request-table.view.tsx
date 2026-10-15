@@ -33,7 +33,7 @@ export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
       const rate = outputTps(row);
       return <dl className="log-metric-grid" aria-label="耗时与速度">
         <Metric label="总耗时" value={milliseconds(row.elapsed)} />
-        <Metric label="首字" value={milliseconds(row.metrics?.timeToFirstTextMs)} />
+        <Metric label="首字" value={milliseconds(row.metrics?.timeToFirstOutputMs ?? row.metrics?.timeToFirstTextMs)} />
         <Metric label="正文" value={milliseconds(row.stream && row.metrics?.textIntervalComplete ? row.metrics.generationMs : null)} />
         <Metric label="TPS" value={rate === null ? '未知' : `${rate.toFixed(1)} t/s`} />
       </dl>;

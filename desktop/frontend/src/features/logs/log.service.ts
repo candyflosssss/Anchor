@@ -11,7 +11,7 @@ export function requestLog(row: Request): RequestLog {
     delivery: row.delivery || '未知', summary: row.code === 'unexpected_html' ? '上游返回了 HTML 网页，而不是模型响应。请检查 API 请求地址（通常以 /v1 结尾）。' : row.code || statusLabels[row.status as LogStatus], stage: row.stage, code: row.code || undefined,
     input: row.input, output: row.output, reasoningEffort: row.reasoning_observed ? row.reasoning_effort : undefined,
     stream: row.stream ?? undefined, generationStatus: row.generation_status || undefined, attemptCount: row.attempt_count, attemptsTruncated: row.attempts_truncated,
-    metrics: { timeToFirstTextMs: row.metrics.time_to_first_text_ms, generationMs: row.metrics.generation_ms, outputTextTokens: row.metrics.output_text_tokens,
+    metrics: { timeToFirstOutputMs: row.metrics.time_to_first_output_ms ?? row.metrics.time_to_first_text_ms, timeToFirstTextMs: row.metrics.time_to_first_text_ms, generationMs: row.metrics.generation_ms, outputTextTokens: row.metrics.output_text_tokens,
       textIntervalComplete: row.metrics.text_interval_complete, cacheReadTokens: row.metrics.cache_read_tokens, reasoningTokens: row.metrics.reasoning_tokens },
     attempts: row.attempts.map(a => ({ number: a.number, provider: a.provider, key: a.key, model: a.model, protocol: a.protocol, http: a.http, elapsed: a.elapsed_ms,
       input: a.input, output: a.output, outcome: a.outcome, code: a.code || undefined, note: a.stage })), evidence: row.evidence ?? {} };

@@ -155,6 +155,10 @@ func setLogMetrics(t *requestTrace, obs protocol.Observation, u protocol.Usage, 
 	if t == nil {
 		return
 	}
+	if !obs.FirstOutput.IsZero() {
+		ms := obs.FirstOutput.Sub(t.start).Milliseconds()
+		t.row.Metrics.TimeToFirstOutputMS = &ms
+	}
 	if !obs.FirstText.IsZero() {
 		ms := obs.FirstText.Sub(t.start).Milliseconds()
 		t.row.Metrics.TimeToFirstTextMS = &ms

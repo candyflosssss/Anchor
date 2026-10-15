@@ -43,6 +43,7 @@
         "stream": false,
         "generation_status": "",
         "metrics": {
+          "time_to_first_output_ms": null,
           "time_to_first_text_ms": null,
           "generation_ms": null,
           "output_text_tokens": null,
@@ -96,6 +97,7 @@
         "stream": true,
         "generation_status": "completed",
         "metrics": {
+          "time_to_first_output_ms": 584,
           "time_to_first_text_ms": 584,
           "generation_ms": 1500,
           "output_text_tokens": 100,

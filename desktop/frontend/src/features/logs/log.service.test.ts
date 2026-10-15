@@ -33,3 +33,13 @@ it('preserves authentication diagnostics even if an error response has HTML head
   const row = { ...fixture.page.requests[0], code: 'authentication', evidence: { response_kind: 'html' } } as Request;
   expect(requestLog(row).summary).toBe('authentication');
 });
+
+it('prefers effective output timing and falls back to legacy text timing', () => {
+  const row = fixture.page.requests[1] as Request;
+  const legacy = structuredClone(row);
+  Reflect.deleteProperty(legacy.metrics, 'time_to_first_output_ms');
+  expect(requestLog(legacy).metrics?.timeToFirstOutputMs).toBe(row.metrics.time_to_first_text_ms);
+  const tool = { ...row, metrics: { ...row.metrics, time_to_first_output_ms: 123, time_to_first_text_ms: null } };
+  expect(requestLog(tool).metrics).toMatchObject({ timeToFirstOutputMs: 123, timeToFirstTextMs: null });
+  expect(requestLog({ ...tool, metrics: { ...tool.metrics, time_to_first_output_ms: 0 } }).metrics?.timeToFirstOutputMs).toBe(0);
+});
