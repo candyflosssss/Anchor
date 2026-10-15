@@ -22,30 +22,42 @@ describe('log column preferences', () => {
     expect(moveColumn(['time', 'model'], 'model', 1)).toEqual(['time', 'model']);
   });
 });
-describe('observed output TPS', () => {
-  it('uses confirmed non-reasoning output tokens over the complete output interval, excluding wait/retry and reasoning', () => {
-    const row = requestFixtures[1];
-    expect(outputTps(row)).toBeCloseTo(326 / 1.2);
-    expect(outputTps({ ...row, elapsed: 9999, output: 9000, metrics: { ...row.metrics!, reasoningTokens: 8000 } })).toBeCloseTo(326 / 1.2);
+describe('end-to-end total output TPS', () => {
+  const row = { ...requestFixtures[1], output: 134, elapsed: 7847 };
+  it('includes reasoning tokens once and uses total request time, including the initial wait', () => {
+    expect(outputTps(row)).toBeCloseTo(17.08, 2);
+    expect(outputTps({ ...row, metrics: { ...row.metrics!, reasoningTokens: 51,
+      nonReasoningOutputTokens: 83, outputGenerationMs: 224 } })).toBeCloseTo(17.08, 2);
+    expect(outputTps({ ...row, elapsed: 1000 })).toBe(134);
   });
-  it('keeps incomplete, non-streaming, reasoning-only and invalid intervals unknown', () => {
-    const row = requestFixtures[1];
-    expect(outputTps(requestFixtures[0])).toBeNull();
-    expect(outputTps(requestFixtures[3])).toBeNull();
-    expect(outputTps(requestFixtures[4])).toBeNull();
-    expect(outputTps({ ...row, stream: false })).toBeNull();
-    for (const outputGenerationMs of [0, -1, null, NaN, Infinity]) {
-      expect(outputTps({ ...row, metrics: { ...row.metrics!, outputGenerationMs } })).toBeNull();
+  it.each([
+    [134, 7847, 17.08], [153, 6183, 24.75], [191, 8006, 23.86],
+    [673, 18270, 36.84], [223, 11465, 19.45],
+  ])('calculates %i total output tokens over %i ms', (output, elapsed, expected) => {
+    expect(outputTps({ ...row, output, elapsed })).toBeCloseTo(expected, 2);
+  });
+  it('supports non-streaming, reasoning-only and old logs without interval metrics', () => {
+    expect(outputTps({ ...row, stream: false, metrics: undefined })).toBeCloseTo(17.08, 2);
+    expect(outputTps({ ...row, stream: undefined, metrics: undefined })).toBeCloseTo(17.08, 2);
+    expect(outputTps(requestFixtures[4])).toBeCloseTo(16 / 1.482);
+    expect(outputTps({ ...row, generationStatus: 'incomplete' })).toBeCloseTo(17.08, 2);
+    expect(outputTps({ ...row, metrics: { ...row.metrics!, outputIntervalComplete: false,
+      outputGenerationMs: null, nonReasoningOutputTokens: null, reasoningTokens: null } })).toBeCloseTo(17.08, 2);
+  });
+  it('uses confirmed root totals over the full retry interval, not a last-attempt subtotal', () => {
+    expect(outputTps({ ...row, output: 200, elapsed: 10000, attemptCount: 2 })).toBe(20);
+    expect(outputTps({ ...row, output: null, attemptCount: 2 })).toBeNull();
+  });
+  it('keeps unfinished, failed and invalid measurements unknown but preserves confirmed zero', () => {
+    for (const status of ['pending', 'failed', 'cancelled', 'interrupted'] as const) {
+      expect(outputTps({ ...row, status })).toBeNull();
     }
-    expect(outputTps({ ...row, metrics: { ...row.metrics!, nonReasoningOutputTokens: null } })).toBeNull();
-    expect(outputTps({ ...row, metrics: { ...row.metrics!, outputIntervalComplete: false } })).toBeNull();
+    for (const elapsed of [undefined, null, 0, -1, NaN, Infinity]) {
+      expect(outputTps({ ...row, elapsed: elapsed as number | null })).toBeNull();
+    }
+    for (const output of [undefined, null, -1, NaN, Infinity]) {
+      expect(outputTps({ ...row, output: output as number | null })).toBeNull();
+    }
+    expect(outputTps({ ...row, output: 0 })).toBe(0);
   });
-});
-
-it('does not substitute total output or body-text metrics for missing output measurements', () => {
-  const row = requestFixtures[1];
-  for (const nonReasoningOutputTokens of [null, undefined, 0, -1, NaN, Infinity]) {
-    expect(outputTps({ ...row, metrics: { ...row.metrics!, nonReasoningOutputTokens } })).toBeNull();
-  }
-  expect(outputTps({ ...row, metrics: { ...row.metrics!, outputGenerationMs: undefined } })).toBeNull();
 });

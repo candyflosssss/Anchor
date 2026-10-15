@@ -39,7 +39,7 @@ export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
         <Metric tone="time" icon={Clock3} label="总耗时" value={milliseconds(row.elapsed)} />
         <Metric tone="input" icon={Timer} label="首字" value={milliseconds(row.metrics?.timeToFirstOutputMs ?? row.metrics?.timeToFirstTextMs)} />
         <Metric tone="output" icon={ArrowUpFromLine} label="输出" value={milliseconds(row.stream && row.metrics?.outputIntervalComplete ? row.metrics.outputGenerationMs ?? null : null)} />
-        <Metric tone="speed" icon={Gauge} label="输出TPS" value={rate === null ? '未知' : `${rate.toFixed(1)} t/s`} />
+        <Metric tone="speed" icon={Gauge} label="总TPS" value={rate === null ? '未知' : `${rate.toFixed(1)} t/s`} />
       </dl>;
     }
     case 'tokens': return <div className="log-token-block"><dl className="log-metric-grid" aria-label="Token 用量">

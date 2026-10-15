@@ -13,23 +13,26 @@ const row: RequestLog = {
 };
 const render = (id: Parameters<typeof ColumnValue>[0]['id'], value = row) => renderToStaticMarkup(createElement(ColumnValue, { id, row: value }));
 describe('grouped request log values', () => {
-  it('combines all timing fields and keeps output TPS independent of total output and duration', () => {
+  it('shows total TPS from total output including reasoning over total request time', () => {
     const html = render('timing');
-    for (const value of ['总耗时', '首字', '输出', '输出TPS', '2,100 ms', '500 ms', '1,200 ms', '200.0 t/s']) expect(html).toContain(value);
-    for (const value of [{ ...row, stream: false }, { ...row, metrics: { ...row.metrics!, outputIntervalComplete: false } }]) {
-      const unknown = render('timing', value);
-      expect(unknown).not.toContain('1,200 ms');
-      expect(unknown).not.toContain('200.0 t/s');
-      expect(unknown.match(/未知/g)).toHaveLength(2);
-    }
+    for (const value of ['总耗时', '首字', '输出', '总TPS', '2,100 ms', '500 ms', '1,200 ms', '142.9 t/s']) expect(html).toContain(value);
+    const failed = render('timing', { ...row, status: 'failed', metrics: { ...row.metrics!, outputIntervalComplete: false } });
+    expect(failed).not.toContain('142.9 t/s');
+    expect(failed.match(/未知/g)).toHaveLength(2);
   });
-  it('shows tool output TPS even when body-text measurements are unknown', () => {
-    const html = render('timing', { ...row, metrics: { ...row.metrics!, timeToFirstOutputMs: 250, timeToFirstTextMs: null, generationMs: null, outputTextTokens: null, textIntervalComplete: false } });
-    expect(html).toContain('250 ms');
-    expect(html).toContain('200.0 t/s');
-    expect(html).not.toContain('未知');
-    expect(html).not.toContain('500 ms');
+  it('shows TPS independently of stream, first output and interval metrics', () => {
+    const html = render('timing', { ...row, stream: false, metrics: undefined });
+    expect(html).toContain('142.9 t/s');
+    expect(html).toContain('2,100 ms');
+    expect(html.match(/未知/g)).toHaveLength(2);
     expect(render('timing', { ...row, metrics: { ...row.metrics!, timeToFirstOutputMs: 0 } })).toContain('>0 ms<');
+    expect(render('timing', { ...row, output: 0 })).toContain('0.0 t/s');
+  });
+  it('keeps output duration visible even if the root total is unknown', () => {
+    const html = render('timing', { ...row, output: null });
+    expect(html).toContain('1,200 ms');
+    expect(html).not.toContain('t/s');
+    expect(html.match(/未知/g)).toHaveLength(1);
   });
   it('groups exact token counts without adding cache or reasoning to the total', () => {
     const html = render('tokens');

@@ -38,7 +38,7 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '详情']);
   const success = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
   const timing = success.getByRole('cell').nth(4), tokens = success.getByRole('cell').nth(5);
-  for (const label of ['总耗时', '首字', '输出', '输出TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
+  for (const label of ['总耗时', '首字', '输出', '总TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
   for (const label of ['输入', '输出', '缓存命中', '思考', '合计']) await expect(tokens.getByText(label, { exact: true })).toBeVisible();
   await expect(success.getByRole('cell').nth(1)).toContainText('HTTP 200');
   await expect(list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_failed' }) }).getByRole('cell').nth(1)).toContainText('invalid_response');
@@ -95,7 +95,7 @@ test('column preferences preserve collected values and survive reload', async ({
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-panel.png') });
   await dialog.getByRole('button', { name: '完成', exact: true }).click();
   const success = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
-  await expect(success).toContainText('584 ms'); await expect(success).toContainText('66.7 t/s');
+  await expect(success).toContainText('584 ms'); await expect(success).toContainText('57.1 t/s');
   await opener.click(); await dialog.getByRole('button', { name: '恢复默认', exact: true }).click();
   while (await dialog.getByRole('checkbox', { checked: true }).count() > 1) await dialog.getByRole('checkbox', { checked: true }).first().uncheck();
   await expect(dialog.getByRole('checkbox', { checked: true })).toBeDisabled();

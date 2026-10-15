@@ -11,7 +11,7 @@ it('shares canonical log fields and preserves missing versus zero', () => {
   const success = requestLog(fixture.page.requests[1] as Request);
   expect(success.metrics?.cacheReadTokens).toBe(0);
   expect(success.reasoningEffort).toBe('high');
-  expect(outputTps(success)).toBeCloseTo(66.6667, 3);
+  expect(outputTps(success)).toBeCloseTo(57.1429, 3);
   expect(outputTps(failed)).toBeNull();
 });
 it('fails without a host and rejects malformed rows before rendering', async () => {
@@ -44,7 +44,7 @@ it('prefers effective output timing and falls back to legacy text timing', () =>
   expect(requestLog({ ...tool, metrics: { ...tool.metrics, time_to_first_output_ms: 0 } }).metrics?.timeToFirstOutputMs).toBe(0);
 });
 
-it('uses only confirmed legacy body-text metrics, including re-serialized old history', () => {
+it('preserves legacy interval metrics without using them for total TPS', () => {
   const row = structuredClone(fixture.page.requests[1]) as Request;
   row.metrics.generation_ms = 1000;
   row.metrics.output_text_tokens = 60;
@@ -56,11 +56,12 @@ it('uses only confirmed legacy body-text metrics, including re-serialized old hi
     } else {
       Object.assign(legacy.metrics, { output_generation_ms: null, non_reasoning_output_tokens: null, output_interval_complete: false });
     }
-    expect(outputTps(requestLog(legacy))).toBe(60);
+    expect(requestLog(legacy).metrics).toMatchObject({ outputGenerationMs: 1000, nonReasoningOutputTokens: 60 });
+    expect(outputTps(requestLog(legacy))).toBeCloseTo(120 / 2.1);
     legacy.metrics.output_text_tokens = null;
-    expect(outputTps(requestLog(legacy))).toBeNull();
+    expect(outputTps(requestLog(legacy))).toBeCloseTo(120 / 2.1);
   }
-  // New output measurements take precedence, even if their token count is unknown.
+  // Missing non-reasoning usage does not invalidate a confirmed total output.
   row.metrics.non_reasoning_output_tokens = null;
-  expect(outputTps(requestLog(row))).toBeNull();
+  expect(outputTps(requestLog(row))).toBeCloseTo(120 / 2.1);
 });
