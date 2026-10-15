@@ -6,8 +6,8 @@
 .log-preview-notice { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 24px; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--muted) / .4); color: hsl(var(--muted-foreground)); font-size: 12px; }
 .log-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid hsl(var(--border)); }
 .log-tabs-row .detail-tabs { border: 0; }
-.log-tabs-row button { display: inline-flex; align-items: center; gap: 7px; padding: 10px 12px 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: hsl(var(--muted-foreground)); font-size: 13px; }
-.log-tabs-row button.is-active { border-bottom-color: hsl(var(--foreground)); color: hsl(var(--foreground)); font-weight: 500; }
+.log-tabs-row .detail-tabs > button { display: inline-flex; align-items: center; gap: 7px; padding: 10px 12px 12px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: hsl(var(--muted-foreground)); font-size: 13px; }
+.log-tabs-row .detail-tabs > button.is-active { border-bottom-color: hsl(var(--foreground)); color: hsl(var(--foreground)); font-weight: 500; }
 .log-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 16px; }
 .log-search { position: relative; flex: 1; min-width: 230px; max-width: 440px; }
 .log-search > svg { position: absolute; top: 11px; left: 10px; color: hsl(var(--muted-foreground)); }

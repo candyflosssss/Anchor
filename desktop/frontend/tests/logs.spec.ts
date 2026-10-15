@@ -165,3 +165,34 @@ test('colored metric tiles stay readable with realistic counts in light and dark
     if (capture) await page.screenshot({ path: resolve(capture, `logs-metrics-${theme}.png`), fullPage: true });
   }
 });
+
+test('display-content action keeps its outline separate from the tab underline', async ({ page }) => {
+  await openLogs(page);
+  const opener = page.getByRole('button', { name: /显示内容/ });
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
+      await opener.focus();
+      await expect(opener).toBeFocused();
+      const style = await opener.evaluate(button => {
+        const css = getComputedStyle(button);
+        const bounds = button.getBoundingClientRect();
+        const row = button.closest('.log-tabs-row')!.getBoundingClientRect();
+        return { bottomColor: css.borderBottomColor, topColor: css.borderTopColor,
+          bottomWidth: css.borderBottomWidth, topWidth: css.borderTopWidth,
+          marginBottom: css.marginBottom, bottomGap: row.bottom - bounds.bottom };
+      });
+      expect(style.bottomColor).toBe(style.topColor);
+      expect(style.bottomWidth).toBe('1px');
+      expect(style.bottomWidth).toBe(style.topWidth);
+      expect(style.marginBottom).toBe('0px');
+      expect(style.bottomGap).toBeGreaterThanOrEqual(4);
+      if (capture) await page.locator('.log-tabs-row').screenshot({ path: resolve(capture, `logs-display-button-${width}-${theme}.png`) });
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog', { name: '显示内容' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(opener).toBeFocused();
+    }
+  }
+});
