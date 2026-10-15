@@ -388,16 +388,44 @@ func TestMappedCatalogFallbackIsConservativeAndRejectsBadTemplates(t *testing.T)
 		t.Fatal(err)
 	}
 	entry := catalog.Models[0]
-	if string(entry["context_window"]) != "null" || string(entry["supported_reasoning_levels"]) != "[]" || entry["model_messages"] != nil || entry["base_instructions"] != nil {
-		t.Fatal("fallback invented capabilities/instructions")
+	if string(entry["context_window"]) != "null" || string(entry["supported_reasoning_levels"]) != "[]" || entry["model_messages"] != nil || string(entry["base_instructions"]) != `"`+mappedBaseInstructions+`"` {
+		t.Fatal("fallback must use explicit generic instructions without inventing capabilities")
 	}
-	// Optional instructions are genuinely optional in a model-name catalog.
+	// Operator-supplied instructions are preserved; missing instructions get the
+	// explicit generic fallback, never a template copied from another model.
 	entry["slug"] = json.RawMessage(`"source"`)
 	valid, _ := json.Marshal(entry)
 	if _, _, err = buildCatalogTemplates([]state.Model{model}, "", map[string]json.RawMessage{"source": valid}); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"priority", "supported_reasoning_levels", "context_window", "model_messages", "support_verbosity"} {
+	for _, instructions := range []string{"missing", "null", `""`, `"Operator instructions"`} {
+		t.Run(instructions, func(t *testing.T) {
+			var template map[string]json.RawMessage
+			_ = json.Unmarshal(valid, &template)
+			if instructions == "missing" {
+				delete(template, "base_instructions")
+			} else {
+				template["base_instructions"] = json.RawMessage(instructions)
+			}
+			rawTemplate, _ := json.Marshal(template)
+			got, _, err := buildCatalogTemplates([]state.Model{model}, "", map[string]json.RawMessage{"source": rawTemplate})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var result struct {
+				Models []map[string]json.RawMessage `json:"models"`
+			}
+			_ = json.Unmarshal(got, &result)
+			want, _ := json.Marshal(mappedBaseInstructions)
+			if instructions == `"Operator instructions"` {
+				want = []byte(instructions)
+			}
+			if !bytes.Equal(result.Models[0]["base_instructions"], want) {
+				t.Fatal("instruction policy not preserved")
+			}
+		})
+	}
+	for _, key := range []string{"priority", "supported_reasoning_levels", "context_window", "model_messages", "support_verbosity", "base_instructions"} {
 		original := entry[key]
 		entry[key] = json.RawMessage(`{"wrong":"type"}`)
 		malformed, _ := json.Marshal(entry)
@@ -430,7 +458,7 @@ func TestStartMigratesLegacyCatalogWithNativeReasoningAndSpeedAliases(t *testing
 	if err := os.WriteFile(configPath, original, 0600); err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range []string{"public", "public(fast)", "public(ultrafast)"} {
+	for _, id := range []string{"public", "public(fast)", "public(ultrafast)", "untemplated"} {
 		model, err := m.Store.Model("public")
 		if err != nil {
 			t.Fatal(err)
@@ -440,6 +468,10 @@ func TestStartMigratesLegacyCatalogWithNativeReasoningAndSpeedAliases(t *testing
 			revision = model.Revision
 		}
 		model.ID = id
+		if id == "untemplated" {
+			model.Codex = nil
+			model.Candidates[0].Model = "no-local-template"
+		}
 		model.Settings = &state.ModelSettings{Configuration: state.ModelConfiguration{
 			SupportedReasoning: []modeldev.ReasoningOption{{Type: "effort", Values: []*string{settingsPtr("medium"), settingsPtr("low"), settingsPtr("xhigh"), settingsPtr("high"), settingsPtr("max"), settingsPtr("default")}}},
 			DefaultReasoning:   &state.ReasoningDefault{Type: "effort", Value: settingsPtr("high")},
@@ -497,7 +529,7 @@ func TestStartMigratesLegacyCatalogWithNativeReasoningAndSpeedAliases(t *testing
 		t.Fatal(err)
 	}
 	catalog := readSyncFile(t, after.Catalog.Path)
-	for _, id := range []string{"public", "public(fast)", "public(ultrafast)"} {
+	for _, id := range []string{"public", "public(fast)", "public(ultrafast)", "untemplated"} {
 		if !bytes.Contains(catalog, []byte(`"slug": "`+id+`"`)) {
 			t.Fatal("missing alias", id)
 		}

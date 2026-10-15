@@ -430,7 +430,7 @@ func TestHelpDocumentsCodexReasoningProjection(t *testing.T) {
 	if err := a.Run(context.Background(), []string{"help"}); err != nil {
 		t.Fatal(err)
 	}
-	for _, hint := range []string{"Codex catalogs project supported reasoning efforts only", "upstream max/default/null remain stored, not relabelled"} {
+	for _, hint := range []string{"Codex all-mapped uses generic Anchor coding instructions only when no operator template exists", "Codex catalogs project supported reasoning efforts only", "upstream max/default/null remain stored, not relabelled"} {
 		if !strings.Contains(out.String(), hint) {
 			t.Fatal("reasoning projection help missing", hint)
 		}

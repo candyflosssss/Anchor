@@ -62,9 +62,9 @@ func (m *Manager) codexTemplates(b state.Binding) (map[string]json.RawMessage, e
 	return out, nil
 }
 
-// Local catalogs may omit instructions (Codex uses its own defaults), unlike
-// strict version-attested metadata. Check the fields we copy without inventing
-// an instruction template or treating an arbitrary JSON object as ModelInfo.
+// Generated entries must include instructions: Codex rejects the entire catalog
+// otherwise. Only all-mapped name-only entries get the explicit generic fallback;
+// version-attested metadata and operator templates retain their own instructions.
 func validateCatalogEntry(entry map[string]json.RawMessage) error {
 	for _, key := range []string{"slug", "display_name", "shell_type", "visibility"} {
 		var value *string
@@ -101,6 +101,7 @@ func validateCatalogEntry(entry map[string]json.RawMessage) error {
 	raw, err := json.Marshal(entry)
 	if err != nil || json.Unmarshal(raw, &shape) != nil || shape.Priority == nil || shape.Levels == nil || shape.Tools == nil ||
 		(shape.Messages != nil && shape.Messages.Template == "") ||
+		((shape.Instructions == nil || *shape.Instructions == "") && shape.Messages == nil) ||
 		(shape.Context != nil && *shape.Context <= 0) || shape.Truncation.Limit <= 0 || (shape.Truncation.Mode != "tokens" && shape.Truncation.Mode != "bytes") {
 		return ErrUnsafe
 	}

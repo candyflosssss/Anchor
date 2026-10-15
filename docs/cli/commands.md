@@ -463,7 +463,7 @@ anchor model settings --id public --file model-settings.json
 
 正整数限制不超过安全整数，上下文不小于已声明输入/输出，默认输出不超过最大输出；temperature 默认值须声明支持且在0..2。保存不改变候选、倍率、Key 范围、调度或版本匹配 Codex 模板。普通 `model put` 保留本节 settings/reference（但其他旧字段仍按其完整替换语义）；供应商编辑同步 tools/streaming。返回的新模型 revision 也用于后续路由/供应商映射编辑。
 
-Codex 同步导出可应用上下文、text/image 输入、并行调用及可表示的 effort/default；其他能力/默认调用值仅保存元数据，当前不自动改写请求。版本匹配完整模板仍必需，不支持的 effort（如 max/default/null）会使同步失败。`agent sync` 后重启 Agent 才读取新目录，现有会话不热更新。详见[模型参考目录契约](../design/model-catalog.md)。
+Codex 同步导出可应用上下文、text/image 输入、并行调用及可表示的 effort/default；其他能力/默认调用值仅保存元数据，当前不自动改写请求。版本匹配完整模板仍必需，只投影 Codex 可表示的 effort；max/default/null 保留在上游配置，不阻断导出、不改成其他档位。`agent sync` 后重启 Agent 才读取新目录，现有会话不热更新。详见[模型参考目录契约](../design/model-catalog.md)。
 
 ## 7. 本机授权
 
@@ -504,7 +504,7 @@ anchor agent sync ID --revision N
 
 发现范围为绝对路径 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`DSH_HOME`，以及 `~/.codex`、`~/.claude`、`~/.dsh`、`~/.gemini`、`~/.config/opencode`；Windows 另查用户 `AppData/Roaming/opencode`。同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录痕迹不证明已安装或运行。当前 Codex、Claude Code、DSH 可托管；Gemini/OpenCode 只识别。
 
-`enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不依赖本地模型缓存；Codex 会生成 Anchor 自有的模型目录并设置 `model_catalog_json`，Claude/DSH 则更新各自配置内的名单。Codex 优先保留模型已声明的元数据，或复用接管前配置明确引用、且位于配置根内的本地目录中精确公开 ID／唯一上游 ID 匹配项；不改写用户目录文件，停止托管时恢复原目录指针。没有模板时只导出保守模型条目，不推测指令、上下文长度或推理档位。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
+`enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不依赖本地模型缓存；Codex 会生成 Anchor 自有的模型目录并设置 `model_catalog_json`，Claude/DSH 则更新各自配置内的名单。Codex 优先保留模型已声明的元数据，或复用接管前配置明确引用、且位于配置根内的本地目录中精确公开 ID／唯一上游 ID 匹配项；不改写用户目录文件，停止托管时恢复原目录指针。没有模板时导出保守模型条目，并使用 Anchor 明示的通用编程助手指令（不是官方模型模板）；Codex 不接受完全缺失指令的条目。已有指令保持不变，不借用其他模型模板，不推测上下文长度或推理档位。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
 
 Codex 目录导出把模型设置中的推理档位投影为客户端可表示的 `none/minimal/low/medium/high/xhigh`：保留原顺序，仅跳过 `max`、`default`、null 等上游原生值，不把它们改名或映射到其他强度，不因此拒绝整个模型／目录。原映射、分身及其上游设置不变；默认 effort 不可表示时，生成目录的 `default_reasoning_level` 为 null，不伪造默认档位。此规则适用于自动同步、启动迁移及手动 `agent sync`／登记；结构或权限错误仍拒绝，不吞掉真正配置冲突。
 

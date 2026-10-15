@@ -345,7 +345,7 @@ Catalog 快照和 public alias → 源 slug 选择归 Binding；空源为排除�
 
 all-mapped 将所有具有启用供应商的公开模型映射作为动态授权范围，无 tools/streaming/Codex 元数据筛选；默认值必须在范围内。桌面显式使用此范围，Codex CLI 原缺省兼容范围和旧 single 绑定保持。客户端的模型列表为落盘快照；管理入口保存映射（包括 Fast/Ultrafast 分身）、删除映射、保存设置／路由或改变供应商候选后自动刷新，不再依赖手动同步。无供应商映射可显示但不选用。
 
-Codex all-mapped 也导出 `anchor_<binding>.models.json` 并管理 `model_catalog_json`，不要求预先提供版本匹配缓存。优先使用明确声明的元数据；也可只读复用接管前配置指向的配置根内本地目录，按公开 ID 或唯一上游 ID 匹配，保留指令模板与已声明能力；无模板时只生成保守的模型名条目，不推断指令／context／reasoning。用户原目录不改写，恢复时还原其原始指针；不循环读取 Anchor 自己生成的旧目录，以免已清除设置残留。目录结构写入不等于已通过所有 Codex 版本原生解析验收。
+Codex all-mapped 也导出 `anchor_<binding>.models.json` 并管理 `model_catalog_json`，不要求预先提供版本匹配缓存。优先使用明确声明的元数据；也可只读复用接管前配置指向的配置根内本地目录，按公开 ID 或唯一上游 ID 匹配，保留指令模板与已声明能力；无模板时生成保守的模型名条目，并使用 Anchor 明示的通用编程助手指令，不冒充官方模板、不借用其他模型指令，不推断 context／reasoning；原生 Codex 不接受完全缺失指令的 ModelInfo。用户原目录不改写，恢复时还原其原始指针；不循环读取 Anchor 自己生成的旧目录，以免已清除设置残留。目录结构写入不等于已通过所有 Codex 版本原生解析验收。
 
 Codex 目录与上游 portable settings 使用不同的推理档位表示。导出器只投影 Codex 能表示的 `none/minimal/low/medium/high/xhigh`；`max/default/null` 等上游原生选项保留在存储及上游配置，仅不出现在生成的 Codex effort 列表，不阻断整份目录、不删除模型、不暗中映射成另一强度。不可表示的默认 effort 导出为 null。明确声明的上下文／能力和原指令模板继续沿用，结构校验、权限、外部修改冲突仍拒绝。此兼容规则用于各目录范围、登记、启动迁移及手动／自动同步。
 

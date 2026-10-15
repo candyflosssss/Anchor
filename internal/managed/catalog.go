@@ -22,9 +22,9 @@ func buildCatalogTemplates(models []state.Model, version string, templates map[s
 	metadataBytes := 0
 	for _, model := range models {
 		// all-mapped is a model-name catalog, not a claim of official model
-		// capabilities. Unknown instructions/context/efforts remain unspecified;
-		// Codex keeps its built-in instruction defaults. Never clone an unrelated
-		// model's instruction template just to make an alias visible.
+		// capabilities. Unknown context/efforts remain unspecified. Codex requires
+		// instructions even for a name-only entry: use an explicit generic Anchor
+		// fallback only when no operator instructions exist, never another model's.
 		var entry map[string]json.RawMessage
 		if version == "" && model.Codex == nil {
 			raw, _ := json.Marshal(map[string]any{
@@ -142,6 +142,11 @@ func buildCatalogTemplates(models []state.Model, version string, templates map[s
 		set("supported_in_api", true)
 		set("prefer_websockets", false)
 		set("use_responses_lite", false)
+		if version == "" && model.Codex == nil {
+			if err := ensureMappedInstructions(entry); err != nil {
+				return nil, nil, err
+			}
+		}
 		if err := validateCatalogEntry(entry); err != nil {
 			return nil, nil, err
 		}
@@ -156,6 +161,28 @@ func buildCatalogTemplates(models []state.Model, version string, templates map[s
 		return nil, nil, errors.New("generated catalog exceeds 1 MiB")
 	}
 	return append(raw, '\n'), ids, err
+}
+
+// A name-only catalog still has to deserialize as Codex ModelInfo. This is an
+// explicit Anchor policy, not an inferred vendor prompt or capability claim.
+const mappedBaseInstructions = "You are a coding assistant. Follow the user's instructions and use the provided tools when appropriate."
+
+func ensureMappedInstructions(entry map[string]json.RawMessage) error {
+	var base *string
+	if raw, ok := entry["base_instructions"]; ok && json.Unmarshal(raw, &base) != nil {
+		return ErrUnsafe
+	}
+	var messages *struct {
+		Template string `json:"instructions_template"`
+	}
+	if raw, ok := entry["model_messages"]; ok && json.Unmarshal(raw, &messages) != nil {
+		return ErrUnsafe
+	}
+	if (base == nil || *base == "") && messages == nil {
+		raw, _ := json.Marshal(mappedBaseInstructions)
+		entry["base_instructions"] = raw
+	}
+	return nil
 }
 
 // Do not infer equivalence between an upstream-native effort and a Codex one.
