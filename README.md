@@ -5,7 +5,7 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.33**，可在已有 `.9`～`.32` 的在线更新中选择 dev 获取：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.34**，可在已有 `.9`～`.33` 的在线更新中选择 dev 获取：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
@@ -13,9 +13,9 @@
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.33/Anchor-Desktop-0.1.0-dev.desktop.33-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.33/anchor-desktop_0.1.0-dev.desktop.33_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.33)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.34/Anchor-Desktop-0.1.0-dev.desktop.34-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.34/anchor-desktop_0.1.0-dev.desktop.34_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.34)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -61,7 +61,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-以下一键安装入口用于 CLI alpha.6。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 已随 desktop.27 发布到 dev 在线更新渠道，使用方式与构建结果见[桌面安装说明](docs/release/desktop.md)；本轮未做原生安装／运行验收。
+以下一键安装入口用于 CLI alpha.6。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 已随 desktop.34 发布到 dev 在线更新渠道，使用方式与构建结果见[桌面安装说明](docs/release/desktop.md)；本轮未做原生安装／运行验收。
 
 已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux / Windows AMD64 `0.1.0-alpha.6` 已公开发布；两平台附件匿名下载与校验通过，Linux 远程一键安装已验证**。不从 Actions artifact 或草稿偷偷安装。
 
@@ -98,8 +98,8 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.33 已投放 dev 渠道）
+### 在线更新（desktop.34 已投放 dev 渠道）
 
-已有 desktop.9～.32：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.33` 的 Windows / Ubuntu24.04 安装包与同版清单。本版让 Key 名称、公开模型 ID／别名、设备连接名称与 Agent Binding ID 支持中文，与供应商名称共用命名规则；已有 ASCII 名称兼容，创建中文名称需同步升级客户端与核心。继承 SSH 密码／密钥设备连接和用户目录 CLI 自动发现能力；远端须预装新版 CLI 且启用 SSH，自动安装尚未实现。state.db 自动迁移到 schema7，旧程序不能打开；升级前备份。旧版无法检查更新时可手动安装 `.33` 一次，安装前先停止本机核心并退出界面。已保存渠道保持不变，开发更新请选择 dev。Linux 默认源实际下载及大小／SHA256检查通过，Windows 远端 digest 与本地一致；原生窗口与安装器未验收。旧 desktop.8 无更新入口。
+已有 desktop.9～.33：**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.34` 的 Windows / Ubuntu24.04 安装包与同版清单。本版包含顶栏设备快速切换、日志分组及首文本／工具输出计时、非推理输出 TPS、供应商倍率 × Key 缓存倍率成本路由、模型映射默认配置及默认流式，并区分请求与上游返回的服务档位；不代表修复 Codex Fast 入口或保证上游加速。继承中文命名与 SSH 设备连接能力；远端须另行升级，自动安装尚未实现。**state.db 自动迁移到 schema8，旧程序不能打开；首次启动前请备份。** 旧版无法检查更新时可手动安装 `.34` 一次，安装前先停止本机核心并退出界面。已保存渠道保持不变，开发更新请选择 dev。Linux 默认源实际下载及大小／SHA256 检查通过，Windows 远端 digest 与本地一致；原生窗口与安装器未验收。旧 desktop.8 无更新入口。
 
 桌面安装确认会正常停服、真正退出当前宿主，再交给系统安装器。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、数据库迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。

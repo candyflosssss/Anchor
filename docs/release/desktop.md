@@ -1,12 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-15。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.33`，北京时间 2026-10-15 01:18:46 已发布到 GitHub Releases，Windows／Linux 安装包与清单同版投放。
-- 本地最新开发包：`0.1.0-dev.desktop.34`，北京时间 2026-10-15 13:52 完成双平台打包，尚未发布；默认在线更新仍为 `.33`。本地 `.34` 使用 schema8，升级后旧版不能打开已迁移数据库，运行前请备份数据。
-- 范围：Key 名称、公开模型 ID／别名、Context／设备连接名称及 Agent Binding ID 支持中文，与供应商名称共用命名规则；桌面表单、CLI、核心及 Codex 托管统一处理。既有 ASCII 名称兼容，无需迁移；创建中文名称须同步升级客户端和运行中的核心。继承 .32 的 SSH 路径发现和设备连接能力。
-- 已有 `.9`～`.32`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.33`，先停止本机核心并退出界面。
-- 线上 `.33` 保持 state.db schema7，无新增迁移；从 .30 及更旧版本升级按已有规则顺序迁移，旧程序不能打开新数据库，不支持数据库降级。
-- 验证：中文功能的八个受影响 Go 包测试、前端 49 项定向测试、typecheck／lint 已通过；本次双平台生产编译与安装包构建、六附件大小／SHA256 digest 核对、默认源 Linux 实际下载通过。构建 revision 为 `72ed6e9c429bec7d1c246a51c0e3062720ff1668`，SOURCE.json dirty=false。本次未安装到本机，未执行浏览器、原生窗口、安装器或 apply 验收。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.34`，北京时间 2026-10-15 14:02:58 已发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：顶栏设备快速切换、日志字段分组与首文本／工具输出计时、非推理输出 TPS、供应商倍率 × Key 缓存倍率成本路由、模型映射默认配置及默认流式、请求与上游返回服务档位展示；继承中文命名和 SSH 设备连接能力。服务档位日志不代表修复 Codex Fast 入口，也不保证上游实际加速。
+- 已有 `.9`～`.33`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.34`，先停止本机核心并退出界面。
+- `.34` 将 state.db 迁移到 schema8，首次启动前请备份；旧程序不能打开已迁移数据库，不支持数据库降级。远端核心不会随本机桌面自动升级。
+- 验证：复用已完成的 Go／TypeScript 契约比对、双平台生产编译与安装包构建及本地产物完整性结果；本轮六附件大小／SHA256 digest、源码对应关系、元数据 ZIP CRC、正式 URL 和标签指向核对，以及默认源 Linux 实际下载通过。构建 revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，SOURCE.json dirty=false。本轮未重新编译、运行测试套件、安装到本机，未执行浏览器、原生窗口、安装器或 apply 验收。
 
 ## 1. 安装与使用行为
 
@@ -29,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.33_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.34_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -86,9 +85,9 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 ## 3. 产物、在线投放与实际构建状态
 
 
-### 本地开发包 `.34`（未发布）
+### 当前在线 dev 版 `.34`
 
-`0.1.0-dev.desktop.34` 于北京时间 2026-10-15 13:52 从干净隔离 worktree 构建，revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，`SOURCE.json` 的 dirty=false；没有混入原工作区未提交的余额界面／缓存改动。
+`0.1.0-dev.desktop.34` 于北京时间 2026-10-15 13:52 从干净隔离 worktree 构建，revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，`SOURCE.json` 的 dirty=false；没有混入原工作区未提交的余额界面／缓存改动。本轮复用这批安装包，于北京时间 2026-10-15 14:02:58 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.34)（非 latest），标签指向上述实际构建提交，未重新编译。
 
 本包包含 `.33` 之后已提交的顶栏设备快速切换、日志字段分组与首文本／工具输出计时、非推理输出 TPS、供应商倍率 × Key 缓存倍率成本路由、模型映射默认配置及默认流式、请求与上游返回服务档位展示。服务档位日志用于观察请求和响应，并不代表修复了 Codex 的 Fast 入口显示或确认上游提供加速。
 
@@ -103,10 +102,14 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 实际验证：Go／TypeScript 契约比对、TypeScript／Vite desktop 生产构建、双平台编译及 `.deb`／NSIS 打包通过；两平台 `SHA256SUMS` 共 13 个文件与 `BUILD.json` 哈希交叉核对通过。Debian 控制版本按脚本映射为 `0.1.0~dev.desktop.34`，包名、amd64 架构与可执行文件条目核对通过；Linux ELF／Windows AMD64 GUI 二进制及 NSIS 安装器类型符合预期。Vite 保留大于 500 kB 的 chunk 提示，不是构建失败。
 
-本版核心会将 state.db 从旧 schema 迁移到 schema8；需先备份，旧核心不能打开已升级数据库，不支持数据库降级。未操作真实数据或 Agent 配置，未运行测试套件、浏览器、原生 GUI、安装器或 apply 验收。未上传包／清单、未创建 GitHub Release 或标签，`BUILD.json` 的 `public_release`／`native_gui_verified`／`installation_verified`／`signed` 均为 false；默认在线更新不变，不能在应用内取得这个本地包。
+本版核心会将 state.db 从旧 schema 迁移到 schema8；需先备份，旧核心不能打开已升级数据库，不支持数据库降级。未操作真实数据或 Agent 配置，未运行测试套件、浏览器、原生 GUI、安装器或 apply 验收。原始 `BUILD.json` 的 `public_release`／`native_gui_verified`／`installation_verified`／`signed` 均保留构建时的 false，不用发布结果改写构建事实。
+
+六附件已完整投放：两平台安装包、`update-desktop.json`、`anchor_0.1.0-dev.desktop.34_source.tar.gz`（含 vendored Go 依赖）、`anchor_0.1.0-dev.desktop.34_metadata.zip`、`SHA256SUMS`。草稿附件上传状态、大小与 SHA256 digest 通过后再公开发布；公开后的正式附件 URL 与 flat 清单一致，标签和源码归档对应实际构建 revision。归档内 go.mod／go.sum、前端锁文件和生成 TS 与该提交一致，元数据 ZIP CRC 通过。发布证据保留在 `dist/desktop/0.1.0-dev.desktop.34/publication/`。
+
+在隔离临时数据目录从该版源码执行 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.33 --json`，默认 GitHub 源发现 `.34` 并实际下载 Linux 安装包，6,027,592 字节及 SHA256 校验通过；Windows 附件 digest 与本地安装包一致。未调用 apply 或安装器，下载验证不等于安装验收。
 
 
-### 当前在线 dev 版 `.30`
+### 历史在线 dev 版 `.30`
 
 `0.1.0-dev.desktop.30` 于北京时间 2026-10-14 14:18:14 发布为 dev prerelease（非 latest）。构建提交 `010bc0a44805995967fc0868c82d60ac816f3ea7`，干净隔离 worktree 的 SOURCE.json 为 dirty=false。
 
