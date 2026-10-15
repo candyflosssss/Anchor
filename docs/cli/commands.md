@@ -4,6 +4,7 @@
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
+- `stop --approve --for-restart` 与 `restart_handoff` 能力仅在当前源码（2026-10-15，未发布），**已安装 desktop.34 不含本次修复**；须同步更新客户端与核心。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
 - 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.32 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
@@ -60,7 +61,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `context inspect` | 查看已保存连接信息 | 本机；名称已登记 |
 | `context test` | 验证连接与实例身份 | 本机；名称已登记，核心在线 |
 | `status` | 查询核心状态 | 所选 Context 的核心在线 |
-| `stop --approve` | 请求核心正常停服 | 所选 Context 在线、已核验身份及管理授权；需要本轮新版核心 |
+| `stop --approve [--for-restart]` | 默认正常停服；显式维护交接保留托管状态 | 所选 Context 在线、已核验身份及管理授权；交接要求未发布源码的 restart_handoff 能力 |
 | `provider list` | 列出供应商 | 所选 Context 的核心在线 |
 | `provider platform` / `platform-put` | 读取／配置平台身份和独立用户授权 | 核心在线；写入需当前 revision，令牌仅 stdin |
 | `provider balance` / `key-quota` | 分别读取远端账户余额、Key 额度 | 核心在线；平台已配置、当前 revision；按平台提供授权 |
@@ -154,14 +155,17 @@ anchor serve
 ### `stop`（当前开发版）
 
 ```text
-anchor [--context NAME] stop --approve
+anchor [--context NAME] stop --approve [--for-restart]
 ```
 
-- `--approve` 为必需确认开关，默认 false；不弹出交互提示。无位置参数。缺少确认、未知参数、目标不可达、授权／身份校验失败时不发送停服写请求。
+- `--approve` 为必需确认开关，默认 false；`--for-restart` 默认 false。不弹出交互提示。无位置参数。缺少确认、未知参数、目标不可达、授权／身份校验失败时不发送停服写请求。
 - 作用域为所选 Context，不是无条件停止本机所有进程；须先登记 Context，与其他管理命令一致。请求携带 Bearer 管理授权与 `X-Anchor-Instance`，调用 `POST /control/v1/shutdown`，不按 PID 强杀或关闭其他服务。
 - 成功 stdout：`{"accepted":true,"instance_id":"<目标实例>","shutdown_complete":false}`。退出 0 **只代表请求被接受**，不代表进程已退出、在途请求全部成功或托管配置已恢复；未知／失败退出 1，不自动重放。
-- 接受后核心拒绝新管理写请求和网关请求，执行既有托管条件恢复与最长 10 秒请求排空，再关闭监听；恢复冲突仍按核心日志与恢复流程处理。外部服务管理器可能重新启动进程，本命令不修改服务策略或开机自启动。
+- 默认停服（未带 `--for-restart`）接受后核心拒绝新管理写请求和网关请求，执行既有托管条件恢复与最长 10 秒请求排空，再关闭监听；恢复冲突仍按核心日志与恢复流程处理。外部服务管理器可能重新启动进程，本命令不修改服务策略或开机自启动。
 - 旧核心无该接口（通常 404），正在停止／未运行生命周期会拒绝（503）；升级须用户明确操作，命令不会替换核心、绕过锁或回退强杀。
+- **维护／升级交接**：`stop --approve --for-restart` 仍需批准，只停止所选核心，**不启动替代进程、不安装更新**。客户端先核验认证实例的 `restart_handoff` 能力；缺少能力则退出 1，零停服写请求，绝不退回普通停服。请求体为 `{"for_restart":true}`；核心冻结托管修改并保留当前 Agent 配置、模型目录、Binding 凭据与原始恢复日志，再排空退出，不短暂切回接管前的地址。
+- 交接成功 stdout 在普通结果上增加 `"bindings_preserved":true,"restart_required":true`；必须同时收到 `accepted:true` 和 `bindings_preserved:true`，缺失／无效确认按结果未知失败，不重放。结果仍是 `shutdown_complete:false`，不证明核心已退出或新核心 ready。调用方等待退出后，用相同数据目录、监听地址和可兼容的新程序启动 `serve`／桌面核心；新核心核验并复用日志，不把 Anchor 的当前配置记作原始基线。
+- 交接不是零停机：核心未启动期间网关不可用；放弃维护时，可重新启动兼容核心后普通 `stop --approve`，或确认核心离线后使用 `recover` 条件恢复。不要将 `--for-restart` 用于最终卸载／永久停服。Ctrl+C／SIGTERM 仍执行普通停服恢复；历史会话缓存的旧提供商／地址不会自动迁移，配置校验成功不等于实际连接验证。
 
 ## 4. Context 与状态
 

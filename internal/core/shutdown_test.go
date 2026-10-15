@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -56,8 +57,8 @@ func TestShutdownAuthorizationAndLifecycle(t *testing.T) {
 	default:
 		t.Fatal("shutdown was not requested")
 	}
-	if !f.core.stopping.Load() {
-		t.Fatal("stop was not gated")
+	if !f.core.stopping.Load() || f.core.restartHandoff.Load() {
+		t.Fatal("ordinary stop must gate without selecting restart")
 	}
 	if w := invoke(f.owner, cfg.InstanceID, "", "{}"); w.Code != 503 {
 		t.Fatal("replayed stop accepted")
@@ -125,9 +126,47 @@ func TestAuthenticatedInstanceReportsProcessIdentity(t *testing.T) {
 	w := httptest.NewRecorder()
 	f.core.Control().ServeHTTP(w, req)
 	var result struct {
-		ProcessID int `json:"process_id"`
+		ProcessID    int      `json:"process_id"`
+		Capabilities []string `json:"capabilities"`
 	}
 	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &result) != nil || result.ProcessID != os.Getpid() {
 		t.Fatal("process identity must reflect the authenticated serving process")
+	}
+	if !slices.Contains(result.Capabilities, "restart_handoff") {
+		t.Fatal("restart handoff capability not advertised")
+	}
+}
+
+func TestRestartShutdownValidatesIntentBeforeMutation(t *testing.T) {
+	f := setup(t)
+	cfg, err := f.store.Settings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.core.running.Store(true)
+	invoke := func(body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:17861/control/v1/shutdown", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+f.owner)
+		req.Header.Set("X-Anchor-Instance", cfg.InstanceID)
+		w := httptest.NewRecorder()
+		f.core.Control().ServeHTTP(w, req)
+		return w
+	}
+	for _, body := range []string{`{"for_restart":null}`, `{"for_restart":"true"}`, `{"for_restart":1}`, `{"for_restart":{}}`, `{"for_restart":true,"extra":true}`, `null`, `[]`, `{"for_restart":true} {}`} {
+		if w := invoke(body); w.Code != 400 {
+			t.Fatalf("malformed restart accepted: %s: %d", body, w.Code)
+		}
+		if f.core.restartHandoff.Load() || f.core.stopping.Load() {
+			t.Fatal("invalid request changed shutdown intent")
+		}
+	}
+	if w := invoke(`{"for_restart":true}`); w.Code != 200 || !strings.Contains(w.Body.String(), `"bindings_preserved":true`) {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if !f.core.restartHandoff.Load() || !f.core.stopping.Load() {
+		t.Fatal("restart not selected")
+	}
+	if w := invoke(`{}`); w.Code != 503 || !f.core.restartHandoff.Load() {
+		t.Fatal("ordinary stop changed accepted restart intent")
 	}
 }

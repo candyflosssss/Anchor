@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
@@ -20,6 +21,7 @@ import (
 type Client struct {
 	endpoint, token, instance string
 	http                      *http.Client
+	capabilities              []string
 }
 type Instance struct {
 	ProcessID      int      `json:"process_id,omitempty"`
@@ -57,6 +59,7 @@ func ConnectWithDialer(ctx context.Context, c state.Context, token string, dial 
 		cl.Close()
 		return nil, Instance{}, ErrIdentity
 	}
+	cl.capabilities = slices.Clone(instance.Capabilities)
 	return cl, instance, nil
 }
 func (c *Client) Close() { c.http.CloseIdleConnections() }
@@ -196,13 +199,32 @@ func (c *Client) SetAgentModels(ctx context.Context, id string, revision int64, 
 
 // Stop requests graceful shutdown. Acceptance is not proof of completed recovery.
 func (c *Client) Stop(ctx context.Context) error {
-	var result struct {
-		Accepted bool `json:"accepted"`
+	return c.stop(ctx, false)
+}
+
+// StopForRestart preserves managed configuration and credentials across a
+// planned restart. It never falls back to Stop on an older core or retries an
+// uncertain mutation. Acceptance is not proof of shutdown or replacement ready.
+func (c *Client) StopForRestart(ctx context.Context) error {
+	if !slices.Contains(c.capabilities, "restart_handoff") {
+		return &RequestError{Code: "unsupported"}
 	}
-	if err := c.call(ctx, "POST", "/control/v1/shutdown", struct{}{}, &result); err != nil {
+	return c.stop(ctx, true)
+}
+
+func (c *Client) stop(ctx context.Context, forRestart bool) error {
+	in := map[string]bool{}
+	if forRestart {
+		in["for_restart"] = true
+	}
+	var result struct {
+		Accepted          bool `json:"accepted"`
+		BindingsPreserved bool `json:"bindings_preserved"`
+	}
+	if err := c.call(ctx, "POST", "/control/v1/shutdown", in, &result); err != nil {
 		return err
 	}
-	if !result.Accepted {
+	if !result.Accepted || (forRestart && !result.BindingsPreserved) {
 		return &RequestError{Code: "invalid_response", Unknown: true}
 	}
 	return nil

@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -145,9 +147,12 @@ func TestUpdateInstallShutdownAndFailedHandoff(t *testing.T) {
 	}))
 	defer server.Close()
 	base = server.URL
+	root, original := restartCodexHome(t)
 	s := testSession(t)
 	bridge := NewBridge(s)
-	requireReady(t, bridge)
+	info := requireReady(t, bridge)
+	unchanged, probe := enrollRestartBinding(t, s, bridge, root)
+	probe()
 	quit := false
 	s.options.Quit = func() { quit = true }
 	if err := updater.Configure(s.options.Dir, updater.Config{Channel: "dev", ManifestURL: base + "/feed"}); err != nil {
@@ -179,6 +184,7 @@ func TestUpdateInstallShutdownAndFailedHandoff(t *testing.T) {
 	if err := os.WriteFile(d.Data.DownloadPath, payload, 0600); err != nil {
 		t.Fatal(err)
 	}
+	executable := s.options.Executable
 	s.options.Executable = "missing-update-helper-executable"
 	r := bridge.InstallUpdate(ConfirmUpdate{Version: c.Data.LatestVersion, Approved: true})
 	if r.Problem == nil || r.Data != nil || quit || s.updating {
@@ -187,6 +193,20 @@ func TestUpdateInstallShutdownAndFailedHandoff(t *testing.T) {
 	waitStopped(t, s.options.Dir)
 	if status := bridge.Status(); status.Problem == nil {
 		t.Fatal("core did not exit normally")
+	}
+	// During this stopped window a new client must still see Anchor, not CCS.
+	unchanged()
+	s.options.Executable = executable
+	requireReady(t, bridge)
+	unchanged()
+	probe() // the saved address/token must work after replacement, not just Verify
+	if stop := bridge.StopCore(ConfirmStop{InstanceID: info.InstanceID, Approved: true}); stop.Problem != nil {
+		t.Fatal(stop)
+	}
+	waitStopped(t, s.options.Dir)
+	restored, err := os.ReadFile(filepath.Join(root, "config.toml"))
+	if err != nil || !bytes.Equal(restored, original) {
+		t.Fatal("ordinary stop lost the pre-Anchor baseline", err)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -193,10 +194,9 @@ func TestProviderCatalogPartialFailureAndLimits(t *testing.T) {
 
 func TestProviderCatalogSharedTimeout(t *testing.T) {
 	f := setup(t)
-	calls := 0
+	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		calls++
-		if calls == 1 {
+		if calls.Add(1) == 1 {
 			io.WriteString(w, `{"data":[{"id":"a"}],"has_more":true,"last_id":"a"}`)
 		} else {
 			<-r.Context().Done()
@@ -206,7 +206,7 @@ func TestProviderCatalogSharedTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	models, _, failure := f.core.readProviderCatalog(ctx, state.Provider{BaseURL: upstream.URL + "/v1"})
-	if failure != "timeout" || len(models) != 0 || calls != 2 {
-		t.Fatalf("failure=%s calls=%d", failure, calls)
+	if failure != "timeout" || len(models) != 0 || calls.Load() != 2 {
+		t.Fatalf("failure=%s calls=%d", failure, calls.Load())
 	}
 }

@@ -75,7 +75,7 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 | --- | --- |
 | `GET /control/v1/instance` | 实例 ID、API 主版本、程序版本、平台、目标用户、地址、进程 ID（process_id）与能力 |
 | `GET /control/v1/status` | 核心与网关 starting / ready / stopping；供应商健康为 per_key（详见工作台，不是总健康结论），托管为 ready/partial，并含逐 Binding 状态与实际连接 unknown |
-| `POST /control/v1/shutdown` | 管理鉴权与实例身份校验，严格空对象 `{}`；正常 Run 生命周期返回 `{accepted:true}`，不代表退出或恢复已完成；无生命周期503 |
+| `POST /control/v1/shutdown` | 管理鉴权与实例身份校验，严格对象 `{}` 为普通条件恢复；`{"for_restart":true}` 为保留托管配置交接，需 `restart_handoff` 能力，返回 `{accepted:true,bindings_preserved:true}`；未知字段／非布尔值拒绝；接受不代表已退出或新核心 ready，无生命周期503 |
 | `GET /control/v1/providers` | 脱敏供应商目录与 revision |
 | `PUT /control/v1/providers/{id}` | `{provider, expected_revision, secret?}`；secret 缺失 / null 保留旧值 |
 | `GET /control/v1/models` | 公开模型、能力与有序候选映射 |
@@ -90,7 +90,7 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 响应错误采用 `{error:{code,message}}`，常见状态：400 无效 / 未支持字段，401 鉴权失败，403 浏览器请求，404 未配置资源，409 实例或 revision 冲突，413 网关请求过大，429 网关总并发超限，502 上游拒绝 / 传输错误，503 无可用候选或核心 starting/stopping/not_running，504 总超时。
 
-实例能力增加 `graceful_stop`。真实 Run 未 ready 时拒绝新管理写入（正常停服请求除外）和网关调用；正在 stopping 时拒绝新管理写入／网关调用，读取状态仍可进行。管理客户端用结构化 RequestError 返回受限分类；写入网络错误、5xx、无效／超大回包标记 Unknown，不重放。
+实例能力包含 `graceful_stop`；2026-10-15 当前未发布源码增加 `restart_handoff`。客户端缺少后者时拒绝维护交接，不发送停服写请求或回退普通停服。真实 Run 未 ready 时拒绝新管理写入（正常停服请求除外）和网关调用；正在 stopping 时拒绝新管理写入／网关调用，读取状态仍可进行。管理客户端用结构化 RequestError 返回受限分类；写入网络错误、5xx、无效／超大回包标记 Unknown，不重放。
 
 ## 4. 网关的真实支持边界
 
@@ -111,6 +111,8 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 ## 5. 生命周期与验证
 
 两监听面全部绑定成功后才发布 ready；第二个端口失败会关闭第一个监听器。CLI 管理请求或桌面窗口结束不会停止核心；Linux Ctrl+C / SIGTERM、Windows Ctrl+C 或带批准的 `stop --approve` 可触发停服流程。停服同时排空两面，最多等待 10 秒，然后取消剩余请求并关闭连接。
+
+**2026-10-15 未发布修复**：用户普通停服仍先条件恢复。维护 `stop --approve --for-restart`／桌面安装更新则显式选择保留交接，不恢复 Agent 文件、目录、原始日志或轮换 Binding token；新核心使用相同数据目录和地址，核验原日志后继续托管，最终普通停服仍能恢复真正的接管前配置。首次接受的停服意图固定，信号／监听错误与交接请求竞争时不得事后切换模式。只要替代核心未 ready，仍存在不可用窗口；不保证在途请求无损、原生安装成功或已有 Codex 会话自动重载。
 
 本轮自动测试使用临时 SQLite 与回环模拟上游，没有读取 / 修改现有 Agent 配置，没有真实付费供应商请求。
 

@@ -31,7 +31,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   context bootstrap [--control-port 17861] --show-once  SSH account bootstrap (local only)
   context use NAME | context list | context inspect NAME | context test NAME
   status                             Query selected context
-  stop --approve                     Request graceful shutdown of selected context
+  stop --approve [--for-restart]      Stop core; optional planned-restart handoff
   provider list
   provider platform --id ID             Read platform configuration (redacted)
   provider platform-put --id ID --revision N [--platform auto|sub2api|newapi|oneapi]
@@ -322,16 +322,27 @@ func (a App) Run(ctx context.Context, args []string) error {
 	case "stop":
 		f := a.flags("stop")
 		approved := f.Bool("approve", false, "confirm graceful shutdown of the selected instance")
+		forRestart := f.Bool("for-restart", false, "preserve managed configuration for a planned restart; does not start a replacement")
 		if err := parse(f, args[1:]); err != nil {
 			return err
 		}
 		if !*approved {
-			return errors.New("stop requires --approve; closes listeners and restores managed configuration")
+			return errors.New("stop requires --approve; closes listeners (restores managed configuration unless --for-restart)")
 		}
-		if err := cl.Stop(ctx); err != nil {
+		if *forRestart {
+			err = cl.StopForRestart(ctx)
+		} else {
+			err = cl.Stop(ctx)
+		}
+		if err != nil {
 			return err
 		}
-		return a.output(map[string]any{"accepted": true, "instance_id": c.InstanceID, "shutdown_complete": false})
+		result := map[string]any{"accepted": true, "instance_id": c.InstanceID, "shutdown_complete": false}
+		if *forRestart {
+			result["bindings_preserved"] = true
+			result["restart_required"] = true
+		}
+		return a.output(result)
 	case "status":
 		if len(args) != 1 {
 			return errors.New("status has no command-specific arguments")

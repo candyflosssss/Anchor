@@ -49,6 +49,7 @@ type Server struct {
 	slots            chan struct{}
 	shutdown         chan struct{}
 	stopOnce         sync.Once
+	restartHandoff   atomic.Bool
 	stopping         atomic.Bool
 	running          atomic.Bool
 	ready            atomic.Bool
@@ -186,21 +187,45 @@ func (s *Server) Control() http.Handler {
 		if !s.identity(w, r) {
 			return
 		}
-		var in *struct{}
+		var in *struct {
+			ForRestart json.RawMessage `json:"for_restart"`
+		}
 		if !decode(w, r, &in) {
 			return
 		}
 		if in == nil {
-			fail(w, 400, "invalid_json", "an empty JSON object is required")
+			fail(w, 400, "invalid_json", "a shutdown JSON object is required")
+			return
+		}
+		forRestart := false
+		switch strings.TrimSpace(string(in.ForRestart)) {
+		case "", "false":
+		case "true":
+			forRestart = true
+		default:
+			fail(w, 400, "invalid_json", "for_restart must be a boolean")
 			return
 		}
 		if !s.running.Load() {
 			fail(w, 503, "not_running", "no running lifecycle")
 			return
 		}
-		s.stopping.Store(true)
-		writeJSON(w, 200, map[string]bool{"accepted": true})
-		s.stopOnce.Do(func() { close(s.shutdown) })
+		s.stopOnce.Do(func() {
+			s.restartHandoff.Store(forRestart)
+			s.stopping.Store(true)
+			close(s.shutdown)
+		})
+		// Requests that crossed the stopping guard cannot change the first
+		// accepted shutdown intent (including signal-driven ordinary stops).
+		if s.restartHandoff.Load() != forRestart {
+			fail(w, 409, "conflict", "a different shutdown mode is already selected")
+			return
+		}
+		result := map[string]bool{"accepted": true}
+		if forRestart {
+			result["bindings_preserved"] = s.restartHandoff.Load()
+		}
+		writeJSON(w, 200, result)
 	})
 	mux.HandleFunc("GET /control/v1/instance", func(w http.ResponseWriter, r *http.Request) {
 		cfg, err := s.Store.Settings()
@@ -212,7 +237,7 @@ func (s *Server) Control() http.Handler {
 		if u, err := user.Current(); err == nil {
 			username = u.Username
 		}
-		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "process_id": os.Getpid(), "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"graceful_stop", "responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth"}})
+		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "process_id": os.Getpid(), "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"graceful_stop", "restart_handoff", "responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth"}})
 	})
 	mux.HandleFunc("GET /control/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		agents, err := s.Agents.Status()
@@ -423,14 +448,28 @@ func (s *Server) Run(ctx context.Context) error {
 	case <-s.shutdown:
 	case runErr = <-errs:
 	}
+	// Signals/listener errors select ordinary recovery unless an authenticated
+	// handoff already won. Freeze intent before deciding whether to restore.
+	s.stopOnce.Do(func() {
+		s.stopping.Store(true)
+		close(s.shutdown)
+	})
 	s.stopping.Store(true)
 	s.ready.Store(false)
-	restored, restoreErr := s.Agents.Stop()
-	if restoreErr != nil {
-		s.Log.Warn("agent recovery incomplete; run anchor recover")
-	}
-	for _, result := range restored {
-		s.Log.Info("binding shutdown", "binding_id", result.BindingID, "status", result.Status)
+	if s.restartHandoff.Load() {
+		// A planned restart must not expose pre-Anchor routes to clients that
+		// load configuration while the old core is draining. The replacement
+		// verifies the existing journal; it never captures Anchor as the baseline.
+		s.Agents.PreserveForRestart()
+		s.Log.Info("bindings preserved for restart")
+	} else {
+		restored, restoreErr := s.Agents.Stop()
+		if restoreErr != nil {
+			s.Log.Warn("agent recovery incomplete; run anchor recover")
+		}
+		for _, result := range restored {
+			s.Log.Info("binding shutdown", "binding_id", result.BindingID, "status", result.Status)
+		}
 	}
 	deadline, stop := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stop()

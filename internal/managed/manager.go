@@ -284,6 +284,17 @@ func (m *Manager) Start() ([]Result, error) {
 	}
 	return out, nil
 }
+
+// PreserveForRestart gates further management without restoring client files.
+// The approved binding, token and original recovery journal remain unchanged so
+// the replacement core can verify/reuse them. Ordinary Stop still restores.
+func (m *Manager) PreserveForRestart() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.stopping = true
+	m.ready = false
+}
+
 func (m *Manager) Stop() ([]Result, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

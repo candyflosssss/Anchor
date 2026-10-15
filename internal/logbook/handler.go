@@ -25,7 +25,7 @@ type Handler struct {
 func NewHandler(next slog.Handler, s *Store) slog.Handler { return &Handler{next: next, store: s} }
 
 var systemMessages = map[string]string{
-	"core ready": "core.started", "core stopped": "core.stopped", "binding startup": "binding.startup", "binding shutdown": "binding.shutdown",
+	"core ready": "core.started", "core stopped": "core.stopped", "bindings preserved for restart": "core.restart_handoff", "binding startup": "binding.startup", "binding shutdown": "binding.shutdown",
 	"agent startup reconciliation unavailable": "binding.startup_failed", "agent recovery incomplete; run anchor recover": "binding.recovery_failed",
 	"drain deadline exceeded; remaining requests canceled": "core.drain_timeout", "usage persistence failed": "usage.write_failed", "test usage persistence failed": "usage.write_failed",
 }

@@ -412,3 +412,11 @@
 - 旧 → 新：`logs detail` / `logs export` 的代理请求 evidence 新增安全 `requested_service_tier` 与可选 `upstream_service_tier`，区分请求 Fast / Ultrafast 与上游实际报告，可观察降级；`logs list` 仍省略 evidence。
 - 兼容与迁移：沿用 evidence 字典，无数据库迁移；旧历史不补写；未指定、Auto、未知和 Standard 分开，不改变协议转发或付费档位选择。调用方应容忍新增 evidence 键。
 - 验证：模拟上游覆盖 JSON／SSE 的 Fast、Ultrafast、降级、未返回、自动与未知值；经现有类型化客户端验证详情与导出，未调用真实付费上游。
+
+## 2026-10-15 — 区分普通停服与升级重启交接（当前源码，未发布）
+
+- 类型：新增参数／修改升级停服行为。
+- 指令与参数：`stop --approve [--for-restart]`；新参数默认 false，只停所选 Context，不安装更新、不启动替代核心。帮助、CLI 测试、功能覆盖表和最新大全同步。
+- 旧 → 新：普通 stop／系统信号仍条件恢复；显式 `--for-restart` 及桌面 InstallUpdate 使用 `shutdown {"for_restart":true}`，保留 Agent 配置、模型目录、Binding 凭据与原始恢复日志，不在升级窗口暴露旧 CCS／原供应商路由。交接输出额外包含 `bindings_preserved:true,restart_required:true`，仍以 `shutdown_complete:false` 表示仅已接受。
+- 兼容与迁移：无数据库 schema 或普通 stop 输出变化。客户端要求认证实例声明 `restart_handoff` 且回包确认保留；旧核心缺能力时退出失败且零停服写请求，不自动降级／强杀。已发布 desktop.34 不含修复，需同步升级宿主和核心；首次人工迁移仍需安排停服、重新启动与 Agent 会话核对。中途失败不自动重放或启动核心，维护取消可显式重启兼容核心后普通停服，或确认离线后 recover。不会自动改写既有会话缓存地址，也不承诺零停机。
+- 验证：全量 `go test -p 1 -timeout 180s ./... -count=1` 及 core／managed／client／cli／desktop 五包 `-race` 检查通过。隔离回归覆盖批准／参数／输出与 Context 身份、旧核心零写拒绝、保留确认缺失结果未知且不重放、真实核心退出／重启间配置／目录／原始日志／token 不变、同一地址和凭据实际代理到模拟上游，以及最终普通停服恢复原始配置、外部编辑保留、helper 启动失败和远程实例不被停止。未执行本机安装／发版／原生安装器验收。

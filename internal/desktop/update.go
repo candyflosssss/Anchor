@@ -167,11 +167,11 @@ func (b *Bridge) InstallUpdate(in ConfirmUpdate) UpdateResult {
 			return r
 		}
 		defer cl.Close()
-		if !slices.Contains(info.Capabilities, "graceful_stop") {
+		if !slices.Contains(info.Capabilities, "restart_handoff") {
 			r.Problem = &Problem{"unsupported"}
 			return r
 		}
-		if err := cl.Stop(ctx); err != nil {
+		if err := cl.StopForRestart(ctx); err != nil {
 			r.Problem = problem(err, true)
 			return r
 		}
