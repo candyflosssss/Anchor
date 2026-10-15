@@ -206,6 +206,10 @@ func (m *Manager) SetEnabled(id string, revision int64, enabled bool) (state.Bin
 		}
 	}
 	b, e = m.Store.EnableBinding(id, revision, enabled)
+	if enabled && errors.Is(e, state.ErrNotFound) {
+		// The binding was found above; activation now requires its default model.
+		e = fmt.Errorf("%w: %w", ErrModelUnavailable, e)
+	}
 	if e == nil {
 		delete(m.last, id)
 	}

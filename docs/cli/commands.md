@@ -299,7 +299,7 @@ anchor usage
 | strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
 | model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段仅预留，当前不参与路由。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
-| model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，Binding 默认模型引用时409 referenced，事务回滚 |
+| model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，已启用 Binding 默认模型引用时409 referenced，事务回滚；已禁用 Binding 不阻止删除且配置保持不变 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；共享 catalog 的1小时缓存与固定公开目录最多30秒/16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY/NO_PROXY，拒绝陈旧快照；更新时间为快照获取时间，带上下文 tiers 的条目返回 invalid，不再静默丢弃分档；改用 model-catalog model/estimate 或 model settings 参考快照；无分档条目只返回 imported_price **预览**，不保存；核对后另行 price-put |
 
@@ -438,7 +438,7 @@ anchor model add --id anchor-code --candidate primary:upstream-model --tools --s
   --codex-model SOURCE_SLUG --codex-version X.Y.Z
 ```
 
-删除使用 `provider model-delete`（见 §5），核对供应商和模型 revision，只移除该供应商候选；删除最后一个候选时阻止删除 Binding 默认模型。这里的示例不会证明真实供应商或 Codex 已兼容。
+删除使用 `provider model-delete`（见 §5），核对供应商和模型 revision，只移除该供应商候选；删除最后一个候选时仅保护**已启用 Binding** 的默认模型，已禁用 Binding 不阻止删除。禁用 Binding 的默认模型、revision、凭据和配置目录归属保持不变；再次启用前须用 `agent set-models` 选择存在的默认模型，或重建同 ID 映射。此修复仅在当前源码中，旧核心仍会检查全部 Binding。这里的示例不会证明真实供应商或 Codex 已兼容。
 
 ### 模型能力与默认值设置（2026-10-14，源码未发布）
 
@@ -586,7 +586,7 @@ anchor agent disable ID --revision N
 - `apply` 只对 enabled Binding 且网关就绪时执行；先持久恢复日志，再原子写目录（有目录时）、原子替换配置指针并配置层校验。返回 `{binding_id, operation_id, status}`。再次应用已接管目标不重置原值或重放文件写入。托管字段为根级 model/model_provider/web_search、可选 model_catalog_json 和独立带标记 provider（含命令认证）；不嵌入 token。
 - `restore` 仅恢复当前值仍等于 Anchor 写入值的字段；第三方值保留并报告 `conflict`。原值已恢复视为完成；被用户删除的配置不盲目重建；被基础配置或独立 `*.config.toml` profile 引用的 provider/目录不删除；目录只有仍等于 Anchor 写入内容且无引用时才删除，用户改过的目录保留并报告冲突。返回状态和冲突字段路径，冲突时 CLI 输出 JSON 后以 1 退出。
 - `restore` 不修改 enabled 或 Binding revision，因此下次启动仍会接管。配置本来不存在时恢复可留下空文件，不删除可能已被其他工具引用的配置文件。
-- `enable` / `disable` 返回 `{binding, management}` 并递增 revision；enable 只批准后续接管，不立即改配置。disable 先条件恢复再禁用凭据，即使出现已报告的第三方冲突也禁用授权，CLI 非零退出；真正的文件/日志 I/O 失败会中止禁用。已接受请求不承诺即时取消。
+- `enable` / `disable` 返回 `{binding, management}` 并递增 revision；enable 只批准后续接管，不立即改配置。当前源码在 enable 事务内检查默认模型存在；模型已删除时返回 `agent_model_unavailable`（HTTP 409），保留禁用状态、revision 和凭据，不自动改选模型。disable 先条件恢复再禁用凭据，即使出现已报告的第三方冲突也禁用授权，CLI 非零退出；真正的文件/日志 I/O 失败会中止禁用。已接受请求不承诺即时取消。
 - `model put` 不会自动刷新已写入的 Codex 目录；网关 all-compatible 授权按每次请求的当前模型/供应商配置判断，而 Codex 目录是接管时快照。新增模型/改元数据后可用 `agent sync ID --revision N`，或 `restore` → `plan` → `apply`（或正常停服再启动），再重启远端 Codex app-server。更新目录不等于让已有会话立即切换。
 - 当前没有 Binding 删除、改路径或改适配器版本入口；默认模型与授权范围用下面的 set-models 显式修改。
 

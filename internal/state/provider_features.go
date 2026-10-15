@@ -351,7 +351,9 @@ func (s *Store) DeleteProviderModel(id string, revision int64, providerID string
 			return tx.Commit()
 		}
 	}
-	rows, err := tx.Query(`SELECT document FROM bindings`)
+	// Disabled bindings retain their configuration for later reuse, not a live
+	// dependency on this model. EnableBinding rechecks the default on activation.
+	rows, err := tx.Query(`SELECT document FROM bindings WHERE enabled=1`)
 	if err != nil {
 		return err
 	}

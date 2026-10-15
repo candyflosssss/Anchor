@@ -195,6 +195,18 @@ func (s *Store) EnableBinding(id string, expected int64, enabled bool) (Binding,
 	if expected != b.Revision {
 		return Binding{}, ErrConflict
 	}
+	if enabled {
+		// Model deletion and activation must agree within the same transaction:
+		// disabled bindings may retain a default whose mapping has been removed.
+		var exists int
+		e = tx.QueryRow(`SELECT 1 FROM models WHERE id=?`, b.Model).Scan(&exists)
+		if errors.Is(e, sql.ErrNoRows) {
+			return Binding{}, ErrNotFound
+		}
+		if e != nil {
+			return Binding{}, e
+		}
+	}
 	b.Enabled = enabled
 	b.Revision++
 	raw, _ := json.Marshal(b)

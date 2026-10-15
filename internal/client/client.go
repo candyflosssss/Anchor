@@ -189,7 +189,7 @@ func (c *Client) AgentAction(ctx context.Context, id, action string, revision in
 }
 
 func (c *Client) SetAgentModels(ctx context.Context, id string, revision int64, model, scope string) (map[string]any, error) {
-	if !state.ValidID(id) || !state.ValidModelID(model) || revision < 1 || (scope != "single" && scope != "all-compatible") {
+	if !state.ValidID(id) || !state.ValidModelID(model) || revision < 1 || (scope != "single" && scope != "all-compatible" && scope != "all-mapped") {
 		return nil, errors.New("invalid binding model policy")
 	}
 	var v map[string]any
