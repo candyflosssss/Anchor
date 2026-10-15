@@ -196,3 +196,26 @@ test('display-content action keeps its outline separate from the tab underline',
     }
   }
 });
+
+test('log search and name filters keep Chinese preedit across query refreshes', async ({ page }) => {
+  await openLogs(page);
+  const session = await page.context().newCDPSession(page);
+  for (const [label, key, text] of [
+    ['搜索日志', 'search', '中文日志'],
+    ['供应商筛选', 'provider', '中文供应商'],
+    ['model筛选', 'model', '中文模型'],
+    ['key筛选', 'key', '中文密钥'],
+  ] as const) {
+    const input = page.getByRole('textbox', { name: label, exact: true });
+    await input.fill('');
+    await input.focus();
+    await session.send('Input.imeSetComposition', { text: 'zhong ', selectionStart: 6, selectionEnd: 6 });
+    await expect(input).toHaveValue('zhong ');
+    await expect(input).toBeFocused();
+    await session.send('Input.insertText', { text });
+    await expect(input).toHaveValue(text);
+    await expect(input).toBeFocused();
+    await expect.poll(() => page.evaluate(k => window.logTest.queries.at(-1)?.[k], key)).toBe(text);
+  }
+  await session.detach();
+});

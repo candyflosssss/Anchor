@@ -1,3 +1,4 @@
+import { ImeForm } from '../../components/shared/ime-form';
 import { useEffect, useState } from 'react';
 import { Check, LoaderCircle, Monitor, Server, Settings2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -41,11 +42,11 @@ export function DeviceSwitcher({ controller: c, current, connected, disabled, on
       })}
     </div>
     {!c.loading && !c.profiles.length && !c.error && <p>暂无已保存设备，请前往设备连接添加。</p>}
-    {passwordProfile && <form className="grid gap-2 rounded-md border p-3" onSubmit={event => { event.preventDefault(); void connect(passwordProfile.name, password); }}>
+    {passwordProfile && <ImeForm className="grid gap-2 rounded-md border p-3" onSubmit={event => { event.preventDefault(); void connect(passwordProfile.name, password); }}>
       <label className="grid gap-2">{passwordProfile.name} 的 SSH 密码<Input type="password" autoComplete="off" autoFocus required disabled={disabled || !!c.pending} value={password} onChange={e => setPassword(e.target.value)} /></label>
       <p>仅本次连接使用，不保存。</p>
       <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="ghost" disabled={!!c.pending} onClick={() => { setPassword(''); setPasswordProfile(null); }}>取消</Button><Button type="submit" size="sm" disabled={disabled || !!c.pending || !password}>连接设备</Button></div>
-    </form>}
+    </ImeForm>}
     {c.pending && <p role="status">正在连接设备…</p>}
     {c.error && <div role="alert" className="grid gap-2 text-destructive"><p>{desktopMessages[c.error]}</p><Button size="sm" variant="outline" disabled={disabled || !!c.pending} onClick={() => { void c.refresh(); }}>刷新设备列表</Button></div>}
     <Button variant="ghost" className="justify-start" disabled={disabled || !!c.pending} onClick={() => { close(); onManage(); }}><Settings2 />管理设备连接</Button>

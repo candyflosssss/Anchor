@@ -152,3 +152,61 @@ test('header can retry a failed device list read', async ({ page }) => {
   await panel.getByRole('button', { name: '刷新设备列表' }).click();
   await expect(panel.getByRole('button', { name: '切换到dev-server' })).toBeVisible();
 });
+
+test('remote connection form preserves Chinese preedit and reserves candidate Enter for the IME', async ({ page }) => {
+  await quickSwitchHost(page);
+  await page.getByRole('button', { name: '设备连接', exact: true }).click();
+  const input = page.getByLabel('连接名称');
+  await input.fill('');
+  await page.getByLabel('SSH 目标').fill('developer@192.0.2.10');
+  await page.getByLabel('信任首次连接的主机密钥').check();
+  await input.evaluate(node => {
+    const form = (node as HTMLInputElement).form!;
+    form.dataset.submits = '0';
+    form.addEventListener('submit', event => {
+      event.preventDefault(); event.stopImmediatePropagation();
+      form.dataset.submits = String(Number(form.dataset.submits) + 1);
+    });
+  });
+  await input.focus();
+  const session = await page.context().newCDPSession(page);
+  await session.send('Input.imeSetComposition', { text: 'shebei ', selectionStart: 7, selectionEnd: 7 });
+  await expect(input).toHaveValue('shebei ');
+  await session.send('Input.insertText', { text: '中文设备' });
+  await expect(input).toHaveValue('中文设备');
+  await input.dispatchEvent('compositionstart');
+  // Real Enter with isComposing=false models WebViews that require the composition-event fallback.
+  await input.press('Enter');
+  await expect(page.locator('form')).toHaveAttribute('data-submits', '0');
+  await input.dispatchEvent('compositionend');
+  await input.press('Enter');
+  await expect(page.locator('form')).toHaveAttribute('data-submits', '1');
+  // A focus change must not leave the next field in a stale composing state.
+  await input.dispatchEvent('compositionstart');
+  await page.getByLabel('SSH 目标').focus();
+  await page.getByLabel('SSH 目标').press('Enter');
+  await expect(page.locator('form')).toHaveAttribute('data-submits', '2');
+  await session.detach();
+});
+
+test('device password popover does not close or connect while accepting IME candidates', async ({ page }) => {
+  await quickSwitchHost(page, 'password');
+  await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();
+  const panel = page.getByRole('dialog', { name: '切换设备' });
+  await panel.getByRole('button', { name: '切换到dev-server' }).click();
+  const input = panel.getByLabel('dev-server 的 SSH 密码');
+  await input.fill('quick-switch-test-password');
+  await input.dispatchEvent('compositionstart');
+  await input.press('Escape');
+  await expect(panel).toBeVisible();
+  await expect(input).toHaveValue('quick-switch-test-password');
+  await input.press('Enter');
+  expect(await page.evaluate(() => (window as unknown as { quickSwitchTest: { calls: unknown[] } }).quickSwitchTest.calls)).toHaveLength(0);
+  await input.dispatchEvent('compositionend');
+  await input.press('Enter');
+  await expect(panel).toBeHidden();
+  expect(await page.evaluate(() => (window as unknown as { quickSwitchTest: { calls: unknown[] } }).quickSwitchTest.calls)).toHaveLength(1);
+  await page.getByRole('button', { name: /dev-server · 已连接/ }).click();
+  await panel.press('Escape');
+  await expect(panel).toBeHidden();
+});

@@ -85,3 +85,15 @@ for (const kind of ['rename', 'copy', 'mapping'] as const) {
     await session.detach();
   });
 }
+
+test('dialog clears stale composition on focus change even if compositionend is missing', async ({ page }) => {
+  await openProvider(page);
+  await page.getByRole('tab', { name: /^Key/ }).click();
+  await page.getByRole('button', { name: '添加 Key', exact: true }).click();
+  const input = page.getByLabel('Key 名称', { exact: true });
+  await input.focus();
+  await input.dispatchEvent('compositionstart');
+  await page.getByLabel('API Key', { exact: true }).focus();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+});

@@ -1,3 +1,4 @@
+import { ImeForm } from '../../components/shared/ime-form';
 import { useState, type FormEvent } from 'react';
 import { RefreshCw, LoaderCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -65,7 +66,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
   return <>
     <section className="detail-card">
       <h2>平台账户配置</h2>
-      <form className="account-form" onSubmit={e => void save(e)} autoComplete="off">
+      <ImeForm className="account-form" onSubmit={e => void save(e)} autoComplete="off">
         <fieldset disabled={disabled} className="account-fields">
           <div className="field"><label htmlFor="account-platform">平台类型</label><select id="account-platform" className="select-field" value={platform} onChange={e => setPlatform(e.target.value)}>{Object.entries(platformLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></div>
           {newAPI && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID（按站点要求填写）</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="可先留空；该站要求时填写数字用户 ID" /><p className="card-hint">这是该站后台的账户 ID。仅当该站要求用户 ID 时填写。</p></div>}
@@ -84,7 +85,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
           </div>
         </fieldset>
         <Button type="submit" disabled={disabled || !platform || !dirty}>{a.busy ? '正在处理…' : '保存平台配置'}</Button>
-      </form>
+      </ImeForm>
       {dirty && <p className="card-hint">草稿尚未保存。</p>}
       {formError && <p className="feedback error-feedback" role="alert">{formError}</p>}
     </section>

@@ -1,3 +1,4 @@
+import { ImeForm } from '../../components/shared/ime-form';
 import { identifierPattern } from '../../lib/identifier';
 import { Monitor, Server, LoaderCircle } from 'lucide-react';
 import type { SessionInfo } from '../../desktop/contract.generated';
@@ -27,7 +28,7 @@ export function ConnectionsView({ currentProfile, disabled, onConnected, onActiv
     <section className="connection-create" aria-labelledby="ssh-heading">
       <h2 id="ssh-heading">添加远程设备</h2>
       <p className="text-muted-foreground">使用 SSH 密码、密钥或已有 SSH 配置连接。Anchor 会完成鉴权、核心启动和管理隧道连接，关闭界面后远端核心继续运行。</p>
-      <form onSubmit={event => { event.preventDefault(); void c.connect(); }}>
+      <ImeForm onSubmit={event => { event.preventDefault(); void c.connect(); }}>
         <fieldset disabled={busy} className="connection-fields">
           <label>连接名称<Input required pattern={identifierPattern} placeholder="开发服务器" value={c.draft.name} onChange={e => c.setDraft({ ...c.draft, name: e.target.value })} /><small>1–128 个中文／字母／数字或 ._-，以字母或数字开头</small></label>
           <label>SSH 目标<Input required placeholder="user@192.168.1.20 或 SSH 别名" value={c.draft.target} onChange={e => c.setDraft({ ...c.draft, target: e.target.value })} /></label>
@@ -43,7 +44,7 @@ export function ConnectionsView({ currentProfile, disabled, onConnected, onActiv
           <p className="text-sm text-muted-foreground">远端需已安装支持设备连接的 Anchor 并开启 SSH。密码只用于本次登录；密钥模式使用系统 OpenSSH，支持 SSH 配置与 SSH Agent。</p>
           <Button type="submit">{c.pending === 'new' && <LoaderCircle className="animate-spin" />}{c.pending === 'new' ? '正在连接…' : '添加并连接'}</Button>
         </fieldset>
-      </form>
+      </ImeForm>
     </section>
   </main>;
 }

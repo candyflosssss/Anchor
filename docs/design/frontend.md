@@ -529,3 +529,10 @@ Model 接受 CNY 与 site_unit；公开元数据无法确认币种时标注「�
 中文名称可保存与原生输入法可用是两项独立验收。供应商重命名／复制、Key 名称和模型别名保留输入中的原始草稿，不在每次 onChange 时 trim，以免受控输入破坏预编辑文本；保存时继续使用既有名称校验规则，不放宽空白或标识符约束。
 
 共享 DialogContent 捕获 composition start/end，结合原生 isComposing 与 keyCode 229 保护候选选字的 Enter／Escape；Radix 在 document capture 阶段处理 Escape，因此同时在 onEscapeKeyDown 阻止组合态关闭。组合完成后普通 Enter 提交、Escape 关闭保持不变。Playwright 使用 Chromium CDP 组合输入覆盖 Key、供应商重命名／复制和模型别名，不以 fill 中文替代组合态回归；这些测试不等于 Linux WebKitGTK 或 Windows 原生输入法验收。Linux 宿主的输入法桥接检测见[桌面运行契约](desktop-runtime.md#中文输入法桥接2026-10-15当前源码未打包)。纯桌面输入交互修复，无新增 CLI／管理接口契约；当前已运行的旧桌面进程不会因此自动更新。
+
+
+### 中文输入法保护补查（2026-10-15，当前源码未打包）
+
+共享 `use-ime-guard.ts` 按输入目标跟踪组合态，结合 `isComposing`／229 识别候选键，并在失焦时清理，以兼容部分 WebView 未发出 compositionend 的情况，避免影响下一个输入框的正常按键。DialogContent 沿用 Radix document capture 阶段的 Escape 保护；内联设备连接、设备切换密码和平台账户表单改用 `ImeForm`，组合态 Enter 不触发隐式提交。共享 Popover 同时保护候选 Enter／Escape 和组合态菜单导航，避免取消候选时误关面板、清空暂存密码；组合完成后普通提交和关闭行为不变。
+
+本轮补查未发现供应商搜索、模型目录搜索及日志搜索／供应商／模型／Key 筛选逐次改写输入文本的问题；使用 Chromium CDP 预编辑与中文提交验证值、焦点和筛选查询，并增加缺失 compositionend 后切换焦点的回归。测试使用原型或模拟桌面桥接，不连接真实 SSH／付费上游，不代表 Linux WebKitGTK、Windows 或系统输入法候选窗口已原生验收。本轮无 CLI／桥接契约变更，未生成安装包或发布更新，已运行的桌面程序不会自动获得源码修复。

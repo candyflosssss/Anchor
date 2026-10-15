@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '../../lib/utils';
+import { useImeGuard } from './use-ime-guard';
 
 interface PopoverApi { close: (refocus?: boolean) => void; menu: boolean }
 const PopoverContext = createContext<PopoverApi | null>(null);
@@ -15,6 +16,7 @@ export function Popover({ trigger, label, menu = false, className, children, dis
   children: ReactNode | ((close: () => void) => ReactNode);
 }) {
   const [open, setOpen] = useState(false);
+  const ime = useImeGuard();
   const anchor = useRef<HTMLButtonElement | null>(null);
   const panel = useRef<HTMLDivElement | null>(null);
   // Focus returns synchronously so a dialog opened by a menu item records the trigger as its restore target.
@@ -38,6 +40,7 @@ export function Popover({ trigger, label, menu = false, className, children, dis
     return () => { document.removeEventListener('pointerdown', press, true); window.removeEventListener('scroll', scroll, true); window.removeEventListener('resize', resize); };
   }, [open, close]);
   function keys(e: KeyboardEvent<HTMLDivElement>) {
+    if (ime.isComposing(e.nativeEvent)) return;
     if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); return; }
     if (!menu) return;
     if (e.key === 'Tab') { close(false); return; }
@@ -49,7 +52,7 @@ export function Popover({ trigger, label, menu = false, className, children, dis
   return <>
     {trigger({ ref: node => { anchor.current = node; }, onClick: () => setOpen(v => !v), 'aria-expanded': open, 'aria-haspopup': menu ? 'menu' : 'dialog', disabled })}
     {open && createPortal(<PopoverContext.Provider value={{ close, menu }}>
-      <div ref={panel} role={menu ? 'menu' : 'dialog'} aria-label={label} tabIndex={-1} onKeyDown={keys} className={cn('popover-panel', menu && 'popover-menu', className)} style={{ position: 'fixed', zIndex: 30, opacity: 0, top: 0, left: 0 }}>
+      <div ref={panel} role={menu ? 'menu' : 'dialog'} aria-label={label} tabIndex={-1} onKeyDown={keys} onCompositionStartCapture={ime.onCompositionStartCapture} onCompositionEndCapture={ime.onCompositionEndCapture} onBlurCapture={ime.onBlurCapture} onKeyDownCapture={ime.onKeyDownCapture} className={cn('popover-panel', menu && 'popover-menu', className)} style={{ position: 'fixed', zIndex: 30, opacity: 0, top: 0, left: 0 }}>
         {typeof children === 'function' ? children(() => close()) : children}
       </div>
     </PopoverContext.Provider>, document.body)}
