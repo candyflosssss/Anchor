@@ -1,8 +1,8 @@
 # 在线更新 v1
 
-- 日期：2026-10-15；**`0.1.0-dev.desktop.39` 已于北京时间 2026-10-15 17:39:27 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
-- 修复 Codex 目录被上游 `max/default/null` effort 或无指令条目整份拒绝的问题：仅投影客户端可表示的档位，无模板条目使用明示的 Anchor 通用编程助手指令；不修改已有模板、不删除模型／速度分身、不把 max 改成 xhigh。 构建 revision `7e4a721347ae0c53b01457114589131ba328f785`，SOURCE.json dirty=false。六包 Go 回归通过，新增用例后 managed／CLI 再次通过；Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过。六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision、默认源从 `.37` 发现并真实下载 Linux 安装包通过；Windows 附件 digest 与本地一致。 本机 CLI／核心／GUI 已升级为 `.39`，core／gateway／agent management 均 ready，Codex／DSH 均 applied。Codex 自有目录与网关均为 12 个模型，默认仍为 `gpt-6.1-sol(fast)`；手动 `agent sync` applied，配置、目录与 journal 无变化。独立 CODEX_HOME 的原生 codex-cli 0.162.1 app-server `initialize + model/list` 已解析实际生成目录，12 个模型与网关完全一致，含普通／Fast／Ultrafast。仅本地名单 RPC，未创建线程、未发推理请求，未重启当前用户 Codex。 未执行 Windows 原生安装、原生 GUI 窗口可见性、系统安装器／应用内 apply、真实付费上游或当前 Codex 会话自动重载验收；不保证上游加速权限、速度或费用。 详见[当前在线 dev 版 `.39`](../release/desktop.md#当前在线-dev-版-39)。
-- **首次迁移限制**：沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.39` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺自动启动核心或既有会话重连。Codex／Claude 需重启（含对应 app-server）加载新名单，DSH 默认模型需新会话；远端核心另行升级。 沿用 schema8，无数据库降级。
+- 日期：2026-10-16；**`0.1.0-dev.desktop.40` 已于北京时间 2026-10-16 01:06:46 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
+- 供应商模型映射新增多选／全选与批量测试、编辑、删除；串行执行、显式确认、固定 revision、保留逐项结果与部分完成状态，不自动重试。另包含已有模型默认值补全、上下文分档计费提示、DSH Desktop 独立托管与模型能力同步，以及托管失败分类反馈。 构建 revision `2da6c20910b54ece98be4f7d713045f711e15d6b`，SOURCE.json dirty=false。Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 详见[当前在线 dev 版 `.40`](../release/desktop.md#当前在线-dev-版-40)。
+- **首次迁移限制**：沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.40` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。 沿用 schema8，无数据库降级。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 

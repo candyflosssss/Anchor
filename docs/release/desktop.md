@@ -1,12 +1,12 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-15。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.39`，北京时间 2026-10-15 17:39:27 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：修复 Codex 目录被上游 `max/default/null` effort 或无指令条目整份拒绝的问题：仅投影客户端可表示的档位，无模板条目使用明示的 Anchor 通用编程助手指令；不修改已有模板、不删除模型／速度分身、不把 max 改成 xhigh。 映射变动自动同步已托管 Agent，保留原用户目录、首次恢复基线、默认模型及凭据。
-- 本机安装与原生目录：本机 CLI／核心／GUI 已升级为 `.39`，core／gateway／agent management 均 ready，Codex／DSH 均 applied。Codex 自有目录与网关均为 12 个模型，默认仍为 `gpt-6.1-sol(fast)`；手动 `agent sync` applied，配置、目录与 journal 无变化。独立 CODEX_HOME 的原生 codex-cli 0.162.1 app-server `initialize + model/list` 已解析实际生成目录，12 个模型与网关完全一致，含普通／Fast／Ultrafast。仅本地名单 RPC，未创建线程、未发推理请求，未重启当前用户 Codex。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.39` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺自动启动核心或既有会话重连。Codex／Claude 需重启（含对应 app-server）加载新名单，DSH 默认模型需新会话；远端核心另行升级。
+- 更新：2026-10-16。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.40`，北京时间 2026-10-16 01:06:46 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：供应商模型映射新增多选／全选与批量测试、编辑、删除；串行执行、显式确认、固定 revision、保留逐项结果与部分完成状态，不自动重试。另包含已有模型默认值补全、上下文分档计费提示、DSH Desktop 独立托管与模型能力同步，以及托管失败分类反馈。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.40` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。
 - 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
-- 验证：干净隔离源码 `7e4a721347ae0c53b01457114589131ba328f785`（SOURCE.json dirty=false）。六包 Go 回归通过，新增用例后 managed／CLI 再次通过；Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过。六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision、默认源从 `.37` 发现并真实下载 Linux 安装包通过；Windows 附件 digest 与本地一致。 未执行 Windows 原生安装、原生 GUI 窗口可见性、系统安装器／应用内 apply、真实付费上游或当前 Codex 会话自动重载验收；不保证上游加速权限、速度或费用。
+- 构建：干净隔离源码 `2da6c20910b54ece98be4f7d713045f711e15d6b`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用功能提交的定向 TypeScript／ESLint、29 项 Vitest 与 9 项 Playwright 通过结果，本轮不重复全量或浏览器测试。
+- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
 
 ## 1. 安装与使用行为
 
@@ -29,7 +29,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.39_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.40_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -85,7 +85,19 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.39`
+### 当前在线 dev 版 `.40`
+
+`0.1.0-dev.desktop.40` 从干净隔离 worktree 的 `2da6c20910b54ece98be4f7d713045f711e15d6b` 构建，于北京时间 2026-10-16 01:06:46 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.40)（非 latest）。tag 指向实际构建提交，不指向后续发行文档提交。
+
+供应商模型映射新增多选／全选与批量测试、编辑、删除；串行执行、显式确认、固定 revision、保留逐项结果与部分完成状态，不自动重试。另包含已有模型默认值补全、上下文分档计费提示、DSH Desktop 独立托管与模型能力同步，以及托管失败分类反馈。
+
+在「供应商 → 选择供应商 → 模型 → 模型映射」勾选条目：批量测试提示用量并按已保存上游与 Key 绑定执行，无可用 Key 跳过；批量编辑未修改字段保持各自原值，并提示共享模型属性影响；批量删除只移除当前供应商映射，核心保留启用 Binding 的引用保护。停止在当前请求完成后生效，批次不是事务，管理／传输错误后保留部分结果并要求重读。
+
+输出 `dist/desktop/0.1.0-dev.desktop.40/`，publication 六附件包括 Windows NSIS、Ubuntu24.04 AMD64 deb、flat 清单、含 vendor 源码、许可／构建元数据 ZIP 与校验清单。Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。
+
+复用功能提交已通过的 TypeScript、定向 ESLint、29 项 Vitest 与 9 项单 worker Playwright；本轮打包不重复运行全量或原生测试。BUILD.json 中 `public_release=false` 是构建时的原始状态，后续发布另行记录。本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 `.39` 的既有本机安装／Codex 名单验收保留为下方历史事实，不等于 `.40` 已安装。
+
+### 历史 dev 版 `.39`
 
 `0.1.0-dev.desktop.39` 从干净隔离 worktree 的 `7e4a721347ae0c53b01457114589131ba328f785` 构建，于北京时间 2026-10-15 17:39:27 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.39)（非 latest）。tag 指向构建提交，不混入未提交余额界面改动。
 

@@ -6,7 +6,7 @@
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.39 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.40 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -15,7 +15,7 @@
 - desktop.23 已交付全部启用 Key 的模型目录合并与逐 Key 分组倍率显示，停用 Key 不查询；复用 `provider models`，命令契约见下文。desktop.25已交付来源Key范围、模型排序／调度设置与账户分组倍率查询；独立账单桌面页仍未接入。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
-2026-10-16 核对增量：上下文价格分档建议与平价导入保护已在当前源码实现，未打包；行为及迁移见下文模型设置与参考目录章节。
+2026-10-16 核对增量：上下文价格分档建议与平价导入保护已随 desktop.40 dev 宿主／核心发布；独立公开 CLI 仍为 alpha.6，不含这些增量；行为及迁移见下文模型设置与参考目录章节。
 
 ## 1. 调用与公共约定
 
@@ -512,7 +512,7 @@ anchor access revoke ID
 
 ### `agent discover` / `agent enroll` / `agent sync`
 
-2026-10-15 当前源码（未发布；desktop.39 不含本次诊断修复）：Agent 管理失败沿用非零退出约定，但不再把所有 409 显示成同一种“冲突”；默认模型已不存在时由原先的 404/not_found 改为 409/agent_model_unavailable，绑定本身不存在仍为 404。CLI stderr 的受限 code 区分：`conflict`（记录 revision 过期）、`agent_config_conflict`（托管字段／目录被外部修改）、`agent_config_unsafe`（配置结构、文件类型或权限不允许安全修改）、`agent_model_unavailable`（默认模型不在当前可用授权范围）、`agent_catalog_invalid`（模型目录生成／本地模板读取校验失败）。其余原因保留 `agent_operation_failed`，不据此推断为配置冲突；不输出解析器、文件系统原文或秘密，不自动重放写入。原有身份／鉴权／绑定不存在处理保持不变。失败后用 `agent discover` 核对绑定状态，必要时 `agent inspect ID` 查看恢复结果；`enabled=true` 仅表示策略开启，不证明配置已应用。
+2026-10-15 源码增量（已随 desktop.40 dev 发布；desktop.39 及独立公开 alpha.6 CLI 不含本次诊断修复）：Agent 管理失败沿用非零退出约定，但不再把所有 409 显示成同一种“冲突”；默认模型已不存在时由原先的 404/not_found 改为 409/agent_model_unavailable，绑定本身不存在仍为 404。CLI stderr 的受限 code 区分：`conflict`（记录 revision 过期）、`agent_config_conflict`（托管字段／目录被外部修改）、`agent_config_unsafe`（配置结构、文件类型或权限不允许安全修改）、`agent_model_unavailable`（默认模型不在当前可用授权范围）、`agent_catalog_invalid`（模型目录生成／本地模板读取校验失败）。其余原因保留 `agent_operation_failed`，不据此推断为配置冲突；不输出解析器、文件系统原文或秘密，不自动重放写入。原有身份／鉴权／绑定不存在处理保持不变。失败后用 `agent discover` 核对绑定状态，必要时 `agent inspect ID` 查看恢复结果；`enabled=true` 仅表示策略开启，不证明配置已应用。
 
 
 ```text
@@ -659,7 +659,7 @@ anchor recover [--id ID]
 | 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，当前源码账户／模型映射页已接分组倍率，账单页面未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
 | 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --tools --streaming | 桌面新建默认开启两项能力；CLI 流式同样默认开启，工具仍须 `--tools`。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
-| 供应商模型映射多选测试／编辑／删除（桌面源码） | 读取 provider workspace 后逐项 provider test/model-put/model-delete | 无专用批量命令；桌面串行复用既有动作，显式确认用量／删除，编辑默认保留各自未改字段，能力／策略／档位仍是公开模型共享属性。采用确认时供应商及模型 revision，管理／传输错误首错停止、显示部分结果并要求重读，不自动重试；停止在当前请求完成后生效。CLI 语法、输出、默认值与退出行为不变 |
+| 供应商模型映射多选测试／编辑／删除（desktop.40 dev） | 读取 provider workspace 后逐项 provider test/model-put/model-delete | 无专用批量命令；桌面串行复用既有动作，显式确认用量／删除，编辑默认保留各自未改字段，能力／策略／档位仍是公开模型共享属性。采用确认时供应商及模型 revision，管理／传输错误首错停止、显示部分结果并要求重读，不自动重试；停止在当前请求完成后生效。CLI 语法、输出、默认值与退出行为不变 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |

@@ -5,7 +5,7 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.39**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.40**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
@@ -13,9 +13,9 @@
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.39/Anchor-Desktop-0.1.0-dev.desktop.39-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.39/anchor-desktop_0.1.0-dev.desktop.39_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.39)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.40/Anchor-Desktop-0.1.0-dev.desktop.40-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.40/anchor-desktop_0.1.0-dev.desktop.40_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.40)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -61,7 +61,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-以下一键安装入口用于 CLI alpha.6。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 已随 desktop.39 发布到 dev 在线更新渠道，使用方式与构建结果见[桌面安装说明](docs/release/desktop.md)；本轮已完成 Linux 用户目录替换与隔离原生 Codex 名单解析；系统安装器／窗口可见性未验收。
+以下一键安装入口用于 CLI alpha.6。Windows GUI 安装程序和 Ubuntu24.04 AMD64 `.deb` 已随 desktop.40 发布到 dev 在线更新渠道，使用方式与构建结果见[桌面安装说明](docs/release/desktop.md)；本轮已完成默认源 Linux 安装包真实下载及完整性检查，Windows 附件 digest 与本地一致；未自动安装、替换运行程序或进行原生窗口验收。
 
 已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux / Windows AMD64 `0.1.0-alpha.6` 已公开发布；两平台附件匿名下载与校验通过，Linux 远程一键安装已验证**。不从 Actions artifact 或草稿偷偷安装。
 
@@ -98,10 +98,10 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.39 已投放 dev 渠道）
+### 在线更新（desktop.40 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.39` 的 Windows / Ubuntu24.04 安装包与同版清单。模型映射设置新增「速度与分身」入口；映射新增／修改／删除后自动同步已托管 Agent，Codex all-mapped 生成 Anchor 自有模型目录。保留原用户目录、恢复基线及凭据；不强开 Codex 原生速度菜单，不保证上游支持、权限或费用。 修复 Codex 目录被上游 `max/default/null` effort 或无指令条目整份拒绝的问题：仅投影客户端可表示的档位，无模板条目使用明示的 Anchor 通用编程助手指令；不修改已有模板、不删除模型／速度分身、不把 max 改成 xhigh。 本机托管已恢复 ready/applied；隔离原生 Codex 0.162.1 名单解析已验证 12 项及速度分身。Codex／Claude 仍需要重启加载新名单。详见[速度分身](docs/design/model-speed-variants.md)。沿用 `.35` 的安全升级交接：`restart_handoff` 保留托管配置、模型目录、凭据与原始恢复日志；普通停止核心仍条件恢复。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.40` 的 Windows / Ubuntu24.04 安装包与同版清单。供应商模型映射新增多选／全选与批量测试、编辑、删除；串行执行、显式确认、固定 revision、保留逐项结果与部分完成状态，不自动重试。另包含已有模型默认值补全、上下文分档计费提示、DSH Desktop 独立托管与模型能力同步，以及托管失败分类反馈。 本轮默认源发现、Linux 真实下载和大小／SHA256 校验通过，Windows 附件 digest 与本地一致；未自动安装或替换运行中的程序，原生窗口／安装器／真实付费上游未验收。
 
-**desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.39` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。远端核心须另行升级。沿用 state.db schema8，从更早版升级须备份，旧程序不能打开迁移后的数据库。Linux 默认源实际下载及大小／SHA256 检查通过，Windows 远端 digest 与本地一致；已完成本机 Linux 用户目录升级、目录迁移与隔离 Codex 名单解析；未执行系统安装器、原生窗口可见性或当前 Codex 会话重载验收。公开 alpha.6 CLI 不含本轮修复。旧 desktop.8 无更新入口。
+**desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.40` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。远端核心须另行升级。沿用 state.db schema8，从更早版升级须备份，旧程序不能打开迁移后的数据库。Linux 默认源实际下载及大小／SHA256 检查通过，Windows 远端 digest 与本地一致；已完成本机 Linux 用户目录升级、目录迁移与隔离 Codex 名单解析；未执行系统安装器、原生窗口可见性或当前 Codex 会话重载验收。公开 alpha.6 CLI 不含本轮修复。旧 desktop.8 无更新入口。
 
 desktop.35 的桌面安装确认使用保留交接停服、真正退出当前宿主，再交给系统安装器；安装完成须重新打开程序。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、数据库迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。
