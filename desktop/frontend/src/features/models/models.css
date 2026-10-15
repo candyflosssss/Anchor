@@ -55,3 +55,17 @@
 
 .key-multiplier { overflow-wrap: anywhere; }
 .key-multiplier strong { font-variant-numeric: tabular-nums; }
+
+/* Scheduling state is explicit text as well as color; disabled routes remain editable. */
+.model-availability, .mapping-channel-state, .mapping-key-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.model-availability { justify-content: space-between; margin: 12px 0 8px; color: hsl(var(--muted-foreground)); }
+.channel-status { display: inline-flex; align-items: center; padding: 2px 7px; border: 1px solid currentColor; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.channel-status.state-available { color: hsl(var(--success)); background: hsl(var(--success) / .08); }
+.channel-status.state-unavailable { color: hsl(var(--destructive)); background: hsl(var(--destructive) / .06); }
+.channel-status.state-unknown { color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); }
+.model-card.availability-unavailable { border-color: hsl(var(--destructive) / .45); }
+.model-unavailable-notice { display: grid; gap: 5px; padding: 10px; border: 1px solid hsl(var(--destructive) / .25); border-radius: 6px; color: hsl(var(--destructive)); background: hsl(var(--destructive) / .05); font-size: 12px; line-height: 1.6; }
+.mapping-channel-state { margin: 8px 0; color: hsl(var(--muted-foreground)); }
+.mapping-channel-state p { flex-basis: 100%; margin: 0; line-height: 1.5; }
+.mapping-candidate.availability-unavailable { border-left: 3px solid hsl(var(--destructive) / .5); }
+.mapping-key-status { margin-left: auto; }

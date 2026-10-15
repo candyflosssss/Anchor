@@ -113,13 +113,13 @@ test('secret replacement is only-input and clearing requires explicit acknowledg
 });
 test('toggle confirms object and impact; cancel is the default focused action', async ({ page }) => {
   await ready(page); await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
-  await page.getByRole('button', { name: '停用供应商', exact: true }).click();
+  await page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态', exact: true }).click();
   const confirm = page.getByRole('alertdialog');
   await expect(confirm).toContainText('停用 摸鱼AI？'); await expect(confirm).toContainText('配置和已存密钥会保留');
   await expect(confirm.getByRole('button', { name: '取消' })).toBeFocused();
   await confirm.getByRole('button', { name: '取消' }).click();
   await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('已启用');
-  await page.getByRole('button', { name: '停用供应商', exact: true }).click();
+  await page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态', exact: true }).click();
   await confirm.getByRole('button', { name: '确认变更' }).dblclick();
   await expect(confirm).toBeHidden();
   await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('已停用');
@@ -319,8 +319,8 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await expect(model).toHaveValue('inherit');
   await expect(model.locator('option:checked')).toContainText('Responses');
   await detail.getByRole('tab', { name: /^Key/ }).click();
-  await detail.getByRole('button', { name: '停用 Key second', exact: true }).click();
-  await expect(detail.getByRole('button', { name: '启用 Key second', exact: true })).toBeVisible();
+  await detail.getByRole('switch', { name: 'Key second 启用状态', exact: true }).click();
+  await expect(detail.getByRole('switch', { name: 'Key second 启用状态', exact: true })).not.toBeChecked();
   await detail.getByRole('tab', { name: /^模型/ }).click();
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   await expect(detail).toContainText('已获取 2 个模型');
@@ -328,8 +328,8 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await expect(merged.getByLabel('demo-model 的可选 Key')).not.toContainText('Key second');
   await expect(detail.getByLabel('Key 查询结果')).not.toContainText('Key second');
   await detail.getByRole('tab', { name: /^Key/ }).click();
-  await detail.getByRole('button', { name: '停用 Key default', exact: true }).click();
-  await expect(detail.getByRole('button', { name: '启用 Key default', exact: true })).toBeVisible();
+  await detail.getByRole('switch', { name: 'Key default 启用状态', exact: true }).click();
+  await expect(detail.getByRole('switch', { name: 'Key default 启用状态', exact: true })).not.toBeChecked();
   await detail.getByRole('tab', { name: /^模型/ }).click();
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   await expect(detail).toContainText('没有启用的 Key，已跳过目录和分组倍率查询。');

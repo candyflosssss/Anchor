@@ -3,7 +3,7 @@ import { probeFailureText } from './provider-test.model';
 import { ProviderCatalogView } from './provider-catalog.view';
 import { ProviderAccountView } from './provider-account.view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RotateCcw, Trash2, TextCursorInput } from 'lucide-react';
+import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Trash2, TextCursorInput } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Switch } from '../../components/ui/switch';
 import { StatusBadge } from '../../components/shared/status-badge';
@@ -56,7 +56,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
       <div className="detail-actions">
         <Button disabled={blocked || !w} onClick={() => c.openDialog({ kind: 'test' })}><Play />测试连通</Button>
         <Button variant="outline" disabled={blocked} onClick={onEdit}><Pencil />编辑配置</Button>
-        <Button variant="outline" disabled={blocked} onClick={() => c.requestToggle(p)}><Power />{p.enabled ? '停用供应商' : '启用供应商'}</Button>
+        <label className="key-toggle" data-state={p.enabled ? 'checked' : 'unchecked'}><Switch className="key-toggle-switch" checked={p.enabled} disabled={blocked || !!c.toggle || !!c.editor} aria-label={`供应商 ${p.id} 启用状态`} onCheckedChange={() => c.requestToggle(p)} /><span>{p.enabled ? '已启用' : '已停用'}</span></label>
         <Popover menu label={`${p.id} 的更多操作`} disabled={blocked || !w} trigger={props => <Button variant="ghost" size="icon" aria-label="更多操作" {...props}><MoreHorizontal /></Button>}>
           <MenuItem onSelect={() => c.openDialog({ kind: 'copy' })}><Copy size={14} />复制为新供应商</MenuItem>
           <MenuItem onSelect={() => c.openDialog({ kind: 'rename' })}><TextCursorInput size={14} />改名</MenuItem>
@@ -126,7 +126,7 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
   const f = c.features;
   return <section className="detail-card">
     <div className="card-toolbar">
-      <div><h2>访问 Key</h2></div>
+      <div><h2>访问 Key</h2><p className="card-hint">Key 开关独立保存；供应商停用时，即使 Key 已启用也不参与路由。</p></div>
       <div className="toolbar-actions">
         <label className="sr-only" htmlFor="key-strategy">Key 调度策略</label>
         <select id="key-strategy" className="select-field" value={w.strategy} disabled={disabled || !w.keys.length} onChange={e => void f.run('strategy', { strategy: e.target.value })}>

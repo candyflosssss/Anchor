@@ -24,7 +24,8 @@ export function useProviderSummaries(providers: Provider[], ready: boolean, tran
   }, [providers, ready, transport]);
   return useMemo(() => providers.map(p => {
     if (!hasReader) return summarize(p, null);
-    if (selected && selected.provider_id === p.id) return summarize(p, selected);
-    return summarize(p, Object.hasOwn(entries, p.id) ? entries[p.id] : undefined);
+    if (selected && selected.provider_id === p.id && selected.revision === p.revision) return summarize(p, selected);
+    const cached = entries[p.id];
+    return summarize(p, cached === null || cached?.revision === p.revision ? cached : undefined);
   }), [providers, entries, selected, hasReader]);
 }

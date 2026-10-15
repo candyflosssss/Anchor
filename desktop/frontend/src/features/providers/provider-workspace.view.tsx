@@ -3,6 +3,7 @@ import type { ProviderBalance } from './use-provider-balances';
 import { ChevronRight, Copy, KeyRound, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RefreshCw, Search, Server, TextCursorInput, Trash2, Unplug } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Button } from '../../components/ui/button';
+import { Switch } from '../../components/ui/switch';
 import { Input } from '../../components/ui/input';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { StatusBadge } from '../../components/shared/status-badge';
@@ -16,7 +17,7 @@ import type { ProviderController } from './use-provider-controller';
 export function ProviderList({ c, summaries, balances, onEdit, onCreate, children }: { c: ProviderController; summaries: ProviderSummary[]; balances: Record<string, ProviderBalance>; onEdit: (p: Provider) => void; onCreate: () => void; children?: ReactNode }) {
   const enabled = c.providers.filter(p => p.enabled).length;
   const byId = new Map(summaries.map(s => [s.provider.id, s]));
-  const rowClick = (e: MouseEvent, id: string) => { if (!(e.target as HTMLElement).closest('button, input, a, select')) c.openProvider(id); };
+  const rowClick = (e: MouseEvent, id: string) => { if (!(e.target as HTMLElement).closest('button, input, a, select, label')) c.openProvider(id); };
   return <div className="workspace">
     <header className="page-header"><div><div className="eyebrow">配置管理</div><h1>供应商</h1></div><Button disabled={c.blocked} onClick={onCreate}><Plus />添加供应商</Button></header>
     {children}
@@ -25,10 +26,11 @@ export function ProviderList({ c, summaries, balances, onEdit, onCreate, childre
     </div>
     <section className="provider-surface" aria-label="供应商列表">
       <div className="table-scroll"><Table><TableCaption className="sr-only">{c.mock ? '模拟供应商列表；健康状态来自本地 Key 与测试记录' : '供应商列表；不回传密钥，健康状态来自本地 Key 与测试记录'}</TableCaption><TableHeader><TableRow>
-        <TableHead scope="col">供应商 / 请求地址</TableHead><TableHead scope="col">健康</TableHead><TableHead scope="col">余额 / 额度</TableHead><TableHead scope="col">Key</TableHead><TableHead scope="col">模型</TableHead><TableHead scope="col" className="col-wide">最近测试</TableHead><TableHead scope="col" className="text-right">操作</TableHead>
+        <TableHead scope="col">供应商 / 请求地址</TableHead><TableHead scope="col">启用状态</TableHead><TableHead scope="col">健康</TableHead><TableHead scope="col">余额 / 额度</TableHead><TableHead scope="col">Key</TableHead><TableHead scope="col">模型</TableHead><TableHead scope="col" className="col-wide">最近测试</TableHead><TableHead scope="col" className="text-right">操作</TableHead>
       </TableRow></TableHeader><TableBody>
         {c.phase === 'ready' && c.visible.map(p => { const s = byId.get(p.id); const loaded = !!s?.workspace; return <TableRow key={p.id} className="clickable-row" onClick={e => rowClick(e, p.id)}>
           <TableCell><div className="provider-cell"><span className="provider-avatar" aria-hidden="true">{Array.from(p.id)[0]}</span><div><button className="provider-name" disabled={c.blocked} onClick={() => c.openProvider(p.id)}>{p.id}</button><span className="provider-url mono" title={p.base_urls.join('\n')}>{p.base_urls[0]}{p.base_urls.length > 1 ? ` +${p.base_urls.length - 1}` : ''}</span></div></div></TableCell>
+          <TableCell><label className="key-toggle" data-state={p.enabled ? 'checked' : 'unchecked'}><Switch className="key-toggle-switch" checked={p.enabled} disabled={c.blocked || !!c.toggle || !!c.dialog || !!c.editor} aria-label={`供应商 ${p.id} 启用状态`} onCheckedChange={() => c.requestToggle(p)} /><span>{p.enabled ? '已启用' : '已停用'}</span></label></TableCell>
           <TableCell>{!p.enabled ? <StatusBadge enabled={false} /> : s ? <HealthPill tone={s.tone} label={s.label} /> : '—'}</TableCell>
           <TableCell><ProviderBalanceCell value={balances[p.id]} /></TableCell>
           <TableCell><span className="secret-status"><KeyRound size={14} />{!loaded ? (p.has_secret ? '已配置' : '—') : s!.keyCount ? `${s!.enabledKeys} / ${s!.keyCount}` : '匿名'}</span></TableCell>

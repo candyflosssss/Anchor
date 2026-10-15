@@ -1,3 +1,4 @@
+import { channelAvailability, type ChannelAvailability } from './channel-availability.model';
 import type { Probe, Workspace } from './provider-features.model';
 import type { KeyStatus } from '../../desktop/contract.generated';
 import type { Provider } from './provider.model';
@@ -89,13 +90,13 @@ export function overviewTotals(summaries: ProviderSummary[]) {
   };
 }
 
-export interface ModelCandidate { provider_id: string; upstream: string; tools: boolean; streaming: boolean; cost_multiplier: number; multiplier: number; strategy: string; revision: number; candidate_index: number; candidate_count: number; key_ids: string[]; keys: KeyStatus[]; tone: Tone; label: string }
+export interface ModelCandidate { provider_enabled: boolean; availability: ChannelAvailability; provider_id: string; upstream: string; tools: boolean; streaming: boolean; cost_multiplier: number; multiplier: number; strategy: string; revision: number; candidate_index: number; candidate_count: number; key_ids: string[]; keys: KeyStatus[]; tone: Tone; label: string }
 export interface ModelGroup { alias: string; revision: number; strategy: string; complete: boolean; candidates: ModelCandidate[] }
 export function aggregateModels(summaries: ProviderSummary[]): ModelGroup[] {
   const groups = new Map<string, ModelCandidate[]>();
   for (const s of summaries) for (const m of s.workspace?.models ?? []) {
     const list = groups.get(m.id) ?? [];
-    list.push({ cost_multiplier: s.provider.cost_multiplier, provider_id: s.provider.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming, multiplier: m.multiplier, strategy: m.strategy, revision: m.revision, candidate_index: m.candidate_index, candidate_count: m.candidate_count, key_ids: m.key_ids, keys: s.workspace?.keys ?? [], tone: s.tone, label: s.label });
+    list.push({ provider_enabled: s.provider.enabled, availability: channelAvailability(s.provider.enabled, m.key_ids, s.workspace?.keys ?? []), cost_multiplier: s.provider.cost_multiplier, provider_id: s.provider.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming, multiplier: m.multiplier, strategy: m.strategy, revision: m.revision, candidate_index: m.candidate_index, candidate_count: m.candidate_count, key_ids: m.key_ids, keys: s.workspace?.keys ?? [], tone: s.tone, label: s.label });
     groups.set(m.id, list);
   }
   return [...groups].map(([alias, candidates]) => {

@@ -715,3 +715,44 @@ test('model routing does not retry an acknowledged write when reloading fails (s
   await expect(card.locator('.model-strategy')).toContainText('固定顺序');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
 });
+
+test('mapping availability follows scoped Keys and provider switches, not provider-wide health (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
+    api.ProviderWorkspace = async input => {
+      const result = await read(input);
+      if (result.data) {
+        result.data.keys = [
+          { ...result.data.keys[0], id: 'scoped', enabled: false, state: 'disabled' },
+          { ...result.data.keys[0], id: 'unrelated', enabled: true, state: 'ready' },
+        ];
+        result.data.models = result.data.models.map(m => ({ ...m, key_ids: ['scoped'] }));
+      }
+      return result;
+    };
+  });
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '刷新配置', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await expect(card).toContainText('0 / 3 个渠道当前可用');
+  await expect(card.locator('.model-unavailable-notice')).toContainText('无有效渠道');
+  await card.locator('.model-sources > summary').click();
+  await expect(card.locator('.mapping-channel-state').filter({ hasText: '供应商已停用' })).toHaveCount(1);
+  await card.locator('.mapping-keys > summary').first().click();
+  await expect(card.locator('.mapping-key-status').first()).toContainText('Key 已停用');
+  await expect(card.locator('.mapping-key-rate').filter({ hasText: 'unrelated' })).toHaveCount(0);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
+    api.ProviderWorkspace = async input => {
+      const result = await read(input);
+      if (result.data) result.data.keys = result.data.keys.map(k => k.id === 'scoped' ? { ...k, enabled: true, state: 'ready' } : k);
+      return result;
+    };
+  });
+  await page.getByRole('button', { name: '刷新配置', exact: true }).click();
+  await expect(card).toContainText('2 / 3 个渠道当前可用');
+  await expect(card.locator('.model-unavailable-notice')).toHaveCount(0);
+  await expect(card.locator('.mapping-key-status').first()).toContainText('Key 已启用');
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
+});
