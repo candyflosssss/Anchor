@@ -3,6 +3,7 @@
 - 更新：2026-10-15。
 - 当前线上桌面 dev 版：`0.1.0-dev.desktop.37`，北京时间 2026-10-15 17:00:56 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
 - 范围：模型映射设置新增「速度与分身」入口；映射新增／修改／删除后自动同步已托管 Agent，Codex all-mapped 生成 Anchor 自有模型目录。保留原用户目录、恢复基线及凭据；不强开 Codex 原生速度菜单，不保证上游支持、权限或费用。 详见[模型分身](../design/model-speed-variants.md)与[Agent 托管](../design/agent-management-layer.md)。
+- 本机后续安装：CLI／核心／GUI 已为 `.37`，但 Codex 目录导出因 `max`／`default` 推理档位失败，Agent 管理 partial；见下方本机升级记录，不能视为 Codex 名单修复验收通过。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.37` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺自动启动核心或既有会话重连。Codex／Claude 需重启（含对应 app-server）加载新名单，DSH 默认模型需新会话；远端核心另行升级。
 - 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
 - 验证：干净隔离源码 `45ac60087a4a046cbcc47c46f22dae19d880fd2b`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.36` 发现／实际下载 Linux 包通过。复用功能任务六包 Go、27 项单元测试、8 项浏览器测试与类型／定向 lint 结果；本轮未重跑完整套件，未安装本机、未执行原生 Codex／Claude／DSH 加载、原生窗口／安装器／apply 或真实付费上游验收。
@@ -94,6 +95,12 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 本地输出 `dist/desktop/0.1.0-dev.desktop.37/`，`publication/` 六附件含 Windows NSIS、Ubuntu24.04 AMD64 deb、flat 更新清单、对应源码（含 Go vendor）、许可／构建元数据 ZIP 和总校验清单。BUILD.json 保留构建时验证事实，在线投放结果另行记录。
 
 Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.36` 发现／实际下载 Linux 包通过。复用功能任务六包 Go、27 项单元测试、8 项浏览器测试与类型／定向 lint 结果；本轮未重跑完整套件，未安装本机、未执行原生 Codex／Claude／DSH 加载、原生窗口／安装器／apply 或真实付费上游验收。 本次只发布，没有替换本机程序、重启真实核心或改动真实 Agent 配置；本机仍为 `.36`。
+
+**后续本机升级（2026-10-15 17:13，部分完成）**：应用户要求，沿用用户目录安装，CLI 从本版已发布的 vendored 源码受限离线编译，GUI 使用已核验与发布 deb payload 一致的 ELF，替换 `~/.local/bin/anchor` 与 `~/.local/bin/anchor-desktop`。没有重建桌面安装包、重复线上发布或启用登录自启动。安全备份保留在仓库外 `~/.config/anchor/backups/pre-desktop37-20261015-170754/`（权限保护，不提交内容）。先退出旧 GUI，经 `stop --approve --for-restart` 收到保留确认、等待旧核心退出后替换；旧核心到达 drain deadline 后取消了剩余请求，不能声称零停机。当前核心和 GUI 的受限临时用户服务均 active，运行 ELF 哈希匹配本版程序；core／gateway ready，GUI 原生窗口可见性未验收。
+
+**Codex 名单迁移失败，不能把程序替换视为映射问题已修复。** 在独立数据副本中只读诊断确认：`gpt-6.1-sol` 及其 Fast／Ultrafast 分身的 portable reasoning effort 包含 `max`、`default`，本版 Codex 目录导出仅接受已列出的 Codex effort，报 `reasoning effort is not supported by Codex export`，整份目录未生成。Codex 绑定为 `apply_failed`，Agent management 为 partial；原 `config.toml`、用户目录、Codex 恢复日志未变，默认模型仍为 `gpt-6.1-sol(fast)`。没有删改用户推理档位、重新绑定、手动覆盖目录或重启当前 Codex 会话；仅重启 Codex 不能解决这次导出失败。
+
+DSH 绑定 applied，启动时更新其受管 provider 字段；核对当前配置与 journal 的 after 一致，所有首次恢复基线及已有 edits.before 保留。state.db schema8、quick_check／foreign_key_check 通过，配置表行、settings、owner token 和绑定凭据保持不变。Codex token-helper 核验通过，绑定凭据访问本机 `GET /v1/models` 返回 200／12 个映射，含 `gpt-6.1-sol(fast)`／`(ultrafast)`；这不代表 Codex 原生模型选择器已加载，也不证明上游速度档位权限或效果。未请求真实付费推理、未执行系统安装器／应用内 apply。实际部署证据位于 `dist/desktop/0.1.0-dev.desktop.37/local-install/verification-local.json`；本次本机升级按 partial 记录，目录兼容性缺陷待修复。
 
 ### 历史在线 dev 版 `.36`
 
