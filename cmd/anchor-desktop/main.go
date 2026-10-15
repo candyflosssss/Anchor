@@ -138,6 +138,7 @@ func run() int {
 	if err != nil {
 		return 1
 	}
+	desktop.ConfigureInputMethod()
 	err = wails.Run(&options.App{Title: "Anchor", Width: 1200, Height: 800, MinWidth: 720, MinHeight: 540,
 		Frameless:   true,
 		AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{bridge},

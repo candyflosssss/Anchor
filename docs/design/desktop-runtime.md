@@ -125,3 +125,10 @@ Connections 仅返回公开档案（name、transport、authentication、target�
 宿主复用 internal/connection 与 CLI 相同的身份／授权／连接策略。密钥模式使用受限 OpenSSH 的 stdio 转发（ssh -W），不开放临时本机管理端口；密码模式使用内置 SSH 通道，首次明确同意后保存公开主机密钥，变化即拒绝。固定 bootstrap 命令只允许已验证 executable／端口；默认在 SSH 非交互 PATH 中查找，缺失时依次检查该账户的 ~/.local/bin/anchor、~/bin/anchor 和系统常见路径，指定路径不回退并支持 ~/。在不加载登录脚本的 POSIX shell 内执行，先检查 bootstrap --help，密钥和密码模式共用此策略；管理令牌保存在受权限保护 SQLite 凭据表，密码不保存。认证错误只返回白名单 code，不暴露 stderr／令牌。程序缺失（remote_anchor_missing）、引导不支持（remote_anchor_unsupported）、管理端口不匹配（remote_control_port）、核心未就绪（remote_core_not_ready）分别展示；其余引导失败／响应无效保留 remote_anchor。旧远端未提供细分诊断时保留通用错误。
 
 切换先核验目标 ready 并保存独立 desktop_context，再替换当前连接；失败不破坏已有连接，不改 CLI current_context。保存的密码连接在下次启动要求重新输入。关闭宿主只关闭本次 SSH，不停止目标核心；StopCore 明确停止当前选中目标，升级安装则只停止本机核心，即使当前 UI 连接远端。旧授权失效后重新 SSH 签发仍必须匹配已绑定实例。远端必须预先安装支持 context bootstrap 的 Anchor，自动安装尚未实现。
+
+
+## 中文输入法桥接（2026-10-15，当前源码未打包）
+
+Linux GUI 宿主在 Wails／GTK 初始化前检测 GNOME Wayland 会话。仅当 GTK_IM_MODULE 未显式配置、已安装 Fcitx5 GTK3 模块且当前 D-Bus 会话已有 org.fcitx.Fcitx5 所有者时，为当前宿主进程选择 GTK_IM_MODULE=fcitx，避免默认 GTK Wayland 模块无法连接独立 Fcitx5 的情况。检测使用现有 DBUS_SESSION_BUS_ADDRESS，限制查询时间，不自动拉起 D-Bus／输入法服务。模块缺失、探测失败、KDE／X11 或显式配置 ibus／simple／wayland 等情况保持原状；Windows WebView2 继续使用系统输入法。
+
+此设置只作用于 GUI 启动，不用于核心或安装辅助入口，不修改用户配置、桌面会话环境、Agent 或系统输入法配置。隔离单元测试覆盖环境选择与保留；本机无窗口 GTK 探针确认默认 context 为 wayland、选择桥接后为 fcitx。前端组合态回归另见[前端规范](frontend.md#中文输入法组合态2026-10-15当前源码未打包)；尚未打包本轮修复，未替换当前运行程序，也未完成真实 WebKitGTK 候选输入或 Windows 原生输入法验收。

@@ -520,3 +520,10 @@ Model 接受 CNY 与 site_unit；公开元数据无法确认币种时标注「�
 卡片直接显示有效渠道数量，完整快照中无有效渠道时显示警示边框和「无有效渠道」说明；映射、排序、设置和修复入口保留。展开显示每个渠道的供应商开关、可用状态和原因，来源 Key 展示各自开关及健康状态；倍率查询结果不覆盖可用性状态。half-open 无法区分等待恢复探测与探测在途，因此标注「可用性待确认」，不猜测可用；不完整／失败读取不冒充无映射或全部不可用。供应商 revision 改变后不复用旧 revision 的工作区快照。状态基于最近读取结果，非实时连通性保证；通过「刷新配置」核对，不自动触发推理或付费请求。
 
 此轮无管理 API／DTO 或 CLI 契约变化；CLI 继续使用 provider put 的 enabled 配置及 provider key-put --disabled／默认 enabled 管理开关，provider workspace 查询 Key 状态，详见[功能覆盖和最新命令](../cli/commands.md)。未新增原生桌面包或在线更新；浏览器模拟宿主不等于 Windows／Linux 原生窗口验收。
+
+
+### 中文输入法组合态（2026-10-15，当前源码未打包）
+
+中文名称可保存与原生输入法可用是两项独立验收。供应商重命名／复制、Key 名称和模型别名保留输入中的原始草稿，不在每次 onChange 时 trim，以免受控输入破坏预编辑文本；保存时继续使用既有名称校验规则，不放宽空白或标识符约束。
+
+共享 DialogContent 捕获 composition start/end，结合原生 isComposing 与 keyCode 229 保护候选选字的 Enter／Escape；Radix 在 document capture 阶段处理 Escape，因此同时在 onEscapeKeyDown 阻止组合态关闭。组合完成后普通 Enter 提交、Escape 关闭保持不变。Playwright 使用 Chromium CDP 组合输入覆盖 Key、供应商重命名／复制和模型别名，不以 fill 中文替代组合态回归；这些测试不等于 Linux WebKitGTK 或 Windows 原生输入法验收。Linux 宿主的输入法桥接检测见[桌面运行契约](desktop-runtime.md#中文输入法桥接2026-10-15当前源码未打包)。纯桌面输入交互修复，无新增 CLI／管理接口契约；当前已运行的旧桌面进程不会因此自动更新。

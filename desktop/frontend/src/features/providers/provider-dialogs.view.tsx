@@ -105,7 +105,7 @@ function RenameBody({ c, run }: { c: ProviderController; run: Run }) {
   const error = id === p.id ? '' : !isValidId(id) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头。' : c.providers.some(x => x.id === id) ? '已存在同名供应商。' : '';
   return <form onSubmit={e => { e.preventDefault(); if (!error && id !== p.id) void run('rename', { target: id }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
-      <div className="field"><label htmlFor="rename-id">新名称</label><Input id="rename-id" value={id} onChange={e => setId(e.target.value.trim())} aria-invalid={!!error} aria-describedby={error ? 'rename-hint' : undefined} autoComplete="off" />
+      <div className="field"><label htmlFor="rename-id">新名称</label><Input id="rename-id" value={id} onChange={e => setId(e.target.value)} aria-invalid={!!error} aria-describedby={error ? 'rename-hint' : undefined} autoComplete="off" />
         {error && <p id="rename-hint" className="field-error">{error}</p>}</div>
     </fieldset>
     <Footer c={c}><Button disabled={c.features.busy || !!error || id === p.id}>确认改名</Button></Footer>
@@ -119,7 +119,7 @@ function CopyBody({ c, run }: { c: ProviderController; run: Run }) {
   const error = !isValidId(id) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头。' : c.providers.some(x => x.id === id) ? '已存在同名供应商。' : '';
   return <form onSubmit={e => { e.preventDefault(); if (!error) void run('copy', { target: id, copy_keys: keys }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
-      <div className="field"><label htmlFor="copy-id">新供应商名称</label><Input id="copy-id" value={id} onChange={e => setId(e.target.value.trim())} aria-invalid={!!error} aria-describedby={error ? 'copy-hint' : undefined} autoComplete="off" />
+      <div className="field"><label htmlFor="copy-id">新供应商名称</label><Input id="copy-id" value={id} onChange={e => setId(e.target.value)} aria-invalid={!!error} aria-describedby={error ? 'copy-hint' : undefined} autoComplete="off" />
         {error && <p id="copy-hint" className="field-error">{error}</p>}</div>
       <label className="checkbox-row"><input type="checkbox" checked={keys} onChange={e => setKeys(e.target.checked)} />同时复制 Key</label>
     </fieldset>
@@ -158,7 +158,7 @@ function KeyBody({ c, d, run }: { c: ProviderController; d: Extract<ProviderDial
   }
   return <form onSubmit={submit} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
-      <div className="field"><label htmlFor="key-id">Key 名称</label><Input id="key-id" value={id} readOnly={!!existing} onChange={e => setId(e.target.value.trim())} aria-invalid={!!idError} aria-describedby={idError ? 'key-id-hint' : undefined} autoComplete="off" />
+      <div className="field"><label htmlFor="key-id">Key 名称</label><Input id="key-id" value={id} readOnly={!!existing} onChange={e => setId(e.target.value)} aria-invalid={!!idError} aria-describedby={idError ? 'key-id-hint' : undefined} autoComplete="off" />
         {idError && <p id="key-id-hint" className="field-error">{idError}</p>}</div>
       <div className="field"><label htmlFor="key-secret">{existing ? '新的 API Key（留空保留）' : 'API Key'}</label><Input id="key-secret" type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={e => setSecret(e.target.value)} aria-invalid={!!secretError} aria-describedby={secretError ? 'key-secret-hint' : undefined} />
         {secretError && <p id="key-secret-hint" className="field-error">{secretError}</p>}</div>
@@ -183,10 +183,10 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
   return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError) void run('model-put', { target: alias, model: upstream.trim(), key_ids: keyIDs, strategy, tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
       <div className="field"><label htmlFor="mapping-upstream">上游模型 ID</label>
-        <Input id="mapping-upstream" list="mapping-upstream-options" value={upstream} autoComplete="off" onChange={e => { setUpstream(e.target.value); const source = c.models?.entries.find(v => v.id === e.target.value.trim()); setKeyIDs(source?.key_ids ?? []); if (!touched) setAlias(e.target.value.trim()); }} />
+        <Input id="mapping-upstream" list="mapping-upstream-options" value={upstream} autoComplete="off" onChange={e => { setUpstream(e.target.value); const source = c.models?.entries.find(v => v.id === e.target.value.trim()); setKeyIDs(source?.key_ids ?? []); if (!touched) setAlias(e.target.value); }} />
         <datalist id="mapping-upstream-options">{options.map(id => <option key={id} value={id} />)}</datalist></div>
       <div className="field"><label htmlFor="mapping-alias">Anchor 公开别名</label>
-        <Input id="mapping-alias" value={alias} readOnly={!!editing} placeholder="例如 coding-main" autoComplete="off" aria-invalid={!!aliasError} aria-describedby={aliasError ? 'mapping-alias-hint' : undefined} onChange={e => { setAlias(e.target.value.trim()); setTouched(true); }} />
+        <Input id="mapping-alias" value={alias} readOnly={!!editing} placeholder="例如 coding-main" autoComplete="off" aria-invalid={!!aliasError} aria-describedby={aliasError ? 'mapping-alias-hint' : undefined} onChange={e => { setAlias(e.target.value); setTouched(true); }} />
         {aliasError && <p id="mapping-alias-hint" className="field-error">{aliasError}</p>}</div>
       <p className="field-hint">相对倍率自动取「供应商倍率 × 来源 Key 的缓存分组倍率」。模型倍率暂不启用。</p>
       {editing && <div className="field"><label htmlFor="mapping-strategy">公开模型调度策略</label>
