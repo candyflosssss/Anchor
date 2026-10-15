@@ -6,7 +6,9 @@
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.40` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。
 - 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
 - 构建：干净隔离源码 `2da6c20910b54ece98be4f7d713045f711e15d6b`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用功能提交的定向 TypeScript／ESLint、29 项 Vitest 与 9 项 Playwright 通过结果，本轮不重复全量或浏览器测试。
-- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
+- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 上述打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
+
+- 后续本机升级：2026-10-16 01:18，按用户明确要求将用户目录中的 CLI／核心／GUI 从 `.39` 升为 `.40`；核心、网关、Agent 托管均 ready，Codex／DSH 均 applied，配置与原始恢复基线保留。此为用户目录安装，不是系统安装器／应用内 apply 验收，详见下方本机升级记录。
 
 ## 1. 安装与使用行为
 
@@ -95,7 +97,14 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 输出 `dist/desktop/0.1.0-dev.desktop.40/`，publication 六附件包括 Windows NSIS、Ubuntu24.04 AMD64 deb、flat 清单、含 vendor 源码、许可／构建元数据 ZIP 与校验清单。Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。
 
-复用功能提交已通过的 TypeScript、定向 ESLint、29 项 Vitest 与 9 项单 worker Playwright；本轮打包不重复运行全量或原生测试。BUILD.json 中 `public_release=false` 是构建时的原始状态，后续发布另行记录。本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 `.39` 的既有本机安装／Codex 名单验收保留为下方历史事实，不等于 `.40` 已安装。
+复用功能提交已通过的 TypeScript、定向 ESLint、29 项 Vitest 与 9 项单 worker Playwright；本轮打包不重复运行全量或原生测试。BUILD.json 中 `public_release=false` 是构建时的原始状态，后续发布另行记录。上述打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 `.39` 的既有本机安装／原生 Codex 名单验收保留为下方历史事实；`.40` 的后续本机升级另记如下。
+
+
+**后续本机升级（2026-10-16 01:18，用户目录安装）**：应用户要求，将 `/home/mosaki/.local/bin/anchor` 和 `/home/mosaki/.local/bin/anchor-desktop` 从 `.39` 升级至 `.40`。CLI 从本版已发布的 vendored 源码（revision `2da6c20910b54ece98be4f7d713045f711e15d6b`）受限离线编译；GUI 复用本版 Linux ELF，已核对与发布 deb 解压内容逐字节一致。没有重建桌面安装包、执行 apt 或重复公开发行，应用菜单仍指向用户目录中的桌面入口。
+
+升级前用 SQLite backup API 保存数据库，并备份 owner token、恢复日志、受管文件和旧二进制至 `/home/mosaki/.config/anchor/backups/pre-desktop40-20261016-011752/`（目录0700／文件0600，不提交内容）。关闭旧 GUI 后，核验本机核心身份并执行 `stop --approve --for-restart`，收到保留确认且旧核心／监听退出后才原子替换二进制。交接期间受管文件与恢复日志不变；新版正常启动后配置表、settings、实例身份、owner token 和绑定凭据保持，用户自有模型目录、首次恢复基线与已有 edits.before 均保留。未走普通停服／恢复／重新托管或强杀。
+
+CLI 和受认证核心均报告 `.40`，核心与 GUI 的运行 ELF 哈希匹配本版产物；core／gateway／agent management 均 ready，Codex／DSH 均 applied。state.db 仍为 schema8，quick_check／foreign_key_check 通过；Codex 默认模型不变，token-helper 验证通过，生成目录与本地 `GET /v1/models` 的12个模型完全一致（HTTP200）。核心／GUI 使用受内存上限约束的临时用户服务，Restart=no，未创建持久 unit 或登录自启动；安装 helper 已退出。证据保留于 `dist/desktop/0.1.0-dev.desktop.40/local-install/`，任务解压目录已清理。未执行系统安装器、应用内 apply、原生窗口可见性、Windows 安装、现有 Codex 会话自动重载或真实上游推理验收；进程运行不等于已验证窗口可见性。
 
 ### 历史 dev 版 `.39`
 

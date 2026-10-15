@@ -1,7 +1,8 @@
 # 在线更新 v1
 
 - 日期：2026-10-16；**`0.1.0-dev.desktop.40` 已于北京时间 2026-10-16 01:06:46 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
-- 供应商模型映射新增多选／全选与批量测试、编辑、删除；串行执行、显式确认、固定 revision、保留逐项结果与部分完成状态，不自动重试。另包含已有模型默认值补全、上下文分档计费提示、DSH Desktop 独立托管与模型能力同步，以及托管失败分类反馈。 构建 revision `2da6c20910b54ece98be4f7d713045f711e15d6b`，SOURCE.json dirty=false。Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 详见[当前在线 dev 版 `.40`](../release/desktop.md#当前在线-dev-版-40)。
+- 供应商模型映射新增多选／全选与批量测试、编辑、删除；串行执行、显式确认、固定 revision、保留逐项结果与部分完成状态，不自动重试。另包含已有模型默认值补全、上下文分档计费提示、DSH Desktop 独立托管与模型能力同步，以及托管失败分类反馈。 构建 revision `2da6c20910b54ece98be4f7d713045f711e15d6b`，SOURCE.json dirty=false。Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 上述打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 详见[当前在线 dev 版 `.40`](../release/desktop.md#当前在线-dev-版-40)。
+- 后续本机升级：2026-10-16 01:18，经用户明确要求，用户目录中的 CLI／核心／GUI 已从 `.39` 升至 `.40`；安全保留交接与重启通过，core／gateway／agent management 均 ready、Codex／DSH 均 applied，配置、凭据和原始恢复基线保持。此为本机用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收；详见[本机升级记录](../release/desktop.md#当前在线-dev-版-40)。
 - **首次迁移限制**：沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.40` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。 沿用 schema8，无数据库降级。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
