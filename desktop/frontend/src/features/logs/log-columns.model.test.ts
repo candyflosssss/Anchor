@@ -7,11 +7,17 @@ describe('log column preferences', () => {
     expect(normalizeColumns(null)).toEqual(defaultColumns);
     expect(normalizeColumns([])).toEqual(defaultColumns);
     expect(normalizeColumns(['deleted-column'])).toEqual(defaultColumns);
-    expect(normalizeColumns(['tps', 'deleted-column', 'model', 'tps', 2])).toEqual(['tps', 'model']);
+    expect(normalizeColumns(['tps', 'deleted-column', 'model', 'timing', 2])).toEqual(['timing', 'model']);
+  });
+  it('migrates legacy fields into blocks without duplicates and preserves first occurrence order', () => {
+    expect(normalizeColumns(['ttft', 'elapsed', 'model', 'upstreamModel', 'input', 'output', 'cacheReadTokens', 'reasoningTokens', 'key', 'provider', 'http', 'delivery', 'errorCode', 'stage', 'stream', 'protocol']))
+      .toEqual(['timing', 'model', 'tokens', 'provider', 'status', 'diagnostics', 'protocol']);
+    expect(normalizeColumns(['toString', '__proto__', 'constructor'])).toEqual(defaultColumns);
+    expect(normalizeColumns(['tokens'])).toEqual(['tokens']);
   });
   it('keeps the requested order and ignores movement beyond either boundary', () => {
-    expect(moveColumn(['time', 'tps', 'model'], 'tps', -1)).toEqual(['tps', 'time', 'model']);
-    expect(moveColumn(['time', 'tps', 'model'], 'tps', 1)).toEqual(['time', 'model', 'tps']);
+    expect(moveColumn(['time', 'timing', 'model'], 'timing', -1)).toEqual(['timing', 'time', 'model']);
+    expect(moveColumn(['time', 'timing', 'model'], 'timing', 1)).toEqual(['time', 'model', 'timing']);
     expect(moveColumn(['time', 'model'], 'time', -1)).toEqual(['time', 'model']);
     expect(moveColumn(['time', 'model'], 'model', 1)).toEqual(['time', 'model']);
   });

@@ -78,7 +78,7 @@
 .log-filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 20px 0 16px; }
 .log-filter-bar .log-filters { flex: 1; margin: 0; }
 .log-column-button-count { border-radius: 4px; padding: 0 4px; font-size: 10px; color: hsl(var(--muted-foreground)); background: hsl(var(--muted)); }
-.log-custom-table td { white-space: nowrap; font-size: 12px; }
+.log-custom-table td { white-space: normal; overflow-wrap: anywhere; font-size: 12px; }
 .log-detail-column { position: sticky; right: 0; width: 48px; padding: 0 8px !important; background: hsl(var(--background)); box-shadow: -1px 0 0 hsl(var(--border)); }
 .log-detail-column button { width: 28px; height: 28px; }
 .dialog-content.log-column-dialog { width: min(880px, calc(100vw - 32px)); max-width: none; display: flex; flex-direction: column; max-height: calc(100dvh - 48px); padding: 0; }
@@ -110,4 +110,30 @@
   .log-column-heading, .log-column-catalog { padding: 20px; }
   .log-column-order { border-left: 0; border-top: 1px solid hsl(var(--border)); padding: 20px; }
   .log-column-dialog-footer { padding: 14px 20px; }
+}
+
+/* Related fields share a cell; labels remain visible instead of relying on hover. */
+.log-custom-table { table-layout: fixed; }
+.log-custom-table td { vertical-align: top; padding-top: 14px; padding-bottom: 14px; }
+.log-custom-table .log-time { white-space: normal; overflow-wrap: anywhere; }
+.log-info-block { display: grid; gap: 7px; min-width: 0; white-space: normal; line-height: 1.4; }
+.log-block-primary, .log-meta-list dd { overflow-wrap: anywhere; }
+.log-result-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.log-http { font-size: 10px; color: hsl(var(--muted-foreground)); }
+.log-meta-list { display: grid; gap: 4px; }
+.log-meta-list > div { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; font-size: 11px; }
+.log-meta-list dt, .log-metric-grid dt { color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 400; }
+.log-meta-list dd, .log-metric-grid dd { margin: 0; }
+.log-metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; text-align: right; line-height: 1.35; }
+.log-metric-grid > div { min-width: 0; }
+.log-metric-grid dd { margin-top: 3px; font-size: 12px; font-weight: 500; white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.log-metric-grid > div:first-child dd, .log-metric-grid > div:nth-child(2) dd { font-weight: 600; }
+.log-token-total { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 6px; border-top: 1px solid hsl(var(--border) / .6); color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.4; }
+.log-properties > div > dd { min-width: 0; }
+.log-properties .log-meta-list > div, .log-properties .log-metric-grid > div { border: 0; padding: 0; }
+.log-properties .log-meta-list dt, .log-properties .log-metric-grid dt { font-size: 10px; margin-bottom: 0; }
+.log-properties .log-metric-grid dd { font-size: 12px; }
+
+@media (max-width: 480px) {
+  .log-detail-body .log-properties { grid-template-columns: minmax(0, 1fr); }
 }

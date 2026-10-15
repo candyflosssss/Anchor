@@ -35,6 +35,23 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   await openLogs(page);
   const list = page.getByRole('region', { name: '请求日志列表' });
   await expect(list.getByRole('row')).toHaveCount(3);
+  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '详情']);
+  const success = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
+  const timing = success.getByRole('cell').nth(4), tokens = success.getByRole('cell').nth(5);
+  for (const label of ['总耗时', '首字', '正文', 'TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
+  for (const label of ['输入', '输出', '缓存命中', '思考', '合计']) await expect(tokens.getByText(label, { exact: true })).toBeVisible();
+  await expect(success.getByRole('cell').nth(1)).toContainText('HTTP 200');
+  await expect(list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_failed' }) }).getByRole('cell').nth(1)).toContainText('invalid_response');
+  await expect(success.getByRole('cell').nth(2)).toContainText('high');
+  const bounds = await success.evaluate(row => {
+    const time = row.querySelector('.log-time')!.getBoundingClientRect();
+    const cell = row.querySelector('td')!.getBoundingClientRect();
+    return { rowHeight: row.getBoundingClientRect().height, timeRight: time.right, cellRight: cell.right,
+      timeWidth: row.querySelector('.log-time')!.scrollWidth, availableWidth: row.querySelector('.log-time')!.clientWidth };
+  });
+  expect(bounds.timeWidth).toBeLessThanOrEqual(bounds.availableWidth);
+  expect(bounds.timeRight).toBeLessThanOrEqual(bounds.cellRight);
+  expect(bounds.rowHeight).toBeLessThan(140);
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-light.png'), fullPage: true });
   await page.getByLabel('请求结果', { exact: true }).selectOption('failed');
   await expect(list.getByRole('row')).toHaveCount(2);
@@ -62,14 +79,14 @@ test('column preferences preserve collected values and survive reload', async ({
   const list = page.getByRole('region', { name: '请求日志列表' });
   const opener = page.getByRole('button', { name: /显示内容/ });
   await opener.click(); const dialog = page.getByRole('dialog');
-  await dialog.getByRole('checkbox', { name: /^供应商/ }).uncheck();
-  await dialog.getByRole('checkbox', { name: /^思考深度/ }).check();
-  await dialog.getByRole('button', { name: '左移思考深度', exact: true }).click();
+  await dialog.getByRole('checkbox', { name: /^供应商 \/ Key/ }).uncheck();
+  await dialog.getByRole('checkbox', { name: /^请求方式/ }).check();
+  await dialog.getByRole('button', { name: '左移请求方式', exact: true }).click();
   await dialog.getByRole('button', { name: '完成', exact: true }).click();
   await expect(opener).toBeFocused();
-  await expect(list.getByRole('columnheader', { name: '供应商', exact: true })).toHaveCount(0);
+  await expect(list.getByRole('columnheader', { name: '供应商 / Key', exact: true })).toHaveCount(0);
   const headers = await list.getByRole('columnheader').allTextContents();
-  expect(headers.indexOf('思考深度')).toBeLessThan(headers.indexOf('错误码'));
+  expect(headers.indexOf('请求方式')).toBeLessThan(headers.indexOf('Token 用量'));
   await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) })).toContainText('high');
   expect(await page.evaluate(() => window.logTest.queries.every(q => !('columns' in q)))).toBe(true);
   await page.reload(); await page.getByRole('button', { name: '日志', exact: true }).click();
@@ -86,8 +103,26 @@ test('column preferences preserve collected values and survive reload', async ({
   await expect(success).toContainText('provider-a');
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('button', { name: '查看请求 fixture_success' }).click();
+  await expect(dialog.getByLabel('Token 用量')).toBeVisible();
+  expect(await dialog.getByLabel('Token 用量').evaluate(el => el.clientWidth)).toBeGreaterThan(200);
+  expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-detail-mobile.png') });
+  await page.keyboard.press('Escape');
   await opener.click(); expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-columns-mobile.png') });
+});
+test('legacy individual column preferences migrate into ordered blocks', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('anchor.ui.logs.columns.v1', JSON.stringify([
+    'time', 'ttft', 'elapsed', 'generationMs', 'tps', 'input', 'output', 'cacheReadTokens', 'reasoningTokens', 'model', 'reasoningEffort', 'provider', 'key', 'http', 'delivery', 'errorCode', 'stage',
+  ])));
+  await openLogs(page);
+  const list = page.getByRole('region', { name: '请求日志列表' });
+  await expect(list.getByRole('columnheader')).toHaveText(['时间', '耗时与速度', 'Token 用量', '模型', '供应商 / Key', '结果与交付', '错误与阶段', '详情']);
+  const failed = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_failed' }) });
+  await expect(failed).toContainText('invalid_response');
+  await expect(failed).toContainText('response_validate');
+  await expect(failed).toContainText('HTTP 200');
 });
 test('retention, export, stable cursor snapshot and system correlation', async ({ page }) => {
   await openLogs(page);
