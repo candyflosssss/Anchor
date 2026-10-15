@@ -5,7 +5,7 @@
 - 范围：供应商映射表单可选额外创建 Fast／Ultrafast 独立模型，Anchor 固定注入 `priority`／`ultrafast` 服务档位；普通模型不变。日志区分调用方、Anchor 策略与上游实际档位，并含已提交的日志布局／缓存命中率改进。不强开 Codex 原生速度菜单，不保证供应商支持、权限或价格；详见[模型分身](../design/model-speed-variants.md)。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.36` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；不承诺零停机、自动启动或既有会话重连。
 - 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。远端核心须另行升级。
-- 验证：干净隔离源码 `f7e961f405a1515f89b412051937fe9d0ecd202c`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.35` 发现／实际下载 Linux 包通过。复用功能任务九包 Go、21 项 Vitest、两项 Playwright、类型与定向 ESLint 结果，发布轮次未重跑套件、未安装本机、未执行原生窗口／安装器／apply 或真实付费上游验收。本机既往升级记录见第 3 节，不代表本版已安装。
+- 验证：干净隔离源码 `f7e961f405a1515f89b412051937fe9d0ecd202c`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.35` 发现／实际下载 Linux 包通过。复用功能任务九包 Go、21 项 Vitest、两项 Playwright、类型与定向 ESLint 结果，发布轮次未重跑套件、未安装本机、未执行原生窗口／安装器／apply 或真实付费上游验收。本机后续升级事实与本地验收边界见第 3 节。
 
 ## 1. 安装与使用行为
 
@@ -92,6 +92,14 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 本地输出 `dist/desktop/0.1.0-dev.desktop.36/`，`publication/` 六附件含两平台安装包、flat 更新清单、对应源码（含 Go vendor）、许可／构建元数据 ZIP 和总校验清单。构建元数据保留构建时未发布及未安装的原始事实，投放结果另行记录。
 
 Fast／Ultrafast 分身与限制见[设计契约](../design/model-speed-variants.md)；安全交接沿用 `.35`，旧版首次迁移限制见页首。Linux 默认源实际下载与大小／SHA256校验通过，Windows 及其他附件 GitHub digest 与本地一致；未安装本机或重启真实核心，未进行原生窗口／安装器或真实付费上游验收。
+
+**后续本机升级（2026-10-15 16:12，用户目录安装）**：应用户要求，CLI 与桌面程序从 `.35` 升至 `.36`。CLI 从本版已发布的 vendored 源码（revision `f7e961f405a1515f89b412051937fe9d0ecd202c`）受限离线编译，GUI 复用本版已校验的 Linux ELF；原子替换 `~/.local/bin/anchor` 和 `~/.local/bin/anchor-desktop`，没有重建安装包、执行 apt、重新投放线上或启用登录自启动。
+
+升级前将数据库、owner token、绑定恢复日志、现有受管配置／目录和旧程序备份至仓库外权限保护目录 `~/.config/anchor/backups/pre-desktop36-20261015-161000/`。先关闭本机旧 GUI，再对已核对身份的 local 核心执行 `stop --approve --for-restart`；收到保留确认并等待旧核心退出后才替换文件。交接前后与新版启动后，受管配置、目录、owner token、原始恢复日志和绑定凭据均未变化，未走普通停服／restore／sync 或强杀。
+
+**升级中发现既有启动状态问题**：保留交接后，两个 `all-mapped` 绑定的恢复日志仍是 `applied`，配置也未变，但启动流程对空目录版本进行元数据校验，将内存管理状态标成 `apply_failed`。核对旧日志和现有配置后，使用原始日志对应的计划 fingerprint 走已有 `agent apply` 的已应用验证分支，清除了状态缓存；未恢复或重新写入 Agent 文件。此轮未修改产品代码修复根因，后续相同重启场景可能再次提示，不应通过普通恢复／重接管掩盖问题。首次本机升级检查也曾因用户自有的相对模型目录路径而提前拒绝；当时尚未停服，核对真实路径后继续。
+
+最终核心、网关、Agent 管理均 ready，两个绑定 applied；核心与 GUI 的 transient user services active，运行 ELF 哈希与本轮 CLI／已发布桌面产物一致。实例身份和配置计数保持，state.db 仍为 schema8，quick_check／foreign_key_check 通过；Codex token-helper 与原绑定凭据匹配，本机 `GET /v1/models` 返回 HTTP200／8模型。未自动创建速度分身、未请求真实付费推理、未验证既有 Codex 会话重载；GUI 进程运行不等于已验收原生窗口可见性。本机证据保留在 `dist/desktop/0.1.0-dev.desktop.36/local-install/`，临时 vendored 源码已清理。
 
 ### 历史 dev 版 `.35`
 
