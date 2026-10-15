@@ -347,6 +347,8 @@ all-mapped 将所有具有启用供应商的公开模型映射作为动态授权
 
 Codex all-mapped 也导出 `anchor_<binding>.models.json` 并管理 `model_catalog_json`，不要求预先提供版本匹配缓存。优先使用明确声明的元数据；也可只读复用接管前配置指向的配置根内本地目录，按公开 ID 或唯一上游 ID 匹配，保留指令模板与已声明能力；无模板时只生成保守的模型名条目，不推断指令／context／reasoning。用户原目录不改写，恢复时还原其原始指针；不循环读取 Anchor 自己生成的旧目录，以免已清除设置残留。目录结构写入不等于已通过所有 Codex 版本原生解析验收。
 
+Codex 目录与上游 portable settings 使用不同的推理档位表示。导出器只投影 Codex 能表示的 `none/minimal/low/medium/high/xhigh`；`max/default/null` 等上游原生选项保留在存储及上游配置，仅不出现在生成的 Codex effort 列表，不阻断整份目录、不删除模型、不暗中映射成另一强度。不可表示的默认 effort 导出为 null。明确声明的上下文／能力和原指令模板继续沿用，结构校验、权限、外部修改冲突仍拒绝。此兼容规则用于各目录范围、登记、启动迁移及手动／自动同步。
+
 自动同步仅处理已启用且存在未恢复 journal 的目标，保持原 scope/default/token。逐绑定失败隔离：映射仍保存成功，其他目标继续同步，状态报告 needs_sync、overridden 或 recovery_pending；不得覆盖外部修改。默认模型不再有可用候选时暂停该目标同步，不擅自选新默认值。更新先在内存中核对／还原旧托管字段，生成下一份配置，再用包含 previous/next 写入值的 prepared journal 和条件原子替换发布；中断后恢复接受前一份或下一份 Anchor 写入值，但拒绝第三方值。不会先发布未接管配置，恢复基线始终是首次接管时的用户值。Codex／Claude 仍需重启，DSH 默认值需新会话生效；自动落盘不代表客户端实时刷新或上游认可 Fast/Ultrafast。
 
 Claude 仅写用户 settings.json 的 model/availableModels、Anthropic 基址、Binding auth 与模型默认环境变量，暂时禁用原 API key/helper 和云平台选项；停用按原字段恢复。基址使用网关 origin，避免 SDK 重复 /v1；自定义默认别名提供 custom model option，网关发现不能保证任意别名进入原生选择器。项目、策略、CLI 覆盖与实际程序连接不作探测。

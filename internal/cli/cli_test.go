@@ -423,3 +423,16 @@ func TestKeyProtocolCLI(t *testing.T) {
 		}
 	}
 }
+
+func TestHelpDocumentsCodexReasoningProjection(t *testing.T) {
+	var out bytes.Buffer
+	a := App{In: strings.NewReader(""), Out: &out, Err: io.Discard}
+	if err := a.Run(context.Background(), []string{"help"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, hint := range []string{"Codex catalogs project supported reasoning efforts only", "upstream max/default/null remain stored, not relabelled"} {
+		if !strings.Contains(out.String(), hint) {
+			t.Fatal("reasoning projection help missing", hint)
+		}
+	}
+}

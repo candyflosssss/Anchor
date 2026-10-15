@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -407,5 +409,129 @@ func TestMappedCatalogFallbackIsConservativeAndRejectsBadTemplates(t *testing.T)
 		} else {
 			entry[key] = original
 		}
+	}
+}
+
+func TestStartMigratesLegacyCatalogWithNativeReasoningAndSpeedAliases(t *testing.T) {
+	m, env, target := workspaceManager(t)
+	root := env.CodexHome
+	var entry map[string]json.RawMessage
+	if err := json.Unmarshal(metadata(t).Entry, &entry); err != nil {
+		t.Fatal(err)
+	}
+	entry["slug"] = json.RawMessage(`"fixture-source"`)
+	source, _ := json.Marshal(map[string]any{"models": []any{entry}})
+	sourcePath := filepath.Join(root, "user.models.json")
+	if err := os.WriteFile(sourcePath, source, 0600); err != nil {
+		t.Fatal(err)
+	}
+	original := []byte("model = \"old\"\nmodel_catalog_json = \"user.models.json\"\n# keep original\n")
+	configPath := filepath.Join(root, "config.toml")
+	if err := os.WriteFile(configPath, original, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"public", "public(fast)", "public(ultrafast)"} {
+		model, err := m.Store.Model("public")
+		if err != nil {
+			t.Fatal(err)
+		}
+		revision := int64(0)
+		if id == "public" {
+			revision = model.Revision
+		}
+		model.ID = id
+		model.Settings = &state.ModelSettings{Configuration: state.ModelConfiguration{
+			SupportedReasoning: []modeldev.ReasoningOption{{Type: "effort", Values: []*string{settingsPtr("medium"), settingsPtr("low"), settingsPtr("xhigh"), settingsPtr("high"), settingsPtr("max"), settingsPtr("default")}}},
+			DefaultReasoning:   &state.ReasoningDefault{Type: "effort", Value: settingsPtr("high")},
+		}}
+		if _, err = m.Store.PutModel(model, revision); err != nil {
+			t.Fatal(err)
+		}
+	}
+	modelsBefore, _ := m.Store.Models()
+	b, err := m.Add(state.Binding{ID: target.ID, AdapterID: "codex", AdapterVersion: "1", ConfigRoot: root, Executable: env.Executable, Model: "public(fast)", ModelScope: "all-mapped", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.ready = true
+	g, err := m.gateway(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Older all-mapped writes only the connection fields and leaves the user's
+	// catalog pointer unmanaged. Startup must migrate this exact live state.
+	g.Models = nil
+	planApply(t, b, g, m.Engine)
+	before, err := m.Engine.load(b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, _ := m.Store.BindingToken(b.ID)
+	m.PreserveForRestart()
+	next := NewManager(m.Store)
+	rows, err := next.Start()
+	if err != nil || len(rows) != 1 || rows[0].Status != "applied" {
+		t.Fatal(rows, err)
+	}
+	defer next.Stop()
+	after, err := next.Engine.load(b.ID)
+	if err != nil || after.Catalog == nil || after.OperationID != before.OperationID || !bytes.Equal(after.Original, before.Original) {
+		t.Fatal("baseline not preserved", err)
+	}
+	for _, old := range before.Edits {
+		found := false
+		for _, updated := range after.Edits {
+			if sameField(old.Path, updated.Path) {
+				found = equal(old.Before, updated.Before)
+			}
+		}
+		if !found {
+			t.Fatal("edit.before lost", old.Path)
+		}
+	}
+	g, err = next.gateway(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = (Codex{}).Verify(b, g); err != nil {
+		t.Fatal(err)
+	}
+	catalog := readSyncFile(t, after.Catalog.Path)
+	for _, id := range []string{"public", "public(fast)", "public(ultrafast)"} {
+		if !bytes.Contains(catalog, []byte(`"slug": "`+id+`"`)) {
+			t.Fatal("missing alias", id)
+		}
+	}
+	if bytes.Contains(catalog, []byte(`"effort": "max"`)) || bytes.Contains(catalog, []byte(`"effort": "default"`)) {
+		t.Fatal("native effort leaked into Codex enum")
+	}
+	snapshot := readSyncFile(t, next.Engine.journalPath(b.ID))
+	if r, err := next.Refresh(b.ID, b.Revision); err != nil || r.Status != "applied" {
+		t.Fatal(r, err)
+	}
+	if !bytes.Equal(snapshot, readSyncFile(t, next.Engine.journalPath(b.ID))) {
+		t.Fatal("no-op manual sync churned journal")
+	}
+	currentToken, _ := m.Store.BindingToken(b.ID)
+	modelsAfter, _ := m.Store.Models()
+	if token != currentToken || !reflect.DeepEqual(modelsBefore, modelsAfter) || !bytes.Equal(source, readSyncFile(t, sourcePath)) {
+		t.Fatal("credential/settings/user catalog changed")
+	}
+	// The desktop settings form uses Enroll for an already managed target.
+	updated, err := next.Enroll(env, EnrollAgent{TargetID: target.ID, Model: "public(ultrafast)", ModelScope: "all-mapped", ExpectedRevision: b.Revision, Approved: true})
+	if err != nil {
+		t.Fatal("settings save rejected", err)
+	}
+	if rows, err := next.Status(); err != nil || rows[0].Status != "applied" {
+		t.Fatal(rows, err)
+	}
+	if updated.Model != "public(ultrafast)" {
+		t.Fatal(updated.Model)
+	}
+	if r, err := next.Stop(); err != nil || r[0].Status != "restored" {
+		t.Fatal(r, err)
+	}
+	if !bytes.Equal(original, readSyncFile(t, configPath)) || !bytes.Equal(source, readSyncFile(t, sourcePath)) {
+		t.Fatal("original configuration/catalog not restored")
 	}
 }

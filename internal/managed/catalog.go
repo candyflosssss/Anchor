@@ -121,20 +121,18 @@ func buildCatalogTemplates(models []state.Model, version string, templates map[s
 					continue
 				}
 				levels := []map[string]string{}
+				// Portable settings describe upstream-native options, not the
+				// Codex ReasoningEffort enum. Project only representable values;
+				// max/default/null must neither poison the whole catalog nor be
+				// relabelled as another effort. Keep the stored settings intact.
 				for _, value := range option.Values {
-					if value == nil {
-						return nil, nil, errors.New("Codex catalog cannot represent null reasoning effort")
+					if codexReasoningEffort(value) {
+						levels = append(levels, map[string]string{"effort": *value, "description": *value})
 					}
-					switch *value {
-					case "none", "minimal", "low", "medium", "high", "xhigh":
-					default:
-						return nil, nil, errors.New("reasoning effort is not supported by Codex export")
-					}
-					levels = append(levels, map[string]string{"effort": *value, "description": *value})
 				}
 				set("supported_reasoning_levels", levels)
 				set("default_reasoning_level", nil)
-				if cfg.DefaultReasoning != nil && cfg.DefaultReasoning.Type == "effort" {
+				if cfg.DefaultReasoning != nil && cfg.DefaultReasoning.Type == "effort" && codexReasoningEffort(cfg.DefaultReasoning.Value) {
 					set("default_reasoning_level", cfg.DefaultReasoning.Value)
 				}
 			}
@@ -158,6 +156,19 @@ func buildCatalogTemplates(models []state.Model, version string, templates map[s
 		return nil, nil, errors.New("generated catalog exceeds 1 MiB")
 	}
 	return append(raw, '\n'), ids, err
+}
+
+// Do not infer equivalence between an upstream-native effort and a Codex one.
+func codexReasoningEffort(value *string) bool {
+	if value == nil {
+		return false
+	}
+	switch *value {
+	case "none", "minimal", "low", "medium", "high", "xhigh":
+		return true
+	default:
+		return false
+	}
 }
 
 // fileReferences checks the configuration we restored and named profile files.
