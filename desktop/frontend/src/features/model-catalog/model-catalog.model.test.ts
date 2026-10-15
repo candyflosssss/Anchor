@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/model-catalog.json';
 import { CONTRACT, type CatalogEstimateInput, type ModelCatalogQuery } from '../../desktop/contract.generated';
-import { checkedCatalogEstimate, checkedModelCatalog, createModelCatalogService } from './model-catalog.model';
+import { checkedCatalogEstimate, checkedModelCatalog, checkedContextPolicy, createModelCatalogService } from './model-catalog.model';
 
 const query: ModelCatalogQuery = { provider_id: 'lab', model_id: 'vision-reasoner', search: '', limit: 0, refresh: false };
 const input: CatalogEstimateInput = { query, usage: fixture.estimate.usage };
@@ -16,6 +16,20 @@ describe('models.dev reference methods', () => {
     expect(model.reasoning_options[1].min).toBe(-1);
     expect(model.pricing?.tiers[0].above_tokens).toBe(250000);
     expect(host.ModelCatalog).toHaveBeenCalledOnce();
+  });
+  it('validates context advice and treats missing legacy advice as unknown', () => {
+    const policy = { model_context: 1050000, recommended_context: 272000, price_threshold: 272000 };
+    expect(checkedContextPolicy(policy)).toEqual(policy);
+    expect(checkedContextPolicy(undefined)).toBeNull();
+    expect(checkedContextPolicy(null)).toBeNull();
+    for (const value of [0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, '272000']) {
+      expect(() => checkedContextPolicy({ ...policy, price_threshold: value })).toThrow();
+    }
+    expect(() => checkedContextPolicy({ ...policy, recommended_context: 500000 })).toThrow();
+    expect(() => checkedContextPolicy({ ...policy, model_context: 128000 })).toThrow();
+    const legacy = structuredClone(fixture.catalog) as Record<string, unknown>;
+    delete (legacy.models as Record<string, unknown>[])[0].context_policy;
+    expect(checkedModelCatalog(legacy).models[0].context_policy).toBeNull();
   });
   it('preserves unknown values and stale provenance without replacing them with false or zero', () => {
     const stale = structuredClone(fixture.catalog);

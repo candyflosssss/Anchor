@@ -51,16 +51,16 @@ func TestMappingCreationCatalogDefaults(t *testing.T) {
 		t.Fatal(m, err)
 	}
 	cfg := m.Settings.Configuration
-	if *cfg.Limits.Context != 400000 || *cfg.Limits.Input != 300000 || *cfg.Limits.Output != 100000 || !*cfg.Capabilities.Vision || len(cfg.SupportedReasoning) != 3 || cfg.DefaultReasoning != nil {
+	if *cfg.Limits.Context != 250000 || *cfg.Limits.Input != 250000 || *cfg.Limits.Output != 100000 || !*cfg.Capabilities.Vision || len(cfg.SupportedReasoning) != 3 || cfg.DefaultReasoning != nil {
 		t.Fatal(cfg)
 	}
-	if *m.Settings.Reference.Models[0].Pricing.Rates.Input != "2.5" {
+	if *m.Settings.Reference.Models[0].Pricing.Rates.Input != "2.5" || *m.Settings.Reference.Models[0].Limits.Context != 400000 {
 		t.Fatal(m.Settings.Reference)
 	}
 	// Updates, including old callers with no settings, retain the imported metadata.
 	m.Settings = nil
 	m, err = cl.PutModel(context.Background(), m, 1)
-	if err != nil || m.Settings == nil || *m.Settings.Configuration.Limits.Context != 400000 {
+	if err != nil || m.Settings == nil || *m.Settings.Configuration.Limits.Context != 250000 {
 		t.Fatal(m, err)
 	}
 	prices, _ := f.store.Prices("p")
@@ -98,7 +98,7 @@ func TestProviderScopedCreationCatalogDefaults(t *testing.T) {
 		t.Fatalf("%d %s", resp.StatusCode, raw)
 	}
 	m, err := f.store.Model("alias")
-	if err != nil || m.Settings == nil || *m.Settings.Configuration.Limits.Context != 400000 {
+	if err != nil || m.Settings == nil || *m.Settings.Configuration.Limits.Context != 250000 {
 		t.Fatal(m, err)
 	}
 	// Attaching another provider never replaces shared settings.
@@ -134,7 +134,7 @@ func TestExplicitReferenceFillsConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 	v, err = cl.SaveModelSettings(context.Background(), catalog.SaveModelSettings{ModelID: m.ID, ExpectedRevision: 1, Configuration: v.Configuration, ReferenceAction: "set", ReferenceProviderID: "lab", ReferenceModelID: "vision-reasoner"})
-	if err != nil || v.Reference == nil || *v.Configuration.Limits.Context != 400000 || *v.Reference.Models[0].Pricing.Rates.Input != "2.5" || *v.Configuration.Capabilities.ToolCall {
+	if err != nil || v.Reference == nil || *v.Configuration.Limits.Context != 250000 || *v.Reference.Models[0].Pricing.Rates.Input != "2.5" || *v.Configuration.Capabilities.ToolCall {
 		t.Fatal(v, err)
 	}
 }
@@ -160,14 +160,14 @@ func TestExistingMappingCatalogDefaultsPreviewAndSave(t *testing.T) {
 			t.Fatal(err)
 		}
 		v, err := cl.ModelSettings(t.Context(), catalog.ModelSettingsQuery{ModelID: m.ID})
-		if err != nil || v.DefaultsStatus != "matched" || v.Reference == nil || v.Configuration.Limits.Output == nil {
+		if err != nil || v.DefaultsStatus != "matched" || v.Reference == nil || v.Configuration.Limits.Output == nil || v.ContextPolicy == nil || *v.ContextPolicy.PriceThreshold != 250000 || *v.ContextPolicy.ModelContext != 400000 {
 			t.Fatal(v, err)
 		}
 		if partial {
 			if *v.Configuration.Limits.Context != 500000 || *v.Configuration.Limits.Output != 64000 || *v.Configuration.Capabilities.Vision {
 				t.Fatal("manual overrides replaced", v)
 			}
-		} else if *v.Configuration.Limits.Context != 400000 || *v.Configuration.Limits.Output != 100000 {
+		} else if *v.Configuration.Limits.Context != 250000 || *v.Configuration.Limits.Output != 100000 {
 			t.Fatal("missing catalog defaults", v)
 		}
 		after, _ := f.store.Model(m.ID)
@@ -210,7 +210,7 @@ func TestExistingMappingCatalogDefaultsFallbacks(t *testing.T) {
 		if err != nil || v.DefaultsStatus != tc.status || v.Reference != nil {
 			t.Fatal(tc.id, v, err)
 		}
-		if tc.tier != "" && (v.Configuration.Limits.Context == nil || *v.Configuration.Limits.Context != 400000) {
+		if tc.tier != "" && (v.Configuration.Limits.Context == nil || *v.Configuration.Limits.Context != 250000 || v.ContextPolicy == nil || *v.ContextPolicy.PriceThreshold != 250000) {
 			t.Fatal(v)
 		}
 	}

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -72,10 +73,43 @@ func TestModelCatalogControlBoundariesAndPriceImport(t *testing.T) {
 		t.Fatal("cache/boundary fetch count", calls.Load())
 	}
 	p, e := f.core.importPrice(context.Background(), "local-alias", "lab", "vision-reasoner")
-	if e != nil || p.Model != "local-alias" || p.InputUSD != 2.5 || p.Source != "models.dev/lab/vision-reasoner" || calls.Load() != 1 {
+	if !errors.Is(e, errTieredReferencePrice) || p != nil || calls.Load() != 1 {
 		t.Fatal(p, e, calls.Load())
+	}
+	p, e = f.core.importPrice(context.Background(), "local-alias", "lab", "text-only")
+	if e != nil || p.InputUSD != 0 || p.Source != "models.dev/lab/text-only" {
+		t.Fatal(p, e)
 	}
 	if _, e := f.core.importPrice(context.Background(), "alias", "", ""); e == nil {
 		t.Fatal("empty catalog ID accepted")
+	}
+}
+
+// Exercise the public action path so a caller gets an actionable error rather
+// than an apparently successful import that silently loses the expensive tier.
+func TestProviderPriceImportRejectsTieredCatalog(t *testing.T) {
+	f := setup(t)
+	f.add(t, "p", "http://127.0.0.1:1", "synthetic")
+	installDefaultsCatalog(t, f)
+	cfg, _ := f.store.Settings()
+	req, _ := http.NewRequest("POST", f.control.URL+"/control/v1/providers/p/action", strings.NewReader(`{"provider_id":"p","expected_revision":1,"action":"price-import","target":"alias","catalog_provider":"lab","model":"vision-reasoner"}`))
+	req.Header.Set("Authorization", "Bearer "+f.owner)
+	req.Header.Set("X-Anchor-Instance", cfg.InstanceID)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusBadRequest || !strings.Contains(string(raw), "context-tiered price cannot be flattened") {
+		t.Fatalf("expected actionable rejection: status=%d body=%s", resp.StatusCode, raw)
+	}
+	prices, err := f.store.Prices("p")
+	if err != nil || len(prices) != 0 {
+		t.Fatal("import changed billing prices", prices, err)
+	}
+	p, err := f.store.Provider("p")
+	if err != nil || p.Revision != 1 {
+		t.Fatal("import mutated provider", p, err)
 	}
 }

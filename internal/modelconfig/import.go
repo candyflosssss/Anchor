@@ -9,11 +9,25 @@ import (
 // Prices remain in the reference snapshot, never in upstream billing rates.
 func FillCatalog(c ModelConfiguration, m modeldev.CatalogModel) ModelConfiguration {
 	within := func(n, limit *int64) bool { return n == nil || limit == nil || *n <= *limit }
-	if c.Limits.Context == nil && within(c.Limits.Input, m.Limits.Context) && within(c.Limits.Output, m.Limits.Context) && within(c.DefaultOutputTokens, m.Limits.Context) {
-		c.Limits.Context = m.Limits.Context
+	policy := modeldev.ContextPolicyFor(m)
+	context := policy.RecommendedContext
+	// A manually declared input/output budget can require a larger window.
+	// Preserve those declarations; never silently reduce an explicit budget.
+	if !within(c.Limits.Input, context) || !within(c.Limits.Output, context) || !within(c.DefaultOutputTokens, context) {
+		context = m.Limits.Context
 	}
-	if c.Limits.Input == nil && within(m.Limits.Input, c.Limits.Context) {
-		c.Limits.Input = m.Limits.Input
+	autoContext := c.Limits.Context == nil
+	if autoContext && within(c.Limits.Input, context) && within(c.Limits.Output, context) && within(c.DefaultOutputTokens, context) {
+		c.Limits.Context = context
+	}
+	input := m.Limits.Input
+	// Only adapt an imported input ceiling to a newly selected price-aware
+	// window. Existing manual limits retain the original conflict/skip behavior.
+	if autoContext && input != nil && c.Limits.Context != nil && *input > *c.Limits.Context {
+		input = c.Limits.Context
+	}
+	if c.Limits.Input == nil && within(input, c.Limits.Context) {
+		c.Limits.Input = input
 	}
 	if c.Limits.Output == nil && within(m.Limits.Output, c.Limits.Context) && within(c.DefaultOutputTokens, m.Limits.Output) {
 		c.Limits.Output = m.Limits.Output

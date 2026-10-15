@@ -10,6 +10,7 @@ type ModelSettingsQuery struct {
 	ModelID string `json:"model_id"`
 }
 type ModelSettingsState struct {
+	ContextPolicy *modeldev.ContextPolicy `json:"context_policy"`
 	// Read-only draft provenance; reading never persists defaults or increments revision.
 	DefaultsStatus string                         `json:"defaults_status"`
 	ModelID        string                         `json:"model_id"`

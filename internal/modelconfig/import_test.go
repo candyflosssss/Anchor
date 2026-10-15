@@ -49,3 +49,21 @@ func TestFillCatalogPreservesExplicitRelatedDeclarations(t *testing.T) {
 		t.Fatal(out)
 	}
 }
+
+func TestFillCatalogUsesPriceBandWithoutChangingModelCapacity(t *testing.T) {
+	maxContext, input, output, manual := int64(1050000), int64(922000), int64(128000), int64(500000)
+	m := modeldev.CatalogModel{Limits: modeldev.CatalogLimits{Context: &maxContext, Input: &input, Output: &output}, Pricing: &modeldev.CatalogPricing{Tiers: []modeldev.CatalogTier{{AboveTokens: 272000}}}}
+	cfg := FillCatalog(ModelConfiguration{}, m)
+	if cfg.Validate() != nil || *cfg.Limits.Context != 272000 || *cfg.Limits.Input != 272000 || *cfg.Limits.Output != 128000 || *m.Limits.Context != 1050000 {
+		t.Fatal(cfg, m)
+	}
+	cfg = FillCatalog(ModelConfiguration{Limits: modeldev.CatalogLimits{Context: &manual}}, m)
+	if cfg.Validate() != nil || *cfg.Limits.Context != 500000 || cfg.Limits.Input != nil {
+		t.Fatal("overwrote explicit window", cfg)
+	}
+	// An explicit input budget is never silently cut to the price band.
+	cfg = FillCatalog(ModelConfiguration{Limits: modeldev.CatalogLimits{Input: &manual}}, m)
+	if cfg.Validate() != nil || *cfg.Limits.Context != 1050000 || *cfg.Limits.Input != 500000 {
+		t.Fatal("overwrote explicit input", cfg)
+	}
+}

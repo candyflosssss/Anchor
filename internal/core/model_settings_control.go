@@ -13,6 +13,9 @@ func modelSettingsState(m state.Model) catalog.ModelSettingsState {
 	if m.Settings != nil {
 		out.Configuration = m.Settings.Configuration
 		out.Reference = m.Settings.Reference
+		if out.Reference != nil && len(out.Reference.Models) == 1 {
+			out.ContextPolicy = modeldev.ContextPolicyFor(out.Reference.Models[0])
+		}
 	}
 	// These existing shared mapping flags remain authoritative.
 	out.Configuration.Capabilities.ToolCall = &m.Tools

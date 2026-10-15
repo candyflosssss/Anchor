@@ -136,6 +136,10 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		err = s.Store.PutPrice(p.ID, p.Revision, *in.Price)
 	case "price-import":
 		imported, err = s.importPrice(r.Context(), in.Target, in.CatalogProvider, in.Model)
+		if errors.Is(err, errTieredReferencePrice) {
+			fail(w, 400, "invalid", "context-tiered price cannot be flattened; use model-catalog model/estimate or model settings reference")
+			return
+		}
 	case "delete", "copy", "rename", "key-put", "key-delete", "strategy":
 		err = s.Store.MutateProvider(p.ID, p.Revision, in.Action, in.Target, in.Secret, in.Strategy, in.Enabled, in.CopyKeys, in.Protocol)
 		if in.Action == "rename" || in.Action == "copy" {

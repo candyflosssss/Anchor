@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/candyflosssss/Anchor/internal/modelconfig"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/state"
+	"os"
 	"reflect"
 	"testing"
 )
@@ -116,5 +118,32 @@ func TestCatalogProjectsNativeReasoningWithoutMutatingMappings(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestCatalogExportsPriceAwareWindowInsteadOfModelMaximum(t *testing.T) {
+	raw, err := os.ReadFile("../../desktop/contract/context-pricing.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source modeldev.CatalogModel
+	if err = json.Unmarshal(raw, &source); err != nil {
+		t.Fatal(err)
+	}
+	model := state.Model{ID: "mapped", Codex: metadata(t), Settings: &state.ModelSettings{Configuration: modelconfig.FillCatalog(state.ModelConfiguration{}, source)}}
+	raw, _, err = buildCatalog([]state.Model{model}, model.Codex.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got struct {
+		Models []struct {
+			Context int64 `json:"context_window"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(raw, &got) != nil || got.Models[0].Context != 272000 {
+		t.Fatal(string(raw))
+	}
+	if *source.Limits.Context != 1050000 {
+		t.Fatal("changed reference capacity")
 	}
 }

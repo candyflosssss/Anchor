@@ -25,7 +25,7 @@ models.dev 元数据是用户可核对的默认参考，不能证明某个中转
 
 每个核心维护一个内存快照，TTL为1小时，首次需要时加载，不后台轮询、不写磁盘。并发刷新合并；`refresh=true` 显式刷新。失败有旧快照则返回旧值并标 `stale=true/failure=refresh_failed`，自动调用1分钟后重试；无快照返回 catalog_unavailable，1分钟内自动失败退避。显式刷新可以立即重试。调用取消只停止等待共享抓取；核心退出取消并等待抓取结束，关闭闲置连接。
 
-旧 `provider price-import` 也复用此缓存：只返回基础输入／输出／缓存单价预览，价格更新时间为快照获取时间；不能表示分档及陈旧状态，因此拒绝陈旧快照。用户核对后仍需 price-put，查询和刷新不写配置。
+旧 `provider price-import` 也复用此缓存：只为无分档目录返回基础输入／输出／缓存单价预览，价格更新时间为快照获取时间；不能表示分档及陈旧状态，因此拒绝陈旧快照；2026-10-16 起也拒绝任何带 tiers 的目录条目，返回 invalid 并提示使用 model-catalog model/estimate 或映射参考快照，防止静默丢档低估。用户核对后仍需 price-put，查询和刷新不写配置。
 
 ## 文本 token 估算
 
@@ -90,3 +90,16 @@ CLI 使用 `model settings --id ID [--file FILE]`，详见[指令大全](../cli/
 `defaults_status` 是新增的只读字符串：`saved` 为 POST 保存后的实际设置；`reference` 为按已存快照补值；`matched` 为新匹配；`unmatched` 为没有唯一一致来源（含多个候选冲突）；`unavailable` 为目录失败、陈旧或超时；`incompatible` 为合并结果无法通过现有配置校验。旧桌面数据缺字段时前端按 saved 兼容。新匹配且 reference 非空时，前端保存使用 set + provider/model ID；已存来源保持 keep。clear 仅清除已保存来源，不关闭后续读取的自动建议；新建议仍需确认保存。速度映射保留基础能力补值，但不自动附加标准价格来源。
 
 精确裸 ID 消歧允许使用目录中自声明的唯一 canonical 所属记录；其他同名第三方条目缺少 canonical 不再使匹配失败。任何非空冲突 canonical 仍拒绝匹配，没有所属记录时不根据模型名前缀或本地供应商名猜测。显式 provider/model 仍优先。CLI 查询、输出字段、示例和错误行为同步见[指令大全](../cli/commands.md)。
+
+
+### 2026-10-16 按上下文价格分档推荐运行窗口（源码未发布）
+
+规范源新增只读 `modeldev.ContextPolicy`：`model_context` 为目录规格上限，`recommended_context` 为不超过规格且不跨首个正数输入分档阈值的保守窗口，`price_threshold` 为首档输入分界，均为可空正整数。没有分档时 threshold=null，不猜测模型专属常数；没有规格上限时不从价格倒推容量。它附在 `CatalogModel.context_policy` 和 `ModelSettingsState.context_policy`，不属于 SaveModelSettings 写入字段。旧客户端可忽略新字段，新前端兼容缺省为未知；旧保存快照读取时由核心重算建议，不能信任过期的派生值。精确 tiers 仍优先于 lossy `context_over_200k`。
+
+创建、读取草稿及显式 set 来源的未设置 `limits.context` 使用建议窗口，不再无条件复制规格最大值。新导入的 input 上限限制到自动选择的运行窗口；output 仍保留有效的模型最大输出。已有 context/input/output/默认预算不被改写；显式输入或输出预算大于建议窗口时，只有可兼容的规格窗口才能补入，同时展示跨档风险。参考快照仍保存完整的规格（如 1,050,000）与全部阶梯；不改变原始目录。
+
+桌面在窗口旁展示规格、输入计费分界及整次请求换档说明，提供「使用基础价参考窗口」显式调整，并同时收敛隐藏输入/输出预算以保持可保存。已有 500k/1050k 等大窗口保持原值，但已知跨档时保存前需勾选费用确认；修改配置、重读、换参考或保存后确认复位。CLI 文件写入本身是显式设置，数值保持，不添加交互确认；可读取 context_policy 检查风险。Fast/Ultrafast 仅可复用基础模型的窗口建议，不自动赋标准价快照；建议不是渠道实际计价证明。参考价格按表格直接展示各输入区间，不再藏为折叠 JSON。
+
+2026-10-16 对照 models.dev、[OpenAI GPT-6.1 Sol 文档](https://developers.openai.com/api/docs/models/gpt-6.1-sol)与[定价页](https://developers.openai.com/api/docs/pricing)：规格 1,050,000，最大输出 128,000；输入 **>272,000**（含缓存）时整次请求切换高档，标准 USD/百万 tokens 的输入/输出/缓存读/缓存写从 2/10/0.1/2.5 变为 4/15/0.2/5。恰好 272,000 不跨档，500,000 已跨档。以上是参考规格，不硬编码模型名或收费倍数；共享离线样例为 `desktop/contract/context-pricing.json`。
+
+窗口配置本身不产生费用，`modeldev.Estimate` 按每次实际输入量选档，对整次输入、输出、缓存、思考按对应单价计算；不是只对超额部分加价，不用输出量触发输入档位。此建议不是代理的 token/费用硬限额，不修改自动压缩阈值；工具结果等仍可能超过客户端预算。供应商手工平价表和旧汇总估算不是分档账单，不能将汇总 token 数当作一条请求套档；本轮不追溯改写手工价或历史数据，也未接入逐请求实际账单。保存按既有机制同步已托管 Agent 目录，运行客户端仍需按其生命周期重载/重启；GET 不同步、不落库。

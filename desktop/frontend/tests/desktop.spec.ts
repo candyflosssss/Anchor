@@ -1,4 +1,5 @@
 import modelCatalogFixture from '../../contract/model-catalog.json' with { type: 'json' };
+import contextPricingFixture from '../../contract/context-pricing.json' with { type: 'json' };
 import modelSettingsFixture from '../../contract/model-settings.json' with { type: 'json' };
 import accountFixture from '../../contract/provider-account.json' with { type: 'json' };
 import { expect, test, type Page } from '@playwright/test';
@@ -845,8 +846,8 @@ test('model settings automatically fills defaults and saves the matched referenc
   await host(page, true);
   await page.evaluate(({ configuration, catalog }) => {
     const api = window.go!.desktop!.Bridge!;
-    const state: ModelSettingsState = { ...configuration, model_id: 'shared-one', revision: 1, defaults_status: 'matched', reference: catalog };
-    state.configuration.limits = { context: 400000, input: 300000, output: 100000 };
+    const state: ModelSettingsState = { ...configuration, model_id: 'shared-one', revision: 1, defaults_status: 'matched', reference: catalog, context_policy: catalog.models[0].context_policy };
+    state.configuration.limits = { context: 250000, input: 250000, output: 100000 };
     api.ModelSettings = async () => ({ contract: 'anchor-desktop-v1', data: structuredClone(state), problem: null });
     api.SaveModelSettings = async input => {
       if (input.reference_action !== 'set' || input.reference_provider_id !== 'lab' || input.reference_model_id !== 'vision-reasoner') throw Error('missing automatic reference');
@@ -859,15 +860,62 @@ test('model settings automatically fills defaults and saves the matched referenc
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
-  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('400000');
+  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('250000');
   await expect(dialog.getByLabel('最大输出（tokens）', { exact: true })).toHaveValue('100000');
   await expect(dialog.getByRole('status')).toContainText('已自动从 models.dev');
   await expect(dialog.getByLabel('目录供应商')).toHaveValue('lab');
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
+  await expect(dialog.getByText('模型规格上限：400,000 tokens', { exact: false })).toBeVisible();
   await dialog.getByLabel('上下文窗口（tokens）').fill('500000');
+  await expect(dialog.getByRole('button', { name: '保存模型设置', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: '重新读取并自动补全', exact: true }).click();
-  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('400000');
+  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('250000');
   await dialog.getByRole('button', { name: '保存模型设置', exact: true }).click();
   await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
+});
+
+
+test('model settings exposes long context prices and requires acknowledgement without losing saved values (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(({ configuration, catalog, priced }) => {
+    const api = window.go!.desktop!.Bridge!;
+    const state: ModelSettingsState = { ...configuration, model_id: 'shared-one', revision: 1, defaults_status: 'reference', context_policy: priced.context_policy, reference: { ...catalog, models: [priced] } };
+    state.configuration.limits = { context: 500000, input: 400000, output: 128000 };
+    api.ModelSettings = async () => ({ contract: 'anchor-desktop-v1', data: structuredClone(state), problem: null });
+    api.SaveModelSettings = async input => {
+      if (input.configuration.limits.context === 272000 && input.configuration.limits.input !== 272000) throw Error('hidden input not reconciled');
+      if (input.reference_action !== 'keep') throw Error('changed pinned reference');
+      window.desktopTest.saves++;
+      state.configuration = input.configuration; state.revision++;
+      return { contract: 'anchor-desktop-v1', data: structuredClone(state), problem: null };
+    };
+  }, { configuration: modelSettingsFixture, catalog: modelCatalogFixture.catalog, priced: contextPricingFixture });
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
+  const save = dialog.getByRole('button', { name: '保存模型设置', exact: true });
+  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('500000');
+  await expect(dialog.getByText('模型规格上限：1,050,000 tokens', { exact: false })).toBeVisible();
+  await expect(dialog.getByRole('table')).toContainText('≤ 272,000');
+  await expect(dialog.getByRole('table')).toContainText('> 272,000');
+  await expect(save).toBeDisabled();
+  await dialog.getByLabel('我已了解跨档费用，保留此窗口').check();
+  await expect(save).toBeEnabled();
+  await dialog.getByLabel('上下文窗口（tokens）').fill('500001');
+  await expect(save).toBeDisabled();
+  await dialog.getByRole('button', { name: '使用基础价参考窗口（272,000）', exact: true }).click();
+  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('272000');
+  await expect(save).toBeEnabled();
+  await save.click();
+  await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
+  await dialog.getByLabel('上下文窗口（tokens）').fill('500000');
+  await dialog.getByLabel('我已了解跨档费用，保留此窗口').check();
+  await save.click();
+  await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
+  await dialog.getByRole('button', { name: '重新读取并自动补全', exact: true }).click();
+  await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('500000');
+  await expect(save).toBeDisabled();
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(2);
 });

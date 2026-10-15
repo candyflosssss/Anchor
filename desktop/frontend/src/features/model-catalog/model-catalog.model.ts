@@ -1,5 +1,5 @@
 import { bridge, call, DesktopProblem } from '../../desktop/transport';
-import type { CatalogCapabilities, CatalogEstimate, CatalogEstimateInput, CatalogLimits, CatalogModel, CatalogPricing, CatalogRates, CatalogUsage, DesktopBridge, ModelCatalog, ModelCatalogQuery, ReasoningOption } from '../../desktop/contract.generated';
+import type { CatalogCapabilities, ContextPolicy, CatalogEstimate, CatalogEstimateInput, CatalogLimits, CatalogModel, CatalogPricing, CatalogRates, CatalogUsage, DesktopBridge, ModelCatalog, ModelCatalogQuery, ReasoningOption } from '../../desktop/contract.generated';
 
 const bad = (): never => { throw new DesktopProblem('read_error'); };
 const record = (v: unknown): Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : bad();
@@ -36,12 +36,22 @@ function reasoning(v: unknown): ReasoningOption {
   else return bad();
   return { type: r.type, values, min, max };
 }
+export function checkedContextPolicy(v: unknown): ContextPolicy | null {
+  // Old cores/snapshots did not carry advice. Missing is unknown, not zero.
+  if (v === undefined || v === null) return null;
+  const p = record(v);
+  const model_context = nullable(p.model_context, v => integer(v, 1));
+  const recommended_context = nullable(p.recommended_context, v => integer(v, 1));
+  const price_threshold = nullable(p.price_threshold, v => integer(v, 1));
+  if (recommended_context !== null && ((model_context !== null && recommended_context > model_context) || (price_threshold !== null && recommended_context > price_threshold))) return bad();
+  return { model_context, recommended_context, price_threshold };
+}
 function model(v: unknown): CatalogModel {
   const m = record(v), c = record(m.capabilities), l = record(m.limits);
   const capabilities: CatalogCapabilities = { input_modalities: strings(c.input_modalities), output_modalities: strings(c.output_modalities), vision: nullable(c.vision, boolean), attachment: nullable(c.attachment, boolean), tool_call: nullable(c.tool_call, boolean), reasoning: nullable(c.reasoning, boolean), structured_output: nullable(c.structured_output, boolean), temperature: nullable(c.temperature, boolean) };
   const limits: CatalogLimits = { context: nullable(l.context, v => integer(v, 1)), input: nullable(l.input, v => integer(v, 1)), output: nullable(l.output, v => integer(v, 1)) };
   if (!Array.isArray(m.reasoning_options) || m.reasoning_options.length > 16) return bad();
-  return { provider_id: string(m.provider_id), id: string(m.id), canonical_model_id: string(m.canonical_model_id), name: string(m.name), source_updated_at: string(m.source_updated_at), capabilities, limits, reasoning_options: m.reasoning_options.map(reasoning), pricing: nullable(m.pricing, pricing) };
+  return { context_policy: checkedContextPolicy(m.context_policy), provider_id: string(m.provider_id), id: string(m.id), canonical_model_id: string(m.canonical_model_id), name: string(m.name), source_updated_at: string(m.source_updated_at), capabilities, limits, reasoning_options: m.reasoning_options.map(reasoning), pricing: nullable(m.pricing, pricing) };
 }
 export function checkedModelCatalog(v: unknown): ModelCatalog {
   const c = record(v);

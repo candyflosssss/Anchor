@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/model-settings.json';
+import contextModel from '../../../../contract/context-pricing.json';
 import type { ModelCatalog, ModelConfiguration } from '../../desktop/contract.generated';
-import { checkedConfiguration, checkedModelSettings, settingsReadDraft, createModelSettingsService, importConfiguration } from './model-settings.model';
+import { applyContextWindow, crossesPriceBand, checkedConfiguration, checkedModelSettings, settingsReadDraft, createModelSettingsService, importConfiguration } from './model-settings.model';
 import { DesktopProblem } from '../../desktop/transport';
 import { CONTRACT } from '../../desktop/contract.generated';
 const config = () => checkedConfiguration(structuredClone(fixture.configuration));
-const catalog = (): ModelCatalog => ({ source: 'models.dev', fetched_at: 1, expires_at: 2, version: 'a'.repeat(64), stale: false, failure: '', providers: [], total: 1, truncated: false, models: [{ provider_id: 'lab', id: 'm', canonical_model_id: '', name: 'M', source_updated_at: '', limits: { context: 500000, input: 400000, output: 64000 }, capabilities: { input_modalities: ['text'], output_modalities: ['text'], vision: false, attachment: null, tool_call: false, reasoning: true, structured_output: null, temperature: false }, reasoning_options: [{ type: 'effort', values: ['low'], min: null, max: null }], pricing: null }] });
+const catalog = (): ModelCatalog => ({ source: 'models.dev', fetched_at: 1, expires_at: 2, version: 'a'.repeat(64), stale: false, failure: '', providers: [], total: 1, truncated: false, models: [{ context_policy: null, provider_id: 'lab', id: 'm', canonical_model_id: '', name: 'M', source_updated_at: '', limits: { context: 500000, input: 400000, output: 64000 }, capabilities: { input_modalities: ['text'], output_modalities: ['text'], vision: false, attachment: null, tool_call: false, reasoning: true, structured_output: null, temperature: false }, reasoning_options: [{ type: 'effort', values: ['low'], min: null, max: null }], pricing: null }] });
 describe('model mapping settings', () => {
   it('checks identity, limits and native reasoning range', () => {
     expect(checkedModelSettings(fixture, 'mapped').configuration.limits.context).toBe(272000);
@@ -94,4 +95,37 @@ it('keeps explicit modalities and reasoning when their boolean flags are unknown
   expect(result.capabilities.vision).toBe(true); expect(result.capabilities.reasoning).toBe(true); expect(result.capabilities.tool_call).toBe(true);
   expect(result.capabilities.input_modalities).toEqual(c.capabilities.input_modalities);
   expect(result.supported_reasoning).toEqual(c.supported_reasoning);
+});
+
+
+describe('price-aware context defaults', () => {
+  const priced = (): ModelCatalog => ({ ...catalog(), models: [structuredClone(contextModel)] });
+  it('uses backend advice instead of the advertised maximum in fill and replace', () => {
+    const c = config(); c.limits = { context: null, input: null, output: null };
+    for (const replace of [false, true]) {
+      const got = importConfiguration(c, priced(), replace);
+      expect(got.limits).toEqual({ context: 272000, input: 272000, output: 128000 });
+    }
+    expect(priced().models[0].limits.context).toBe(1050000);
+    c.limits.context = 500000;
+    expect(importConfiguration(c, priced(), false).limits.context).toBe(500000);
+    expect(importConfiguration(c, priced(), true).limits.context).toBe(272000);
+  });
+  it('retains explicit budgets, reconciles hidden limits on explicit reduction, and detects crossing', () => {
+    const c = config(); c.limits = { context: null, input: 500000, output: null };
+    expect(importConfiguration(c, priced(), false).limits).toEqual({ context: 1050000, input: 500000, output: 128000 });
+    const state = checkedModelSettings(fixture, 'mapped');
+    state.context_policy = contextModel.context_policy;
+    expect(crossesPriceBand(state)).toBe(false);
+    state.configuration.limits = { context: 500000, input: 400000, output: 32000 };
+    expect(crossesPriceBand(state)).toBe(true);
+    state.configuration = applyContextWindow(state.configuration, 272000);
+    expect(state.configuration.limits).toEqual({ context: 272000, input: 272000, output: 32000 });
+    expect(() => checkedConfiguration(state.configuration)).not.toThrow();
+    expect(crossesPriceBand(state)).toBe(false);
+  });
+  it('accepts legacy missing advice without inventing a tier and rejects malformed advice', () => {
+    expect(checkedModelSettings({ ...fixture, context_policy: undefined }, 'mapped').context_policy).toBeNull();
+    expect(() => checkedModelSettings({ ...fixture, context_policy: { model_context: 128000, recommended_context: 272000, price_threshold: 272000 } }, 'mapped')).toThrow();
+  });
 });

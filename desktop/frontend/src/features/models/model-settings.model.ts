@@ -1,6 +1,6 @@
 import { bridge, call, DesktopProblem } from '../../desktop/transport';
 import type { DesktopBridge, ModelCatalog, ModelConfiguration, ModelSettingsState, SaveModelSettings } from '../../desktop/contract.generated';
-import { checkedModelCatalog } from '../model-catalog/model-catalog.model';
+import { checkedModelCatalog, checkedContextPolicy } from '../model-catalog/model-catalog.model';
 
 const bad = (): never => { throw new DesktopProblem('read_error'); };
 const obj = (v: unknown): Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : bad();
@@ -53,7 +53,7 @@ export function checkedModelSettings(value: unknown, id: string): ModelSettingsS
   if (reference && reference.models.length !== 1) return bad();
   const defaults_status = s.defaults_status ?? 'saved';
   if (typeof defaults_status !== 'string' || !['saved', 'reference', 'matched', 'unmatched', 'unavailable', 'incompatible'].includes(defaults_status)) return bad();
-  return { defaults_status, model_id: id, revision, candidate_count, display_name: s.display_name, configuration: checkedConfiguration(s.configuration), reference };
+  return { context_policy: checkedContextPolicy(s.context_policy), defaults_status, model_id: id, revision, candidate_count, display_name: s.display_name, configuration: checkedConfiguration(s.configuration), reference };
 }
 // Import is explicit. Fill mode protects configured values; replacement mode
 // resets defaults that may not exist in the new provider's reasoning range.
@@ -71,10 +71,17 @@ export function importConfiguration(old: ModelConfiguration, catalog: ModelCatal
   if (caps.vision !== null && caps.input_modalities.length) caps.input_modalities = caps.vision ? [...new Set([...caps.input_modalities, 'image'])] : caps.input_modalities.filter(v => v !== 'image');
   const limits = { ...old.limits };
   const within = (n: number | null, limit: number | null) => n === null || limit === null || n <= limit;
-  if (replace) Object.assign(limits, m.limits);
-  else {
-    if (limits.context === null && [limits.input, limits.output, old.default_output_tokens].every(n => within(n, m.limits.context))) limits.context = m.limits.context;
-    if (limits.input === null && within(m.limits.input, limits.context)) limits.input = m.limits.input;
+  const suggested = m.context_policy?.recommended_context ?? m.limits.context;
+  if (replace) {
+    Object.assign(limits, m.limits, { context: suggested });
+    if (limits.input !== null && limits.context !== null && limits.input > limits.context) limits.input = limits.context;
+    if (!within(limits.output, limits.context)) limits.output = null;
+  } else {
+    const context = [limits.input, limits.output, old.default_output_tokens].every(n => within(n, suggested)) ? suggested : m.limits.context;
+    const autoContext = limits.context === null;
+    if (autoContext && [limits.input, limits.output, old.default_output_tokens].every(n => within(n, context))) limits.context = context;
+    const input = autoContext && m.limits.input !== null && limits.context !== null ? Math.min(m.limits.input, limits.context) : m.limits.input;
+    if (limits.input === null && within(input, limits.context)) limits.input = input;
     if (limits.output === null && within(m.limits.output, limits.context) && within(old.default_output_tokens, m.limits.output)) limits.output = m.limits.output;
   }
   return checkedConfiguration({ ...structuredClone(old), limits, capabilities: caps, supported_reasoning: caps.reasoning === false ? [] : replace || !old.supported_reasoning.length ? structuredClone(m.reasoning_options) : structuredClone(old.supported_reasoning), default_reasoning: replace || caps.reasoning === false ? null : structuredClone(old.default_reasoning), default_output_tokens: replace && (!within(old.default_output_tokens, limits.context) || !within(old.default_output_tokens, limits.output)) ? null : old.default_output_tokens, default_temperature: replace && caps.temperature !== true ? null : old.default_temperature });
@@ -105,4 +112,17 @@ export function settingsReadDraft(state: ModelSettingsState) {
     incompatible: '目录默认值与手工配置不兼容，已保留当前设置；请在下方核对参考模型。',
   };
   return { provider: source?.provider_id ?? '', model: source?.id ?? '', referenceAction: state.defaults_status === 'matched' && source ? 'set' as const : 'keep' as const, notice: notices[state.defaults_status] ?? '' };
+}
+
+// A window only permits larger requests; it is not itself the billed usage.
+export function crossesPriceBand(state: ModelSettingsState): boolean {
+  const threshold = state.context_policy?.price_threshold;
+  return threshold != null && state.configuration.limits.context !== null && state.configuration.limits.context > threshold;
+}
+
+// Explicit UI action: also reconcile hidden input/output budgets, so choosing
+// the base-price window never leaves an invalid, unsaveable draft.
+export function applyContextWindow(cfg: ModelConfiguration, context: number): ModelConfiguration {
+  const cap = (n: number | null) => n === null ? null : Math.min(n, context);
+  return { ...cfg, limits: { context, input: cap(cfg.limits.input), output: cap(cfg.limits.output) }, default_output_tokens: cap(cfg.default_output_tokens) };
 }

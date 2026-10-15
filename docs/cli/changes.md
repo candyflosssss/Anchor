@@ -486,3 +486,13 @@
 - 旧 → 新：DSH Web/Desktop 不再只有 id/name；同步映射名称、视觉／输入模态、上下文、可表示思考档位及绑定默认模型的默认 effort。显式默认输出写 maxTokens，单独输出能力不转成请求默认。
 - 兼容与迁移：两端 profile、绑定及凭据仍独立，schema/DTO 不变；已有 journal 可安全扩展 reasoningEffort 所有权，保留原恢复值；清空元数据移除旧字段。none/default/null、toggle/budget 不重命名；显式选项无可表示思考档位时禁用 DSH reasoning，原映射保留。需更新核心；本次未打包／发布，不宣称旧 DSH 原生加载兼容。
 - 验证：共享投影、双 profile 更新／清除／默认切换／旧 journal 升级／幂等／冲突／条件恢复与管理 API 自动同步测试；实际执行结果见本次任务记录。
+
+
+## 2026-10-16 — 按上下文计费分档补默认窗口并阻止价格导入丢档（当前源码，未发布）
+
+- 类型：修改默认值、输出和失败行为；没有新增命令、参数或数据库迁移。
+- 指令与参数：`model add/put`、`provider action model-put` 的新建自动补值；`model settings --id ID [--file FILE]`；`model-catalog model/estimate`；`provider action price-import`。
+- 旧 → 新：未设置的运行上下文不再直接复制模型最大容量，已知价格分档时采用不超过容量和首个正数输入价档阈值的建议窗口；相关自动 input 上限随窗口收敛。查询输出增加可空只读 `context_policy`（model_context/recommended_context/price_threshold），完整容量与所有单价仍在参考快照，已存快照建议重算。已有手工 context/input/output/默认预算不被覆盖，显式相关预算大于建议时仅补兼容的规格窗口。
+- 旧 → 新：原 price-import 仅取基础单价，会遗漏长上下文档；现在带 tiers 的目录条目返回 HTTP 400 invalid，不写供应商。无分档的正常预览不变。分档模型改用 model-catalog model/estimate 或 model settings 参考来源；供应商手工平价与历史汇总数据不被追溯修改。
+- 兼容与迁移：旧客户端可忽略新增只读字段；新前端兼容旧核心缺字段为未知。CLI 文件写入保持显式值，不新增交互确认，不允许把只读 context_policy 原样写回。已有大窗口可按 commands.md 的 jq 示例显式采用建议并收敛预算；Fast/Ultrafast 建议不是标准报价证明。桌面有单独跨档确认，不增加 GUI 独占业务入口。窗口设置本身不计费、不保证限费，估算按单次实际输入（含缓存）选整次请求价档；未接入逐请求实际账单。
+- 验证：resource-guard 下 8 个相关 Go 包全量测试通过（含实际请求边界 272000/272001/500000、缓存读写、核心只读补值/保存、速度变体、平价导入拒绝、Agent 导出、CLI 帮助和 TS 契约漂移）；前端 typecheck、22 项定向单测及相关 ESLint 通过；Chromium 单 worker 的 3 项模型设置模拟桥接浏览器测试通过；文档 jq 正常建议与未知拒绝示例通过。未操作真实 Agent 配置、未调用付费推理、未构建桌面包或发布更新，不代表原生双平台验收。

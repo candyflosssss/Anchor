@@ -15,6 +15,8 @@
 - desktop.23 已交付全部启用 Key 的模型目录合并与逐 Key 分组倍率显示，停用 Key 不查询；复用 `provider models`，命令契约见下文。desktop.25已交付来源Key范围、模型排序／调度设置与账户分组倍率查询；独立账单桌面页仍未接入。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
 
+2026-10-16 核对增量：上下文价格分档建议与平价导入保护已在当前源码实现，未打包；行为及迁移见下文模型设置与参考目录章节。
+
 ## 1. 调用与公共约定
 
 下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。公开 Release 是安装源；实际公开版本及平台附件见发行页。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
@@ -299,7 +301,7 @@ anchor usage
 | model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段仅预留，当前不参与路由。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
 | model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，Binding 默认模型引用时409 referenced，事务回滚 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
-| price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；共享 catalog 的1小时缓存与固定公开目录最多30秒/16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY/NO_PROXY，拒绝陈旧快照；更新时间为快照获取时间，仅基础价不含分档。只返回 imported_price **预览**，不保存；核对后另行 price-put |
+| price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；共享 catalog 的1小时缓存与固定公开目录最多30秒/16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY/NO_PROXY，拒绝陈旧快照；更新时间为快照获取时间，带上下文 tiers 的条目返回 invalid，不再静默丢弃分档；改用 model-catalog model/estimate 或 model settings 参考快照；无分档条目只返回 imported_price **预览**，不保存；核对后另行 price-put |
 
 推理测试校验上游响应，而不是要求输出必须能跨协议转换。Responses 的 `reasoning` 项不再被误判为 `invalid_response`；16 token 额度包含推理，达到额度时只有推理内容的 `incomplete` 响应也可通过最小连通测试。成功不保证完整可见答案、跨协议推理转换或持续健康。HTTP 200 仍可能因无效 JSON、缺少响应 ID、上游失败或其他不支持的输出而返回 `probe.failure="invalid_response"`；不回显原始正文。推理项修复已随 desktop.16 dev 发布。当前源码进一步修复文本元数据误判（未发布）：测试允许文本项携带 `logprobs`、非空 `annotations`，只检查文本和元数据容器，不保存其内容；跨协议转换边界保持原有要求。测试失败时，`logs detail REQUEST_ID` / `logs export` 的 `evidence.validation_reason` 提供固定原因：`invalid_json`（无效 JSON）、`missing_response_id`（缺少响应 ID）、`upstream_error`（上游错误或 failed）、`unsupported_content`（文本结构不支持）、`unsupported_output`（输出类型不支持）、`invalid_tool_call`（工具调用不完整）、`invalid_choices`（Chat Completions choices 不符合要求）、`refusal`（拒绝回复）；未分类错误使用 `invalid_structure`。此字段不含原始错误文本或未知字段名，历史日志不会补写。命令语法、`probe.failure` 和退出码不变。
 
@@ -445,11 +447,13 @@ anchor model settings --id ID
 anchor model settings --id ID --file FILE
 ```
 
-前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、configuration、reference、defaults_status。读取会从已保存参考快照，或按所有候选上游精确 ID 自动匹配 models.dev（最多等待 8 秒）补充未设置值，作为草稿返回；不写库、不增加 revision、不同步 Agent，手工值保持不变。`defaults_status` 为 saved（保存响应/旧核心）、reference（使用已保存快照）、matched（新自动匹配）、unmatched（未找到唯一一致的条目）、unavailable（目录失败/超时/陈旧）或 incompatible（目录值与手工配置不兼容）。未匹配或失败仍返回现有配置，可重新读取重试或手工指定来源。速度变体可补基础能力，但不自动附加标准价格快照。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
+前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、configuration、reference、defaults_status、context_policy。读取会从已保存参考快照，或按所有候选上游精确 ID 自动匹配 models.dev（最多等待 8 秒）补充未设置值，作为草稿返回；不写库、不增加 revision、不同步 Agent，手工值保持不变。`defaults_status` 为 saved（保存响应/旧核心）、reference（使用已保存快照）、matched（新自动匹配）、unmatched（未找到唯一一致的条目）、unavailable（目录失败/超时/陈旧）或 incompatible（目录值与手工配置不兼容）。未匹配或失败仍返回现有配置，可重新读取重试或手工指定来源。速度变体可补基础能力，但不自动附加标准价格快照。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
 
 写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
 
 `reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照，同时补齐未声明的上下文、限制、能力及思考范围）。补值保留显式设置，目录输入/输出与手工上下文或默认输出预算冲突时跳过相应限制；未知默认思考值不猜测。clear 只清除已保存快照，不禁用后续读取的自动建议。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
+
+2026-10-16 新增只读 `context_policy={model_context,recommended_context,price_threshold}`，字段可为 null：区分模型规格、基础输入价档参考窗口和分界，目录条目也返回同样建议。自动补值取不超过规格的首个正数输入分档阈值，不硬编码 272k/500k；自动 input 随窗口收敛。没有分档资料不代表不加价。已有手工限制保持，已有大窗口不会只读迁移；CLI 显式写入大窗口表示操作者选择，桌面另有费用确认。分档依据单次实际输入（含缓存），超过分界后整次请求换档；配置窗口本身不收费，也不是代理费用硬限额。Fast/Ultrafast 的基础模型建议不能证明其价格。`context_policy` 是只读字段，不能原样作为写入对象提交。
 
 从读取结果整理写入文件的示例（`jq` 是外部工具）：
 
@@ -461,6 +465,20 @@ jq '(.defaults_status == "matched" and .reference != null) as $matched
        reference_provider_id: (if $matched then .reference.models[0].provider_id else "" end),
        reference_model_id: (if $matched then .reference.models[0].id else "" end)}' current-settings.json > model-settings.json
 anchor model settings --id public --file model-settings.json
+```
+
+如需显式采用核心建议窗口（例如已保存大窗口需要调小），在上述生成的写入文件上应用建议并收敛现有预算：
+
+```sh
+jq --slurpfile current current-settings.json '
+  $current[0].context_policy.recommended_context as $window
+  | if $window == null then error("no verified context recommendation") else
+      .configuration.limits.context = $window
+      | .configuration.limits.input |= (if . == null then null else ([., $window] | min) end)
+      | .configuration.limits.output |= (if . == null then null else ([., $window] | min) end)
+      | .configuration.default_output_tokens |= (if . == null then null else ([., $window] | min) end)
+    end' model-settings.json > base-window-settings.json
+anchor model settings --id public --file base-window-settings.json
 ```
 
 正整数限制不超过安全整数，上下文不小于已声明输入/输出，默认输出不超过最大输出；temperature 默认值须声明支持且在0..2。保存不改变候选、倍率、Key 范围、调度或版本匹配 Codex 模板。普通 `model put` 保留本节 settings/reference（但其他旧字段仍按其完整替换语义）；供应商编辑同步 tools/streaming。返回的新模型 revision 也用于后续路由/供应商映射编辑。

@@ -1,0 +1,60 @@
+{
+  "provider_id": "openai",
+  "id": "gpt-6.1-sol",
+  "canonical_model_id": "openai/gpt-6.1-sol",
+  "name": "GPT-6.1 Sol",
+  "source_updated_at": "",
+  "capabilities": {
+    "input_modalities": [
+      "text",
+      "image"
+    ],
+    "output_modalities": [
+      "text"
+    ],
+    "vision": true,
+    "attachment": true,
+    "tool_call": true,
+    "reasoning": true,
+    "structured_output": false,
+    "temperature": false
+  },
+  "limits": {
+    "context": 1050000,
+    "input": 922000,
+    "output": 128000
+  },
+  "reasoning_options": [],
+  "pricing": {
+    "currency": "USD",
+    "unit": "per_million_tokens",
+    "rates": {
+      "input": "2",
+      "output": "10",
+      "cache_read": "0.1",
+      "cache_write": "2.5",
+      "reasoning": null,
+      "input_audio": null,
+      "output_audio": null
+    },
+    "tiers": [
+      {
+        "above_tokens": 272000,
+        "rates": {
+          "input": "4",
+          "output": "15",
+          "cache_read": "0.2",
+          "cache_write": "5",
+          "reasoning": null,
+          "input_audio": null,
+          "output_audio": null
+        }
+      }
+    ]
+  },
+  "context_policy": {
+    "model_context": 1050000,
+    "recommended_context": 272000,
+    "price_threshold": 272000
+  }
+}

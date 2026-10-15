@@ -49,6 +49,7 @@ export interface ModelSettingsQuery {
   model_id: string;
 }
 export interface ModelSettingsState {
+  context_policy: ContextPolicy | null;
   defaults_status: string;
   model_id: string;
   revision: number;
@@ -123,7 +124,13 @@ export interface CatalogPricing {
   rates: CatalogRates;
   tiers: CatalogTier[];
 }
+export interface ContextPolicy {
+  model_context: number | null;
+  recommended_context: number | null;
+  price_threshold: number | null;
+}
 export interface CatalogModel {
+  context_policy: ContextPolicy | null;
   provider_id: string;
   id: string;
   canonical_model_id: string;

@@ -152,7 +152,7 @@ func TestSpeedVariantsKeepCapabilitiesWithoutStandardPrices(t *testing.T) {
 	}
 	for _, speed := range []string{"fast", "ultrafast"} {
 		m, err := f.store.Model("priced(" + speed + ")")
-		if err != nil || m.Settings == nil || m.Settings.Reference != nil || m.Settings.Configuration.Limits.Context == nil || *m.Settings.Configuration.Limits.Context != 400000 {
+		if err != nil || m.Settings == nil || m.Settings.Reference != nil || m.Settings.Configuration.Limits.Context == nil || *m.Settings.Configuration.Limits.Context != 250000 {
 			t.Fatal(m, err)
 		}
 	}

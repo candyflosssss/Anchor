@@ -86,6 +86,7 @@ type CatalogPricing struct {
 	Tiers    []CatalogTier `json:"tiers"`
 }
 type CatalogModel struct {
+	ContextPolicy    *ContextPolicy      `json:"context_policy"`
 	ProviderID       string              `json:"provider_id"`
 	ID               string              `json:"id"`
 	CanonicalModelID string              `json:"canonical_model_id"`

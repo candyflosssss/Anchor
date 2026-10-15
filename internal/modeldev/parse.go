@@ -191,7 +191,9 @@ func parse(raw []byte) (map[string]providerData, error) {
 					}
 				}
 			}
-			dst.Models[id] = CatalogModel{ProviderID: pid, ID: id, CanonicalModelID: m.Canonical, Name: m.Name, SourceUpdatedAt: m.Updated, Capabilities: caps, Limits: limits, ReasoningOptions: m.Options, Pricing: price}
+			model := CatalogModel{ProviderID: pid, ID: id, CanonicalModelID: m.Canonical, Name: m.Name, SourceUpdatedAt: m.Updated, Capabilities: caps, Limits: limits, ReasoningOptions: m.Options, Pricing: price}
+			model.ContextPolicy = ContextPolicyFor(model)
+			dst.Models[id] = model
 		}
 		out[pid] = dst
 	}

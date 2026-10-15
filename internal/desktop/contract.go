@@ -289,6 +289,7 @@ type ReasoningOption = modeldev.ReasoningOption
 type CatalogRates = modeldev.CatalogRates
 type CatalogTier = modeldev.CatalogTier
 type CatalogPricing = modeldev.CatalogPricing
+type ContextPolicy = modeldev.ContextPolicy
 type CatalogModel = modeldev.CatalogModel
 type ModelCatalog = modeldev.ModelCatalog
 type CatalogUsage = modeldev.CatalogUsage

@@ -50,3 +50,12 @@ func TestModelHelpDocumentsStreamingDefault(t *testing.T) {
 		})
 	}
 }
+
+func TestModelSettingsHelpDocumentsPriceAwareDefaults(t *testing.T) {
+	var out bytes.Buffer
+	app := App{Err: &out}
+	err := app.models(context.Background(), nil, []string{"settings", "--help"})
+	if !errors.Is(err, flag.ErrHelp) || !strings.Contains(out.String(), "price-aware") || !strings.Contains(out.String(), "context_policy") || !strings.Contains(out.String(), "no write") {
+		t.Fatal(err, out.String())
+	}
+}

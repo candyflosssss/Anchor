@@ -74,6 +74,7 @@ func (s *Server) previewModelCatalog(ctx context.Context, m state.Model) catalog
 		snapshot = &v
 		out.DefaultsStatus = "matched"
 	}
+	out.ContextPolicy = modeldev.ContextPolicyFor(snapshot.Models[0])
 	cfg := modelconfig.FillCatalog(out.Configuration, snapshot.Models[0])
 	if cfg.Validate() != nil {
 		out.DefaultsStatus = "incompatible"

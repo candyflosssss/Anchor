@@ -31,9 +31,15 @@ func (s *Server) importPrice(ctx context.Context, alias, providerID, model strin
 	}
 	return referencePrice(result.Models[0], alias, result.FetchedAt)
 }
+
+var errTieredReferencePrice = errors.New("context-tiered prices cannot be represented as a flat provider price")
+
 func referencePrice(model modeldev.CatalogModel, alias string, fetchedAt int64) (*catalog.Price, error) {
 	if model.Pricing == nil || model.Pricing.Rates.Input == nil || model.Pricing.Rates.Output == nil {
 		return nil, state.ErrNotFound
+	}
+	if len(model.Pricing.Tiers) != 0 {
+		return nil, errTieredReferencePrice
 	}
 	r := model.Pricing.Rates
 	value := func(v *string) *float64 {

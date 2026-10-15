@@ -112,6 +112,9 @@ DSH maxTokens exports explicit default output tokens only, not the output capaci
 Codex CLI enrollment defaults to all-compatible; Claude/DSH and desktop enrollment use all-mapped.
 All-mapped reads model mappings with enabled providers, without Codex metadata/tools/streaming filters.
 Mapping/provider changes automatically refresh applied Agent model lists; agent sync remains a manual retry.
+Unset model context stays within the first models.dev input-price band when known; explicit limits are retained.
+Long-context pricing is selected by actual request input (including cache), not the configured window.
+provider price-import rejects context-tiered prices; use model-catalog model/estimate or model settings references.
 Codex all-mapped uses generic Anchor coding instructions only when no operator template exists.
 Codex catalogs project supported reasoning efforts only; upstream max/default/null remain stored, not relabelled.
 All-compatible requires exact-version Codex metadata and the selected local models_cache.json for enrollment.
@@ -647,7 +650,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	if args[0] == "settings" {
 		f := a.flags("model settings")
 		id := f.String("id", "", "public model ID (Chinese supported)")
-		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); omitted previews settings with models.dev defaults (no write)")
+		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); omitted previews price-aware models.dev defaults and context_policy (no write)")
 		if err := parse(f, args[1:]); err != nil {
 			return err
 		}

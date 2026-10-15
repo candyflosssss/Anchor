@@ -86,6 +86,11 @@
               }
             }
           ]
+        },
+        "context_policy": {
+          "model_context": 400000,
+          "recommended_context": 250000,
+          "price_threshold": 250000
         }
       }
     ],
@@ -180,6 +185,11 @@
                 }
               }
             ]
+          },
+          "context_policy": {
+            "model_context": 400000,
+            "recommended_context": 250000,
+            "price_threshold": 250000
           }
         }
       ],
