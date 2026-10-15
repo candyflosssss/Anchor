@@ -1,10 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-15。
-- 当前桌面 dev 版：`0.1.0-dev.desktop.33`，北京时间 2026-10-15 01:18:46 已发布到 GitHub Releases，Windows／Linux 安装包与清单同版投放。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.33`，北京时间 2026-10-15 01:18:46 已发布到 GitHub Releases，Windows／Linux 安装包与清单同版投放。
+- 本地最新开发包：`0.1.0-dev.desktop.34`，北京时间 2026-10-15 13:52 完成双平台打包，尚未发布；默认在线更新仍为 `.33`。本地 `.34` 使用 schema8，升级后旧版不能打开已迁移数据库，运行前请备份数据。
 - 范围：Key 名称、公开模型 ID／别名、Context／设备连接名称及 Agent Binding ID 支持中文，与供应商名称共用命名规则；桌面表单、CLI、核心及 Codex 托管统一处理。既有 ASCII 名称兼容，无需迁移；创建中文名称须同步升级客户端和运行中的核心。继承 .32 的 SSH 路径发现和设备连接能力。
 - 已有 `.9`～`.32`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.33`，先停止本机核心并退出界面。
-- 本轮保持 state.db schema7，无新增迁移；从 .30 及更旧版本升级按已有规则顺序迁移，旧程序不能打开新数据库，不支持数据库降级。
+- 线上 `.33` 保持 state.db schema7，无新增迁移；从 .30 及更旧版本升级按已有规则顺序迁移，旧程序不能打开新数据库，不支持数据库降级。
 - 验证：中文功能的八个受影响 Go 包测试、前端 49 项定向测试、typecheck／lint 已通过；本次双平台生产编译与安装包构建、六附件大小／SHA256 digest 核对、默认源 Linux 实际下载通过。构建 revision 为 `72ed6e9c429bec7d1c246a51c0e3062720ff1668`，SOURCE.json dirty=false。本次未安装到本机，未执行浏览器、原生窗口、安装器或 apply 验收。
 
 ## 1. 安装与使用行为
@@ -83,6 +84,27 @@ env NODE_OPTIONS=--max-old-space-size=768 \
 Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主高版本发行版编译的文件不能声称具有 Ubuntu24.04 最低兼容性。双平台安装包入口用容器解决开发库缺失与 glibc 基线问题，不绕过资源保护。
 
 ## 3. 产物、在线投放与实际构建状态
+
+
+### 本地开发包 `.34`（未发布）
+
+`0.1.0-dev.desktop.34` 于北京时间 2026-10-15 13:52 从干净隔离 worktree 构建，revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，`SOURCE.json` 的 dirty=false；没有混入原工作区未提交的余额界面／缓存改动。
+
+本包包含 `.33` 之后已提交的顶栏设备快速切换、日志字段分组与首文本／工具输出计时、非推理输出 TPS、供应商倍率 × Key 缓存倍率成本路由、模型映射默认配置及默认流式、请求与上游返回服务档位展示。服务档位日志用于观察请求和响应，并不代表修复了 Codex 的 Fast 入口显示或确认上游提供加速。
+
+本地输出目录为 `dist/desktop/0.1.0-dev.desktop.34/`：
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| Windows AMD64 | `windows-amd64/Anchor-Desktop-0.1.0-dev.desktop.34-windows-amd64-setup.exe` | 8223883 | `0ecec0319b1e3462216f34704fb8545ecf2c9bb5c6b05734d3a4538a0fafeab0` |
+| Ubuntu 24.04 AMD64 | `linux-amd64/anchor-desktop_0.1.0-dev.desktop.34_amd64.deb` | 6027592 | `ed1ac02faa1b433301e94c9638554182389479e29fb0dfeb9f43a05ba0347060` |
+
+同目录保留 `SOURCE.json`、容器环境记录、两平台 `BUILD.json`／`SHA256SUMS`、许可证与第三方通知。构建使用 Go 1.26.0、Node 22.22.1、npm 9.2.0 和记录 digest 的 Ubuntu 24.04 容器；通过现有受资源限制的 `scripts/package-desktop.sh --version 0.1.0-dev.desktop.34` 串行完成。
+
+实际验证：Go／TypeScript 契约比对、TypeScript／Vite desktop 生产构建、双平台编译及 `.deb`／NSIS 打包通过；两平台 `SHA256SUMS` 共 13 个文件与 `BUILD.json` 哈希交叉核对通过。Debian 控制版本按脚本映射为 `0.1.0~dev.desktop.34`，包名、amd64 架构与可执行文件条目核对通过；Linux ELF／Windows AMD64 GUI 二进制及 NSIS 安装器类型符合预期。Vite 保留大于 500 kB 的 chunk 提示，不是构建失败。
+
+本版核心会将 state.db 从旧 schema 迁移到 schema8；需先备份，旧核心不能打开已升级数据库，不支持数据库降级。未操作真实数据或 Agent 配置，未运行测试套件、浏览器、原生 GUI、安装器或 apply 验收。未上传包／清单、未创建 GitHub Release 或标签，`BUILD.json` 的 `public_release`／`native_gui_verified`／`installation_verified`／`signed` 均为 false；默认在线更新不变，不能在应用内取得这个本地包。
+
 
 ### 当前在线 dev 版 `.30`
 
