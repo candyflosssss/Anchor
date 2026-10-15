@@ -5,7 +5,7 @@
 - 范围：顶栏设备快速切换、日志字段分组与首文本／工具输出计时、非推理输出 TPS、供应商倍率 × Key 缓存倍率成本路由、模型映射默认配置及默认流式、请求与上游返回服务档位展示；继承中文命名和 SSH 设备连接能力。服务档位日志不代表修复 Codex Fast 入口，也不保证上游实际加速。
 - 已有 `.9`～`.33`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.34`，先停止本机核心并退出界面。
 - `.34` 将 state.db 迁移到 schema8，首次启动前请备份；旧程序不能打开已迁移数据库，不支持数据库降级。远端核心不会随本机桌面自动升级。
-- 验证：复用已完成的 Go／TypeScript 契约比对、双平台生产编译与安装包构建及本地产物完整性结果；本轮六附件大小／SHA256 digest、源码对应关系、元数据 ZIP CRC、正式 URL 和标签指向核对，以及默认源 Linux 实际下载通过。构建 revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，SOURCE.json dirty=false。本轮未重新编译、运行测试套件、安装到本机，未执行浏览器、原生窗口、安装器或 apply 验收。
+- 验证：复用已完成的 Go／TypeScript 契约比对、双平台生产编译与安装包构建及本地产物完整性结果；本轮六附件大小／SHA256 digest、源码对应关系、元数据 ZIP CRC、正式 URL 和标签指向核对，以及默认源 Linux 实际下载通过。构建 revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，SOURCE.json dirty=false。在线发布轮次未重新编译、运行测试套件或安装到本机，未执行浏览器、原生窗口、安装器或 apply 验收；后续本机用户目录升级见本版产物段落。
 
 ## 1. 安装与使用行为
 
@@ -108,6 +108,10 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 在隔离临时数据目录从该版源码执行 `update download --channel dev --product desktop --current-version 0.1.0-dev.desktop.33 --json`，默认 GitHub 源发现 `.34` 并实际下载 Linux 安装包，6,027,592 字节及 SHA256 校验通过；Windows 附件 digest 与本地安装包一致。未调用 apply 或安装器，下载验证不等于安装验收。
 
+
+**后续本机升级（2026-10-15 14:08）**：应用户要求，沿用原有用户目录安装，将 `~/.local/bin/anchor-desktop` 从 `.32` 替换为上述已发布 `.34` 的 Linux ELF；CLI 从同一发布源码归档（含 vendor，revision `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`）受资源限制编译为 `.34` 并更新 `~/.local/bin/anchor`，没有混入工作区未提交代码，也未重建桌面包或改动线上 Release。正常重启现有用户 `anchor-core.service` 后，核心／网关 ready、Agent 管理 ready、两个绑定 applied；运行核心 ELF 与新 CLI 哈希一致，本机桌面 ELF 与发布包哈希一致，桌面运行库无缺失。
+
+迁移前 state.db／logs.db、owner token、恢复数据及旧二进制已在仓库外受保护备份，目录 `~/.config/anchor/backups/pre-desktop34-20261015-140854/`；备份 state.db 为 schema7，quick_check=ok。升级后 schema8，quick_check 和 foreign_key_check 均通过，实例身份与供应商／Key／模型／绑定／Context 数量保持。当前证据位于 `dist/desktop/0.1.0-dev.desktop.34/local-install/`，不含秘密。更新前没有桌面宿主运行，因此没有退出或启动 GUI；未执行 apt 安装、应用内 apply 或原生窗口验收，不能把用户目录替换等同于系统包安装测试。
 
 ### 历史在线 dev 版 `.30`
 
