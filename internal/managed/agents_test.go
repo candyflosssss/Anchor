@@ -13,13 +13,16 @@ import (
 )
 
 func TestMappedAgentLifecycle(t *testing.T) {
-	for _, adapter := range []string{"codex", "claude", "dsh"} {
+	for _, adapter := range []string{"codex", "claude", "dsh", "dsh-desktop"} {
 		t.Run(adapter, func(t *testing.T) {
 			m, env, _ := workspaceManager(t)
 			if _, err := m.Store.PutModel(state.Model{ID: "plain-alias", Candidates: []state.Candidate{{ProviderID: "p", Model: "upstream-without-metadata"}}}, 0); err != nil {
 				t.Fatal(err)
 			}
 			root := filepath.Join(env.Home, "."+adapter)
+			if adapter == "dsh-desktop" {
+				root = filepath.Join(env.Home, ".dsh")
+			}
 			if err := os.MkdirAll(root, 0700); err != nil {
 				t.Fatal(err)
 			}
@@ -32,8 +35,8 @@ func TestMappedAgentLifecycle(t *testing.T) {
 			case "claude":
 				path = filepath.Join(root, "settings.json")
 				original = []byte(`{"model":"original","env":{"USER_SETTING":"keep","ANTHROPIC_AUTH_TOKEN":"old-private","ANTHROPIC_API_KEY":"old-key"},"hooks":{"Stop":[]},"permissions":{"allow":["Read"]}}`)
-			case "dsh":
-				path = filepath.Join(root, "profiles", "web", "cordis.patch.yml")
+			case "dsh", "dsh-desktop":
+				path = AdapterFor(adapter).(StructuredAgent).path(state.Binding{ConfigRoot: root})
 				if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 					t.Fatal(err)
 				}
@@ -103,7 +106,7 @@ func TestMappedAgentLifecycle(t *testing.T) {
 					t.Fatal("credential precedence")
 				}
 			}
-			if adapter == "dsh" && !bytes.Contains(raw, []byte("!!js")) {
+			if (adapter == "dsh" || adapter == "dsh-desktop") && !bytes.Contains(raw, []byte("!!js")) {
 				t.Fatal("custom YAML tag lost")
 			}
 			workspace, err := m.Workspace(env)
@@ -151,7 +154,7 @@ func TestMappedAgentLifecycle(t *testing.T) {
 				_ = json.Unmarshal(raw, &cfg)
 				cfg["new_user"] = "preserve"
 				raw, _ = json.Marshal(cfg)
-			case "dsh":
+			case "dsh", "dsh-desktop":
 				raw = append(raw, []byte("- id: new-user\n  config:\n    text: preserve\n")...)
 			}
 			if err := os.WriteFile(path, raw, 0600); err != nil {
@@ -171,7 +174,7 @@ func TestMappedAgentLifecycle(t *testing.T) {
 			if adapter == "claude" && !bytes.Contains(restored, []byte("old-private")) {
 				t.Fatal("original auth not restored")
 			}
-			if adapter == "dsh" && (!bytes.Contains(restored, []byte("original-model")) || !bytes.Contains(restored, []byte("!!js"))) {
+			if (adapter == "dsh" || adapter == "dsh-desktop") && (!bytes.Contains(restored, []byte("original-model")) || !bytes.Contains(restored, []byte("!!js"))) {
 				t.Fatal("DSH original not restored")
 			}
 		})
@@ -275,5 +278,121 @@ func TestStructuredReservedRouteAndInvalidEnvironment(t *testing.T) {
 	m.ready = true
 	if _, err := m.Plan(b.ID); err == nil {
 		t.Fatal("reserved route overwritten")
+	}
+}
+
+func TestDSHProfilesIndependentLifecycle(t *testing.T) {
+	m, env, _ := workspaceManager(t)
+	root := filepath.Join(env.Home, ".dsh")
+	paths, baseline := map[string]string{}, map[string][]byte{}
+	for _, adapter := range []string{"dsh", "dsh-desktop"} {
+		path := AdapterFor(adapter).(StructuredAgent).path(state.Binding{ConfigRoot: root})
+		paths[adapter] = path
+		baseline[adapter] = []byte("- id: user-" + adapter + "\n  config: {keep: true}\n")
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, baseline[adapter], 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// An existing CLI-chosen Web binding must not be migrated or renamed.
+	web, err := m.Add(state.Binding{ID: "z-legacy-web", AdapterID: "dsh", AdapterVersion: "1", ConfigRoot: root, Executable: env.Executable, Model: "public", ModelScope: "all-mapped", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer m.Stop()
+	targets, err := Discover(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]string{}
+	for _, target := range targets {
+		if target.ConfigRoot == root {
+			ids[target.Agent] = target.ID
+		}
+	}
+	desktop, err := m.Enroll(env, EnrollAgent{TargetID: ids["dsh-desktop"], Model: "public", Approved: true})
+	if err != nil || desktop.ID == web.ID || desktop.AdapterID != "dsh-desktop" {
+		t.Fatal(desktop, err)
+	}
+	webToken, _ := m.Store.BindingToken(web.ID)
+	desktopToken, _ := m.Store.BindingToken(desktop.ID)
+	if webToken == "" || desktopToken == "" || webToken == desktopToken {
+		t.Fatal("profiles must have distinct scoped credentials")
+	}
+	desktopRaw := readSyncFile(t, paths["dsh-desktop"])
+	if bytes.Contains(desktopRaw, []byte(webToken)) || !bytes.Contains(desktopRaw, []byte(desktopToken)) {
+		t.Fatal("wrong profile credential")
+	}
+	// Web re-enrollment must skip the Desktop binding even when it sorts first.
+	if _, err := m.Store.PutModel(state.Model{ID: "web-default", Candidates: []state.Candidate{{ProviderID: "p", Model: "actual"}}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := m.Enroll(env, EnrollAgent{TargetID: ids["dsh"], Model: "web-default", ExpectedRevision: web.Revision, Approved: true})
+	if err != nil || updated.ID != web.ID || updated.Revision != web.Revision+1 {
+		t.Fatal(updated, err)
+	}
+	web = updated
+	if !bytes.Equal(readSyncFile(t, paths["dsh-desktop"]), desktopRaw) {
+		t.Fatal("Web re-enrollment changed Desktop")
+	}
+	// A runtime restart recovers and reapplies each journal independently.
+	if _, err := m.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	for adapter, path := range paths {
+		if !bytes.Equal(readSyncFile(t, path), baseline[adapter]) {
+			t.Fatal("shutdown did not restore", adapter)
+		}
+	}
+	if rows, err := m.Start(); err != nil || len(rows) != 2 {
+		t.Fatal(rows, err)
+	}
+	desktopRaw = readSyncFile(t, paths["dsh-desktop"])
+	web, result, err := m.SetEnabled(web.ID, web.Revision, false)
+	if err != nil || result.Status != "restored" || !bytes.Equal(readSyncFile(t, paths["dsh"]), baseline["dsh"]) {
+		t.Fatal(web, result, err)
+	}
+	if !bytes.Equal(readSyncFile(t, paths["dsh-desktop"]), desktopRaw) {
+		t.Fatal("disabling Web changed Desktop")
+	}
+	if _, err := m.Store.BindingForToken(webToken); !errors.Is(err, state.ErrNotFound) {
+		t.Fatal("disabled Web credential accepted", err)
+	}
+	if b, err := m.Store.BindingForToken(desktopToken); err != nil || b.ID != desktop.ID {
+		t.Fatal("Desktop credential disabled with Web", err)
+	}
+	if _, _, err := m.SetEnabled(web.ID, web.Revision, true); err != nil {
+		t.Fatal(err)
+	}
+	webRaw := readSyncFile(t, paths["dsh"])
+	if _, result, err := m.SetEnabled(desktop.ID, desktop.Revision, false); err != nil || result.Status != "restored" {
+		t.Fatal(result, err)
+	}
+	if !bytes.Equal(readSyncFile(t, paths["dsh"]), webRaw) || !bytes.Equal(readSyncFile(t, paths["dsh-desktop"]), baseline["dsh-desktop"]) {
+		t.Fatal("Desktop restore changed Web or failed to restore its own baseline")
+	}
+}
+
+func TestDSHConfigPathAllowlist(t *testing.T) {
+	for _, tc := range []struct {
+		profile string
+		allowed bool
+	}{{"web", true}, {"desktop", true}, {"sdk", false}, {"custom", false}} {
+		path := filepath.Join(t.TempDir(), "profiles", tc.profile, "cordis.patch.yml")
+		if supportedConfig(path) != tc.allowed {
+			t.Fatal("unexpected config allowlist", path)
+		}
+	}
+	root := t.TempDir()
+	if _, err := AdapterFor("dsh-desktop").Inspect(state.Binding{ConfigRoot: root}); err == nil {
+		t.Fatal("missing Desktop profile accepted")
+	}
+	if _, err := os.Stat(filepath.Join(root, "profiles")); !os.IsNotExist(err) {
+		t.Fatal("Desktop profile initialized by Anchor", err)
 	}
 }

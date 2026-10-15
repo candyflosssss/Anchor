@@ -70,12 +70,15 @@ func Discover(env Environment) ([]AgentTarget, error) {
 		candidates = append(candidates, struct{ agent, root, source string }{"claude", env.ClaudeHome, "CLAUDE_CONFIG_DIR"})
 	}
 	if env.DSHHome != "" && filepath.IsAbs(env.DSHHome) {
-		candidates = append(candidates, struct{ agent, root, source string }{"dsh", env.DSHHome, "DSH_HOME"})
+		candidates = append(candidates,
+			struct{ agent, root, source string }{"dsh", env.DSHHome, "DSH_HOME"},
+			struct{ agent, root, source string }{"dsh-desktop", env.DSHHome, "DSH_HOME"})
 	}
 	candidates = append(candidates,
 		struct{ agent, root, source string }{"codex", filepath.Join(env.Home, ".codex"), "home"},
 		struct{ agent, root, source string }{"claude", filepath.Join(env.Home, ".claude"), "home"},
 		struct{ agent, root, source string }{"dsh", filepath.Join(env.Home, ".dsh"), "home"},
+		struct{ agent, root, source string }{"dsh-desktop", filepath.Join(env.Home, ".dsh"), "home"},
 		struct{ agent, root, source string }{"gemini", filepath.Join(env.Home, ".gemini"), "home"},
 		struct{ agent, root, source string }{"opencode", filepath.Join(env.Home, ".config", "opencode"), "home"},
 	)
@@ -86,6 +89,12 @@ func Discover(env Environment) ([]AgentTarget, error) {
 	seen := map[string]bool{}
 	for _, c := range candidates {
 		root := filepath.Clean(c.root)
+		// Desktop owns profile initialization; never offer to create it.
+		if c.agent == "dsh-desktop" {
+			if _, err := os.Lstat(filepath.Join(root, "profiles", "desktop")); errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+		}
 		id := targetID(c.agent, root)
 		if seen[id] {
 			continue
@@ -101,7 +110,7 @@ func Discover(env Environment) ([]AgentTarget, error) {
 			out = append(out, t)
 			continue
 		}
-		if c.agent == "claude" || c.agent == "dsh" {
+		if c.agent == "claude" || c.agent == "dsh" || c.agent == "dsh-desktop" {
 			t.Supported = true
 			t.Status = "ready"
 			if _, err := AdapterFor(c.agent).Inspect(state.Binding{ConfigRoot: root}); err != nil {

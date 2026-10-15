@@ -73,11 +73,11 @@ export interface AgentRow { id: string; agent: string; target?: AgentTarget; bin
 /** Keep unavailable platforms visible, and retain recovery for undiscovered bindings. */
 export function agentRows(data: AgentWorkspace): AgentRow[] {
   const rows: AgentRow[] = data.targets.map(target => ({ id: target.id, agent: target.agent, target,
-    binding: data.bindings.find(b => sameAgentRoot(b.config_root, target.config_root)) }));
+    binding: data.bindings.find(b => b.adapter_id === target.agent && sameAgentRoot(b.config_root, target.config_root)) }));
   for (const binding of data.bindings) {
     if (!rows.some(row => row.binding?.id === binding.id)) rows.push({ id: `binding-${binding.id}`, agent: binding.adapter_id, binding });
   }
-  const platforms = ['codex', 'claude', 'gemini', 'opencode', 'dsh'];
+  const platforms = ['codex', 'claude', 'gemini', 'opencode', 'dsh', 'dsh-desktop'];
   for (const agent of platforms) if (!rows.some(row => row.agent === agent)) rows.push({ id: `platform-${agent}`, agent });
   return rows.sort((a, b) => (platforms.indexOf(a.agent) < 0 ? platforms.length : platforms.indexOf(a.agent)) -
     (platforms.indexOf(b.agent) < 0 ? platforms.length : platforms.indexOf(b.agent)));

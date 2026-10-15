@@ -83,7 +83,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   agent discover                     Read targets, mapped model availability and bindings
   agent enroll --target ID --model MODEL --approve [--revision N] [--model-scope all-mapped|all-compatible]
                [--template ALIAS:LOCAL_SOURCE ...] (empty source excludes alias)
-  agent add --id ID --adapter codex|claude|dsh --config-root ABS_DIR --model MODEL --approve
+  agent add --id ID --adapter codex|claude|dsh|dsh-desktop --config-root ABS_DIR --model MODEL --approve
             [--model-scope all-compatible|all-mapped|single] [--anchor-executable ABS_PATH]
                                             Register; apply explicitly or on next serve
   agent list | agent inspect ID | agent plan ID
@@ -105,7 +105,7 @@ Provider, Key, public model and Context names accept 1..128 Unicode letters (inc
 Agent binding names use the same characters, with a 64 UTF-8 byte limit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
 init/serve/access/context/recover/update/agent token operate locally. Business commands use the selected context.
-Codex, Claude Code user settings and DSH web profile management are available; runtime connection remains unverified.
+Codex, Claude Code user settings and independent DSH Web (dsh) / Desktop (dsh-desktop) profile management are available; runtime connection remains unverified.
 Codex CLI enrollment defaults to all-compatible; Claude/DSH and desktop enrollment use all-mapped.
 All-mapped reads model mappings with enabled providers, without Codex metadata/tools/streaming filters.
 Mapping/provider changes automatically refresh applied Agent model lists; agent sync remains a manual retry.

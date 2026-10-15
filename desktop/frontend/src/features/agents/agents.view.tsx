@@ -65,7 +65,7 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
       })}</section>}
     </>}
     <ConfirmAction open={!!c.disableTarget} title="停用此 Agent 的托管？" busy={c.busy} onCancel={() => c.setDisableTarget(null)} onConfirm={() => { if (c.disableTarget) void c.manage(c.disableTarget, 'disable'); }}>
-      <p className="break-all">{c.disableTarget?.config_root}</p><p>按字段恢复 Anchor 写入的配置并停用网关凭据。第三方修改会保留并报告冲突。完成后请重启对应 Agent；DSH 请新建会话。</p>
+      <p className="break-all">{c.disableTarget?.config_root}</p><p>按字段恢复 Anchor 写入的配置并停用网关凭据。第三方修改会保留并报告冲突。完成后请重启对应 Agent（DSH Desktop 关闭窗口可能只是隐藏，请完全退出）；DSH 请新建会话。</p>
     </ConfirmAction>
   </div>;
 }

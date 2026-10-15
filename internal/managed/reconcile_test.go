@@ -23,7 +23,7 @@ func readSyncFile(t *testing.T, path string) []byte {
 }
 
 func TestSyncMappingsRetainsBaselineAndDoesNotChurn(t *testing.T) {
-	for _, adapter := range []string{"codex", "claude", "dsh"} {
+	for _, adapter := range []string{"codex", "claude", "dsh", "dsh-desktop"} {
 		t.Run(adapter, func(t *testing.T) {
 			m, env, _ := workspaceManager(t)
 			root := t.TempDir()
@@ -34,8 +34,8 @@ func TestSyncMappingsRetainsBaselineAndDoesNotChurn(t *testing.T) {
 			if adapter == "claude" {
 				path, original = filepath.Join(root, "settings.json"), []byte(`{"model":"original","user":"keep"}`)
 			}
-			if adapter == "dsh" {
-				path, original = filepath.Join(root, "profiles", "web", "cordis.patch.yml"), []byte("- id: unrelated\n  config: {user: keep}\n")
+			if adapter == "dsh" || adapter == "dsh-desktop" {
+				path, original = filepath.Join(root, "profiles", map[string]string{"dsh": "web", "dsh-desktop": "desktop"}[adapter], "cordis.patch.yml"), []byte("- id: unrelated\n  config: {user: keep}\n")
 			}
 			if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 				t.Fatal(err)

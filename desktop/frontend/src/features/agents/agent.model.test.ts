@@ -21,12 +21,25 @@ describe('Agent contract and controlled transport', () => {
       await expect(service.enroll(fixture.enroll)).rejects.toMatchObject({ code });
     }
   });
-  it('keeps five platforms and matches Windows binding paths without duplicate targets', () => {
+  it('keeps six platforms and matches Windows binding paths without duplicate targets', () => {
     const data = { ...fixture.workspace, bindings: [{ ...fixture.workspace.bindings[0], config_root: 'c:/users/fixture/.codex' }] };
     const rows = agentRows(data);
-    expect(rows.map(row => row.agent)).toEqual(['codex', 'claude', 'gemini', 'opencode', 'dsh']);
+    expect(rows.map(row => row.agent)).toEqual(['codex', 'claude', 'gemini', 'opencode', 'dsh', 'dsh-desktop']);
     expect(rows[0].binding?.id).toBe('codex-fixture');
     expect(rows[4].target).toBeUndefined();
+  });
+  it('matches DSH Web and Desktop bindings by adapter as well as their shared home', () => {
+    const target = fixture.workspace.targets[0], binding = fixture.workspace.bindings[0];
+    const data = { ...fixture.workspace,
+      targets: ['dsh', 'dsh-desktop'].map(agent => ({ ...target, id: agent, agent, config_root: 'C:\\Users\\fixture\\.dsh' })),
+      bindings: ['dsh-desktop', 'dsh'].map(adapter_id => ({ ...binding, id: `bound-${adapter_id}`, adapter_id, config_root: 'c:/users/fixture/.dsh' })),
+    };
+    const rows = agentRows(data).filter(row => row.agent.startsWith('dsh'));
+    expect(rows).toHaveLength(2);
+    expect(rows.map(row => [row.agent, row.binding?.id])).toEqual([['dsh', 'bound-dsh'], ['dsh-desktop', 'bound-dsh-desktop']]);
+    const missingDesktop = agentRows({ ...data, targets: data.targets.slice(0, 1) });
+    expect(missingDesktop.find(row => row.agent === 'dsh-desktop')?.binding?.id).toBe('bound-dsh-desktop');
+    expect(missingDesktop.find(row => row.agent === 'dsh-desktop')?.target).toBeUndefined();
   });
   it('retains multiple roots and recovery when a bound directory disappears', () => {
     const data = { ...fixture.workspace, targets: [{ ...fixture.workspace.targets[0], id: 'another', config_root: '/isolated/codex' }] };

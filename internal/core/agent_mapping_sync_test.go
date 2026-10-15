@@ -19,7 +19,7 @@ func syncTestAgents(t *testing.T, f *fixture) map[string]string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, adapter := range []string{"codex", "claude", "dsh"} {
+	for _, adapter := range []string{"codex", "claude", "dsh", "dsh-desktop"} {
 		root := t.TempDir()
 		if err := os.Chmod(root, 0700); err != nil {
 			t.Fatal(err)
@@ -28,8 +28,8 @@ func syncTestAgents(t *testing.T, f *fixture) map[string]string {
 		if adapter == "claude" {
 			path, raw = filepath.Join(root, "settings.json"), `{"user":"keep"}`
 		}
-		if adapter == "dsh" {
-			path, raw = filepath.Join(root, "profiles", "web", "cordis.patch.yml"), "- id: unrelated\n  config: {user: keep}\n"
+		if adapter == "dsh" || adapter == "dsh-desktop" {
+			path, raw = filepath.Join(root, "profiles", map[string]string{"dsh": "web", "dsh-desktop": "desktop"}[adapter], "cordis.patch.yml"), "- id: unrelated\n  config: {user: keep}\n"
 		}
 		if err = os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			t.Fatal(err)

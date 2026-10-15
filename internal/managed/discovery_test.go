@@ -184,3 +184,45 @@ func TestDiscoverDSHKnownRoots(t *testing.T) {
 		})
 	}
 }
+
+func TestDiscoverDSHDesktopProfiles(t *testing.T) {
+	for _, override := range []bool{false, true} {
+		t.Run(map[bool]string{false: "default", true: "override"}[override], func(t *testing.T) {
+			env := Environment{Home: t.TempDir()}
+			root := filepath.Join(env.Home, ".dsh")
+			if override {
+				root = filepath.Join(env.Home, "custom")
+				env.DSHHome = root
+			} else {
+				// The same explicit/default home must not yield duplicate targets.
+				env.DSHHome = root
+			}
+			if err := os.MkdirAll(root, 0700); err != nil {
+				t.Fatal(err)
+			}
+			targets, err := Discover(env)
+			if err != nil || len(targets) != 1 || targets[0].Agent != "dsh" {
+				t.Fatal("uninitialized Desktop discovered", targets, err)
+			}
+			profile := filepath.Join(root, "profiles", "desktop")
+			if err := os.MkdirAll(profile, 0700); err != nil {
+				t.Fatal(err)
+			}
+			targets, err = Discover(env)
+			if err != nil || len(targets) != 2 {
+				t.Fatal(targets, err)
+			}
+			web, desktop := targets[0], targets[1]
+			if web.Agent != "dsh" || desktop.Agent != "dsh-desktop" || web.ID == desktop.ID || desktop.ConfigRoot != root || !desktop.Supported || desktop.Status != "ready" || desktop.Source != "DSH_HOME" {
+				t.Fatal(targets)
+			}
+			if err := os.WriteFile(filepath.Join(profile, "cordis.patch.yml"), []byte("- id: duplicated\n- id: duplicated\n"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			targets, err = Discover(env)
+			if err != nil || targets[1].Status != "config_unsupported" || targets[0].Status != web.Status {
+				t.Fatal("Desktop config status leaked into Web", targets, err)
+			}
+		})
+	}
+}

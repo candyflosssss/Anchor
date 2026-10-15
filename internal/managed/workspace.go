@@ -184,7 +184,10 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	for _, old := range bindings {
 		if sameRoot(old.ConfigRoot, b.ConfigRoot) {
 			if old.AdapterID != b.AdapterID {
-				return b, state.ErrConflict
+				if state.BindingRootsConflict(old, b) {
+					return b, state.ErrConflict
+				}
+				continue
 			}
 			b.ID = old.ID
 			b.ConfigRoot = old.ConfigRoot

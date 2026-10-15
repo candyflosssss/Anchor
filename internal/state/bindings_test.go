@@ -146,3 +146,61 @@ func TestAllCompatibleModelsAndExplicitMigration(t *testing.T) {
 		t.Fatal("disabled provider still eligible", models, err)
 	}
 }
+
+func TestDSHProfileOwnership(t *testing.T) {
+	for _, first := range []string{"dsh", "dsh-desktop"} {
+		t.Run(first, func(t *testing.T) {
+			s := newStore(t)
+			root := t.TempDir()
+			exe, _ := os.Executable()
+			makeBinding := func(id, adapter string) Binding {
+				return Binding{ID: id, AdapterID: adapter, AdapterVersion: "1", ConfigRoot: root, Model: "public", Executable: exe, Enabled: true}
+			}
+			second := "dsh"
+			if first == "dsh" {
+				second = "dsh-desktop"
+			}
+			for _, adapter := range []string{first, second} {
+				b, err := s.AddBinding(makeBinding(adapter, adapter))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := s.EnableBinding(b.ID, b.Revision, false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, adapter := range []string{"dsh", "dsh-desktop", "codex", "claude"} {
+				if _, err := s.AddBinding(makeBinding("duplicate-"+adapter, adapter)); !errors.Is(err, ErrConflict) {
+					t.Fatal("overlapping ownership accepted", adapter, err)
+				}
+			}
+			// Existing Web ownership keys are unchanged, and survive reopening.
+			var key string
+			if err := s.db.QueryRow(`SELECT root FROM bindings WHERE id='dsh'`).Scan(&key); err != nil || key != canonicalBindingRoot(root) {
+				t.Fatal(key, err)
+			}
+			dir := s.Dir
+			s.Close()
+			reopened, err := Open(dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer reopened.Close()
+			bindings, err := reopened.Bindings()
+			if err != nil || len(bindings) != 2 {
+				t.Fatal(bindings, err)
+			}
+		})
+	}
+	// A Desktop binding must not bypass another adapter's whole-root ownership.
+	s := newStore(t)
+	exe, _ := os.Executable()
+	b := Binding{ID: "other", AdapterID: "claude", AdapterVersion: "1", ConfigRoot: t.TempDir(), Model: "public", Executable: exe}
+	if _, err := s.AddBinding(b); err != nil {
+		t.Fatal(err)
+	}
+	b.ID, b.AdapterID = "desktop", "dsh-desktop"
+	if _, err := s.AddBinding(b); !errors.Is(err, ErrConflict) {
+		t.Fatal("Desktop bypassed existing ownership", err)
+	}
+}

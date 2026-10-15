@@ -9,5 +9,6 @@ export const agentBrands: Record<string, { name: string; logo: string; monochrom
   claude: { name: 'Claude Code', logo: claude },
   gemini: { name: 'Gemini CLI', logo: gemini },
   opencode: { name: 'OpenCode', logo: opencode, monochrome: true },
-  dsh: { name: 'DSH', logo: dsh },
+  dsh: { name: 'DSH Web', logo: dsh },
+  'dsh-desktop': { name: 'DSH Desktop', logo: dsh },
 };

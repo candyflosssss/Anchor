@@ -369,3 +369,13 @@ DSH 仅写已有 profiles/web 下 cordis.patch.yml：llm-pi-ai 的 Anchor 命名
 本机 CLI／核心／GUI 已升级为 `.39`，core／gateway／agent management 均 ready，Codex／DSH 均 applied。Codex 自有目录与网关均为 12 个模型，默认仍为 `gpt-6.1-sol(fast)`；手动 `agent sync` applied，配置、目录与 journal 无变化。独立 CODEX_HOME 的原生 codex-cli 0.162.1 app-server `initialize + model/list` 已解析实际生成目录，12 个模型与网关完全一致，含普通／Fast／Ultrafast。仅本地名单 RPC，未创建线程、未发推理请求，未重启当前用户 Codex。 用户原目录、首次恢复基线、凭据、默认模型和配置行均保留；启动迁移、原位手动同步、设置保存与停止恢复有隔离回归。`.38` 中间本地包因原生检查失败未上线，最终修复发布于 `.39`。
 
 六包 Go 回归通过，新增用例后 managed／CLI 再次通过；Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过。六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision、默认源从 `.37` 发现并真实下载 Linux 安装包通过；Windows 附件 digest 与本地一致。 未执行 Windows 原生安装、原生 GUI 窗口可见性、系统安装器／应用内 apply、真实付费上游或当前 Codex 会话自动重载验收；不保证上游加速权限、速度或费用。 名单加载不等于推理请求通过，现有客户端仍须重新加载。
+
+### 2026-10-15 DSH Desktop 独立 Agent（当前源码，未发布）
+
+新增适配器 `dsh-desktop` v1，与已有 `dsh`（Web）独立；两端仅复用 YAML 编辑、计划与条件恢复能力，不共享绑定、token、revision、默认模型或 journal。ConfigRoot 均为核心宿主的 DSH home（绝对 DSH_HOME 或 ~/.dsh），路径分别固定为 profiles/web/cordis.patch.yml 与 profiles/desktop/cordis.patch.yml。Desktop 只有已存在 profile 才发现/登记，不用 npm CLI 初始化或启动保留的 desktop profile。
+
+发现 ID 由 adapter + home 生成；旧 Web ID 不变。持久化沿用 schema8，保留全部旧 root 所有权键，仅新增 Desktop 使用 `dsh-desktop:` 前缀的规范化 home 所有权键；唯一允许共根的是 Web/Desktop 这一对，重复同端和其他适配器仍冲突，禁用保留所有权。登记与前端匹配同时检查适配器及规范化路径，不能把同 home 的另一端当作旧绑定更新。
+
+Engine 的恢复/同步路径白名单仅增加 profiles/desktop/cordis.patch.yml，其他任意 profile 不放行；模型映射自动同步继续逐绑定执行。两端都只修改自己的 llm-pi-ai Anchor 命名路由和 agent-default-model；不写 home 级公共 patch、.credentials.yaml 或 Electron userData/desktop/settings.json。配置层级为 bundles → profile → home → 运行时覆盖，本适配器不探测更高层或声明真实连接有效。HMR 缺失时完全退出并重启，Desktop 关闭窗口可能只是隐藏；已有会话保留原模型，新默认值需新会话。
+
+上游依据固定到 [86a4022 Desktop 路径](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/apps/desktop/src/paths.ts)、[Desktop 生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/apps/desktop/README.zh.md)、[CLI/profile 层级](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/apps/cli/README.zh.md)。本节替代此前“仅 Web、其他 profile 不托管”的当前能力限制；真实 DSH Desktop、Linux/Windows 原生窗口及付费上游仍未验收。

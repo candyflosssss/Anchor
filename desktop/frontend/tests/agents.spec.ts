@@ -16,12 +16,12 @@ test.beforeEach(async ({ page }) => {
         window.agentTest.enrolls.push(input);
         if (window.agentTest.failWrite) return { contract: f.contract, data: null, problem: { code: window.agentTest.failureCode ?? 'conflict' } };
         const target = data.targets.find(t => t.id === input.target_id)!;
-        data.bindings = [{ ...f.workspace.bindings[0], id: target.id, adapter_id: target.agent, config_root: target.config_root, model_scope: input.model_scope, model: input.model, model_templates: input.model_templates }];
+        data.bindings = [...data.bindings.filter(b => b.id !== target.id), { ...f.workspace.bindings[0], id: target.id, adapter_id: target.agent, config_root: target.config_root, model_scope: input.model_scope, model: input.model, model_templates: input.model_templates }];
         return result(data);
       },
       ManageAgent: async (input: ManageAgent) => {
         window.agentTest.actions.push(input);
-        const row = data.bindings[0];
+        const row = data.bindings.find(b => b.id === input.binding_id)!;
         if (window.agentTest.failWrite) {
           if (input.action === 'enable') { row.enabled = true; row.revision++; row.status = 'apply_failed'; }
           return { contract: f.contract, data: null, problem: { code: window.agentTest.failureCode ?? 'conflict' } };
@@ -45,10 +45,10 @@ async function openSettings(page: import('@playwright/test').Page) {
 
 test('compact platform list, inline enrollment, sync and conditional disable', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
-  await expect(page.getByRole('switch')).toHaveCount(5);
+  await expect(page.getByRole('switch')).toHaveCount(6);
   await expect(page.getByRole('region', { name: 'Codex 托管设置' })).toHaveCount(0);
   await expect(page.getByText(fixture.workspace.targets[0].config_root, { exact: true })).toHaveCount(0);
-  for (const name of ['Claude Code', 'Gemini CLI', 'OpenCode', 'DSH']) await expect(page.getByRole('switch', { name: `${name} 托管`, exact: true })).toBeDisabled();
+  for (const name of ['Claude Code', 'Gemini CLI', 'OpenCode', 'DSH Web', 'DSH Desktop']) await expect(page.getByRole('switch', { name: `${name} 托管`, exact: true })).toBeDisabled();
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).not.toBeChecked();
   await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
@@ -130,11 +130,11 @@ test('DSH discovery details and all brand logos stay inside platform rows', asyn
     source: 'home', supported: false, status: 'unsupported', catalog_version: '', templates: [] }); });
   await page.getByRole('button', { name: '重新识别' }).click();
   expect(await page.locator('.agent-brand img').evaluateAll(images => images.every(image => (image as HTMLImageElement).complete && (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
-  await page.getByRole('button', { name: 'DSH 托管设置', exact: true }).click();
-  const region = page.getByRole('region', { name: 'DSH 托管设置' });
+  await page.getByRole('button', { name: 'DSH Web 托管设置', exact: true }).click();
+  const region = page.getByRole('region', { name: 'DSH Web 托管设置' });
   await expect(region).toContainText('/isolated/.dsh');
   await expect(region).toContainText('尚无适配器');
-  await expect(page.getByRole('switch', { name: 'DSH 托管', exact: true })).toBeDisabled();
+  await expect(page.getByRole('switch', { name: 'DSH Web 托管', exact: true })).toBeDisabled();
   await openSettings(page);
   await expect(region).toHaveCount(0);
 });
@@ -154,7 +154,7 @@ test('compact layout stays within narrow windows and dark theme', async ({ page 
   await page.screenshot({ path: process.env.ANCHOR_AGENT_DARK_PREVIEW ?? 'test-results/agents-dark.png' });
 });
 
-for (const [agent, name] of [['claude', 'Claude Code'], ['dsh', 'DSH']]) {
+for (const [agent, name] of [['claude', 'Claude Code'], ['dsh', 'DSH Web'], ['dsh-desktop', 'DSH Desktop']]) {
   test(`${name} enrolls all mapped aliases and restores through its platform switch`, async ({ page }) => {
     await page.evaluate(agent => {
       const id = `${agent}-fixture`;
@@ -179,6 +179,36 @@ for (const [agent, name] of [['claude', 'Claude Code'], ['dsh', 'DSH']]) {
     expect(await page.evaluate(() => window.agentTest.actions.at(-1))).toMatchObject({ binding_id: `${agent}-fixture`, action: 'disable' });
   });
 }
+
+test('DSH Web and Desktop at the same home keep independent switches and actions', async ({ page }) => {
+  await page.evaluate(() => {
+    for (const agent of ['dsh', 'dsh-desktop']) {
+      window.agentTest.data.targets.push({ id: agent, agent, config_root: '/fixture/.dsh', source: 'home', supported: true, status: 'ready', catalog_version: '', templates: [] });
+      for (const model of window.agentTest.data.models) model.available_targets.push(agent);
+    }
+  });
+  await page.getByRole('button', { name: '重新识别', exact: true }).click();
+  const web = page.getByRole('switch', { name: 'DSH Web 托管', exact: true });
+  const desktop = page.getByRole('switch', { name: 'DSH Desktop 托管', exact: true });
+  await web.click();
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await expect(web).toBeChecked();
+  await expect(desktop).not.toBeChecked();
+  await desktop.click();
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await expect(web).toBeChecked();
+  await expect(desktop).toBeChecked();
+  expect(await page.evaluate(() => window.agentTest.enrolls.map(v => v.target_id))).toEqual(['dsh', 'dsh-desktop']);
+  await web.click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(web).not.toBeChecked();
+  await expect(desktop).toBeChecked();
+  await page.getByRole('button', { name: 'DSH Desktop 托管设置', exact: true }).click();
+  await page.getByRole('button', { name: '同步模型映射', exact: true }).click();
+  expect(await page.evaluate(() => window.agentTest.actions)).toMatchObject([
+    { binding_id: 'dsh', action: 'disable' }, { binding_id: 'dsh-desktop', action: 'sync' },
+  ]);
+});
 
 for (const [code, message] of [
   ['agent_catalog_invalid', '无法生成托管模型目录'],

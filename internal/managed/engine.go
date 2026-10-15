@@ -492,7 +492,8 @@ func supportedConfig(path string) bool {
 	case "config.toml", "settings.json":
 		return true
 	case "cordis.patch.yml":
-		return filepath.Base(filepath.Dir(path)) == "web" && filepath.Base(filepath.Dir(filepath.Dir(path))) == "profiles"
+		profile := filepath.Base(filepath.Dir(path))
+		return (profile == "web" || profile == "desktop") && filepath.Base(filepath.Dir(filepath.Dir(path))) == "profiles"
 	}
 	return false
 }

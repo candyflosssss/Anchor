@@ -14,7 +14,7 @@ import (
 
 // Exercise the two actual client protocols with scoped mapped-model credentials.
 func TestMappedAgentsGatewayProtocols(t *testing.T) {
-	for _, adapter := range []string{"claude", "dsh"} {
+	for _, adapter := range []string{"claude", "dsh", "dsh-desktop"} {
 		t.Run(adapter, func(t *testing.T) {
 			f := setup(t)
 			var calls atomic.Int32

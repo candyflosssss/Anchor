@@ -134,3 +134,7 @@ Connections 仅返回公开档案（name、transport、authentication、target�
 Linux GUI 宿主在 Wails／GTK 初始化前检测 GNOME Wayland 会话。仅当 GTK_IM_MODULE 未显式配置、已安装 Fcitx5 GTK3 模块且当前 D-Bus 会话已有 org.fcitx.Fcitx5 所有者时，为当前宿主进程选择 GTK_IM_MODULE=fcitx，避免默认 GTK Wayland 模块无法连接独立 Fcitx5 的情况。检测使用现有 DBUS_SESSION_BUS_ADDRESS，限制查询时间，不自动拉起 D-Bus／输入法服务。模块缺失、探测失败、KDE／X11 或显式配置 ibus／simple／wayland 等情况保持原状；Windows WebView2 继续使用系统输入法。
 
 此设置只作用于 GUI 启动，不用于核心或安装辅助入口，不修改用户配置、桌面会话环境、Agent 或系统输入法配置。隔离单元测试覆盖环境选择与保留；本机无窗口 GTK 探针确认默认 context 为 wayland、选择桥接后为 fcitx。前端组合态回归另见[前端规范](frontend.md#中文输入法组合态2026-10-15当前源码未打包)；尚未打包本轮修复，未替换当前运行程序，也未完成真实 WebKitGTK 候选输入或 Windows 原生输入法验收。
+
+### DSH Desktop 独立托管增量（2026-10-15，当前源码未发布）
+
+AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字符串新增 `dsh-desktop`；旧 `dsh` 始终为 Web。核心返回相同 DSH home 下两个不同 target ID，前端按 adapter_id + 规范化配置根匹配绑定，不把两端合并。桌面固定展示 DSH Web、DSH Desktop 独立行；未发现也保留已登记端的恢复入口。生命周期、鉴权和写入继续复用核心，不新增任意路径/命令桥接。细节见 [Agent 管理层增量](agent-management-layer.md#2026-10-15-dsh-desktop-独立-agent当前源码未发布) 与 [CLI §8](../cli/commands.md#8-agent-托管与独立恢复)。模拟绑定验证不代表原生 DSH Desktop 已加载配置。

@@ -44,7 +44,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
     const generation = ++epoch.current;
     try {
       const v = await action();
-      if (alive.current && epoch.current === generation) { setData(v); setTargetId(''); setNotice('托管状态已更新。配置应用或恢复后请完全退出并重新启动对应 Agent（DSH 请新建会话）；配置成功仍需在 Agent 中验证实际请求。'); }
+      if (alive.current && epoch.current === generation) { setData(v); setTargetId(''); setNotice('托管状态已更新。配置应用或恢复后请完全退出并重新启动对应 Agent（DSH Desktop 关闭窗口可能只是隐藏，请完全退出；DSH 请新建会话）；配置成功仍需在 Agent 中验证实际请求。'); }
     } catch (e) {
       if (alive.current && epoch.current === generation) {
         setError(agentMessage(e)); setTargetId(affectedRow);

@@ -73,7 +73,7 @@ func TestAgentTokenAndIndependentRecovery(t *testing.T) {
 	}
 }
 func TestAgentHelpMatchesLifecycle(t *testing.T) {
-	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version"} {
+	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh|dsh-desktop", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version"} {
 		if !strings.Contains(help, s) {
 			t.Fatal("missing help", s)
 		}
@@ -233,4 +233,48 @@ func TestCLIDiscoverEnrollSync(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(root, "anchor_"+id+".models.json")); !os.IsNotExist(err) {
 		t.Fatal("catalog not restored", err)
 	}
+	// Both DSH adapters use the same home but independent CLI IDs and files.
+	dshRoot := filepath.Join(home, ".dsh")
+	for adapter, profile := range map[string]string{"dsh": "web", "dsh-desktop": "desktop"} {
+		path := filepath.Join(dshRoot, "profiles", profile, "cordis.patch.yml")
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("- id: user\n  config: {keep: true}\n"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		id := "cli-" + adapter
+		output := run(true, "agent", "add", "--id", id, "--adapter", adapter, "--config-root", dshRoot, "--model", "public", "--approve")
+		var binding state.Binding
+		if err := json.Unmarshal([]byte(output), &binding); err != nil || binding.AdapterID != adapter || binding.ModelScope != "all-mapped" {
+			t.Fatal(output, err)
+		}
+		output = run(true, "agent", "inspect", id)
+		if !strings.Contains(output, "profiles") || !strings.Contains(output, profile) {
+			t.Fatal("incorrect profile inspection", output)
+		}
+		run(true, "agent", "sync", id, "--revision", "1")
+	}
+	output = run(true, "agent", "discover")
+	if err := json.Unmarshal([]byte(output), &workspace); err != nil {
+		t.Fatal(err)
+	}
+	for _, target := range workspace.Targets {
+		if target.Agent == "dsh-desktop" {
+			run(true, "agent", "enroll", "--target", target.ID, "--model", "public", "--revision", "1", "--approve")
+		}
+	}
+	desktopPath := filepath.Join(dshRoot, "profiles", "desktop", "cordis.patch.yml")
+	before, err := os.ReadFile(desktopPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run(true, "agent", "disable", "cli-dsh", "--revision", "1")
+	after, err := os.ReadFile(desktopPath)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatal("Web disable changed Desktop", err)
+	}
+	run(false, "agent", "disable", "cli-dsh-desktop", "--revision", "1")
+	run(true, "agent", "disable", "cli-dsh-desktop", "--revision", "2")
+
 }

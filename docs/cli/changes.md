@@ -4,6 +4,14 @@
 
 命令、别名、参数、默认值、作用域、输出和行为变化均应记录。每条包含日期、适用版本/未发布状态、旧→新差异、兼容与迁移方式及实际验证。纯内部重构或仅修正文档措辞且不改变 CLI 契约时无需新增虚假变更。
 
+## 2026-10-15 — DSH Desktop 独立 Agent（当前源码，未发布）
+
+- 类型：新增适配器与发现目标；扩展既有生命周期参数范围。
+- 指令与参数：`agent add --adapter dsh-desktop --config-root ABS_DSH_HOME`；`agent discover/enroll/list/inspect/plan/apply/sync/restore/enable/disable/set-models` 沿用既有入口，目标/绑定独立。
+- 旧 → 新：`dsh` 仍只操作 web profile；新增 `dsh-desktop` 只操作已存在的 desktop profile。相同 DSH home 可同时登记两端，每端独立 token、revision、默认模型及恢复日志；其他适配器仍保留整根所有权限制。
+- 兼容与迁移：不改旧 `dsh` 绑定、发现 ID 或数据库 schema；桌面显示区分 DSH Web/Desktop。新能力需更新核心和客户端，未构建或发布安装包；不自动初始化 Desktop，不修改真实 Agent 配置、公共 patch、凭据库或 Electron 壳设置。
+- 验证：隔离状态下的发现、双端同 home 生命周期、同步/恢复、鉴权和 CLI/前端回归见本任务更新记录；不将模拟桥接或网关测试视为原生 Desktop/真实上游验收。
+
 ## 2026-10-10 — 建立当前 CLI 文档基线（0.1.0-dev，未发布）
 
 - 类型：基线收录；本轮仅登记既有实现，没有新增、删除或改变可执行指令。

@@ -65,7 +65,7 @@ func (b Binding) Validate() error {
 	if (b.ModelScope == "all-compatible" || b.CodexVersion != "") && !ValidCodexVersion(b.CodexVersion) {
 		return errors.New("all-compatible bindings require a Codex catalog version")
 	}
-	if !ValidID(b.ID) || len(b.ID) > 64 || (b.AdapterID != "codex" && b.AdapterID != "claude" && b.AdapterID != "dsh") || b.AdapterVersion != "1" || !ValidModelID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
+	if !ValidID(b.ID) || len(b.ID) > 64 || (b.AdapterID != "codex" && b.AdapterID != "claude" && b.AdapterID != "dsh" && b.AdapterID != "dsh-desktop") || b.AdapterVersion != "1" || !ValidModelID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
 		return errors.New("invalid binding: supported adapter v1, absolute approved root/executable and valid IDs required")
 	}
 	return nil
@@ -102,6 +102,25 @@ func (s *Store) Binding(id string) (Binding, error) {
 	}
 	return b, e
 }
+
+// BindingRootsConflict retains whole-root ownership except for DSH's two
+// independently managed, disjoint profiles. Disabled bindings retain ownership.
+func BindingRootsConflict(a, b Binding) bool {
+	if canonicalBindingRoot(a.ConfigRoot) != canonicalBindingRoot(b.ConfigRoot) {
+		return false
+	}
+	return !((a.AdapterID == "dsh" && b.AdapterID == "dsh-desktop") ||
+		(a.AdapterID == "dsh-desktop" && b.AdapterID == "dsh"))
+}
+
+func canonicalBindingRoot(root string) string {
+	root = filepath.Clean(root)
+	if runtime.GOOS == "windows" {
+		root = strings.ToLower(root)
+	}
+	return root
+}
+
 func (s *Store) AddBinding(b Binding) (Binding, error) {
 	if e := b.Validate(); e != nil {
 		return Binding{}, e
@@ -110,9 +129,12 @@ func (s *Store) AddBinding(b Binding) (Binding, error) {
 	if e != nil {
 		return Binding{}, e
 	}
-	rootKey := filepath.Clean(b.ConfigRoot)
-	if runtime.GOOS == "windows" {
-		rootKey = strings.ToLower(rootKey)
+	root := canonicalBindingRoot(b.ConfigRoot)
+	rootKey := root
+	// Keep all existing keys intact, including legacy Web bindings. The prefix
+	// cannot collide with an absolute path; no schema/data migration is needed.
+	if b.AdapterID == "dsh-desktop" {
+		rootKey = "dsh-desktop:" + root
 	}
 	b.Revision = 1
 	v, _ := json.Marshal(b)
@@ -121,14 +143,29 @@ func (s *Store) AddBinding(b Binding) (Binding, error) {
 		return Binding{}, e
 	}
 	defer tx.Rollback()
-	// Conservative v1 ownership: one binding for the entire canonical config root.
-	var n int
-	e = tx.QueryRow(`SELECT count(*) FROM bindings WHERE id=? OR root=?`, b.ID, rootKey).Scan(&n)
+	rows, e := tx.Query(`SELECT document FROM bindings WHERE id=? OR root IN (?,?)`, b.ID, root, "dsh-desktop:"+root)
 	if e != nil {
 		return Binding{}, e
 	}
-	if n != 0 {
-		return Binding{}, ErrConflict
+	defer rows.Close()
+	for rows.Next() {
+		var document string
+		var old Binding
+		if e = rows.Scan(&document); e != nil {
+			return Binding{}, e
+		}
+		if e = json.Unmarshal([]byte(document), &old); e != nil {
+			return Binding{}, e
+		}
+		if old.ID == b.ID || BindingRootsConflict(old, b) {
+			return Binding{}, ErrConflict
+		}
+	}
+	if e = rows.Err(); e != nil {
+		return Binding{}, e
+	}
+	if e = rows.Close(); e != nil {
+		return Binding{}, e
 	}
 	_, e = tx.Exec(`INSERT INTO bindings(id,root,document,token,hash,enabled,revision) VALUES(?,?,?,?,?,?,1)`, b.ID, rootKey, string(v), token, digest(token), b.Enabled)
 	if e != nil {

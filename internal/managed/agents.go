@@ -17,6 +17,8 @@ func AdapterFor(id string) Adapter {
 		return StructuredAgent{}
 	case "dsh":
 		return StructuredAgent{DSH: true}
+	case "dsh-desktop":
+		return StructuredAgent{DSH: true, Desktop: true}
 	}
 	return unsupportedAdapter{}
 }
@@ -33,11 +35,18 @@ func (unsupportedAdapter) Verify(state.Binding, GatewayBinding) (Inspection, err
 	return Inspection{}, state.ErrInvalid
 }
 
-type StructuredAgent struct{ DSH bool }
+type StructuredAgent struct{ DSH, Desktop bool }
+
+func (a StructuredAgent) profile() string {
+	if a.Desktop {
+		return "desktop"
+	}
+	return "web"
+}
 
 func (a StructuredAgent) path(b state.Binding) string {
 	if a.DSH {
-		return filepath.Join(b.ConfigRoot, "profiles", "web", "cordis.patch.yml")
+		return filepath.Join(b.ConfigRoot, "profiles", a.profile(), "cordis.patch.yml")
 	}
 	return filepath.Join(b.ConfigRoot, "settings.json")
 }
@@ -64,7 +73,10 @@ func (a StructuredAgent) Inspect(b state.Binding) (Inspection, error) {
 	if a.DSH {
 		id = "dsh"
 		reload = "new_session_required"
-		limits = []string{"web profile only; other profiles are not managed", "start a new session to use the changed default model; no real upstream verification"}
+		if a.Desktop {
+			id = "dsh-desktop"
+		}
+		limits = []string{a.profile() + " profile only; home patches and runtime overrides are not probed", "configuration only; with HMR disabled fully quit and restart the client (closing the Desktop window may only hide it); start a new session to use the changed default model; no real upstream verification"}
 		for _, row := range root.Content {
 			if insert := nodeKey(row, "insert"); insert != nil {
 				return Inspection{}, errors.New("DSH insert patches are not supported by this adapter revision")
