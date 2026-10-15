@@ -3,7 +3,7 @@ import { validRoutingRule } from '../models/model-routing.model';
 import type { Action, Price, Probe, Workspace, KeyRateCache } from '../../desktop/contract.generated';
 import { protocolName, ProviderProblem, type Provider } from './provider.model';
 export type { Action, Price, Probe, Workspace };
-export function actionFor(p: Provider, action: string, fields: Partial<Action> = {}): Action {
+export function actionFor(p: Pick<Provider, 'id' | 'revision'>, action: string, fields: Partial<Action> = {}): Action {
   return { key_ids: null, provider_id: p.id, expected_revision: p.revision, action, price: null, catalog_provider: '', target: '', secret: '', enabled: true, approved: false, copy_keys: false, strategy: 'round-robin', model: '', multiplier: 0, protocol: '', model_revision: 0, tools: false, streaming: false, ...fields };
 }
 const count = (v: number) => Number.isSafeInteger(v) && v >= 0;

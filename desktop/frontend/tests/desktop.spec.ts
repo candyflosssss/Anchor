@@ -661,6 +661,7 @@ test('model settings opens from each card, saves context and reasoning and survi
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toBeVisible();
   await dialog.getByLabel('上下文窗口（tokens）').fill('300000');
   await dialog.getByLabel('默认思考等级').selectOption('"low"');
@@ -669,6 +670,7 @@ test('model settings opens from each card, saves context and reasoning and survi
   await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
   await dialog.getByRole('button', { name: '关闭编辑面板', exact: true }).click();
   await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('300000');
   await expect(dialog.getByLabel('默认思考等级')).toHaveValue('"low"');
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
@@ -755,4 +757,85 @@ test('mapping availability follows scoped Keys and provider switches, not provid
   await expect(card.locator('.model-unavailable-notice')).toHaveCount(0);
   await expect(card.locator('.mapping-key-status').first()).toContainText('Key 已启用');
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
+});
+
+declare global { interface Window { speedSettingsTest: { calls: import('../src/desktop/contract.generated').Action[]; failure: 'conflict' | 'unknown' | null } } }
+for (const failure of ['conflict', 'unknown'] as const) test(`mapping speed settings blocks ${failure} retries until explicit reread (simulated host)`, async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
+    let tier = '', revision = 1;
+    window.speedSettingsTest = { calls: [], failure: null };
+    api.ProviderWorkspace = async input => {
+      const result = await read(input);
+      if (result.data) result.data.models = result.data.models.map(m => m.id === 'shared-one' ? { ...m, service_tier: tier, revision } : m);
+      return result;
+    };
+    api.ProviderAction = async input => {
+      window.speedSettingsTest.calls.push(input);
+      await new Promise(resolve => setTimeout(resolve, 150));
+      const failure = window.speedSettingsTest.failure;
+      if (failure !== 'conflict') { tier = input.service_tier ?? tier; revision++; }
+      if (failure) return { contract: 'anchor-desktop-v1', data: null, problem: { code: failure } };
+      return api.ProviderWorkspace({ provider_id: input.provider_id });
+    };
+  });
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('分身来源渠道').selectOption('摸鱼AI');
+  const tier = dialog.getByLabel('Anchor 固定速度档位');
+  await expect(tier).toBeEnabled();
+  await tier.selectOption('priority');
+  await page.evaluate(value => { window.speedSettingsTest.failure = value; }, failure);
+  await dialog.getByRole('button', { name: '保存速度设置', exact: true }).dblclick();
+  await expect(dialog.getByRole('alert')).toContainText(failure === 'unknown' ? '写入结果未知' : '配置已被其他操作修改');
+  await expect(tier).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '保存速度设置', exact: true })).toBeDisabled();
+  expect(await page.evaluate(() => window.speedSettingsTest.calls)).toMatchObject([{ target: 'shared-one', model: 'upstream-shared-one', model_revision: 1, expected_revision: 3, key_ids: ['default'], strategy: 'round-robin', tools: true, streaming: true, service_tier: 'priority', speed_variants: [] }]);
+  await page.evaluate(() => { window.speedSettingsTest.failure = null; });
+  await dialog.getByRole('button', { name: '重新读取速度设置', exact: true }).click();
+  await expect(tier).toHaveValue(failure === 'unknown' ? 'priority' : '');
+  await expect(tier).toBeEnabled();
+  await tier.selectOption('ultrafast');
+  await dialog.getByRole('button', { name: '保存速度设置', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('速度设置已保存');
+  expect(await page.evaluate(() => window.speedSettingsTest.calls.length)).toBe(2);
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(card).toContainText('Anchor 固定档位：Ultrafast');
+});
+
+test('mapping speed settings cannot replay an acknowledged malformed result or a failed reread (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
+    window.speedSettingsTest = { calls: [], failure: null };
+    api.ProviderAction = async input => {
+      window.speedSettingsTest.calls.push(input);
+      const result = await read({ provider_id: input.provider_id });
+      if (result.data) result.data.provider_id = 'different-provider';
+      return result;
+    };
+    api.ProviderWorkspace = async input => window.desktopTest.writeError
+      ? { contract: 'anchor-desktop-v1', data: null, problem: { code: 'read_error' } } : read(input);
+  });
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('分身来源渠道').selectOption('摸鱼AI');
+  const tier = dialog.getByLabel('Anchor 固定速度档位');
+  await expect(tier).toBeEnabled();
+  await tier.selectOption('priority');
+  await dialog.getByRole('button', { name: '保存速度设置', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('速度设置已保存，但返回配置无法核对');
+  await expect(dialog.getByRole('button', { name: '保存速度设置', exact: true })).toBeDisabled();
+  await page.evaluate(() => { window.desktopTest.writeError = 'invalid'; });
+  await dialog.getByRole('button', { name: '重新读取速度设置', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('未能读取供应商配置');
+  await expect(dialog.getByRole('button', { name: '保存速度设置', exact: true })).toHaveCount(0);
+  await page.evaluate(() => { window.desktopTest.writeError = null; });
+  await dialog.getByRole('button', { name: '重新读取速度设置', exact: true }).click();
+  await expect(tier).toBeEnabled();
+  expect(await page.evaluate(() => window.speedSettingsTest.calls.length)).toBe(1);
 });

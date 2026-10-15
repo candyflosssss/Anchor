@@ -1,3 +1,4 @@
+import type { ProviderTransport } from '../providers/provider.model';
 import { useState, type ReactNode } from 'react';
 import { ArrowLeftRight, ArrowUp, ArrowDown, Check, ChevronDown, GripVertical, LoaderCircle, RefreshCw, Settings2, Undo2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -28,7 +29,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
   const unknown = !g.complete || candidates.some(c => c.availability.state === 'unknown');
   const availability = available ? 'available' : unknown ? 'unknown' : 'unavailable';
   return <article className={`detail-card model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} aria-label={`模型 ${g.alias}`}>
-    <header><h2 className="mono">{g.alias}</h2><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="上下文、能力与思考选项" onClick={settings}><Settings2 size={15} /><span>设置</span></Button></header>
+    <header><h2 className="mono">{g.alias}</h2><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="速度与分身、上下文、能力与思考选项" onClick={settings}><Settings2 size={15} /><span>设置</span></Button></header>
     <div className="model-card-summary"><span className="model-strategy">{ruleLabel(draft.strategy)}</span><span>{candidates.length} 个来源 · {keyCount} 个 Key</span></div>
     <div className="model-availability" role="status"><span className={`channel-status state-${availability}`}>{available ? '当前可用' : unknown ? '可用性待确认' : '当前不可用'}</span><span>{available} / {candidates.length} 个渠道当前可用</span></div>
     {availability === 'unavailable' && <p className="model-unavailable-notice"><strong>无有效渠道</strong>所有来源的供应商已停用，或限定的 Key 已停用、失效、冷却或不存在。请检查供应商与 Key 开关；映射配置仍保留。</p>}
@@ -73,8 +74,8 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
   </article>;
 }
 
-export function ModelsView({ summaries, loading, disabled, rates, routing, onOpen, onShowProviders, children }: Common & {
-  summaries: ProviderSummary[]; loading: boolean; onShowProviders: () => void; children?: ReactNode;
+export function ModelsView({ summaries, loading, disabled, rates, routing, onOpen, onShowProviders, transport, children }: Common & {
+  transport?: ProviderTransport; summaries: ProviderSummary[]; loading: boolean; onShowProviders: () => void; children?: ReactNode;
 }) {
   const [settingsID, setSettingsID] = useState<string | null>(null);
   const groups = aggregateModels(summaries), pending = loading || summaries.some(s => s.workspace === undefined);
@@ -83,7 +84,7 @@ export function ModelsView({ summaries, loading, disabled, rates, routing, onOpe
   return <div className="workspace">
     <header className="page-header"><div><div className="eyebrow">路由</div><h1>模型映射</h1></div><div className="mapping-rate-actions"><Button variant="outline" size="sm" disabled={locked} onClick={() => { void routing.refresh(); }}>刷新配置</Button><Button variant="outline" size="sm" disabled={locked || !groups.length} onClick={() => { void rates.refresh(groups.flatMap(g => g.candidates.flatMap(sourceTargets))); }}><RefreshCw size={14} />{rates.busy ? '正在查询分组倍率…' : '刷新分组倍率'}</Button></div></header>
     {children}
-    {settingsID && <ModelSettingsDialog key={settingsID} id={settingsID} active={!disabled || routing.busy} close={() => setSettingsID(null)} saved={() => routing.refresh()} />}
+    {settingsID && <ModelSettingsDialog key={settingsID} id={settingsID} group={groups.find(g => g.alias === settingsID)} transport={transport} active={!disabled || routing.busy} close={() => setSettingsID(null)} saved={() => routing.refresh()} />}
     {readFailed && <p className="feedback error-feedback" role="alert">部分供应商状态读取失败，渠道可用性可能不完整；请刷新配置重试。</p>}
     {routing.error && <p className="feedback error-feedback" role="alert">{routing.error}</p>}
     {routing.needsRead && <p className="card-hint">保存结果需要核对，请重新读取配置后继续修改。</p>}

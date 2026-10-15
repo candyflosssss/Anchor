@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import type { ProviderTransport } from '../providers/provider.model';
+import type { ModelGroup } from '../providers/provider-summary.model';
+import { ModelSpeedSettingsDialog } from './model-speed-settings.view';
 import type { ModelConfiguration, ReasoningOption } from '../../desktop/contract.generated';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
@@ -27,7 +31,13 @@ function ReasoningFields({ cfg, change }: { cfg: ModelConfiguration; change: (cf
   </div>;
 }
 
-export function ModelSettingsDialog({ id, active, close, saved }: { id: string; active: boolean; close: () => void; saved: () => Promise<void> }) {
+type SettingsProps = { id: string; active: boolean; close: () => void; saved: () => Promise<void> };
+export function ModelSettingsDialog({ group, transport, ...props }: SettingsProps & { group?: ModelGroup; transport?: ProviderTransport }) {
+  const [page, setPage] = useState<'speed' | 'capabilities'>('speed');
+  if (group && transport && page === 'speed') return <ModelSpeedSettingsDialog group={group} transport={transport} {...props} capabilities={() => setPage('capabilities')} />;
+  return <ModelCapabilitiesDialog {...props} speed={group && transport ? () => setPage('speed') : undefined} />;
+}
+function ModelCapabilitiesDialog({ id, active, close, saved, speed }: SettingsProps & { speed?: () => void }) {
   const c = useModelSettings(id, active, saved), state = c.state, cfg = state?.configuration;
   const locked = !active || c.busy || c.needsRead;
   const setCap = (key: keyof ModelConfiguration['capabilities'], v: boolean | null | string[]) => {
@@ -41,6 +51,7 @@ export function ModelSettingsDialog({ id, active, close, saved }: { id: string; 
   const reference = state?.reference, sourceModel = reference?.models[0], pricing = sourceModel?.pricing;
   return <Dialog open={active} onOpenChange={open => { if (!open && !c.busy) close(); }}><DialogContent className="model-settings-dialog" onRequestClose={() => { if (!c.busy) close(); }}>
     <header><DialogTitle>模型设置 · {id}</DialogTitle><DialogDescription>声明此映射的能力与默认值，参考数据来自 models.dev。保存时不会请求推理接口。</DialogDescription></header>
+    {speed && <nav className="settings-actions" aria-label="模型设置分类"><Button variant="outline" disabled={c.busy} onClick={speed}>速度与分身</Button><Button variant="secondary" disabled>上下文、能力与思考</Button><p className="card-hint">切换页面不保留未保存草稿；请先保存当前设置。</p></nav>}
     {c.error && <p className="feedback error-feedback" role="alert">{c.error}</p>}{c.notice && <p className="feedback" role="status">{c.notice}</p>}
     {(c.needsRead || (!state && !c.busy)) && <Button variant="outline" onClick={() => void c.read()} disabled={c.busy}>重新读取设置</Button>}
     {!state ? <p className="card-hint">{c.busy ? '正在读取模型设置…' : '未取得模型设置。'}</p> : cfg && <form onSubmit={e => { e.preventDefault(); if (!locked) void c.save(); }}>
