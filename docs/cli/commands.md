@@ -6,7 +6,7 @@
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.35 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.36 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -35,7 +35,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 - 正常操作 stdout 为一个 JSON 值；`logs export` 为逐条 JSONL，`logs follow` 为重复页 JSON；`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
 - 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
-- 当前源码的公开模型 ID 另允许单个 `(fast)`／`(ultrafast)` 保留后缀（完整 ID 仍最多 128 个 Unicode 码点）；其他用户名称不接受括号。此速度分身增量尚未发布，须同步升级 CLI 与核心。
+- 当前源码的公开模型 ID 另允许单个 `(fast)`／`(ultrafast)` 保留后缀（完整 ID 仍最多 128 个 Unicode 码点）；其他用户名称不接受括号。此速度分身增量已随 desktop.36 宿主／核心发布 dev；独立 CLI 公开 alpha.6 不含本功能，须使用兼容源码 CLI 并同步升级核心。
 - 当前源码中 Key 名称、公开模型 ID／别名、Context／设备连接名称和 Agent Binding ID 使用相同中文命名规则。Agent ID 另有最多 64 个 UTF-8 字节的限制（中文通常每字 3 字节），用于保持托管日志与目录文件名长度安全；其余为最多 128 个 Unicode 码点。实例／授权 ID、令牌、错误码及 SSH 技术字段不采用用户名称规则。此增量已随 desktop.33 桌面 dev 安装包发布；独立 CLI 正式预发行仍为 alpha.6，源码 CLI 需重新构建。使用中文名称须同时升级客户端和运行中的核心。
 - 管理写请求不自动重试。断线、5xx、无效／超大回包可能使写入结果未知，先查询并核对 revision，不盲目重复写入。客户端以 `RequestError` 保留 HTTP 状态、受限 code 与 Unknown 标记，不把原始远端 message 或秘密写到 stderr；网络错误文案使用 `offline`，响应异常使用 `invalid_response`。退出码规则不变。
 - 密钥只从 stdin 输入；不要把真实密钥放进命令参数、历史或文档。供应商秘密目前依赖文件权限/ACL，**不是静态加密**。
@@ -329,7 +329,9 @@ anchor provider model-put --id primary --revision 2 --target coding-main \
   --model upstream-model --model-revision 4 --source-key key-main
 ```
 
-### 固定速度档位与模型分身（2026-10-15，源码未发布）
+### 固定速度档位与模型分身（2026-10-15，desktop.36 已发布 dev）
+
+独立 CLI 公开预发行仍为 alpha.6，不含下述参数；须使用兼容源码 CLI。
 
 `provider model-put` 可重复 `--speed-variant fast`／`--speed-variant ultrafast`，在同一事务中额外创建 `ALIAS(fast)`／`ALIAS(ultrafast)`。两者分别固定发送 `priority`／`ultrafast`，真实上游模型 ID 不变。普通映射与所有分身一起成功或整体失败：任一分身已存在（包括其他供应商）、超长／非法别名、重复选项或 revision 冲突时不保留部分写入。分身只复制当前供应商候选及来源 Key，是独立快照，不自动随普通映射同步，也不复制普通档位价格。
 

@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-15。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.35`，北京时间 2026-10-15 14:57:18 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：修复计划升级停服会临时恢复旧 Agent／CCS 地址的问题；`restart_handoff` 保留托管配置、目录、Binding 凭据和原始恢复日志。普通停止核心仍条件恢复；不承诺零停机、自动启动或既有 Codex 会话重载。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。**desktop.34 及更早版本的旧升级器不含修复；首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.35`、重新打开并核对实际 Agent 连接。** 新宿主面对无 `restart_handoff` 的旧核心拒绝在线安装，不降级／强杀；主机与核心均升级后，后续更新才使用保留交接。
-- 沿用 `.34` 的 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。远端核心不会随本机桌面自动升级。
-- 验证：干净隔离源码 `2bb386fc5a679107f4e659efb09e23fcfc669565`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译与安装包构建通过；六附件大小／SHA256 digest、vendored 源码与元数据 ZIP CRC、标签指向及默认源从 `.34` 发现／实际下载 Linux 包通过。复用修复任务全量 Go 与五包 race 结果，发布轮次未重跑套件、未安装本机、未执行浏览器／原生窗口／安装器／apply 或真实 Codex 会话重载验收；后续本机用户目录升级与启动结果见第 3 节。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.36`，北京时间 2026-10-15 16:03:45 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：供应商映射表单可选额外创建 Fast／Ultrafast 独立模型，Anchor 固定注入 `priority`／`ultrafast` 服务档位；普通模型不变。日志区分调用方、Anchor 策略与上游实际档位，并含已提交的日志布局／缓存命中率改进。不强开 Codex 原生速度菜单，不保证供应商支持、权限或价格；详见[模型分身](../design/model-speed-variants.md)。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.36` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；不承诺零停机、自动启动或既有会话重连。
+- 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。远端核心须另行升级。
+- 验证：干净隔离源码 `f7e961f405a1515f89b412051937fe9d0ecd202c`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.35` 发现／实际下载 Linux 包通过。复用功能任务九包 Go、21 项 Vitest、两项 Playwright、类型与定向 ESLint 结果，发布轮次未重跑套件、未安装本机、未执行原生窗口／安装器／apply 或真实付费上游验收。本机既往升级记录见第 3 节，不代表本版已安装。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.35_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.36_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -85,7 +85,15 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 ## 3. 产物、在线投放与实际构建状态
 
 
-### 当前在线 dev 版 `.35`
+### 当前在线 dev 版 `.36`
+
+`0.1.0-dev.desktop.36` 从干净隔离 worktree 的 `f7e961f405a1515f89b412051937fe9d0ecd202c` 构建，于北京时间 2026-10-15 16:03:45 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.36)（非 latest），tag 指向实际构建提交，未混入工作区未提交的余额界面改动。
+
+本地输出 `dist/desktop/0.1.0-dev.desktop.36/`，`publication/` 六附件含两平台安装包、flat 更新清单、对应源码（含 Go vendor）、许可／构建元数据 ZIP 和总校验清单。构建元数据保留构建时未发布及未安装的原始事实，投放结果另行记录。
+
+Fast／Ultrafast 分身与限制见[设计契约](../design/model-speed-variants.md)；安全交接沿用 `.35`，旧版首次迁移限制见页首。Linux 默认源实际下载与大小／SHA256校验通过，Windows 及其他附件 GitHub digest 与本地一致；未安装本机或重启真实核心，未进行原生窗口／安装器或真实付费上游验收。
+
+### 历史 dev 版 `.35`
 
 `0.1.0-dev.desktop.35` 从干净隔离 worktree 的 `2bb386fc5a679107f4e659efb09e23fcfc669565` 构建，于北京时间 2026-10-15 14:57:18 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.35)（非 latest），tag 指向实际构建提交，未混入余额界面等未提交改动。
 
