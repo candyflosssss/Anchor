@@ -706,7 +706,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	version := f.String("codex-version", "", "exact source/target Codex version X.Y.Z")
 	var candidates, candidateKeys repeated
 	f.Var(&candidateKeys, "candidate-key", "1-based candidate index:key ID; repeat for allowed source Keys")
-	f.Var(&candidates, "candidate", "ordered provider:model mapping")
+	f.Var(&candidates, "candidate", "ordered provider:model mapping; creation imports unambiguous exact models.dev defaults and reference prices")
 	if err := parse(f, args[1:]); err != nil {
 		return err
 	}
@@ -798,7 +798,7 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	f.Var(&sourceKeys, "source-key", "allowed source Key ID for model-put; repeat; omit to preserve")
 	allKeys := f.Bool("all-keys", false, "clear source Key restriction on model-put")
 	model := f.String("model", "", "upstream model")
-	mr := f.Int64("model-revision", 0, "current model revision; zero creates or attaches a new provider")
+	mr := f.Int64("model-revision", 0, "current model revision; zero creates or attaches; new aliases import exact models.dev defaults when unambiguous")
 	multiplier := f.Float64("multiplier", 0, "relative cost multiplier 0.01..1000; omitted preserves existing or defaults to 1")
 	tools := f.Bool("tools", false, "advertise function tools")
 	stream := f.Bool("streaming", false, "advertise streaming")

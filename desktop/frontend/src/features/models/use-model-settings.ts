@@ -23,7 +23,7 @@ export function useModelSettings(id: string, active: boolean, saved: () => Promi
     setState(null); setError(''); setNotice(''); setBusy(false); setNeedsRead(false); setProviders([]); setModels([]); setProvider(''); setModel(''); setReferenceAction('keep');
     if (active) {
       const request = new AbortController(); lifecycle.abort.current = request; lifecycle.lock.current = true; setBusy(true);
-      void modelSettingsService.read(id, request.signal).then(v => { if (!request.signal.aborted) setState(v); }).catch(e => { if (!request.signal.aborted) setError(settingsError(e)); }).finally(() => { if (!request.signal.aborted) { lifecycle.lock.current = false; setBusy(false); } });
+      void modelSettingsService.read(id, request.signal).then(v => { if (!request.signal.aborted) { setState(v); const source = v.reference?.models[0]; if (source) { setProvider(source.provider_id); setModel(source.id); } } }).catch(e => { if (!request.signal.aborted) setError(settingsError(e)); }).finally(() => { if (!request.signal.aborted) { lifecycle.lock.current = false; setBusy(false); } });
     }
     return () => { lifecycle.epoch.current++; lifecycle.abort.current?.abort(); lifecycle.lock.current = false; };
   }, [id, active]);
@@ -40,7 +40,7 @@ export function useModelSettings(id: string, active: boolean, saved: () => Promi
       const v = await modelCatalogService.query({ provider_id: provider, model_id: model, search: '', limit: 0, refresh: true }, signal);
       if (v.stale) throw new DesktopProblem('read_error');
       setState({ ...state, configuration: importConfiguration(state.configuration, v, replace), reference: v });
-      referenceID.current = { provider, model }; setReferenceAction('set'); setNotice('已导入草稿，请核对所有上游候选后保存。');
+      referenceID.current = { provider, model }; setReferenceAction('set'); setNotice('已将上下文、能力和参考价格填入草稿；未提供的字段保持未知。请核对所有上游候选并点击「保存模型设置」。参考价格不会覆盖供应商计费单价。');
     });
   }
   function clearReference() { if (!lock.current && !needsRead) { setState(v => v && ({ ...v, reference: null })); setReferenceAction('clear'); } }

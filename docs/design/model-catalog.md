@@ -4,7 +4,7 @@
 
 ## 数据与身份
 
-固定来源 `https://models.dev/api.json`。这是社区维护的参考目录；官方供应商文档及实际请求账单仍需单独核对。模型按 `(provider_id, model_id)` 精确选择；供应商 ID 属于 models.dev，与 Anchor 本机供应商 ID 无自动对应关系。`canonical_model_id` 只保留原始声明，不自动跨供应商匹配。
+固定来源 `https://models.dev/api.json`。这是社区维护的参考目录；官方供应商文档及实际请求账单仍需单独核对。模型按 `(provider_id, model_id)` 精确选择；供应商 ID 属于 models.dev，与 Anchor 本机供应商 ID 无自动对应关系。`canonical_model_id` 保留原始声明，不按模型名前缀猜测供应商。2026-10-15 源码新增创建映射的精确自动解析：显式 `provider_id/model_id` 优先，其次全目录唯一的精确上游 ID；同名多渠道仅在全部声明同一 canonical 身份且唯一 canonical 所属记录存在时消歧，否则保留未设置。多个候选必须解析为同一目录记录，不使用模糊搜索、手工别名或第一个匹配。
 
 `ModelCatalogQuery`：`provider_id/model_id/search` 默认空，`limit` 默认0（模型列表实际取50，最大100），`refresh` 默认false。空 provider 返回供应商列表；只给 provider 返回模型列表，search 做 ID／名称子串过滤；给 provider+model 精确查询一条模型，不能同时 search。provider/model/search 最多128/256/128字节，无控制字符或首尾空白。未知供应商／模型返回 not_found；目录默认排序并给出 `total/truncated`。
 
@@ -75,3 +75,10 @@ DTO 由 Go 生成到 `desktop/contract.generated.ts`，共享离线样例 `deskt
 Codex 的完整版本匹配目录模板仍是必要前提。生成目录时应用显式 context、text/image 输入模态/视觉、并行工具调用；effort 可以导出 none/minimal/low/medium/high/xhigh，其他或 null effort 会阻止同步，避免伪造/静默降级。非思考模型清空目录中的思考等级和默认值。模板指令与截断策略保留。toggle/budget 思考、输出预算、temperature、结构化输出等保存为能力/默认值元数据，目前不自动改写推理请求。更新目录需 `agent sync`，并重启 Agent；保存映射不热更新正在运行的会话。Agent 自动压缩策略没有添加到通用模型设置。
 
 CLI 使用 `model settings --id ID [--file FILE]`，详见[指令大全](../cli/commands.md)。本轮验证使用隔离状态和模拟目录，没有修改真实 Agent 配置或调用真实付费上游。
+
+
+### 2026-10-15 创建自动补值与手动应用修复（源码未发布）
+
+共享核心在两条创建入口（model add、provider model-put 创建新别名，含桌面批量导入）尝试精确解析；每个创建操作最多等待 3 秒，共享目录抓取仍由既有 30 秒超时和 Close 生命周期约束。无目录、陈旧、未匹配、歧义、多候选不一致或导入配置无效时保留未设置，不阻止创建；编辑/追加已有映射不重填。候选使用上游 ID，不拿 Anchor 供应商名称当 models.dev provider。手工 tools/streaming 标记仍权威，目录没有声明的默认值不猜测。
+
+手动 `reference_action=set` 在核心捕获参考快照时同时补齐未声明的配置，保留显式值；目录输入/输出超过手工上下文、或输出低于已有默认预算时跳过，避免生成无法保存的配置。前端“补充”采用同一冲突规则；“替换”清除超限输出预算和不受支持的 Temperature 默认值。参考快照包含完整价格、来源与版本；未知和零价区别保留。参考价格**不覆盖**供应商 `prices` 计费表，也不自动改写 Agent 配置。已有映射不会在只读查询时悄悄迁移，须显式导入并保存。

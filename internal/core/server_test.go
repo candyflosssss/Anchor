@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -45,6 +46,8 @@ func setup(t *testing.T) *fixture {
 	}
 	logs := new(bytes.Buffer)
 	srv := New(st, slog.New(slog.NewJSONHandler(logs, nil)))
+	srv.modelCatalog.Close()
+	srv.modelCatalog = modeldev.NewWithTransport(modelCatalogTransport(func(*http.Request) (*http.Response, error) { return nil, modeldev.ErrUnavailable }))
 	t.Cleanup(srv.Close)
 	control := httptest.NewServer(srv.Control())
 	t.Cleanup(control.Close)

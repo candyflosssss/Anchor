@@ -242,6 +242,9 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 			err = state.ErrInvalid
 			break
 		}
+		if m.Revision == 0 {
+			s.initializeModelCatalog(r.Context(), &m)
+		}
 		_, err = s.Store.PutProviderModel(m, expected, p.ID, p.Revision)
 	case "model-delete":
 		m, e := s.Store.Model(in.Target)

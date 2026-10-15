@@ -339,6 +339,9 @@ func (s *Server) Control() http.Handler {
 				return
 			}
 		}
+		if in.ExpectedRevision == 0 {
+			s.initializeModelCatalog(r.Context(), &in.Model)
+		}
 		m, err := s.Store.PutModel(in.Model, in.ExpectedRevision)
 		if err != nil {
 			apiError(w, err)

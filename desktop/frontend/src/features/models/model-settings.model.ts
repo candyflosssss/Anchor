@@ -63,8 +63,14 @@ export function importConfiguration(old: ModelConfiguration, catalog: ModelCatal
   // A manual vision declaration is authoritative in fill mode.
   if (caps.vision !== null && caps.input_modalities.length) caps.input_modalities = caps.vision ? [...new Set([...caps.input_modalities, 'image'])] : caps.input_modalities.filter(v => v !== 'image');
   const limits = { ...old.limits };
-  for (const key of ['context', 'input', 'output'] as const) if (replace || limits[key] === null) limits[key] = m.limits[key];
-  return { ...structuredClone(old), limits, capabilities: caps, supported_reasoning: caps.reasoning === false ? [] : replace || !old.supported_reasoning.length ? structuredClone(m.reasoning_options) : structuredClone(old.supported_reasoning), default_reasoning: replace || caps.reasoning === false ? null : structuredClone(old.default_reasoning) };
+  const within = (n: number | null, limit: number | null) => n === null || limit === null || n <= limit;
+  if (replace) Object.assign(limits, m.limits);
+  else {
+    if (limits.context === null && [limits.input, limits.output, old.default_output_tokens].every(n => within(n, m.limits.context))) limits.context = m.limits.context;
+    if (limits.input === null && within(m.limits.input, limits.context)) limits.input = m.limits.input;
+    if (limits.output === null && within(m.limits.output, limits.context) && within(old.default_output_tokens, m.limits.output)) limits.output = m.limits.output;
+  }
+  return checkedConfiguration({ ...structuredClone(old), limits, capabilities: caps, supported_reasoning: caps.reasoning === false ? [] : replace || !old.supported_reasoning.length ? structuredClone(m.reasoning_options) : structuredClone(old.supported_reasoning), default_reasoning: replace || caps.reasoning === false ? null : structuredClone(old.default_reasoning), default_output_tokens: replace && (!within(old.default_output_tokens, limits.context) || !within(old.default_output_tokens, limits.output)) ? null : old.default_output_tokens, default_temperature: replace && caps.temperature !== true ? null : old.default_temperature });
 }
 export function createModelSettingsService(getBridge: () => Pick<DesktopBridge, 'ModelSettings' | 'SaveModelSettings'> = bridge) {
   return {

@@ -368,6 +368,8 @@ sub2api Key 直接倍率结果的 `basis=key_billing`，`group` 和 `group_name`
 
 ## 6. 公开模型与候选路由
 
+2026-10-15 源码行为修复（未发布）：`model add` 及 `provider model-put` 创建全新公开别名时，共享核心自动尝试 models.dev 精确匹配候选的**上游模型 ID**，最多等待 3 秒，复用缓存。无歧义且所有候选解析为同一目录记录时，将上下文、输入/输出上限、能力、原生思考范围与完整参考价格快照写入模型 `settings`，同次创建 revision 仍为 1。显式 provider/model 身份或一致且唯一的 canonical 所属记录可消歧；不按本地供应商名、公开别名或模型名前缀猜测。下载失败、目录陈旧、未匹配、歧义和多候选不一致时正常创建但不自动填值，可用 `model settings --file FILE` 的 set 来源显式导入。更新/追加已有别名不覆盖设置，tools/streaming 仍按显式映射标记。仅请求公开目录，不带推理凭据；参考价格不写入供应商实际计费单价。
+
 ```text
 anchor model list
 anchor model add --id ID --candidate PROVIDER:MODEL [OPTIONS]
@@ -418,7 +420,7 @@ anchor model settings --id ID --file FILE
 
 写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
 
-`reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照）。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
+`reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照，同时补齐未声明的上下文、限制、能力及思考范围）。补值保留显式设置，目录输入/输出与手工上下文或默认输出预算冲突时跳过相应限制；未知默认思考值不猜测。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
 
 从读取结果整理写入文件的示例（`jq` 是外部工具）：
 

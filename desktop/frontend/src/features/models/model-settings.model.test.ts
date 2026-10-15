@@ -16,15 +16,33 @@ describe('model mapping settings', () => {
   });
   it('preserves manual overrides and defaults when filling empty fields', () => {
     const c = config(), imported = importConfiguration(c, catalog(), false);
-    expect(imported.limits).toEqual({ context: 272000, input: 400000, output: 32000 });
+    expect(imported.limits).toEqual({ context: 272000, input: null, output: 32000 });
     expect(imported.capabilities.vision).toBe(true); expect(imported.capabilities.tool_call).toBe(true);
     expect(imported.default_reasoning).toEqual(c.default_reasoning); expect(imported.supported_reasoning).toEqual(c.supported_reasoning);
     expect(c.limits.input).toBeNull();
+    expect(() => checkedConfiguration(imported)).not.toThrow();
   });
   it('replaces metadata only after explicit selection and clears incompatible defaults', () => {
     const imported = importConfiguration(config(), catalog(), true);
     expect(imported.limits.context).toBe(500000); expect(imported.capabilities.vision).toBe(false);
     expect(imported.supported_reasoning[0].values).toEqual(['low']); expect(imported.default_reasoning).toBeNull();
+  });
+  it('imports all absent limits and preserves zero/unknown reference prices', () => {
+    const c = config(), source = catalog();
+    c.limits = { context: null, input: null, output: null };
+    source.models[0].pricing = { currency: 'USD', unit: 'per_million_tokens', rates: { input: '0', output: '10', cache_read: null, cache_write: null, reasoning: null, input_audio: null, output_audio: null }, tiers: [] };
+    const imported = importConfiguration(c, source, false);
+    expect(imported.limits).toEqual(source.models[0].limits);
+    expect(source.models[0].pricing.rates.input).toBe('0');
+    expect(source.models[0].pricing.rates.cache_read).toBeNull();
+  });
+  it('clears only incompatible request defaults when replacing directory metadata', () => {
+    const c = config(), source = catalog();
+    c.capabilities.temperature = true; c.default_temperature = 0.7;
+    source.models[0].limits.output = 1;
+    const imported = importConfiguration(c, source, true);
+    expect(imported.default_temperature).toBeNull(); expect(imported.default_output_tokens).toBeNull();
+    expect(() => checkedConfiguration(imported)).not.toThrow();
   });
   it('keeps toggle, null effort and budget reasoning separate', () => {
     const c: ModelConfiguration = config();

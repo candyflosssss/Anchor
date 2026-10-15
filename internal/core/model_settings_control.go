@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/modelconfig"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/state"
 	"net/http"
@@ -83,6 +84,11 @@ func (s *Server) saveModelSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		settings.Reference = &snapshot
+		settings.Configuration = modelconfig.FillCatalog(settings.Configuration, snapshot.Models[0])
+		if settings.Validate() != nil {
+			apiError(w, state.ErrInvalid)
+			return
+		}
 	}
 	m.Settings = &settings
 	m.DisplayName = in.DisplayName
