@@ -492,6 +492,9 @@ anchor access revoke ID
 
 ### `agent discover` / `agent enroll` / `agent sync`
 
+2026-10-15 当前源码（未发布；desktop.39 不含本次诊断修复）：Agent 管理失败沿用非零退出约定，但不再把所有 409 显示成同一种“冲突”；默认模型已不存在时由原先的 404/not_found 改为 409/agent_model_unavailable，绑定本身不存在仍为 404。CLI stderr 的受限 code 区分：`conflict`（记录 revision 过期）、`agent_config_conflict`（托管字段／目录被外部修改）、`agent_config_unsafe`（配置结构、文件类型或权限不允许安全修改）、`agent_model_unavailable`（默认模型不在当前可用授权范围）、`agent_catalog_invalid`（模型目录生成／本地模板读取校验失败）。其余原因保留 `agent_operation_failed`，不据此推断为配置冲突；不输出解析器、文件系统原文或秘密，不自动重放写入。原有身份／鉴权／绑定不存在处理保持不变。失败后用 `agent discover` 核对绑定状态，必要时 `agent inspect ID` 查看恢复结果；`enabled=true` 仅表示策略开启，不证明配置已应用。
+
+
 ```text
 anchor agent discover
 anchor agent enroll --target ID --model MODEL --approve [--revision N]

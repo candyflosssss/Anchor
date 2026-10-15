@@ -9,12 +9,23 @@ import (
 )
 
 func agentError(w http.ResponseWriter, e error) {
-	if errors.Is(e, state.ErrConflict) || errors.Is(e, state.ErrNotFound) {
+	// Only allowlisted categories cross the boundary. Never return a parser or
+	// filesystem error string, which may contain private configuration values.
+	code, message := "agent_operation_failed", "agent operation failed; inspect local target status and recovery records"
+	switch {
+	case errors.Is(e, managed.ErrModelUnavailable):
+		code, message = "agent_model_unavailable", "default model is unavailable under the selected model scope; check enabled provider candidates"
+	case errors.Is(e, managed.ErrCatalogInvalid):
+		code, message = "agent_catalog_invalid", "managed model catalog could not be generated; check local templates and model metadata"
+	case errors.Is(e, managed.ErrChanged):
+		code, message = "agent_config_conflict", "managed configuration or catalog changed externally; external edits were preserved"
+	case errors.Is(e, managed.ErrUnsafe):
+		code, message = "agent_config_unsafe", "agent configuration cannot be safely edited; check structure, file types and permissions"
+	case errors.Is(e, state.ErrConflict), errors.Is(e, state.ErrNotFound):
 		apiError(w, e)
 		return
 	}
-	// A config parser or filesystem error may contain private values or paths.
-	fail(w, 409, "agent_operation_failed", "unsafe, changed, unsupported or unavailable target; inspect status and recovery records locally")
+	fail(w, http.StatusConflict, code, message)
 }
 
 // Local catalog snapshots can be larger than the client response budget.

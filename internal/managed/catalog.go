@@ -3,6 +3,7 @@ package managed
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -17,6 +18,14 @@ func buildCatalog(models []state.Model, version string) ([]byte, []string, error
 }
 
 func buildCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage) ([]byte, []string, error) {
+	raw, ids, err := encodeCatalogTemplates(models, version, templates)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
+	}
+	return raw, ids, nil
+}
+
+func encodeCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage) ([]byte, []string, error) {
 	entries := []map[string]json.RawMessage{}
 	ids := []string{}
 	metadataBytes := 0

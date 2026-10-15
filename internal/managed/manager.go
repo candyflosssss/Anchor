@@ -3,6 +3,7 @@ package managed
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -27,6 +28,9 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 	}
 	model, e := m.Store.Model(b.Model)
 	if e != nil {
+		if errors.Is(e, state.ErrNotFound) {
+			return GatewayBinding{}, fmt.Errorf("%w: %w", ErrModelUnavailable, e)
+		}
 		return GatewayBinding{}, e
 	}
 	models, e := m.Store.BindingModels(b)
@@ -46,7 +50,7 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 			}
 		}
 		if !found {
-			return GatewayBinding{}, errors.New("default model is unavailable under the selected model scope")
+			return GatewayBinding{}, ErrModelUnavailable
 		}
 	} else if b.AdapterID == "codex" && model.Codex == nil {
 		models = nil
@@ -66,7 +70,7 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 		var err error
 		templates, err = m.codexTemplates(b)
 		if err != nil {
-			return GatewayBinding{}, err
+			return GatewayBinding{}, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
 		}
 	}
 	return GatewayBinding{Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil

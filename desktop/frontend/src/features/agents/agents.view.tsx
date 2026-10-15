@@ -30,7 +30,9 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
             <button type="button" className="agent-platform-heading" aria-label={`${name} 托管设置`} aria-expanded={open} aria-controls={panelId}
               disabled={c.busy} onClick={() => open ? c.cancel() : c.select(row)}>
               <span className="agent-brand">{brand ? <img src={brand.logo} alt="" className={brand.monochrome ? 'agent-brand-monochrome' : undefined} /> : <Bot size={28} />}</span>
-              <span className="agent-platform-name">{name}</span><ChevronDown size={16} className="agent-chevron" />
+              <span className="agent-platform-name">{name}</span>
+              {binding?.enabled && binding.status !== 'applied' && <span className="agent-platform-status" aria-label={`${name} 托管状态`}>{managementStatus[binding.status] ?? binding.status}</span>}
+              <ChevronDown size={16} className="agent-chevron" />
             </button>
             <Switch aria-label={`${name} 托管`} checked={!!binding?.enabled} disabled={c.busy || !canToggle}
               onCheckedChange={checked => {

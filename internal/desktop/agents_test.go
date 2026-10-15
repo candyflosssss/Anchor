@@ -125,4 +125,26 @@ func TestRealCoreAgentBridgeLifecycle(t *testing.T) {
 	if r.Problem != nil || r.Data.Bindings[0].Status != "applied" {
 		t.Fatalf("enable: %+v", r)
 	}
+	row = r.Data.Bindings[0]
+	r = b.ManageAgent(ManageAgent{BindingID: row.ID, ExpectedRevision: row.Revision - 1, Action: "sync"})
+	if r.Problem == nil || r.Problem.Code != "conflict" {
+		t.Fatalf("revision conflict: %+v", r)
+	}
+	path := filepath.Join(root, "config.toml")
+	raw, err = os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(raw), `model = "public"`, `model = "external-edit"`, 1))
+	if err = os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	r = b.ManageAgent(ManageAgent{BindingID: row.ID, ExpectedRevision: row.Revision, Action: "sync"})
+	if r.Problem == nil || r.Problem.Code != "agent_config_conflict" {
+		t.Fatalf("external edit was hidden behind revision conflict: %+v", r)
+	}
+	now, err = os.ReadFile(path)
+	if err != nil || string(now) != string(raw) {
+		t.Fatal("external edit overwritten", err)
+	}
 }

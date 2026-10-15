@@ -38,7 +38,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
     setTargetId(row.id); setModel(available.find(m => m.id === row.binding?.model)?.id ?? available[0]?.id ?? '');
     setError(''); setNotice('');
   }
-  async function write(action: () => Promise<AgentWorkspace>) {
+  async function write(action: () => Promise<AgentWorkspace>, affectedRow = targetId) {
     if (!enabled || busy || latch.current) return;
     latch.current = true; setWriting(true); setError(''); setNotice('');
     const generation = ++epoch.current;
@@ -47,10 +47,25 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
       if (alive.current && epoch.current === generation) { setData(v); setTargetId(''); setNotice('托管状态已更新。配置应用或恢复后请完全退出并重新启动对应 Agent（DSH 请新建会话）；配置成功仍需在 Agent 中验证实际请求。'); }
     } catch (e) {
       if (alive.current && epoch.current === generation) {
-        setError(agentMessage(e)); setTargetId('');
+        setError(agentMessage(e)); setTargetId(affectedRow);
         // Read after partial/conflicting writes. Never automatically replay them.
-        try { const v = await agentService.workspace(); if (alive.current && epoch.current === generation) setData(v); }
-        catch { if (alive.current && epoch.current === generation) setData(null); }
+        try {
+          const v = await agentService.workspace();
+          if (alive.current && epoch.current === generation) {
+            setData(v);
+            const row = agentRows(v).find(r => r.id === affectedRow);
+            if (row?.target) {
+              const choices = availableAgentModels(v, row.target);
+              setModel(current => choices.some(m => m.id === current) ? current : choices.find(m => m.id === row.binding?.model)?.id ?? choices[0]?.id ?? '');
+            }
+            setError(`${agentMessage(e)} 已重新读取当前状态。`);
+          }
+        } catch {
+          if (alive.current && epoch.current === generation) {
+            setData(null);
+            setError(`${agentMessage(e)} 重新读取也失败了，当前结果尚未确认，请重新识别；不要重复提交。`);
+          }
+        }
       }
     } finally { latch.current = false; if (alive.current && epoch.current === generation) { setWriting(false); setDisableTarget(null); } }
   }
@@ -62,6 +77,6 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
     read, select, cancel: () => { if (!busy) setTargetId(''); },
     enroll: () => selected?.supported && selected.status === 'ready' && availableModels.some(m => m.id === model) && write(() => agentService.enroll({ target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
       model_scope: 'all-mapped', model_templates: {}, approved: true })),
-    manage: (row: ManagedAgent, action: 'sync' | 'enable' | 'disable') => write(() => agentService.manage({ binding_id: row.id, expected_revision: row.revision, action })),
+    manage: (row: ManagedAgent, action: 'sync' | 'enable' | 'disable') => write(() => agentService.manage({ binding_id: row.id, expected_revision: row.revision, action }), rows.find(v => v.binding?.id === row.id)?.id),
   };
 }

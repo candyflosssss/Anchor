@@ -94,6 +94,10 @@ func problem(err error, writing bool) *Problem {
 		case 401, 403:
 			return &Problem{"unauthorized"}
 		case 409:
+			switch r.Code {
+			case "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe":
+				return &Problem{r.Code}
+			}
 			if r.Code == "referenced" {
 				return &Problem{"referenced"}
 			}

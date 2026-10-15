@@ -452,3 +452,13 @@
 - 旧 → 新：all-mapped 中完全缺失指令的模型条目会让原生 Codex 0.162.1 拒绝整份目录并回退内置名单。现在仅在无上游／本地模板指令时补入 Anchor 明示的通用编程助手指令；不冒充官方模板、不借用其他模型指令、已有指令不改。
 - 兼容与迁移：只更新 Anchor 自有目录，保留用户目录、首次恢复基线、默认模型与凭据；须重新加载 Codex 名单。损坏的模板字段仍拒绝，严格版本匹配元数据规则不变。
 - 验证：隔离原生 Codex 0.162.1 的 initialize + model/list 已用修正样本验证 12 项包含速度分身，未创建线程或发付费请求；最终 `.39` 双平台包已上线、本机已安装，实际生成目录通过原生 model/list 12 项一致性核验；手动 sync applied 且无改写。详见本轮 release 记录。
+
+
+## 2026-10-15 — Agent 失败安全分类与桌面重读反馈（当前源码，未发布）
+
+- 类型：修改失败诊断；命令、参数、默认值与退出码不变。
+- 指令与参数：`agent enroll/add/plan/apply/sync/restore/enable/disable/set-models` 复用的管理错误；`agent discover/inspect` 仍为核对入口，无 CLI 功能缺口。
+- 旧 → 新：Agent 操作的各类 409 在 GUI 中统一显示笼统“配置冲突” → 区分 revision、外部修改、不安全配置、默认模型不可用和目录生成失败；未分类原因仍为 `agent_operation_failed`。CLI stderr 保留安全 code，帮助同步说明分类。默认模型不存在不再误报为绑定不存在（404/not_found），改为 409/agent_model_unavailable；绑定不存在仍返回 404。不公开解析器／文件系统错误原文；不自动重放写入。
+- 桌面反馈：失败后保留或展开对应 Agent 的设置；重读成功才显示“已重新读取”，重读失败明确结果未确认；已启用但未 applied 的绑定在折叠列表直接显示状态，避免开启策略被误认为已成功应用。
+- 兼容与迁移：新增受限桌面 ProblemCode，无 DTO 字段或数据库迁移；须同时升级核心与桌面才能得到细分诊断，desktop.39 不含本次修复。旧核心／未分类失败不能据此断言具体原因；截图中的 Windows 根因尚未取得诊断，未发布新包。
+- 验证：managed/core/desktop/client/cli 五包 Go 回归、TypeScript 检查、Agent Model 14 项单测、Agent 页面 15 项 Playwright 单 worker 用例及定向 ESLint 通过；包含真实隔离 Bridge/core 外部改写冲突与 revision 冲突区分、错误不泄密、重读失败和 enable 部分成功反馈。不请求付费上游、不改用户真实 Agent 配置；不是 Windows 原生验收。

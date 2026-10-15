@@ -13,7 +13,7 @@ const Contract = "anchor-desktop-v1"
 const MaxSafeRevision int64 = 9007199254740991
 
 // ProblemCodes is the sole source for generated TypeScript error literals.
-var ProblemCodes = []string{"offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed"}
+var ProblemCodes = []string{"offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed", "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe"}
 
 type Problem struct {
 	Code string `json:"code"`

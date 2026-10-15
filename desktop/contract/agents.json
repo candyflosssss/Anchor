@@ -62,5 +62,12 @@
     "binding_id": "codex-fixture",
     "expected_revision": 1,
     "action": "sync"
-  }
+  },
+  "failure_codes": [
+    "agent_operation_failed",
+    "agent_model_unavailable",
+    "agent_catalog_invalid",
+    "agent_config_conflict",
+    "agent_config_unsafe"
+  ]
 }

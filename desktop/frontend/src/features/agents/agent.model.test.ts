@@ -1,13 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DesktopProblem } from '../../desktop/transport';
 import fixture from '../../../../contract/agents.json';
 import { CONTRACT, type AgentWorkspace, type DesktopBridge } from '../../desktop/contract.generated';
-import { checkedAgentWorkspace, createAgentService, availableAgentModels, targetStatus, agentRows } from './agent.model';
+import { checkedAgentWorkspace, createAgentService, availableAgentModels, targetStatus, agentRows, agentMessage } from './agent.model';
 
 function api(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   const result = { contract: CONTRACT, data: fixture.workspace, problem: null };
   return { AgentWorkspace: async () => result, EnrollAgent: async () => result, ManageAgent: async () => result, ...overrides } as DesktopBridge;
 }
 describe('Agent contract and controlled transport', () => {
+  it('distinguishes safe failure categories without asserting a reread has succeeded', async () => {
+    const codes = ['conflict', 'agent_operation_failed', 'agent_model_unavailable', 'agent_catalog_invalid', 'agent_config_conflict', 'agent_config_unsafe'] as const;
+    expect(fixture.failure_codes).toEqual(codes.slice(1));
+    const messages = codes.map(code => agentMessage(new DesktopProblem(code)));
+    expect(new Set(messages).size).toBe(codes.length);
+    expect(messages.every(message => !message.includes('已重新读取'))).toBe(true);
+    expect(agentMessage(new DesktopProblem('agent_operation_failed'))).toContain('不能据此判定为配置冲突');
+    for (const code of codes.slice(1)) {
+      const service = createAgentService(() => api({ EnrollAgent: async () => ({ contract: CONTRACT, data: null, problem: { code } }) }));
+      await expect(service.enroll(fixture.enroll)).rejects.toMatchObject({ code });
+    }
+  });
   it('keeps five platforms and matches Windows binding paths without duplicate targets', () => {
     const data = { ...fixture.workspace, bindings: [{ ...fixture.workspace.bindings[0], config_root: 'c:/users/fixture/.codex' }] };
     const rows = agentRows(data);

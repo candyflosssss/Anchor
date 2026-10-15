@@ -54,7 +54,12 @@ export function agentMessage(error: unknown): string {
   const code = error instanceof DesktopProblem ? error.code : 'unknown';
   const messages: Record<string, string> = {
     invalid: '托管选择无效。请检查默认模型、模板、目录和版本，重新识别后再提交。',
-    conflict: '目标状态已变化、存在配置冲突，或模型不满足托管条件。已重新读取，请核对目录、模板和供应商启用状态后再操作。',
+    conflict: '托管记录版本已变化，本次操作未完成。请核对重新读取的状态后再操作。',
+    agent_config_conflict: '托管配置或模型目录已被外部修改，未覆盖这些修改。请展开对应 Agent 核对状态，处理冲突后再同步。',
+    agent_config_unsafe: '无法安全修改 Agent 配置。请检查配置结构、文件类型和目录权限；不要直接删除原配置。',
+    agent_model_unavailable: '默认模型在当前托管范围内不可用。请检查模型映射和候选供应商的启用状态，或选择其他默认模型。',
+    agent_catalog_invalid: '无法生成托管模型目录。请检查本地 Codex 模板和模型元数据；这不是托管记录版本冲突，重复重启不能修复。',
+    agent_operation_failed: 'Agent 托管操作未完成，后台未提供更具体的安全诊断。请核对当前状态和本机恢复记录；不能据此判定为配置冲突。',
     unknown: '操作结果未知。请重新读取托管状态后核对，不要重复提交。',
     unsupported: '当前核心未提供 Agent 托管接口，请更新后重新连接。',
     identity: '本机核心身份不匹配，已停止操作。', unauthorized: '没有本机核心管理权限。',

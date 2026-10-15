@@ -23,6 +23,8 @@ func TestStructuredMutationErrorsNeverReplayOrLeak(t *testing.T) {
 	}{
 		{401, `{"error":{"code":"unauthorized","message":"secret-details"}}`, false, "unauthorized"},
 		{409, `{"error":{"code":"conflict"}}`, false, "conflict"},
+		{409, `{"error":{"code":"agent_catalog_invalid","message":"secret-details"}}`, false, "agent_catalog_invalid"},
+		{409, `{"error":{"code":"agent_config_conflict","message":"secret-details"}}`, false, "agent_config_conflict"},
 		{500, `{"error":{"code":"internal_error","message":"secret-details"}}`, true, "internal_error"},
 		{400, `{"error":{"code":"中文错误","message":"secret-details"}}`, false, "request_failed"},
 		{200, `not-json-secret-details`, true, "invalid_response"},

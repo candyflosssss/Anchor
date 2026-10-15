@@ -3,6 +3,11 @@ import type { ProblemCode, SessionInfo } from './contract.generated';
 import { DesktopProblem, desktopSession } from './transport';
 import { prototype } from './environment';
 export const desktopMessages: Record<ProblemCode, string> = {
+  agent_operation_failed: 'Agent 托管操作未完成，请核对当前状态和本机恢复记录。',
+  agent_model_unavailable: 'Agent 默认模型不可用，请检查模型映射和候选供应商。',
+  agent_catalog_invalid: '无法生成 Agent 模型目录，请检查模板和模型元数据。',
+  agent_config_conflict: 'Agent 托管配置已被外部修改，已保留这些修改。',
+  agent_config_unsafe: 'Agent 配置无法安全修改，请检查结构、文件类型与权限。',
   referenced: '项目仍有引用，无法删除。',
   offline: '当前设备核心不可用，请重新连接。',
   unauthorized: '管理凭据不可用，请重新连接设备以完成 SSH 鉴权，或检查本机实例权限。',

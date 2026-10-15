@@ -9,6 +9,7 @@
 .agent-brand img { width: 28px; height: 28px; object-fit: contain; }
 .dark .agent-brand-monochrome { filter: invert(1); }
 .agent-platform-name { font-size: 15px; font-weight: 600; letter-spacing: -.015em; }
+.agent-platform-status { font-size: 12px; color: hsl(var(--destructive)); overflow-wrap: anywhere; }
 .agent-chevron { margin-left: auto; color: hsl(var(--muted-foreground)); transition: transform .15s ease; }
 .agent-platform-heading[aria-expanded=true] .agent-chevron { transform: rotate(180deg); }
 .agent-settings { padding: 8px 24px 24px 86px; border-top: 1px solid hsl(var(--border) / .5); background: hsl(var(--muted) / .18); }
