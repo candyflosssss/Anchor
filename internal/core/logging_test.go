@@ -406,13 +406,15 @@ func TestGatewayLoggingLoad(t *testing.T) {
 	}
 }
 
-func TestToolStreamFirstOutputIsPersistedAndExportedWithoutTextTPS(t *testing.T) {
+func TestToolStreamOutputTPSIsPersistedAndExportedWithoutTextTPS(t *testing.T) {
 	f := setup(t)
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		io.WriteString(w, "data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"name\":\"exec\"}}\n\n")
 		w.(http.Flusher).Flush()
 		io.WriteString(w, "data: {\"type\":\"response.function_call_arguments.delta\",\"delta\":\"DO_NOT_STORE\"}\n\n")
+		w.(http.Flusher).Flush()
+		time.Sleep(5 * time.Millisecond)
 		io.WriteString(w, "data: {\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"status\":\"completed\",\"usage\":{\"input_tokens\":12,\"output_tokens\":9,\"output_tokens_details\":{\"reasoning_tokens\":0}}}}\n\n")
 	}))
 	defer up.Close()
@@ -432,11 +434,14 @@ func TestToolStreamFirstOutputIsPersistedAndExportedWithoutTextTPS(t *testing.T)
 	if r.Metrics.TimeToFirstTextMS != nil || r.Metrics.GenerationMS != nil || r.Metrics.OutputTextTokens != nil || r.Metrics.TextIntervalComplete {
 		t.Fatalf("tool arguments must not become text measurements: %+v", r.Metrics)
 	}
+	if !r.Metrics.OutputIntervalComplete || r.Metrics.OutputGenerationMS == nil || *r.Metrics.OutputGenerationMS <= 0 || r.Metrics.NonReasoningOutputTokens == nil || *r.Metrics.NonReasoningOutputTokens != 9 {
+		t.Fatalf("tool stream must retain output TPS measurements: %+v", r.Metrics)
+	}
 	var export bytes.Buffer
 	if err := c.ExportLogs(t.Context(), logbook.Query{}, &export); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(export.String(), `"time_to_first_output_ms":`) || strings.Contains(export.String(), "DO_NOT_STORE") {
+	if !strings.Contains(export.String(), `"non_reasoning_output_tokens":9`) || !strings.Contains(export.String(), `"time_to_first_output_ms":`) || strings.Contains(export.String(), "DO_NOT_STORE") {
 		t.Fatal("export must include timing, not tool arguments")
 	}
 }

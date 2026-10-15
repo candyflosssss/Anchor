@@ -38,7 +38,7 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '详情']);
   const success = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
   const timing = success.getByRole('cell').nth(4), tokens = success.getByRole('cell').nth(5);
-  for (const label of ['总耗时', '首字', '正文', 'TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
+  for (const label of ['总耗时', '首字', '输出', '输出TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
   for (const label of ['输入', '输出', '缓存命中', '思考', '合计']) await expect(tokens.getByText(label, { exact: true })).toBeVisible();
   await expect(success.getByRole('cell').nth(1)).toContainText('HTTP 200');
   await expect(list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_failed' }) }).getByRole('cell').nth(1)).toContainText('invalid_response');

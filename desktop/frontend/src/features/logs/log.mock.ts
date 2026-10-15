@@ -23,14 +23,14 @@ const baseFixtures: RequestLog[] = [
 export const requestFixtures: RequestLog[] = baseFixtures.map(row => {
   const snapshots: Record<string, Partial<RequestLog>> = {
     req_demo_8f2c91: { reasoningEffort: 'high', stream: false },
-    req_demo_b7a403: { reasoningEffort: 'medium', stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 584, generationMs: 1200, outputTextTokens: 326, textIntervalComplete: true, cacheReadTokens: 1024, reasoningTokens: 0 } },
-    req_demo_c102ee: { reasoningEffort: null, stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 284, generationMs: 640, outputTextTokens: 482, textIntervalComplete: true, cacheReadTokens: 1536, reasoningTokens: 0 } },
-    req_demo_d39e20: { reasoningEffort: 'high', stream: true, metrics: { timeToFirstTextMs: 820, generationMs: null, outputTextTokens: null, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: null } },
-    req_demo_e910af: { reasoningEffort: 'high', stream: false, generationStatus: 'incomplete', metrics: { timeToFirstTextMs: null, generationMs: null, outputTextTokens: 0, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: 16 } },
-    req_demo_f21d64: { reasoningEffort: null, stream: true, metrics: { timeToFirstTextMs: 390, generationMs: null, outputTextTokens: null, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: null } },
+    req_demo_b7a403: { reasoningEffort: 'medium', stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 584, outputGenerationMs: 1200, nonReasoningOutputTokens: 326, outputIntervalComplete: true, generationMs: 1200, outputTextTokens: 326, textIntervalComplete: true, cacheReadTokens: 1024, reasoningTokens: 0 } },
+    req_demo_c102ee: { reasoningEffort: null, stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 284, outputGenerationMs: 640, nonReasoningOutputTokens: 482, outputIntervalComplete: true, generationMs: 640, outputTextTokens: 482, textIntervalComplete: true, cacheReadTokens: 1536, reasoningTokens: 0 } },
+    req_demo_d39e20: { reasoningEffort: 'high', stream: true, metrics: { timeToFirstTextMs: 820, outputGenerationMs: null, nonReasoningOutputTokens: null, outputIntervalComplete: false, generationMs: null, outputTextTokens: null, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: null } },
+    req_demo_e910af: { reasoningEffort: 'high', stream: false, generationStatus: 'incomplete', metrics: { timeToFirstTextMs: null, outputGenerationMs: null, nonReasoningOutputTokens: 0, outputIntervalComplete: false, generationMs: null, outputTextTokens: 0, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: 16 } },
+    req_demo_f21d64: { reasoningEffort: null, stream: true, metrics: { timeToFirstTextMs: 390, outputGenerationMs: null, nonReasoningOutputTokens: null, outputIntervalComplete: false, generationMs: null, outputTextTokens: null, textIntervalComplete: false, cacheReadTokens: null, reasoningTokens: null } },
     req_demo_a098bc: { reasoningEffort: 'low', stream: false },
     req_demo_109ea4: { reasoningEffort: 'medium', stream: true },
-    req_demo_34abc0: { reasoningEffort: 'low', stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 180, generationMs: 420, outputTextTokens: 140, textIntervalComplete: true, cacheReadTokens: 0, reasoningTokens: 0 } },
+    req_demo_34abc0: { reasoningEffort: 'low', stream: true, generationStatus: 'completed', metrics: { timeToFirstTextMs: 180, outputGenerationMs: 420, nonReasoningOutputTokens: 140, outputIntervalComplete: true, generationMs: 420, outputTextTokens: 140, textIntervalComplete: true, cacheReadTokens: 0, reasoningTokens: 0 } },
   };
   return { ...row, ...snapshots[row.id] };
 });

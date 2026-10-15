@@ -586,6 +586,9 @@ export interface WorkspaceResult {
   problem: Problem | null;
 }
 export interface Metrics {
+  output_generation_ms: number | null;
+  non_reasoning_output_tokens: number | null;
+  output_interval_complete: boolean;
   time_to_first_output_ms: number | null;
   time_to_first_text_ms: number | null;
   generation_ms: number | null;

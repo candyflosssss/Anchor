@@ -49,7 +49,10 @@
           "output_text_tokens": null,
           "text_interval_complete": false,
           "cache_read_tokens": null,
-          "reasoning_tokens": null
+          "reasoning_tokens": null,
+          "output_generation_ms": null,
+          "non_reasoning_output_tokens": null,
+          "output_interval_complete": false
         },
         "attempt_count": 1,
         "attempts_truncated": false,
@@ -99,11 +102,14 @@
         "metrics": {
           "time_to_first_output_ms": 584,
           "time_to_first_text_ms": 584,
-          "generation_ms": 1500,
-          "output_text_tokens": 100,
-          "text_interval_complete": true,
+          "generation_ms": null,
+          "output_text_tokens": null,
+          "text_interval_complete": false,
           "cache_read_tokens": 0,
-          "reasoning_tokens": 20
+          "reasoning_tokens": 20,
+          "output_generation_ms": 1500,
+          "non_reasoning_output_tokens": 100,
+          "output_interval_complete": true
         },
         "attempt_count": 1,
         "attempts_truncated": false,

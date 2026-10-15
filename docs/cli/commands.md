@@ -674,9 +674,11 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts/evidence 大字段，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 
-2026-10-15 当前源码（未发布）：请求 `metrics` 新增可空的 `time_to_first_output_ms`，表示从根请求开始到首个非空正文或工具调用参数增量（含 Responses 自定义工具输入）；角色、心跳、空增量、工具空壳与单独思考不计入。`time_to_first_text_ms` 继续只表示正文首字，正文生成耗时与 TPS 口径不变。旧历史缺少新字段时不补算；升级正在处理请求的核心后仅对新请求采集，旧桌面可忽略新增字段。
+2026-10-15 当前源码（未发布）：请求 `metrics` 新增可空的 `time_to_first_output_ms`，表示从根请求开始到首个非空正文或工具调用参数增量（含 Responses 自定义工具输入）；角色、心跳、空增量、工具空壳与单独思考不计入。`time_to_first_text_ms` 继续只表示正文首字，原有正文指标继续保留，当前界面采用下述新增输出指标计算输出 TPS。旧历史缺少新字段时不补算；升级正在处理请求的核心后仅对新请求采集，旧桌面可忽略新增字段。
 
-2026-10-13 当前源码（未发布）：`list/detail/follow/export` 的请求结果在协议正常结束且响应写入成功后保留 `succeeded` / `complete`，客户端在日志或用量收尾期间断开不再改记为 `client_cancelled`；未完成或写入失败时的取消仍为 `cancelled`。历史记录不自动重判，须升级正在处理请求的核心后才能影响新记录。TPS 仅在完整正文区间及正文 Token 可确认时计算；工具／非文本输出、缺少用量或 reasoning Token、非流式及中断区间保持未知。命令、参数及 JSON 字段不变。
+2026-10-15 当前源码（未发布）：请求 `metrics` 新增可空的 `output_generation_ms`、`non_reasoning_output_tokens` 和布尔 `output_interval_complete`。输出耗时从首次有效正文或工具参数增量到协议完成，不含首字前等待；非思考输出 Token = 本次成功尝试的确认输出 Token − 思考 Token，包含正文和工具参数，无思考事件的 Anthropic 沿用既有规则。桌面输出 TPS = 非思考输出 Token / 输出耗时秒数，只有流式、成功完整区间、可分离且为正的 Token 和耗时时显示；纯思考、中断、缺用量或无法分离思考时未知。区间可能包含交错思考或等待，并非纯解码速度。`generation_ms/output_text_tokens/text_interval_complete` 仍为原有正文指标；旧日志不补写，桌面只对已确认的完整正文统计作兼容回退。`logs list/detail/follow/export` 沿用既有入口输出新增字段，无新命令或参数；需要升级处理请求的核心才对新记录生效。
+
+2026-10-13 当前源码（未发布）：`list/detail/follow/export` 的请求结果在协议正常结束且响应写入成功后保留 `succeeded` / `complete`，客户端在日志或用量收尾期间断开不再改记为 `client_cancelled`；未完成或写入失败时的取消仍为 `cancelled`。历史记录不自动重判，须升级正在处理请求的核心后才能影响新记录。原有正文指标继续保留；当前输出 TPS 口径见上文。命令、参数不变。
 
 `follow` 每 2 秒输出一页完整 JSON（不是逐条去重订阅，可重复且 pending 后续会更新）；窗口起点在启动时固定，cursor/until 按提供值使用。Ctrl+C 终止，正常退出规则沿用应用。`export` 忽略 cursor/limit，从固定 latest 上界按页流式写 JSONL 到 stdout，最多 200,000 条、2分钟；每条为完整请求或系统事件，适合重定向到文件。记录到期/更新仍可能改变导出内容，不承诺事务级快照。中途失败返回非零，CLI 输出文件可能不完整，应按退出码处理。
 

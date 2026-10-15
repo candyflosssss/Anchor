@@ -172,6 +172,19 @@ func setLogMetrics(t *requestTrace, obs protocol.Observation, u protocol.Usage, 
 		v := u.Reasoning
 		t.row.Metrics.ReasoningTokens = &v
 	}
+	// Keep output and text measurements separate: tool arguments count as output,
+	// but their token counts cannot be attributed to body text.
+	if success && !obs.FirstOutput.IsZero() && !obs.Terminal.IsZero() && obs.Status == "completed" {
+		duration := obs.Terminal.Sub(obs.FirstOutput).Milliseconds()
+		if duration > 0 {
+			t.row.Metrics.OutputGenerationMS = &duration
+			t.row.Metrics.OutputIntervalComplete = true
+			if u.Known && (u.ReasoningKnown || (p == "anthropic" && !obs.Reasoning)) && u.Reasoning >= 0 && u.Output >= u.Reasoning {
+				output := u.Output - u.Reasoning
+				t.row.Metrics.NonReasoningOutputTokens = &output
+			}
+		}
+	}
 	if success && !obs.FirstText.IsZero() && !obs.Terminal.IsZero() && obs.Status == "completed" {
 		duration := obs.Terminal.Sub(obs.FirstText).Milliseconds()
 		if duration > 0 {

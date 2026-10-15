@@ -34,8 +34,8 @@ export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
       return <dl className="log-metric-grid" aria-label="耗时与速度">
         <Metric label="总耗时" value={milliseconds(row.elapsed)} />
         <Metric label="首字" value={milliseconds(row.metrics?.timeToFirstOutputMs ?? row.metrics?.timeToFirstTextMs)} />
-        <Metric label="正文" value={milliseconds(row.stream && row.metrics?.textIntervalComplete ? row.metrics.generationMs : null)} />
-        <Metric label="TPS" value={rate === null ? '未知' : `${rate.toFixed(1)} t/s`} />
+        <Metric label="输出" value={milliseconds(row.stream && row.metrics?.outputIntervalComplete ? row.metrics.outputGenerationMs ?? null : null)} />
+        <Metric label="输出TPS" value={rate === null ? '未知' : `${rate.toFixed(1)} t/s`} />
       </dl>;
     }
     case 'tokens': return <div className="log-token-block"><dl className="log-metric-grid" aria-label="Token 用量">

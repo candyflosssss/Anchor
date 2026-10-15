@@ -12,13 +12,17 @@ var ErrUnavailable = errors.New("log storage unavailable")
 
 // All optional measurements are pointers: an absent observation is not zero.
 type Metrics struct {
-	TimeToFirstOutputMS  *int64 `json:"time_to_first_output_ms"`
-	TimeToFirstTextMS    *int64 `json:"time_to_first_text_ms"`
-	GenerationMS         *int64 `json:"generation_ms"`
-	OutputTextTokens     *int64 `json:"output_text_tokens"`
-	TextIntervalComplete bool   `json:"text_interval_complete"`
-	CacheReadTokens      *int64 `json:"cache_read_tokens"`
-	ReasoningTokens      *int64 `json:"reasoning_tokens"`
+	// Output metrics include text and tool arguments, but exclude reasoning tokens.
+	OutputGenerationMS       *int64 `json:"output_generation_ms"`
+	NonReasoningOutputTokens *int64 `json:"non_reasoning_output_tokens"`
+	OutputIntervalComplete   bool   `json:"output_interval_complete"`
+	TimeToFirstOutputMS      *int64 `json:"time_to_first_output_ms"`
+	TimeToFirstTextMS        *int64 `json:"time_to_first_text_ms"`
+	GenerationMS             *int64 `json:"generation_ms"`
+	OutputTextTokens         *int64 `json:"output_text_tokens"`
+	TextIntervalComplete     bool   `json:"text_interval_complete"`
+	CacheReadTokens          *int64 `json:"cache_read_tokens"`
+	ReasoningTokens          *int64 `json:"reasoning_tokens"`
 }
 type Attempt struct {
 	Number    int    `json:"number"`

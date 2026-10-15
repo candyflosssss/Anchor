@@ -22,8 +22,8 @@ describe('log column preferences', () => {
     expect(moveColumn(['time', 'model'], 'model', 1)).toEqual(['time', 'model']);
   });
 });
-describe('observed text TPS', () => {
-  it('uses confirmed text tokens over the complete text generation interval, excluding wait/retry and reasoning', () => {
+describe('observed output TPS', () => {
+  it('uses confirmed non-reasoning output tokens over the complete output interval, excluding wait/retry and reasoning', () => {
     const row = requestFixtures[1];
     expect(outputTps(row)).toBeCloseTo(326 / 1.2);
     expect(outputTps({ ...row, elapsed: 9999, output: 9000, metrics: { ...row.metrics!, reasoningTokens: 8000 } })).toBeCloseTo(326 / 1.2);
@@ -34,10 +34,18 @@ describe('observed text TPS', () => {
     expect(outputTps(requestFixtures[3])).toBeNull();
     expect(outputTps(requestFixtures[4])).toBeNull();
     expect(outputTps({ ...row, stream: false })).toBeNull();
-    for (const generationMs of [0, -1, null, NaN, Infinity]) {
-      expect(outputTps({ ...row, metrics: { ...row.metrics!, generationMs } })).toBeNull();
+    for (const outputGenerationMs of [0, -1, null, NaN, Infinity]) {
+      expect(outputTps({ ...row, metrics: { ...row.metrics!, outputGenerationMs } })).toBeNull();
     }
-    expect(outputTps({ ...row, metrics: { ...row.metrics!, outputTextTokens: null } })).toBeNull();
-    expect(outputTps({ ...row, metrics: { ...row.metrics!, textIntervalComplete: false } })).toBeNull();
+    expect(outputTps({ ...row, metrics: { ...row.metrics!, nonReasoningOutputTokens: null } })).toBeNull();
+    expect(outputTps({ ...row, metrics: { ...row.metrics!, outputIntervalComplete: false } })).toBeNull();
   });
+});
+
+it('does not substitute total output or body-text metrics for missing output measurements', () => {
+  const row = requestFixtures[1];
+  for (const nonReasoningOutputTokens of [null, undefined, 0, -1, NaN, Infinity]) {
+    expect(outputTps({ ...row, metrics: { ...row.metrics!, nonReasoningOutputTokens } })).toBeNull();
+  }
+  expect(outputTps({ ...row, metrics: { ...row.metrics!, outputGenerationMs: undefined } })).toBeNull();
 });

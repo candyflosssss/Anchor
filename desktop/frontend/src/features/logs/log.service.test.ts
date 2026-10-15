@@ -43,3 +43,24 @@ it('prefers effective output timing and falls back to legacy text timing', () =>
   expect(requestLog(tool).metrics).toMatchObject({ timeToFirstOutputMs: 123, timeToFirstTextMs: null });
   expect(requestLog({ ...tool, metrics: { ...tool.metrics, time_to_first_output_ms: 0 } }).metrics?.timeToFirstOutputMs).toBe(0);
 });
+
+it('uses only confirmed legacy body-text metrics, including re-serialized old history', () => {
+  const row = structuredClone(fixture.page.requests[1]) as Request;
+  row.metrics.generation_ms = 1000;
+  row.metrics.output_text_tokens = 60;
+  row.metrics.text_interval_complete = true;
+  for (const omitted of [true, false]) {
+    const legacy = structuredClone(row);
+    if (omitted) {
+      for (const field of ['output_generation_ms', 'non_reasoning_output_tokens', 'output_interval_complete']) Reflect.deleteProperty(legacy.metrics, field);
+    } else {
+      Object.assign(legacy.metrics, { output_generation_ms: null, non_reasoning_output_tokens: null, output_interval_complete: false });
+    }
+    expect(outputTps(requestLog(legacy))).toBe(60);
+    legacy.metrics.output_text_tokens = null;
+    expect(outputTps(requestLog(legacy))).toBeNull();
+  }
+  // New output measurements take precedence, even if their token count is unknown.
+  row.metrics.non_reasoning_output_tokens = null;
+  expect(outputTps(requestLog(row))).toBeNull();
+});

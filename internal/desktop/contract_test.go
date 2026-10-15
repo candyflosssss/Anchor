@@ -155,6 +155,10 @@ func TestSharedLogContract(t *testing.T) {
 	if failed.HTTP == nil || *failed.HTTP != 200 || failed.Code != "invalid_response" || failed.Input != nil || failed.Metrics.TimeToFirstOutputMS != nil || failed.Metrics.TimeToFirstTextMS != nil || ok.Metrics.TimeToFirstOutputMS == nil || *ok.Metrics.TimeToFirstOutputMS != 584 || ok.Metrics.CacheReadTokens == nil || *ok.Metrics.CacheReadTokens != 0 {
 		t.Fatal("log null/zero semantics drift")
 	}
+	if failed.Metrics.OutputGenerationMS != nil || failed.Metrics.NonReasoningOutputTokens != nil || failed.Metrics.OutputIntervalComplete ||
+		ok.Metrics.OutputGenerationMS == nil || *ok.Metrics.OutputGenerationMS != 1500 || ok.Metrics.NonReasoningOutputTokens == nil || *ok.Metrics.NonReasoningOutputTokens != 100 || !ok.Metrics.OutputIntervalComplete || ok.Metrics.OutputTextTokens != nil || ok.Metrics.TextIntervalComplete {
+		t.Fatal("output TPS contract drift")
+	}
 	encoded, _ := json.Marshal(failed)
 	var keys map[string]any
 	json.Unmarshal(encoded, &keys)

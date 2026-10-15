@@ -8,25 +8,26 @@ import type { RequestLog } from './log.model';
 
 const row: RequestLog = {
   ...requestFixtures[1], input: 1200, output: 300, elapsed: 2100, stream: true, attemptCount: 1,
-  metrics: { timeToFirstTextMs: 500, generationMs: 1200, outputTextTokens: 240,
+  metrics: { outputGenerationMs: 1200, nonReasoningOutputTokens: 240, outputIntervalComplete: true, timeToFirstTextMs: 500, generationMs: 1200, outputTextTokens: 240,
     textIntervalComplete: true, cacheReadTokens: 400, reasoningTokens: 60 },
 };
 const render = (id: Parameters<typeof ColumnValue>[0]['id'], value = row) => renderToStaticMarkup(createElement(ColumnValue, { id, row: value }));
 describe('grouped request log values', () => {
-  it('combines all timing fields and keeps text TPS independent of total output and duration', () => {
+  it('combines all timing fields and keeps output TPS independent of total output and duration', () => {
     const html = render('timing');
-    for (const value of ['总耗时', '首字', '正文', 'TPS', '2,100 ms', '500 ms', '1,200 ms', '200.0 t/s']) expect(html).toContain(value);
-    for (const value of [{ ...row, stream: false }, { ...row, metrics: { ...row.metrics!, textIntervalComplete: false } }]) {
+    for (const value of ['总耗时', '首字', '输出', '输出TPS', '2,100 ms', '500 ms', '1,200 ms', '200.0 t/s']) expect(html).toContain(value);
+    for (const value of [{ ...row, stream: false }, { ...row, metrics: { ...row.metrics!, outputIntervalComplete: false } }]) {
       const unknown = render('timing', value);
       expect(unknown).not.toContain('1,200 ms');
       expect(unknown).not.toContain('200.0 t/s');
       expect(unknown.match(/未知/g)).toHaveLength(2);
     }
   });
-  it('shows tool first output while keeping text duration and TPS unknown', () => {
+  it('shows tool output TPS even when body-text measurements are unknown', () => {
     const html = render('timing', { ...row, metrics: { ...row.metrics!, timeToFirstOutputMs: 250, timeToFirstTextMs: null, generationMs: null, outputTextTokens: null, textIntervalComplete: false } });
     expect(html).toContain('250 ms');
-    expect(html.match(/未知/g)).toHaveLength(2);
+    expect(html).toContain('200.0 t/s');
+    expect(html).not.toContain('未知');
     expect(html).not.toContain('500 ms');
     expect(render('timing', { ...row, metrics: { ...row.metrics!, timeToFirstOutputMs: 0 } })).toContain('>0 ms<');
   });
