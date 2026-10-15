@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-15。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.34`，北京时间 2026-10-15 14:02:58 已发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：顶栏设备快速切换、日志字段分组与首文本／工具输出计时、非推理输出 TPS、供应商倍率 × Key 缓存倍率成本路由、模型映射默认配置及默认流式、请求与上游返回服务档位展示；继承中文命名和 SSH 设备连接能力。服务档位日志不代表修复 Codex Fast 入口，也不保证上游实际加速。
-- 已有 `.9`～`.33`：设置 → 在线更新 → dev · 快速测试 → 检查、下载并安装更新。旧版不能检查时手动安装 `.34`，先停止本机核心并退出界面。
-- `.34` 将 state.db 迁移到 schema8，首次启动前请备份；旧程序不能打开已迁移数据库，不支持数据库降级。远端核心不会随本机桌面自动升级。
-- 验证：复用已完成的 Go／TypeScript 契约比对、双平台生产编译与安装包构建及本地产物完整性结果；本轮六附件大小／SHA256 digest、源码对应关系、元数据 ZIP CRC、正式 URL 和标签指向核对，以及默认源 Linux 实际下载通过。构建 revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，SOURCE.json dirty=false。在线发布轮次未重新编译、运行测试套件或安装到本机，未执行浏览器、原生窗口、安装器或 apply 验收；后续本机用户目录升级见本版产物段落。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.35`，北京时间 2026-10-15 14:57:18 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：修复计划升级停服会临时恢复旧 Agent／CCS 地址的问题；`restart_handoff` 保留托管配置、目录、Binding 凭据和原始恢复日志。普通停止核心仍条件恢复；不承诺零停机、自动启动或既有 Codex 会话重载。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。**desktop.34 及更早版本的旧升级器不含修复；首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.35`、重新打开并核对实际 Agent 连接。** 新宿主面对无 `restart_handoff` 的旧核心拒绝在线安装，不降级／强杀；主机与核心均升级后，后续更新才使用保留交接。
+- 沿用 `.34` 的 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。远端核心不会随本机桌面自动升级。
+- 验证：干净隔离源码 `2bb386fc5a679107f4e659efb09e23fcfc669565`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译与安装包构建通过；六附件大小／SHA256 digest、vendored 源码与元数据 ZIP CRC、标签指向及默认源从 `.34` 发现／实际下载 Linux 包通过。复用修复任务全量 Go 与五包 race 结果，本轮未重跑套件、未安装本机、未执行浏览器／原生窗口／安装器／apply 或真实 Codex 会话重载验收。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.34_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.35_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -85,7 +85,15 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 ## 3. 产物、在线投放与实际构建状态
 
 
-### 当前在线 dev 版 `.34`
+### 当前在线 dev 版 `.35`
+
+`0.1.0-dev.desktop.35` 从干净隔离 worktree 的 `2bb386fc5a679107f4e659efb09e23fcfc669565` 构建，于北京时间 2026-10-15 14:57:18 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.35)（非 latest），tag 指向实际构建提交，未混入余额界面等未提交改动。
+
+本地输出 `dist/desktop/0.1.0-dev.desktop.35/` 包含两平台安装包、`SOURCE.json`、各平台 `BUILD.json`／许可通知／`SHA256SUMS`；`publication/` 的六个线上附件为 Linux `.deb`、Windows NSIS 安装器、`update-desktop.json`、含 Go vendor 的对应源码、许可／构建元数据 ZIP 和总校验清单。构建元数据保留未安装、未原生验收与构建时未发布的原始事实，线上发布／下载结果另行保存。
+
+修复与首次迁移限制见页首及[安全重启交接](../design/desktop-runtime.md#2026-10-15-安全重启交接修复desktop35-已发布)。默认源 Linux 实际下载与大小／SHA256校验通过，Windows 及其他附件 GitHub digest 与本地一致；未执行本机安装或重启真实服务。
+
+### 历史 dev 版 `.34`
 
 `0.1.0-dev.desktop.34` 于北京时间 2026-10-15 13:52 从干净隔离 worktree 构建，revision 为 `cae11dc63ed42c56e4b1c134fa8469b6fea0c496`，`SOURCE.json` 的 dirty=false；没有混入原工作区未提交的余额界面／缓存改动。本轮复用这批安装包，于北京时间 2026-10-15 14:02:58 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.34)（非 latest），标签指向上述实际构建提交，未重新编译。
 

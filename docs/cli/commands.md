@@ -4,9 +4,9 @@
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
-- `stop --approve --for-restart` 与 `restart_handoff` 能力仅在当前源码（2026-10-15，未发布），**已安装 desktop.34 不含本次修复**；须同步更新客户端与核心。
+- `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.32 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.35 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -61,7 +61,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `context inspect` | 查看已保存连接信息 | 本机；名称已登记 |
 | `context test` | 验证连接与实例身份 | 本机；名称已登记，核心在线 |
 | `status` | 查询核心状态 | 所选 Context 的核心在线 |
-| `stop --approve [--for-restart]` | 默认正常停服；显式维护交接保留托管状态 | 所选 Context 在线、已核验身份及管理授权；交接要求未发布源码的 restart_handoff 能力 |
+| `stop --approve [--for-restart]` | 默认正常停服；显式维护交接保留托管状态 | 所选 Context 在线、已核验身份及管理授权；交接要求 desktop.35／兼容源码核心的 restart_handoff 能力 |
 | `provider list` | 列出供应商 | 所选 Context 的核心在线 |
 | `provider platform` / `platform-put` | 读取／配置平台身份和独立用户授权 | 核心在线；写入需当前 revision，令牌仅 stdin |
 | `provider balance` / `key-quota` | 分别读取远端账户余额、Key 额度 | 核心在线；平台已配置、当前 revision；按平台提供授权 |
