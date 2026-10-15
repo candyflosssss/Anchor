@@ -166,7 +166,7 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
           <td className="cell-hint">{[m.tools && '函数工具', m.streaming && '流式输出'].filter(Boolean).join(' · ') || '基础'}</td>
           <td className="cell-hint">{m.strategy === 'round-robin' ? '加权轮询' : '顺序优先'} · {m.multiplier}× · {m.candidate_count} 个候选</td>
           <td className="row-actions">
-            <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试模型 ${m.id}`} onClick={() => c.openDialog({ kind: 'test', model: m.upstream })}><Play />测试</Button>
+            <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试模型 ${m.id}`} onClick={() => c.openDialog({ kind: 'test', model: m.upstream, keyIds: m.key_ids })}><Play />测试</Button>
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={`编辑模型 ${m.id}`} onClick={() => c.openDialog({ kind: 'mapping', alias: m.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming })}>编辑</Button>
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={`删除模型 ${m.id}`} onClick={() => ask({ action: 'model-delete', title: `删除模型 ${m.id}？`, body: '仅移除此供应商的映射，保留其他供应商。最后一个候选被移除时删除公开模型；若 Binding 引用它则阻止删除。', fields: { target: m.id, model_revision: m.revision } })}><Trash2 /></Button>
           </td>

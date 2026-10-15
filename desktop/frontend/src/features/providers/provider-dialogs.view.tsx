@@ -9,6 +9,7 @@ import { ProbeCard } from './provider-detail.view';
 import { protocolName } from './provider.model';
 import { isValidId, type ProviderDialog } from './provider-summary.model';
 import { useProviderTest } from './use-provider-test';
+import { keyForMappingTest } from './provider-test.model';
 import type { ProviderController } from './use-provider-controller';
 
 /** Every provider sub-action dialog. The dialog itself is the explicit confirmation step (approved: true). */
@@ -59,22 +60,30 @@ function Footer({ c, children }: { c: ProviderController; children: ReactNode })
 function TestBody({ c, d }: { c: ProviderController; d: Extract<ProviderDialog, { kind: 'test' }> }) {
   const w = c.features.data!;
   const keys = w.keys.filter(k => k.enabled);
-  const [key, setKey] = useState(keys.some(k => k.id === d.keyId) ? d.keyId! : keys[0]?.id ?? (w.keys.length ? '' : 'anonymous'));
+  const configured = !!d.model;
+  const [selectedKey, setKey] = useState(keys.some(k => k.id === d.keyId) ? d.keyId! : keys[0]?.id ?? (w.keys.length ? '' : 'anonymous'));
+  const key = configured ? keyForMappingTest(w, d.keyIds ?? []) : selectedKey;
   const test = useProviderTest(c.selected!, key, d.model ?? '', c.transport, c.features.refresh);
   const output = useRef<HTMLPreElement | null>(null);
   useEffect(() => { if (output.current) output.current.scrollTop = output.current.scrollHeight; }, [test.progress?.text]);
   return <form onSubmit={e => { e.preventDefault(); void test.start(); }} noValidate>
     <fieldset className="editor-fields" disabled={test.busy || c.features.busy}>
-      <div className="field"><label htmlFor="test-key">使用 Key</label>
-        <select id="test-key" className="select-field w-full" value={key} onChange={e => setKey(e.target.value)}>
-          {w.keys.length ? keys.length ? keys.map(k => <option value={k.id} key={k.id}>{k.id}</option>) : <option value="">没有启用的 Key</option> : <option value="anonymous">匿名（无 Key）</option>}
-        </select></div>
-      <div className="field"><label htmlFor="test-model">可用模型</label>
-        <select id="test-model" className="select-field w-full" value={test.model} disabled={test.loading || !test.models.length} onChange={e => test.setModel(e.target.value)}>
-          {!test.models.length && <option value="">{test.loading ? '正在读取此 Key 的可用模型…' : '没有可用模型'}</option>}
-          {test.models.map(id => <option key={id} value={id}>{id}</option>)}
-        </select></div>
-      {test.catalogError && <div role="alert" className="field-error">{test.catalogError}<Button type="button" size="sm" variant="outline" onClick={test.refreshCatalog}>重新获取模型</Button></div>}
+      {configured ? <div className="stack">
+        <div className="field"><span>上游模型</span><p className="mono break-all">{d.model}</p></div>
+        <div className="field"><span>使用 Key</span><p>{key === 'anonymous' ? '匿名（无 Key）' : key || '没有可用的 Key'}</p></div>
+        {!key && <p role="alert" className="field-error">{d.keyIds?.length ? '此模型映射绑定的 Key 均未启用或已不存在，请先检查映射与 Key 配置。' : '此供应商没有启用的 Key，请先启用 Key。'}</p>}
+      </div> : <>
+        <div className="field"><label htmlFor="test-key">使用 Key</label>
+          <select id="test-key" className="select-field w-full" value={key} onChange={e => setKey(e.target.value)}>
+            {w.keys.length ? keys.length ? keys.map(k => <option value={k.id} key={k.id}>{k.id}</option>) : <option value="">没有启用的 Key</option> : <option value="anonymous">匿名（无 Key）</option>}
+          </select></div>
+        <div className="field"><label htmlFor="test-model">可用模型</label>
+          <select id="test-model" className="select-field w-full" value={test.model} disabled={test.loading || !test.models.length} onChange={e => test.setModel(e.target.value)}>
+            {!test.models.length && <option value="">{test.loading ? '正在读取此 Key 的可用模型…' : '没有可用模型'}</option>}
+            {test.models.map(id => <option key={id} value={id}>{id}</option>)}
+          </select></div>
+        {test.catalogError && <div role="alert" className="field-error">{test.catalogError}<Button type="button" size="sm" variant="outline" onClick={test.refreshCatalog}>重新获取模型</Button></div>}
+      </>}
       <p className="warning-copy">将发送一次推理请求，可能产生少量用量。</p>
     </fieldset>
     {(test.busy || test.progress || test.error) && <section className="test-live-output" aria-label="实时返回信息">

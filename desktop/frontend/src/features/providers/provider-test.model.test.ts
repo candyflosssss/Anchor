@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../../../../contract/provider-probe.json';
+import workspace from '../../../../contract/provider-workspace.json';
 import catalog from '../../../../contract/provider-models.json';
-import { checkedProgress, modelsForKey, probeFailureText } from './provider-test.model';
+import { checkedProgress, keyForMappingTest, modelsForKey, probeFailureText } from './provider-test.model';
 
 describe('Key-scoped inference diagnostics', () => {
   it('offers only models returned for the selected Key', () => {
@@ -27,4 +28,28 @@ it('accepts the shared HTML diagnostic and explains HTTP 200 with a webpage body
   expect(probeFailureText(result.result!.failure)).toContain('/v1');
   expect(probeFailureText(result.result!.failure)).toContain('HTML');
   expect(probeFailureText('timeout')).toBe('timeout');
+});
+
+describe('configured mapping test Key', () => {
+  const w = { ...workspace, keys: [
+    { ...workspace.keys[0], id: 'unrelated', enabled: true },
+    { ...workspace.keys[0], id: 'disabled', enabled: false },
+    { ...workspace.keys[0], id: 'bound', enabled: true },
+    { ...workspace.keys[0], id: 'alternate', enabled: true },
+  ] };
+  it('selects an enabled bound Key in binding order, never an unrelated Key', () => {
+    expect(keyForMappingTest(w, ['disabled', 'bound'])).toBe('bound');
+    expect(keyForMappingTest(w, ['alternate', 'bound'])).toBe('alternate');
+    expect(keyForMappingTest(w, ['missing', 'disabled'])).toBe('');
+    expect(keyForMappingTest(w, ['anonymous'])).toBe('');
+  });
+  it('uses an enabled provider Key when the mapping is unrestricted', () => {
+    expect(keyForMappingTest(w, [])).toBe('unrelated');
+    expect(keyForMappingTest({ ...w, keys: w.keys.map(k => ({ ...k, enabled: false })) }, [])).toBe('');
+  });
+  it('permits anonymous only without stored Keys and without a missing real binding', () => {
+    expect(keyForMappingTest({ ...w, keys: [] }, [])).toBe('anonymous');
+    expect(keyForMappingTest({ ...w, keys: [] }, ['anonymous'])).toBe('anonymous');
+    expect(keyForMappingTest({ ...w, keys: [] }, ['missing'])).toBe('');
+  });
 });

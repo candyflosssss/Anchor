@@ -1,5 +1,12 @@
 import { ProviderProblem } from './provider.model';
-import type { ProbeProgress, ProbeRequest, ProviderModels } from '../../desktop/contract.generated';
+import type { ProbeProgress, ProbeRequest, ProviderModels, Workspace } from '../../desktop/contract.generated';
+
+/** A configured mapping must never fall back outside its Key binding. */
+export function keyForMappingTest(workspace: Workspace, keyIds: string[]): string {
+  if (!workspace.keys.length) return !keyIds.length || keyIds.includes('anonymous') ? 'anonymous' : '';
+  if (keyIds.length) return keyIds.find(id => workspace.keys.some(key => key.id === id && key.enabled)) ?? '';
+  return workspace.keys.find(key => key.enabled)?.id ?? '';
+}
 
 export function modelsForKey(catalog: ProviderModels, key: string): string[] {
   return catalog.entries.filter(entry => entry.key_ids.includes(key)).map(entry => entry.id);

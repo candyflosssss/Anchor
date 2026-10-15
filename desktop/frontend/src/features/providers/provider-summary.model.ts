@@ -5,7 +5,7 @@ import type { Provider } from './provider.model';
 export type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'unknown';
 export type DetailTab = 'overview' | 'keys' | 'models' | 'usage' | 'account';
 export type ProviderDialog =
-  | { kind: 'test'; model?: string; keyId?: string }
+  | { kind: 'test'; model?: string; keyId?: string; keyIds?: string[] }
   | { kind: 'rename' } | { kind: 'copy' } | { kind: 'delete' }
   | { kind: 'key'; keyId?: string }
   | { kind: 'mapping'; alias?: string; upstream?: string; tools?: boolean; streaming?: boolean };

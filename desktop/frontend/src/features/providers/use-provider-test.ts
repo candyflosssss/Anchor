@@ -3,8 +3,8 @@ import type { ProbeProgress, ProbeRequest } from '../../desktop/contract.generat
 import { modelsForKey } from './provider-test.model';
 import { ProviderProblem, type Provider, type ProviderTransport } from './provider.model';
 
-/** An isolated dialog session: Key-specific catalog, transient output and cancellation. */
-export function useProviderTest(p: Provider, key: string, preferredModel: string, transport: ProviderTransport, finished: () => Promise<void>) {
+/** An isolated dialog session: fixed mapping or Key-specific catalog, transient output and cancellation. */
+export function useProviderTest(p: Provider, key: string, configuredModel: string, transport: ProviderTransport, finished: () => Promise<void>) {
   const [models, setModels] = useState<string[]>([]);
   const [model, setModel] = useState('');
   const [loading, setLoading] = useState(true);
@@ -31,17 +31,22 @@ export function useProviderTest(p: Provider, key: string, preferredModel: string
   useEffect(() => {
     const abort = new AbortController();
     setModels([]); setModel(''); setLoading(true); setCatalogError(''); setProgress(null); setError('');
+    // A saved upstream model is authoritative; catalog permissions are not needed to probe it.
+    if (configuredModel) {
+      setModels([configuredModel]); setModel(configuredModel); setLoading(false);
+      return () => abort.abort();
+    }
     if (!key) { setLoading(false); return () => abort.abort(); }
     void transport.discover({ provider_id: p.id, expected_revision: p.revision, key_id: key }, abort.signal).then(catalog => {
       if (abort.signal.aborted) return;
       const options = modelsForKey(catalog, key);
-      setModels(options); setModel(options.includes(preferredModel) ? preferredModel : options[0] ?? '');
+      setModels(options); setModel(options[0] ?? '');
       if (!options.length) setCatalogError(catalog.failure ? '未能获取此 Key 的可用模型。请检查目录权限后重试。' : '此 Key 没有可用模型。');
     }).catch(e => {
       if (!abort.signal.aborted) setCatalogError(e instanceof ProviderProblem && e.code === 'conflict' ? '配置版本已变化，请关闭弹窗并刷新后重试。' : '未能获取此 Key 的可用模型，请重试。');
     }).finally(() => { if (!abort.signal.aborted) setLoading(false); });
     return () => abort.abort();
-  }, [transport, p.id, p.revision, key, preferredModel, retry]);
+  }, [transport, p.id, p.revision, key, configuredModel, retry]);
 
   async function start() {
     if (locked.current || loading || !models.includes(model) || !key || !transport.probe) return;
