@@ -5,7 +5,7 @@
 - 范围：修复计划升级停服会临时恢复旧 Agent／CCS 地址的问题；`restart_handoff` 保留托管配置、目录、Binding 凭据和原始恢复日志。普通停止核心仍条件恢复；不承诺零停机、自动启动或既有 Codex 会话重载。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。**desktop.34 及更早版本的旧升级器不含修复；首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.35`、重新打开并核对实际 Agent 连接。** 新宿主面对无 `restart_handoff` 的旧核心拒绝在线安装，不降级／强杀；主机与核心均升级后，后续更新才使用保留交接。
 - 沿用 `.34` 的 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。远端核心不会随本机桌面自动升级。
-- 验证：干净隔离源码 `2bb386fc5a679107f4e659efb09e23fcfc669565`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译与安装包构建通过；六附件大小／SHA256 digest、vendored 源码与元数据 ZIP CRC、标签指向及默认源从 `.34` 发现／实际下载 Linux 包通过。复用修复任务全量 Go 与五包 race 结果，本轮未重跑套件、未安装本机、未执行浏览器／原生窗口／安装器／apply 或真实 Codex 会话重载验收。
+- 验证：干净隔离源码 `2bb386fc5a679107f4e659efb09e23fcfc669565`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译与安装包构建通过；六附件大小／SHA256 digest、vendored 源码与元数据 ZIP CRC、标签指向及默认源从 `.34` 发现／实际下载 Linux 包通过。复用修复任务全量 Go 与五包 race 结果，发布轮次未重跑套件、未安装本机、未执行浏览器／原生窗口／安装器／apply 或真实 Codex 会话重载验收；后续本机用户目录升级与启动结果见第 3 节。
 
 ## 1. 安装与使用行为
 
@@ -91,7 +91,13 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 本地输出 `dist/desktop/0.1.0-dev.desktop.35/` 包含两平台安装包、`SOURCE.json`、各平台 `BUILD.json`／许可通知／`SHA256SUMS`；`publication/` 的六个线上附件为 Linux `.deb`、Windows NSIS 安装器、`update-desktop.json`、含 Go vendor 的对应源码、许可／构建元数据 ZIP 和总校验清单。构建元数据保留未安装、未原生验收与构建时未发布的原始事实，线上发布／下载结果另行保存。
 
-修复与首次迁移限制见页首及[安全重启交接](../design/desktop-runtime.md#2026-10-15-安全重启交接修复desktop35-已发布)。默认源 Linux 实际下载与大小／SHA256校验通过，Windows 及其他附件 GitHub digest 与本地一致；未执行本机安装或重启真实服务。
+修复与首次迁移限制见页首及[安全重启交接](../design/desktop-runtime.md#2026-10-15-安全重启交接修复desktop35-已发布)。默认源 Linux 实际下载与大小／SHA256校验通过，Windows 及其他附件 GitHub digest 与本地一致；该发布轮次未执行本机安装或重启真实服务。
+
+**后续本机升级（2026-10-15 15:06，用户目录安装）**：应用户要求，从同一已发布的 vendored 源码（revision `2bb386fc5a679107f4e659efb09e23fcfc669565`）受资源限制编译 CLI，并将 `~/.local/bin/anchor` 和 `~/.local/bin/anchor-desktop` 从 `.34` 原子替换为 `.35`；桌面 ELF 直接复用已校验的发布产物，没有重建安装包、执行 apt 或再次线上投放。升级前核心与 GUI 均未运行，旧用户服务单元不存在；本轮创建分离且限内存的 transient user units，`Restart=no`，没有启用登录自启动，也未改动其他代理服务。
+
+升级前数据库、owner token、恢复数据、受管 Agent 配置及旧二进制已备份至仓库外受保护目录 `~/.config/anchor/backups/pre-desktop35-20261015-150633/`。启动后验证运行核心与 CLI 哈希一致、GUI 进程与发布 ELF 哈希一致、两个服务 active；核心／网关／Agent 管理 ready，两个绑定 applied，`restart_handoff` 能力存在。state.db 仍为 schema8，quick_check／foreign_key_check 通过，实例身份及供应商／Key／模型／绑定／Context 数量保持。Codex 受管配置指向 `http://127.0.0.1:17860/v1`，新版 token-helper 与绑定凭据匹配，使用绑定凭据请求本机 `GET /v1/models` 返回 200／8 个模型，未请求付费推理。CCS 在操作前已关闭，操作后仍无相关进程且 15722 未监听，无需终止进程。
+
+本轮证据在 `dist/desktop/0.1.0-dev.desktop.35/local-install/`，不含秘密。GUI 进程已启动，但未验证 Wayland 原生窗口可见性；未执行安装器／应用内 apply／浏览器测试／真实上游推理／现有 Codex 会话重载验收，不能将配置接管或本机模型列表通过视为旧会话已经重连。
 
 ### 历史 dev 版 `.34`
 
