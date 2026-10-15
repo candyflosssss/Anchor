@@ -134,5 +134,11 @@ func (s *Server) QueryProvider(parent context.Context, in providerapi.Query) (pr
 	}
 	adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: selected.Secret}
 	in.KeyID = selected.ID
-	return adapter.Query(ctx, in), nil
+	result := adapter.Query(ctx, in)
+	if in.Operation == "effective-rate" && in.RemoteKeyID == 0 && found {
+		if err = s.cacheKeyRate(p, keys, selected.ID, &result); err != nil {
+			return out, err
+		}
+	}
+	return result, nil
 }

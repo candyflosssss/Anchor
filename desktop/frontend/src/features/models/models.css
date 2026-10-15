@@ -52,3 +52,6 @@
 @media (max-width: 1400px) { .workspace .model-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1000px) { .workspace .model-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: reduce) { .model-sources > summary > svg, .mapping-keys > summary > svg { transition: none; } .route-spinner { animation: none; } }
+
+.key-multiplier { overflow-wrap: anywhere; }
+.key-multiplier strong { font-variant-numeric: tabular-nums; }

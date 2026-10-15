@@ -11,8 +11,9 @@ import (
 )
 
 type modelSchedule struct {
-	revision int64
-	current  []float64
+	signature string
+	revision  int64
+	current   []float64
 }
 type routeAffinity struct {
 	provider, model, key string
@@ -74,22 +75,44 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 	if m.RoutingStrategy() == "priority" {
 		return m.Candidates, nil
 	}
-	providers := make([]state.Provider, len(m.Candidates))
-	keys := make([][]state.ProviderKey, len(m.Candidates))
-	for i, c := range m.Candidates {
+	// Cost-based rules schedule actual provider/model/Key routes. The stored
+	// candidate multiplier is reserved and intentionally never used here.
+	strategy := m.RoutingStrategy()
+	costs := []*float64{}
+	routes := []state.Candidate{}
+	providers := []state.Provider{}
+	keys := [][]state.ProviderKey{}
+	for _, c := range m.Candidates {
 		p, err := s.Store.Provider(c.ProviderID)
 		if err != nil {
 			return nil, err
 		}
-		providers[i] = p
-		keys[i], err = s.Store.ProviderKeys(p.ID)
+		sourceKeys, err := s.Store.ProviderKeys(p.ID)
 		if err != nil {
 			return nil, err
 		}
-		if len(keys[i]) == 0 {
-			keys[i] = []state.ProviderKey{{ID: "anonymous", Enabled: true}}
+		if len(sourceKeys) == 0 {
+			sourceKeys = []state.ProviderKey{{ID: "anonymous", Enabled: true}}
+		}
+		if strategy == "lowest-latency" {
+			routes = append(routes, c)
+			providers = append(providers, p)
+			keys = append(keys, sourceKeys)
+			continue
+		}
+		for _, k := range sourceKeys {
+			if !k.Enabled || !candidateAllowsKey(c.KeyIDs, k.ID) {
+				continue
+			}
+			route := c
+			route.KeyIDs = []string{k.ID}
+			routes = append(routes, route)
+			providers = append(providers, p)
+			keys = append(keys, []state.ProviderKey{k})
+			costs = append(costs, p.EffectiveKeyMultiplier(k))
 		}
 	}
+	m.Candidates = routes
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
@@ -110,10 +133,13 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 	if len(available) == 0 {
 		return []state.Candidate{}, nil
 	}
-	strategy := m.RoutingStrategy()
 	if strategy == "lowest-price" {
 		sort.SliceStable(available, func(i, j int) bool {
-			return m.Candidates[available[i]].EffectiveMultiplier() < m.Candidates[available[j]].EffectiveMultiplier()
+			a, b := costs[available[i]], costs[available[j]]
+			if a == nil || b == nil {
+				return a != nil && b == nil
+			}
+			return *a < *b
 		})
 	} else if strategy == "lowest-latency" {
 		score := func(i int) (float64, bool) {
@@ -147,22 +173,52 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 			}
 		}
 		if preferred < 0 {
+			// Rebuild smooth weights after cache/config/Key changes, even when the
+			// public model revision and endpoint count have not changed.
+			signatureBytes, _ := json.Marshal([]any{m.Candidates, providers, costs})
+			signature := string(signatureBytes)
 			schedule := s.routing[m.ID]
-			if schedule == nil || schedule.revision != m.Revision || len(schedule.current) != len(m.Candidates) {
-				schedule = &modelSchedule{revision: m.Revision, current: make([]float64, len(m.Candidates))}
+			if schedule == nil || schedule.revision != m.Revision || schedule.signature != signature || len(schedule.current) != len(m.Candidates) {
+				schedule = &modelSchedule{signature: signature, revision: m.Revision, current: make([]float64, len(m.Candidates))}
 				s.routing[m.ID] = schedule
 			}
 			usable := map[int]bool{}
 			for _, i := range available {
 				usable[i] = true
 			}
+			// Unknown rates are fallback-only while any known route is usable.
+			// Zero is a valid free route; share evenly among free routes, avoiding 1/0.
+			known, free := false, false
+			minimum := 0.0
+			for _, i := range available {
+				if v := costs[i]; v != nil {
+					known = true
+					if *v == 0 {
+						free = true
+					}
+					if *v > 0 && (minimum == 0 || *v < minimum) {
+						minimum = *v
+					}
+				}
+			}
+			sort.SliceStable(available, func(a, b int) bool { return costs[available[a]] != nil && costs[available[b]] == nil })
 			total := 0.0
-			for i, c := range m.Candidates {
+			for i := range m.Candidates {
 				if !usable[i] {
 					schedule.current[i] = 0
 					continue
 				}
-				weight := 1 / c.EffectiveMultiplier()
+				weight := 1.0
+				if known {
+					v := costs[i]
+					if v == nil || (free && *v != 0) {
+						schedule.current[i] = 0
+						continue
+					}
+					if !free {
+						weight = minimum / *v
+					}
+				}
 				total += weight
 				schedule.current[i] += weight
 				if preferred < 0 || schedule.current[i] > schedule.current[preferred] {

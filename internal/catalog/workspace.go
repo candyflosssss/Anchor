@@ -26,15 +26,29 @@ type ModelProtocol struct {
 	Protocol string `json:"protocol"`
 }
 
+// KeyRateCache is a persisted observation, not configuration. A failed refresh
+// retains the last successful value and timestamp; nil means unknown, never 1.
+type KeyRateCache struct {
+	Multiplier  *float64 `json:"multiplier"`
+	Group       string   `json:"group"`
+	GroupName   string   `json:"group_name"`
+	Basis       string   `json:"basis"`
+	ObservedAt  string   `json:"observed_at"`
+	AttemptedAt string   `json:"attempted_at"`
+	Failure     string   `json:"failure"`
+}
+
 type KeyStatus struct {
-	Protocol       string          `json:"protocol"`
-	ModelProtocols []ModelProtocol `json:"model_protocols"`
-	ID             string          `json:"id"`
-	Enabled        bool            `json:"enabled"`
-	State          string          `json:"state"`
-	Failures       int             `json:"failures"`
-	RetryAt        int64           `json:"retry_at"`
-	Test           *Probe          `json:"test"`
+	Rate                *KeyRateCache   `json:"rate"`
+	EffectiveMultiplier *float64        `json:"effective_multiplier"`
+	Protocol            string          `json:"protocol"`
+	ModelProtocols      []ModelProtocol `json:"model_protocols"`
+	ID                  string          `json:"id"`
+	Enabled             bool            `json:"enabled"`
+	State               string          `json:"state"`
+	Failures            int             `json:"failures"`
+	RetryAt             int64           `json:"retry_at"`
+	Test                *Probe          `json:"test"`
 }
 type Probe struct {
 	Revision   int64  `json:"revision"`

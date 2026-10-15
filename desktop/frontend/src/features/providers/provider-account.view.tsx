@@ -96,7 +96,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
     <section className="detail-card">
       <div className="card-toolbar"><h2>分组倍率</h2><Button variant="outline" size="sm" disabled={queryDisabled} onClick={() => query('effective-rate')}><RefreshCw size={14} />刷新分组倍率</Button></div>
       <GroupRateObservation value={a.rate} />
-      <p className="card-hint">这是平台返回的倍率快照。sub2api Key 直读显示含个人覆盖和高峰规则的当前计费倍率，未返回的分组名称留空。模型映射中的路由倍率单独保存，查询不会修改路由。</p>
+      <p className="card-hint">这是平台返回的倍率快照。sub2api Key 直读显示含个人覆盖和高峰规则的当前计费倍率，未返回的分组名称留空。自动核对当前 Key 的成功查询会缓存分组倍率；相对倍率 = 供应商倍率 × 缓存分组倍率。指定后台 Key ID 的查询不写入本地 Key 缓存。</p>
     </section>
     <div className="overview-grid">
       <Observation title="余额" value={a.balance} disabled={queryDisabled} onRefresh={() => query('balance')} />

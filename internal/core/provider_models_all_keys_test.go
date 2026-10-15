@@ -107,6 +107,28 @@ func TestCatalogMergesEnabledKeysAndFetchesRates(t *testing.T) {
 	}
 	after, _ := f.store.Provider("p")
 	afterKeys, _ := f.store.ProviderKeys("p")
+	for i := range afterKeys {
+		k := afterKeys[i]
+		switch k.ID {
+		case "default", "second":
+			want := 0.8
+			if k.ID == "second" {
+				want = 1.5
+			}
+			if k.Rate == nil || k.Rate.Multiplier == nil || *k.Rate.Multiplier != want || k.Rate.ObservedAt == "" || k.Rate.Failure != "" {
+				t.Fatalf("missing per-Key cache for %s: %+v", k.ID, k.Rate)
+			}
+		case "third":
+			if k.Rate == nil || k.Rate.Failure != "key_not_found" || k.Rate.Multiplier != nil {
+				t.Fatalf("unexpected failed cache: %+v", k.Rate)
+			}
+		case "disabled":
+			if k.Rate != nil {
+				t.Fatal("queried disabled Key")
+			}
+		}
+		afterKeys[i].Rate = nil
+	}
 	if !reflect.DeepEqual(before, after) || !reflect.DeepEqual(beforeKeys, afterKeys) || strings.Contains(raw, token) {
 		t.Fatal("configuration mutated or token leaked")
 	}

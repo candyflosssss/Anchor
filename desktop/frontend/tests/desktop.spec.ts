@@ -3,7 +3,7 @@ import accountFixture from '../../contract/provider-account.json' with { type: '
 import { expect, test, type Page } from '@playwright/test';
 import fixture from '../../contract/providers.json' with { type: 'json' };
 import updateFixture from '../../contract/updates.json' with { type: 'json' };
-import { CONTRACT, type AccountSettings, type DesktopBridge, type ModelSettingsState, type Provider } from '../src/desktop/contract.generated';
+import { CONTRACT, type AccountSettings, type DesktopBridge, type KeyRateCache, type ModelSettingsState, type Provider } from '../src/desktop/contract.generated';
 
 declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | 'invalid' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
@@ -16,6 +16,8 @@ async function host(page: Page, rateMappings = false) {
     const accounts: Record<string, AccountSettings> = {};
     const settings = (id: string): AccountSettings => ({ ...(accounts[id] ?? { ...account.settings, platform: '' }), provider_id: id, revision: providers.find(p => p.id === id)?.revision ?? 1 });
     let providers: Provider[] = rows;
+    if (rateMappings) providers = providers.map(p => p.id === '摸鱼AI' ? { ...p, cost_multiplier: 0.5 } : p);
+    const rateCache: Record<string, KeyRateCache> = {};
     const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
     window.routingTest = { calls: [] };
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
@@ -40,6 +42,13 @@ async function host(page: Page, rateMappings = false) {
         window.accountTest.queries++;
         await new Promise(resolve => setTimeout(resolve, 150));
         const failure = window.accountTest.failure;
+        if (!input.remote_key_id) {
+          const cacheID = JSON.stringify([input.provider_id, input.key_id || 'default']);
+          const now = new Date().toISOString();
+          rateCache[cacheID] = failure
+            ? { ...(rateCache[cacheID] ?? { multiplier: null, group: '', group_name: '', basis: '', observed_at: '' }), attempted_at: now, failure }
+            : { multiplier: Number(account.rate.rate.multiplier), group: account.rate.rate.group, group_name: account.rate.rate.group_name, basis: account.rate.rate.basis, observed_at: now, attempted_at: now, failure: '' };
+        }
         return { contract, data: { ...account.rate, provider_id: input.provider_id, revision: input.expected_revision, platform: settings(input.provider_id).platform || 'sub2api', key_id: input.key_id || 'default', remote_key_id: input.remote_key_id, failure,
           rate: failure ? null : { ...account.rate.rate } }, problem: null };
       },
@@ -97,7 +106,7 @@ async function host(page: Page, rateMappings = false) {
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
         return { contract, data: { provider_id: provider.id, key_id: input.key_id || 'anonymous', revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '', partial: false, entries: [{ id: 'demo-model', key_ids: [input.key_id || 'anonymous'] }], keys: [{ id: input.key_id || 'anonymous', enabled: true, protocol: 'responses', http_status: 200, failure: '', group: '', group_name: '', multiplier: null, rate_basis: '', rate_failure: 'platform_required' }] }, problem: null };
       },
-      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
+      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ rate: rateCache[JSON.stringify([input.provider_id, 'default'])] ?? null, effective_multiplier: rateCache[JSON.stringify([input.provider_id, 'default'])]?.multiplier != null ? providers.find(p => p.id === input.provider_id)!.cost_multiplier * rateCache[JSON.stringify([input.provider_id, 'default'])].multiplier! : null, id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
@@ -365,8 +374,8 @@ test('catalog pagination, themes and narrow layouts keep Key protocols accessibl
     api.ProviderWorkspace = async input => {
       const result = await workspace(input);
       if (result.data) result.data.keys = [
-        { id: 'default', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null, protocol: 'responses', model_protocols: [] },
-        { id: 'premium', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null, protocol: 'anthropic', model_protocols: [] },
+        { rate: null, effective_multiplier: null, id: 'default', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null, protocol: 'responses', model_protocols: [] },
+        { rate: null, effective_multiplier: null, id: 'premium', enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null, protocol: 'anthropic', model_protocols: [] },
       ];
       return result;
     };
@@ -476,7 +485,7 @@ for (const failure of ['', 'unknown', 'conflict'] as const) {
     }
     await page.getByRole('button', { name: '编辑模型 already', exact: true }).click();
     await expect(page.getByRole('dialog').getByLabel('函数工具', { exact: true })).not.toBeChecked();
-    await expect(page.getByRole('dialog').getByLabel('此供应商的相对倍率')).toHaveValue('2');
+    await expect(page.getByRole('dialog').getByLabel('此供应商的相对倍率')).toHaveCount(0);
   });
 }
 
@@ -502,15 +511,17 @@ test('group rate mappings distinguish routing and platform values and deduplicat
   await expect(page.getByRole('heading', { name: 'shared-one', exact: true })).toBeVisible();
   for (const summary of await page.locator('.model-sources > summary').all()) await summary.click();
   for (const summary of await page.locator('.mapping-keys > summary').all()) await summary.click();
-  await expect(page.getByText('路由倍率', { exact: false }).filter({ hasText: '2.5×' })).toHaveCount(2);
+  await expect(page.getByText('供应商倍率 0.5×', { exact: true })).toHaveCount(2);
   const before = await page.evaluate(() => window.accountTest.queries);
   await page.getByRole('button', { name: '刷新分组倍率', exact: true }).dblclick();
-  await expect(page.getByText('0.80000000000000001×', { exact: true })).toHaveCount(6);
+  await expect(page.locator('.key-multiplier').filter({ hasText: '分组倍率 0.8×' })).toHaveCount(6);
   expect(await page.evaluate(() => window.accountTest.queries)).toBe(before + 3);
+  await expect(page.locator('.key-multiplier').filter({ hasText: '相对倍率 0.4×' })).toHaveCount(2);
   await page.evaluate(() => { window.accountTest.failure = 'auth_required'; });
   await page.getByRole('button', { name: '刷新分组倍率', exact: true }).click();
   await expect(page.getByRole('alert').first()).toContainText('用户令牌');
-  await expect(page.getByText('路由倍率', { exact: false }).filter({ hasText: '2.5×' })).toHaveCount(2);
+  await expect(page.locator('.key-multiplier').filter({ hasText: '刷新失败，沿用上次成功缓存。' })).toHaveCount(6);
+  await expect(page.getByText('供应商倍率 0.5×', { exact: true })).toHaveCount(2);
   await page.locator('.mapping-candidate .candidate').first().click();
   await page.getByRole('tab', { name: '账户与余额', exact: true }).click();
   await expect(page.getByRole('tab', { name: '账户与余额', exact: true })).toHaveAttribute('aria-selected', 'true');

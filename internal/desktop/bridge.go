@@ -65,7 +65,7 @@ func provider(p state.Provider) (Provider, bool) {
 		return Provider{}, false
 	}
 	// Provider-level protocol is internal legacy state; protocols belong to Keys/models.
-	return Provider{p.ID, p.HomepageURL, append([]string(nil), urls...), p.Enabled, p.TimeoutSeconds, p.MaxConcurrent, p.Revision, p.HasSecret}, true
+	return Provider{p.CostMultiplier, p.ID, p.HomepageURL, append([]string(nil), urls...), p.Enabled, p.TimeoutSeconds, p.MaxConcurrent, p.Revision, p.HasSecret}, true
 }
 func (b *Bridge) Providers() ProvidersResult {
 	s := b.session
@@ -105,7 +105,7 @@ func (b *Bridge) SaveProvider(in SaveProvider) SaveResult {
 		r.Problem = &Problem{"invalid"}
 		return r
 	}
-	p := state.Provider{ID: in.Provider.ID, HomepageURL: in.Provider.HomepageURL, BaseURLs: append([]string(nil), in.Provider.BaseURLs...), Enabled: in.Provider.Enabled, TimeoutSeconds: in.Provider.TimeoutSeconds, MaxConcurrent: in.Provider.MaxConcurrent}
+	p := state.Provider{CostMultiplier: in.Provider.CostMultiplier, ID: in.Provider.ID, HomepageURL: in.Provider.HomepageURL, BaseURLs: append([]string(nil), in.Provider.BaseURLs...), Enabled: in.Provider.Enabled, TimeoutSeconds: in.Provider.TimeoutSeconds, MaxConcurrent: in.Provider.MaxConcurrent}
 	if err := p.Validate(); err != nil {
 		r.Problem = &Problem{"invalid"}
 		return r

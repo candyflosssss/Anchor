@@ -104,6 +104,11 @@ func (s *Store) ConfigureProviderPlatform(in providerapi.Configure) (providerapi
 	if _, err = tx.Exec(`INSERT INTO provider_platforms(provider_id,document,user_token) VALUES(?,?,?) ON CONFLICT(provider_id) DO UPDATE SET document=excluded.document,user_token=excluded.user_token`, in.ProviderID, string(b), c.UserToken); err != nil {
 		return providerapi.Settings{}, err
 	}
+	if old.Platform != c.Platform || old.SiteURL != c.SiteURL || old.UserID != c.UserID || secret != c.UserToken {
+		if _, err = tx.Exec(`DELETE FROM key_rate_cache WHERE provider_id=?`, in.ProviderID); err != nil {
+			return providerapi.Settings{}, err
+		}
+	}
 	var p Provider
 	if json.Unmarshal([]byte(pdoc), &p) != nil {
 		return providerapi.Settings{}, ErrInvalid

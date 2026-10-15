@@ -1,6 +1,6 @@
 import { isValidId } from '../../lib/identifier';
 import { validRoutingRule } from '../models/model-routing.model';
-import type { Action, Price, Probe, Workspace } from '../../desktop/contract.generated';
+import type { Action, Price, Probe, Workspace, KeyRateCache } from '../../desktop/contract.generated';
 import { protocolName, ProviderProblem, type Provider } from './provider.model';
 export type { Action, Price, Probe, Workspace };
 export function actionFor(p: Provider, action: string, fields: Partial<Action> = {}): Action {
@@ -17,6 +17,14 @@ function checkedProbe(p: Probe | null): Probe | null {
   if (![p.revision, p.at, p.http_status, p.elapsed_ms].every(count) || typeof p.key_id !== 'string' || typeof p.model !== 'string' || !['', 'busy', 'authentication', 'rate_limited', 'network', 'timeout', 'invalid_response', 'unexpected_html', 'http_error'].includes(p.failure)) throw new ProviderProblem('read_error');
   return { revision: p.revision, at: p.at, http_status: p.http_status, elapsed_ms: p.elapsed_ms, key_id: p.key_id, model: p.model, failure: p.failure };
 }
+export function checkedKeyRate(rate: KeyRateCache | null): KeyRateCache | null {
+  if (rate == null) return null;
+  if (rate.multiplier !== null && (!Number.isFinite(rate.multiplier) || rate.multiplier < 0) ||
+      ![rate.group, rate.group_name, rate.basis, rate.failure, rate.observed_at, rate.attempted_at].every(v => typeof v === 'string') ||
+      !['', 'key_billing', 'authenticated_group', 'personal_override'].includes(rate.basis) ||
+      !Number.isFinite(Date.parse(rate.attempted_at)) || (rate.multiplier !== null && !Number.isFinite(Date.parse(rate.observed_at)))) throw new ProviderProblem('read_error');
+  return { multiplier: rate.multiplier, group: rate.group, group_name: rate.group_name, basis: rate.basis, failure: rate.failure, observed_at: rate.observed_at, attempted_at: rate.attempted_at };
+}
 export function checkedWorkspace(w: Workspace): Workspace {
   if (!w || typeof w.provider_id !== 'string' || !count(w.revision) || typeof w.deleted !== 'boolean' || !Array.isArray(w.keys) || !Array.isArray(w.models) || !Array.isArray(w.usage) || !Array.isArray(w.prices) || !Array.isArray(w.estimates) || (!w.deleted && !['priority', 'round-robin'].includes(w.strategy))) throw new ProviderProblem('read_error');
   return { prices: w.prices.map(checkedPrice), imported_price: w.imported_price == null ? null : checkedPrice(w.imported_price), estimates: w.estimates.map(e => {
@@ -24,7 +32,8 @@ export function checkedWorkspace(w: Workspace): Workspace {
     return { model: e.model, usd: e.usd };
   }), provider_id: w.provider_id, revision: w.revision, deleted: w.deleted, strategy: w.strategy, probe: checkedProbe(w.probe), keys: w.keys.map(k => {
     if (!Object.hasOwn(protocolName, k.protocol) || !Array.isArray(k.model_protocols) || k.model_protocols.some(m => typeof m.model !== 'string' || !m.model || !Object.hasOwn(protocolName, m.protocol)) || new Set(k.model_protocols.map(m => m.model)).size !== k.model_protocols.length || typeof k.id !== 'string' || typeof k.enabled !== 'boolean' || !count(k.failures) || !count(k.retry_at) || !['ready', 'disabled', 'cooling', 'invalid', 'half-open'].includes(k.state)) throw new ProviderProblem('read_error');
-    return { id: k.id, protocol: k.protocol, model_protocols: k.model_protocols.map(m => ({ model: m.model, protocol: m.protocol })), enabled: k.enabled, state: k.state, failures: k.failures, retry_at: k.retry_at, test: checkedProbe(k.test) };
+    if (k.effective_multiplier != null && (!Number.isFinite(k.effective_multiplier) || k.effective_multiplier < 0)) throw new ProviderProblem('read_error');
+    return { rate: checkedKeyRate(k.rate), effective_multiplier: k.effective_multiplier ?? null, id: k.id, protocol: k.protocol, model_protocols: k.model_protocols.map(m => ({ model: m.model, protocol: m.protocol })), enabled: k.enabled, state: k.state, failures: k.failures, retry_at: k.retry_at, test: checkedProbe(k.test) };
   }), models: w.models.map(m => {
     if (![m.revision, m.candidate_count, m.candidate_index].every(count) || m.candidate_index >= m.candidate_count || !Array.isArray(m.key_ids) || m.key_ids.length > 64 || m.key_ids.some(id => typeof id !== 'string' || !id) || new Set(m.key_ids).size !== m.key_ids.length || typeof m.id !== 'string' || typeof m.upstream !== 'string' || typeof m.display_name !== 'string' || typeof m.tools !== 'boolean' || typeof m.streaming !== 'boolean' || !Number.isFinite(m.multiplier) || m.multiplier < 0.01 || m.multiplier > 1000 || !validRoutingRule(m.strategy)) throw new ProviderProblem('read_error');
     return { key_ids: [...m.key_ids], candidate_index: m.candidate_index, id: m.id, display_name: m.display_name, upstream: m.upstream, tools: m.tools, streaming: m.streaming, revision: m.revision, candidate_count: m.candidate_count, multiplier: m.multiplier, strategy: m.strategy };

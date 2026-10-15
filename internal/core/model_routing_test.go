@@ -81,6 +81,8 @@ func TestWeightedModelGatewayDistributionAndAvailability(t *testing.T) {
 	defer ub.Close()
 	f.add(t, "a", ua.URL, "synthetic-a")
 	f.add(t, "b", ub.URL, "synthetic-b")
+	cacheTestRate(t, f, "a", "default", 1)
+	cacheTestRate(t, f, "b", "default", 2)
 	m, err := f.store.PutModel(state.Model{ID: "public", Strategy: "round-robin", Candidates: []state.Candidate{{ProviderID: "a", Model: "up-a", Multiplier: 1}, {ProviderID: "b", Model: "up-b", Multiplier: 2}}}, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -124,7 +126,9 @@ func TestWeightedModelGatewayDistributionAndAvailability(t *testing.T) {
 	if a.Load() != 10 {
 		t.Fatal("busy candidate received traffic")
 	}
-	// Editing the mapping changes the weights immediately, without retained routing debt.
+	// Refreshing group caches changes weights immediately without model edits or routing debt.
+	cacheTestRate(t, f, "a", "default", 2)
+	cacheTestRate(t, f, "b", "default", 1)
 	m.Candidates[0].Multiplier = 2
 	m.Candidates[1].Multiplier = 1
 	if _, err = f.store.PutModel(m, m.Revision); err != nil {

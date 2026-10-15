@@ -14,6 +14,7 @@ var ErrReferenced = errors.New("resource is referenced")
 var ErrInvalid = errors.New("invalid operation")
 
 type ProviderKey struct {
+	Rate           *catalog.KeyRateCache   `json:"rate"`
 	Protocol       string                  `json:"protocol"`
 	ModelProtocols []catalog.ModelProtocol `json:"model_protocols"`
 	ID             string                  `json:"id"`
@@ -43,8 +44,8 @@ func (k ProviderKey) EffectiveProtocol(model string) string {
 }
 
 func (s *Store) ProviderKeys(id string) ([]ProviderKey, error) {
-	rows, err := s.db.Query(`SELECT k.id,k.enabled,k.secret,k.protocol,COALESCE(m.model,''),COALESCE(m.protocol,'')
- FROM provider_keys k LEFT JOIN key_model_protocols m ON m.provider_id=k.provider_id AND m.key_id=k.id
+	rows, err := s.db.Query(`SELECT k.id,k.enabled,k.secret,k.protocol,COALESCE(m.model,''),COALESCE(m.protocol,''),COALESCE(r.document,'')
+ FROM provider_keys k LEFT JOIN key_rate_cache r ON r.provider_id=k.provider_id AND r.key_id=k.id LEFT JOIN key_model_protocols m ON m.provider_id=k.provider_id AND m.key_id=k.id
  WHERE k.provider_id=? ORDER BY k.id,m.model`, id)
 	if err != nil {
 		return nil, err
@@ -53,9 +54,14 @@ func (s *Store) ProviderKeys(id string) ([]ProviderKey, error) {
 	out := []ProviderKey{}
 	for rows.Next() {
 		var k ProviderKey
-		var model, protocol string
-		if err = rows.Scan(&k.ID, &k.Enabled, &k.Secret, &k.Protocol, &model, &protocol); err != nil {
+		var model, protocol, rate string
+		if err = rows.Scan(&k.ID, &k.Enabled, &k.Secret, &k.Protocol, &model, &protocol, &rate); err != nil {
 			return nil, err
+		}
+		if rate != "" {
+			if err = json.Unmarshal([]byte(rate), &k.Rate); err != nil {
+				return nil, err
+			}
 		}
 		if len(out) == 0 || out[len(out)-1].ID != k.ID {
 			k.ModelProtocols = []catalog.ModelProtocol{}
@@ -257,6 +263,9 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 				}
 				if !ValidProtocol(protocol) {
 					return ErrInvalid
+				}
+				if _, err = tx.Exec(`DELETE FROM key_rate_cache WHERE provider_id=? AND key_id=? AND EXISTS(SELECT 1 FROM provider_keys WHERE provider_id=? AND id=? AND secret!=?)`, id, target, id, target, secret); err != nil {
+					return err
 				}
 				_, err = tx.Exec(`INSERT INTO provider_keys(provider_id,id,secret,enabled,protocol) VALUES(?,?,?,?,?) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=excluded.enabled,protocol=excluded.protocol`, id, target, secret, enabled, protocol)
 			}

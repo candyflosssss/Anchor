@@ -30,12 +30,13 @@ export async function call<T>(operation: () => Promise<{ contract: string; data:
 export function checkedProvider(p: DesktopProvider): Provider {
   if (!p || typeof p.id !== 'string' || typeof p.homepage_url !== 'string' || !Array.isArray(p.base_urls) || p.base_urls.length < 1 || p.base_urls.length > 16 ||
     p.base_urls.some(u => typeof u !== 'string' || !u) ||
+    !Number.isFinite(p.cost_multiplier) || p.cost_multiplier < 0.000001 || p.cost_multiplier > 1000 ||
     typeof p.enabled !== 'boolean' || typeof p.has_secret !== 'boolean' ||
     !Number.isSafeInteger(p.revision) || p.revision < 1 ||
     !Number.isInteger(p.timeout_seconds) || p.timeout_seconds < 1 || p.timeout_seconds > 3600 ||
     !Number.isInteger(p.max_concurrent) || p.max_concurrent < 1 || p.max_concurrent > 64) throw new ProviderProblem('read_error');
   // Pick only public DTO fields; unexpected response properties never reach state.
-  return { id: p.id, homepage_url: p.homepage_url, base_urls: [...p.base_urls], enabled: p.enabled,
+  return { cost_multiplier: p.cost_multiplier, id: p.id, homepage_url: p.homepage_url, base_urls: [...p.base_urls], enabled: p.enabled,
     has_secret: p.has_secret, revision: p.revision, timeout_seconds: p.timeout_seconds, max_concurrent: p.max_concurrent };
 }
 function providerError(error: unknown, writing: boolean): never {

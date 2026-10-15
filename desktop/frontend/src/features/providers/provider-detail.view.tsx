@@ -1,3 +1,4 @@
+import { KeyMultiplierView } from './key-multiplier.view';
 import { probeFailureText } from './provider-test.model';
 import { ProviderCatalogView } from './provider-catalog.view';
 import { ProviderAccountView } from './provider-account.view';
@@ -158,13 +159,13 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
 function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace; disabled: boolean; ask: (a: Ask) => void }) {
   return <div className="stack">
     <section className="detail-card">
-      <div className="card-toolbar"><div><h2>模型映射</h2></div>
+      <div className="card-toolbar"><div><h2>模型映射</h2><p className="card-hint">供应商倍率 {c.selected?.cost_multiplier}× · 相对倍率 = 供应商倍率 × Key 缓存分组倍率</p></div>
         <Button variant="outline" disabled={disabled} onClick={() => c.openDialog({ kind: 'mapping' })}><Plus />手动添加映射</Button></div>
-      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col">调度 / 倍率</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
+      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col">来源 Key / 相对倍率</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
         {w.models.map(m => <tr key={m.id}>
           <td className="mono">{m.id}</td><td className="mono break-all">{m.upstream}</td>
           <td className="cell-hint">{[m.tools && '函数工具', m.streaming && '流式输出'].filter(Boolean).join(' · ') || '基础'}</td>
-          <td className="cell-hint">{m.strategy === 'round-robin' ? '加权轮询' : '顺序优先'} · {m.multiplier}× · {m.candidate_count} 个候选</td>
+          <td className="cell-hint">{w.keys.filter(k => m.key_ids.length ? m.key_ids.includes(k.id) : k.enabled).map(k => <div key={k.id}><strong className="mono">{k.id}</strong><KeyMultiplierView value={k} /></div>)}{!w.keys.length && '匿名来源 · 倍率未知'}</td>
           <td className="row-actions">
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试模型 ${m.id}`} onClick={() => c.openDialog({ kind: 'test', model: m.upstream, keyIds: m.key_ids })}><Play />测试</Button>
             <Button size="sm" variant="ghost" disabled={disabled} aria-label={`编辑模型 ${m.id}`} onClick={() => c.openDialog({ kind: 'mapping', alias: m.id, upstream: m.upstream, tools: m.tools, streaming: m.streaming })}>编辑</Button>

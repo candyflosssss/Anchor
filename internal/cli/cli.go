@@ -70,7 +70,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   usage                                Persistent per-provider/model totals
   provider add|put --id ID --base-url URL [--base-url URL ...] [--homepage-url URL]
                 [--secret-stdin] [--revision N] [--protocol responses|chat-completions|anthropic]
-                [--timeout 120] [--max-concurrent 4] [--disabled]
+                [--timeout 120] [--max-concurrent 4] [--cost-multiplier N] [--disabled]
   model list
   model settings --id ID [--file FILE]
   model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL...
@@ -575,6 +575,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	protocol := f.String("protocol", "", "default protocol for a newly created default Key; empty keeps the stored value or uses responses")
 	timeout := f.Int("timeout", 120, "total request timeout in seconds")
 	max := f.Int("max-concurrent", 4, "provider concurrency")
+	cost := f.Float64("cost-multiplier", 0, "provider recharge cost factor 0.000001..1000; omitted preserves existing or defaults to 1")
 	disabled := f.Bool("disabled", false, "disable provider")
 	rev := f.Int64("revision", 0, "expected current revision")
 	stdin := f.Bool("secret-stdin", false, "read API key from stdin")
@@ -587,7 +588,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	if args[0] == "put" && *rev < 1 {
 		return errors.New("put requires the current --revision")
 	}
-	p := state.Provider{ID: *id, HomepageURL: *homepage, BaseURLs: append([]string(nil), bases...), Protocol: *protocol, Enabled: !*disabled, TimeoutSeconds: *timeout, MaxConcurrent: *max}
+	p := state.Provider{CostMultiplier: *cost, ID: *id, HomepageURL: *homepage, BaseURLs: append([]string(nil), bases...), Protocol: *protocol, Enabled: !*disabled, TimeoutSeconds: *timeout, MaxConcurrent: *max}
 	if err := p.Validate(); err != nil {
 		return err
 	}
@@ -799,7 +800,7 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	allKeys := f.Bool("all-keys", false, "clear source Key restriction on model-put")
 	model := f.String("model", "", "upstream model")
 	mr := f.Int64("model-revision", 0, "current model revision; zero creates or attaches; new aliases import exact models.dev defaults when unambiguous")
-	multiplier := f.Float64("multiplier", 0, "relative cost multiplier 0.01..1000; omitted preserves existing or defaults to 1")
+	multiplier := f.Float64("multiplier", 0, "reserved legacy model multiplier 0.01..1000; not used for routing")
 	tools := f.Bool("tools", false, "advertise function tools")
 	stream := f.Bool("streaming", false, "advertise streaming")
 	if err := parse(f, args[1:]); err != nil {

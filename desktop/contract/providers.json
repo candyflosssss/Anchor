@@ -12,7 +12,8 @@
       "timeout_seconds": 120,
       "max_concurrent": 4,
       "revision": 3,
-      "has_secret": true
+      "has_secret": true,
+      "cost_multiplier": 1
     },
     {
       "id": "备用供应商",
@@ -24,7 +25,8 @@
       "timeout_seconds": 90,
       "max_concurrent": 2,
       "revision": 1,
-      "has_secret": true
+      "has_secret": true,
+      "cost_multiplier": 1
     },
     {
       "id": "本地调试",
@@ -36,7 +38,8 @@
       "timeout_seconds": 30,
       "max_concurrent": 1,
       "revision": 2,
-      "has_secret": false
+      "has_secret": false,
+      "cost_multiplier": 1
     }
   ],
   "empty": [],

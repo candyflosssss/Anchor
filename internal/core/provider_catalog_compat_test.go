@@ -140,6 +140,9 @@ func TestNewAPIModelCatalogSelectedKey(t *testing.T) {
 				t.Fatal(status, raw, paths)
 			}
 			after, _ := f.store.ProviderKeys("newapi")
+			for i := range after {
+				after[i].Rate = nil
+			}
 			p, _ := f.store.Provider("newapi")
 			mappings, _ := f.store.Models()
 			if !reflect.DeepEqual(before, after) || p.Revision != 2 || len(mappings) != 0 || strings.Contains(raw, "fixture-restricted-token") {

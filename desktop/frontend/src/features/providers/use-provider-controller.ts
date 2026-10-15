@@ -132,6 +132,7 @@ export function useProviderController(environment: ProviderEnvironment) {
       const result = await transport.discover(target, abort.signal);
       if (abort.signal.aborted || epoch !== catalogEpoch.current) return;
       setModels(result);
+      await features.refresh();
     } catch (error) {
       if (abort.signal.aborted || epoch !== catalogEpoch.current) return;
       const code = error instanceof ProviderProblem ? error.code : 'read_error';

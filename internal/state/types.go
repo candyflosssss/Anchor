@@ -98,6 +98,9 @@ func (p Provider) URLs() []string {
 
 // Normalize makes BaseURLs authoritative and BaseURL its first entry.
 func (p *Provider) Normalize() {
+	if p.CostMultiplier == 0 {
+		p.CostMultiplier = 1
+	}
 	p.BaseURLs = append([]string(nil), p.URLs()...)
 	if len(p.BaseURLs) > 0 {
 		p.BaseURL = p.BaseURLs[0]
@@ -109,8 +112,9 @@ func ValidProtocol(p string) bool {
 }
 
 type Provider struct {
-	ID          string `json:"id"`
-	HomepageURL string `json:"homepage_url,omitempty"`
+	CostMultiplier float64 `json:"cost_multiplier"`
+	ID             string  `json:"id"`
+	HomepageURL    string  `json:"homepage_url,omitempty"`
 	// BaseURL mirrors BaseURLs[0] for older readers; BaseURLs is authoritative.
 	BaseURL  string   `json:"base_url"`
 	BaseURLs []string `json:"base_urls,omitempty"`
@@ -126,6 +130,9 @@ type Provider struct {
 }
 
 func (p Provider) Validate() error {
+	if math.IsNaN(p.CostMultiplier) || math.IsInf(p.CostMultiplier, 0) || p.CostMultiplier < 0 || p.CostMultiplier > 1000 || (p.CostMultiplier > 0 && p.CostMultiplier < 0.000001) {
+		return errors.New("provider cost multiplier must be 0.000001..1000 (0 preserves/defaults to 1)")
+	}
 	if !ValidProviderID(p.ID) {
 		return errors.New("invalid provider ID: use 1..128 Unicode letters (including Chinese), decimal digits, or ._-; start with a letter or digit")
 	}

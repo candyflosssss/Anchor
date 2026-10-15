@@ -24,7 +24,12 @@ export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController;
   const enabledKeys = w.keys.filter(k => k.enabled).length;
   const rateLabel = (id: string) => {
     const k = models?.keys.find(k => k.id === id);
-    if (!k) return '分组倍率尚未查询';
+    const cached = w.keys.find(k => k.id === id);
+    if (cached?.rate?.multiplier != null) {
+      const rate = cached.rate;
+      return `${rate.group_name || rate.group ? `分组 ${rate.group_name || rate.group} · ` : ''}分组倍率 ${rate.multiplier}× · 相对倍率 ${cached.effective_multiplier ?? '未知'}× · 缓存${rate.failure ? '（刷新失败，沿用上次结果）' : ''}`;
+    }
+    if (!k) return '分组倍率未知（未缓存）';
     const group = k.group_name ? `${k.group_name}（${k.group}）` : k.group;
     return `${group ? `分组 ${group} · ` : ''}${k.multiplier !== null ? `${k.multiplier}×${k.rate_basis === 'personal_override' ? '（个人倍率）' : k.rate_basis === 'key_billing' ? '（当前计费）' : ''}` : `倍率未知：${catalogRateFailureText[k.rate_failure] || '上游未提供'}`}`;
   };
@@ -56,7 +61,7 @@ export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController;
         </select>
       </div>
       {filtered.length ? <div className="catalog-table">
-        <div className="catalog-columns" aria-hidden="true"><span>上游模型</span><div><span>可用 Key / 分组倍率</span><span>请求协议</span></div><span>映射</span></div>
+        <div className="catalog-columns" aria-hidden="true"><span>上游模型</span><div><span>可用 Key / 分组倍率 / 相对倍率</span><span>请求协议</span></div><span>映射</span></div>
         <ul className="catalog-list" aria-label="上游模型 ID">{visible.map(id => {
           const listed = (models?.entries.find(e => e.id === id)?.key_ids ?? []).filter(keyID => keyID === 'anonymous' || w.keys.some(k => k.id === keyID && k.enabled));
           const keyIDs = [...new Set([...listed, ...w.keys.filter(k => k.model_protocols.some(m => m.model === id)).map(k => k.id)])];

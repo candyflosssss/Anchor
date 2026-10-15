@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { ArrowLeftRight, ArrowUp, ArrowDown, Check, ChevronDown, GripVertical, LoaderCircle, RefreshCw, Settings2, Undo2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { aggregateModels, type DetailTab, type ModelCandidate, type ModelGroup, type ProviderSummary } from '../providers/provider-summary.model';
+import { KeyMultiplierView } from '../providers/key-multiplier.view';
 import { rateFailureText } from '../providers/provider-account.model';
 import { rateID, type MappingRatesController, type RateTarget } from './use-mapping-rates';
 import { routingRules, routeID, ruleLabel } from './model-routing.model';
@@ -38,11 +39,12 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
             <button className={`candidate tone-${m.tone}`} disabled={disabled || routing.busy} title={m.label} aria-label={`${m.provider_id}（${m.label}）上游 ${m.upstream}，编辑映射`} onClick={() => onOpen(m.provider_id, 'models')}><strong>{m.provider_id}</strong><span className="mono">{m.upstream}</span></button>
             {candidates.length > 1 && <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i - 1); }}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === candidates.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i + 1); }}><ArrowDown size={13} /></Button></div>}
           </div>
-          <div className="mapping-source-meta"><span>路由倍率 <strong>{m.multiplier}×</strong></span><details className="mapping-keys"><summary><ChevronDown size={12} />{sourceTargets(m).length ? `${sourceTargets(m).length} 个 Key` : '匿名来源'}</summary><div className="mapping-rates">
+          <div className="mapping-source-meta"><span>供应商倍率 <strong>{m.cost_multiplier}×</strong></span><details className="mapping-keys"><summary><ChevronDown size={12} />{sourceTargets(m).length ? `${sourceTargets(m).length} 个 Key` : '匿名来源'}</summary><div className="mapping-rates">
             {!sourceTargets(m).length && <p className="card-hint">此来源不使用 Key。</p>}
             {sourceTargets(m).map(t => {
               const id = rateID(t), value = rates.values[id], failure = rates.errors[id] || (value?.failure && (rateFailureText[value.failure] ?? '查询失败，分组倍率未知。'));
-              return <div className="mapping-key-rate" key={id}><span className="mapping-key-name" aria-label={`来源 Key ${t.key_id}`}><span>Key</span><strong className="mono">{t.key_id}</strong></span><span className="mapping-platform-rate" title={failure || undefined}>分组倍率 <strong>{rates.pending === id ? '查询中…' : value?.rate?.multiplier != null ? `${value.rate.multiplier}×` : '—'}</strong></span>{failure && <p className="feedback error-feedback" role="alert">{failure}</p>}</div>;
+              const key = rates.keys[id] ?? m.keys.find(k => k.id === t.key_id);
+              return <div className="mapping-key-rate" key={id}><span className="mapping-key-name" aria-label={`来源 Key ${t.key_id}`}><span>Key</span><strong className="mono">{t.key_id}</strong></span>{rates.pending === id ? <span>查询中…</span> : <KeyMultiplierView value={key} />}{failure && <p className="feedback error-feedback" role="alert">{failure}</p>}</div>;
             })}
           </div></details></div>
         </li>)}</ul>

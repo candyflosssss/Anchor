@@ -73,7 +73,15 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		out.KeyID = "anonymous"
 	}
 	start := time.Now()
-	defer func() { out.ElapsedMS = time.Since(start).Milliseconds(); writeJSON(w, 200, out) }()
+	var cacheErr error
+	defer func() {
+		if cacheErr != nil {
+			apiError(w, cacheErr)
+			return
+		}
+		out.ElapsedMS = time.Since(start).Milliseconds()
+		writeJSON(w, 200, out)
+	}()
 	if len(keys) == 0 {
 		out.Failure = "no_enabled_keys"
 		return
@@ -157,6 +165,9 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 	for i, key := range keys {
 		adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: key.Secret}
 		rate := adapter.QueryKeyRate(ctx)
+		if cacheErr = s.cacheKeyRate(p, allKeys, key.ID, &rate); cacheErr != nil {
+			return
+		}
 		out.Keys[i].RateFailure = rate.Failure
 		if rate.EffectiveRate != nil {
 			v := rate.EffectiveRate

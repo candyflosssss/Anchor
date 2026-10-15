@@ -146,6 +146,9 @@ func TestDirectoryUsesSelectedKeyDefaultProtocol(t *testing.T) {
 		t.Fatal(status, calls)
 	}
 	after, _ := f.store.ProviderKeys("p")
+	for i := range after {
+		after[i].Rate = nil
+	}
 	p, _ := f.store.Provider("p")
 	if !reflect.DeepEqual(before, after) || p.Revision != 3 {
 		t.Fatal("discovery changed settings")

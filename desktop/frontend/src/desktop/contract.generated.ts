@@ -376,6 +376,7 @@ export interface Problem {
   code: ProblemCode;
 }
 export interface Provider {
+  cost_multiplier: number;
   id: string;
   homepage_url: string;
   base_urls: string[];
@@ -520,7 +521,18 @@ export interface ModelProtocol {
   model: string;
   protocol: string;
 }
+export interface KeyRateCache {
+  multiplier: number | null;
+  group: string;
+  group_name: string;
+  basis: string;
+  observed_at: string;
+  attempted_at: string;
+  failure: string;
+}
 export interface KeyStatus {
+  rate: KeyRateCache | null;
+  effective_multiplier: number | null;
   protocol: string;
   model_protocols: ModelProtocol[];
   id: string;

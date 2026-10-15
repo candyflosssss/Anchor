@@ -33,8 +33,8 @@ function seed(id: string, w: Workspace) {
   if (id === '摸鱼AI') w.models = [mapping('demo-model-mini')];
   if (id === '备用供应商') {
     w.keys = [
-      { id: 'backup', protocol: 'chat-completions', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: { revision: w.revision, key_id: 'backup', model: 'backup-model', at: now - 7200, http_status: 200, elapsed_ms: 860, failure: '' } },
-      { id: 'primary', protocol: 'responses', model_protocols: [], enabled: true, state: 'cooling', failures: 3, retry_at: now + 600, test: null },
+      { rate: null, effective_multiplier: null, id: 'backup', protocol: 'chat-completions', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: { revision: w.revision, key_id: 'backup', model: 'backup-model', at: now - 7200, http_status: 200, elapsed_ms: 860, failure: '' } },
+      { rate: null, effective_multiplier: null, id: 'primary', protocol: 'responses', model_protocols: [], enabled: true, state: 'cooling', failures: 3, retry_at: now + 600, test: null },
     ];
     w.models = [{ ...mapping('backup-model'), candidate_index: 1 }];
     w.usage = [{ provider_id: id, model: 'coding-main', requests: 42, failures: 1, elapsed_ms: 50400, known: 40, input_tokens: 120000, output_tokens: 30000, cache_read: 20000, cache_write: 0 }];
@@ -78,6 +78,13 @@ export class MockProviderTransport implements ProviderTransport {
     if (settings.revision !== q.expected_revision) throw new ProviderProblem('conflict');
     const platform = settings.platform && settings.platform !== 'auto' ? settings.platform : 'sub2api';
     const failure = platform === 'oneapi' ? 'unsupported' : !settings.has_user_token ? 'auth_required' : '';
+    const p = this.rows.find(p => p.id === q.provider_id)!;
+    const key = this.detail(p).keys.find(k => k.id === (q.key_id || 'default'));
+    if (key && q.remote_key_id === 0) {
+      const now = new Date().toISOString();
+      if (failure) { key.rate = { multiplier: null, group: '', group_name: '', basis: '', observed_at: '', ...key.rate, attempted_at: now, failure }; }
+      else key.rate = { multiplier: Number(accountFixture.rate.rate.multiplier), group: accountFixture.rate.rate.group, group_name: accountFixture.rate.rate.group_name, basis: accountFixture.rate.rate.basis, observed_at: now, attempted_at: now, failure: '' };
+    }
     return { ...accountFixture.rate, provider_id: q.provider_id, revision: q.expected_revision, platform,
       key_id: q.key_id || 'default', remote_key_id: q.remote_key_id, observed_at: new Date().toISOString(), failure,
       rate: failure ? null : { ...accountFixture.rate.rate } };
@@ -125,6 +132,10 @@ export class MockProviderTransport implements ProviderTransport {
       ...catalogFixture.success.keys[0], id: k.id, enabled: k.enabled, protocol: k.protocol,
       ...(i ? { group: 'premium', group_name: '高级组', multiplier: '1.5' } : {}),
     }));
+    for (const observation of observations) {
+      const key = w.keys.find(k => k.id === observation.id);
+      if (key && observation.multiplier != null) { const now = new Date().toISOString(); key.rate = { multiplier: Number(observation.multiplier), group: observation.group, group_name: observation.group_name, basis: observation.rate_basis, observed_at: now, attempted_at: now, failure: '' }; }
+    }
     return { ...catalogFixture.success, key_id: input.key_id || (keys.length ? '' : 'anonymous'), provider_id: current.id, revision: current.revision,
       models: [...catalogFixture.success.models], entries: catalogFixture.success.models.map(id => ({ id, key_ids: observations.map(k => k.id) })), keys: observations };
 
@@ -136,6 +147,7 @@ export class MockProviderTransport implements ProviderTransport {
       if (!this.seeded.has(p.id)) { this.seeded.add(p.id); seed(p.id, w); }
       this.workspaces.set(p.id, w);
     }
+    for (const key of w.keys) key.effective_multiplier = key.rate?.multiplier == null ? null : p.cost_multiplier * key.rate.multiplier;
     w.revision = p.revision; return w;
   }
   async probe(input: ProbeRequest, signal: AbortSignal): Promise<ProbeProgress> {
@@ -200,7 +212,7 @@ export class MockProviderTransport implements ProviderTransport {
         const k = w.keys.find(k => k.id === a.target); if (!a.target || (!k && !a.secret)) throw fixtureError('invalid');
         if (a.protocol && !['responses', 'chat-completions', 'anthropic'].includes(a.protocol)) throw fixtureError('invalid');
         if (k) { k.protocol = a.protocol || k.protocol; k.enabled = a.enabled; k.state = a.enabled ? 'ready' : 'disabled'; }
-        else w.keys.push({ id: a.target, protocol: a.protocol || 'responses', model_protocols: [], enabled: a.enabled, state: a.enabled ? 'ready' : 'disabled', failures: 0, retry_at: 0, test: null }); p.has_secret = !!w.keys.length; p.revision++; break;
+        else w.keys.push({ rate: null, effective_multiplier: null, id: a.target, protocol: a.protocol || 'responses', model_protocols: [], enabled: a.enabled, state: a.enabled ? 'ready' : 'disabled', failures: 0, retry_at: 0, test: null }); p.has_secret = !!w.keys.length; p.revision++; break;
       }
       case 'key-model-protocol': {
         const k = w.keys.find(k => k.id === a.target);
@@ -272,7 +284,7 @@ export class MockProviderTransport implements ProviderTransport {
         const k = w.keys.find(k => k.id === 'default');
         if (!input.secret) w.keys = w.keys.filter(k => k.id !== 'default');
         else if (k) { k.enabled = true; k.state = 'ready'; }
-        else w.keys.push({ id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
+        else w.keys.push({ rate: null, effective_multiplier: null, id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
       }
       saved.has_secret = w.keys.length > 0;
     }

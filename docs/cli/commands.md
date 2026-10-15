@@ -209,12 +209,13 @@ anchor provider put --id ID --base-url URL [--base-url URL ...] [--homepage-url 
 | `--homepage-url` | 空 | 供应商主页，仅用于展示，不参与请求；HTTP(S)，禁止 userinfo |
 | `--protocol` | 空 | `responses` / `chat-completions` / `anthropic`；仅用于新建 default Key 的初始协议及无 Key 时的匿名协议，不批量改已有 Key；空值保留已存值，新供应商按 `responses` |
 | `--timeout` | `120` | 单候选总超时，秒，1..3600；仍受上游响应头 30 秒等待上限限制 |
+| `--cost-multiplier` | 新建 `1`；编辑省略保留 | 供应商充值成本倍率，有限数 `0.000001..1000`；1:2充值填0.5；输出 `cost_multiplier`。0仅作旧客户端省略值 |
 | `--max-concurrent` | `4` | 单供应商并发 1..64；网关全局另有限制 16 |
 | `--disabled` | `false` | 设置后禁用此供应商 |
 | `--revision` | `0` | add 必须为 0；put 必填当前值且 ≥1，通过 list 获取 |
 | `--secret-stdin` | `false` | 从 stdin 读取密钥，最多 8192 字节，去除首尾空白；内部换行无效 |
 
-更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商，省略 `--homepage-url` 会清除主页，`--base-url` 列表整体替换。密钥是例外：put 未提供 `--secret-stdin` 保留 default Key，提供并读到空值会清除 default Key；其他命名 Key 保留。has_secret 表示至少存在一个已存 Key，不等于全部启用。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
+更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商，省略 `--homepage-url` 会清除主页，`--base-url` 列表整体替换。供应商倍率也是例外：省略 `--cost-multiplier` 保留既有值，新建默认1。密钥是例外：put 未提供 `--secret-stdin` 保留 default Key，提供并读到空值会清除 default Key；其他命名 Key 保留。has_secret 表示至少存在一个已存 Key，不等于全部启用。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
 
 安全输入示例（变量须由用户安全提供；URL 为占位值）：
 
@@ -248,7 +249,7 @@ anchor provider models --id '摸鱼AI' --revision 3
 
 stdout 为 `{provider_id, key_id, revision, http_status, elapsed_ms, models, failure, partial, entries, keys}`。默认聚合查询的 key_id 为空，显式查询为指定 ID，无 Key 为 anonymous。models 为合并去重排序的字符串数组；entries 为 `{id, key_ids}`，列出该模型对应的全部启用且目录成功的可选 Key。keys 逐项包含 `{id, enabled, protocol, http_status, failure, group, group_name, multiplier, rate_basis, rate_failure}`；multiplier 为十进制字符串或 null（未知），不会假定为1。至少一个 Key 目录成功时顶层 failure 为空，partial 表示存在失败 Key，逐 Key failure 保留原因；所有查询 Key 失败时 models/entries 为空；无启用 Key 时 http_status=0，models/entries/keys 为空。目录层失败输出结构化结果并退出0，调用者必须检查 failure 和 partial；管理层失败仍非零退出。目录失败分类为 no_enabled_keys（无启用 Key，未请求上游）、authentication、unsupported、rate_limited、http_error、network、timeout、busy、too_large、invalid_response。
 
-分组倍率从已存平台账户授权自动匹配推理 Key 的远端身份后抓取，支持 Sub2API 的个人覆盖／分组默认倍率、NewAPI 的确定分组倍率；OneAPI 暂不支持，auto 分组无单一倍率。NewAPI 掩码候选必须通过固定只读 `POST /api/token/{数字ID}/key` 取回完整 Key 核对，不能凭掩码判定身份；Sub2API 使用完整 Key 精确匹配。最多4页账号 Key（每页100条），每 Key 的倍率查询最多8次请求／2 MiB响应，并受上述共享期限限制。倍率缺授权、未识别平台、找不到 Key、超时等均通过 rate_failure 表示，不丢弃已查询的模型，不把抓取值写入 Anchor 映射倍率。响应不包含上游错误正文、密钥或原始网络异常。
+分组倍率从已存平台账户授权自动匹配推理 Key 的远端身份后抓取，支持 Sub2API 的个人覆盖／分组默认倍率、NewAPI 的确定分组倍率；OneAPI 暂不支持，auto 分组无单一倍率。NewAPI 掩码候选必须通过固定只读 `POST /api/token/{数字ID}/key` 取回完整 Key 核对，不能凭掩码判定身份；Sub2API 使用完整 Key 精确匹配。最多4页账号 Key（每页100条），每 Key 的倍率查询最多8次请求／2 MiB响应，并受上述共享期限限制。倍率缺授权、未识别平台、找不到 Key、超时等均通过 rate_failure 表示，不丢弃已查询的模型，自动按本地 Key 持久缓存有效分组倍率，供供应商倍率×分组倍率调度；不改旧模型倍率字段。失败保留上次成功缓存，无缓存保持未知。缓存不递增配置 revision；配置变更后的迟到结果被拒绝。响应不包含上游错误正文、密钥或原始网络异常。
 
 一次显式目录查询（可能包含路径切换和分页），不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。显式推理测试和映射写入使用下列独立命令，目录查询本身不自动导入。
 
@@ -278,7 +279,7 @@ anchor provider price-import --id ID --revision N --target ALIAS --catalog-provi
 anchor usage
 ```
 
-上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace.models` 返回当前供应商的 `multiplier`（相对倍率）、`strategy`（公开模型策略）及 `candidate_count`（总候选数）。`workspace` 的 keys 额外返回 protocol 和 model_protocols（[{model,protocol}]，始终数组），不返回秘密。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商、Key ID 和公开别名均沿用中文命名规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
+上述动作均使用所选 Context 的管理鉴权及实例校验。`workspace.models` 返回当前供应商的 `multiplier`（旧模型倍率，仅预留，不参与路由）、`strategy`（公开模型策略）及 `candidate_count`（总候选数）。`workspace` 的 keys 额外返回可空 `rate`（multiplier/group/group_name/basis/observed_at/attempted_at/failure）及核心计算的可空 `effective_multiplier`，公式为供应商 `cost_multiplier` × Key缓存分组倍率；未知不填1，失败保留成功观察。另返回 protocol 和 model_protocols（[{model,protocol}]，始终数组），不返回秘密。`workspace` 的 id 必填；其余供应商动作还须当前 `--revision`，从 list/workspace 获取。供应商、Key ID 和公开别名均沿用中文命名规则。不自动重试；未知结果先 workspace/list 重读。stdout 为 Workspace（provider_id/revision/strategy/keys/models/usage/prices/estimates，及可空 probe/imported_price）；删除返回 deleted=true。`usage` 单独返回全供应商/模型聚合数组，包括已删除或改名前 ID 的历史数据。
 
 | 动作 | 参数、默认值和语义 |
 | --- | --- |
@@ -289,7 +290,7 @@ anchor usage
 | key-delete / key-reset | target 与 approve 必填；delete 删除秘密，reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
 | strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
-| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1。新模型 strategy 默认 round-robin（按倍率倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（路由倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；编辑 tools/streaming 默认 false，能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
+| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段仅预留，当前不参与路由。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；编辑 tools/streaming 默认 false，能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
 | model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，Binding 默认模型引用时409 referenced，事务回滚 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；共享 catalog 的1小时缓存与固定公开目录最多30秒/16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY/NO_PROXY，拒绝陈旧快照；更新时间为快照获取时间，仅基础价不含分档。只返回 imported_price **预览**，不保存；核对后另行 price-put |
@@ -308,16 +309,18 @@ GUI 在供应商详情的三个页签提供同等操作。数据库启动自动�
 
 ### 来源 Key 与模型调度
 
+当前源码（未打包）使用 **供应商倍率 × Key缓存分组倍率**。同供应商的不同 Key 独立参与价格／加权调度，同 Key 全部模型复用缓存。已知可用路由优先，未知仅回退；全部未知时等权，零倍率路由优先等权。固定优先／低延迟规则保持原义。缓存没有后台刷新或TTL，失败沿用旧观察并显示时间；详细口径、schema8迁移与失效规则见[倍率设计](../design/provider-multipliers.md)。
+
 
 `provider model-put` 支持可重复 `--source-key ID` 限制候选Key；省略时编辑保留原范围、新建允许所有启用Key。`--all-keys` 显式清空限制，与 source-key互斥。导入的指定来源Key参与真实调度；健康失败只切换范围内Key或其他候选，仍被引用的Key不能删除。`workspace.models` 返回 key_ids／candidate_index。schema5→6自动迁移，旧核心不能打开，需同步升级CLI与核心。
 
-`model routing` 的 candidate列表必须完整且成员不变，原子修改共享模型顺序／规则、递增模型revision，保留所有来源Key、路由倍率、tools／streaming及Codex元数据。策略语义见[供应商接口 §9](../design/provider-interface.md#9-来源-key与模型调度2026-10-13当前源码)：缓存亲和10分钟（不保证缓存命中），低价按路由倍率，低延迟成功EWMA观察30分钟。输出JSON含model_id／revision／strategy／order。旧revision返回conflict，不自动重试写入。
+`model routing` 的 candidate列表必须完整且成员不变，原子修改共享模型顺序／规则、递增模型revision，保留所有来源Key、预留模型倍率、tools／streaming及Codex元数据。策略语义见[供应商接口 §9](../design/provider-interface.md#9-来源-key与模型调度2026-10-13当前源码)：缓存亲和10分钟（不保证缓存命中），低价按供应商倍率×Key缓存分组倍率，低延迟成功EWMA观察30分钟。输出JSON含model_id／revision／strategy／order。旧revision返回conflict，不自动重试写入。
 
 ```bash
 anchor model routing --id coding-main --revision 3 --strategy priority \
   --candidate backup:upstream-model --candidate primary:upstream-model
 anchor provider model-put --id primary --revision 2 --target coding-main \
-  --model upstream-model --model-revision 4 --source-key key-main --multiplier 0.8
+  --model upstream-model --model-revision 4 --source-key key-main
 ```
 
 ### 平台兼容查询（源码 CLI；desktop.21 核心已发布）
@@ -356,11 +359,11 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 | 实际扣费及 tokens | USD actual_cost、输入输出、缓存、费用分项 | quota、输入输出及已有缓存／音频等数值明细 | quota、基础字段；token 语义标记待核验 |
 | 当前有效分组倍率 | 推理 Key 直读当前有效倍率（含个人／高峰）；旧站回退或显式 remote-key-id 需用户授权 | 用户授权，默认自动核对所选 Key；可显式 remote-key-id，用户身份定价；auto 返回 unknown | unsupported |
 
-sub2api Key 直接倍率结果的 `basis=key_billing`，`group` 和 `group_name` 可为空（接口未披露组名／ID），不可推定为默认组或1×；`multiplier` 为平台的当前有效计费倍率。显式正整数 `--remote-key-id` 保持旧的用户授权查询语义，不使用当前推理 Key 的直读结果替代该远端 Key。`provider models` 未配置账户平台时可通过一个 Key 专用接口请求识别 sub2api；其他平台仍需账户平台配置。倍率读取失败不会丢弃模型目录，也不会修改 Anchor 路由倍率。
+sub2api Key 直接倍率结果的 `basis=key_billing`，`group` 和 `group_name` 可为空（接口未披露组名／ID），不可推定为默认组或1×；`multiplier` 为平台的当前有效计费倍率。显式正整数 `--remote-key-id` 保持旧的用户授权查询语义，不使用当前推理 Key 的直读结果替代该远端 Key。`provider models` 未配置账户平台时可通过一个 Key 专用接口请求识别 sub2api；其他平台仍需账户平台配置。倍率读取失败不会丢弃模型目录。默认自动核对本地 Key 的查询会持久缓存分组倍率，失败保留上次成功观察；显式远端数字ID不写本地缓存。
 
 `usage-records` 的 `--scope` 默认 `account`，可选 `key`。`--page` 默认1，上限100000；`--page-size` 默认50，范围1..100。sub2api 和 NewAPI 用户日志正常分页；NewAPI Key 日志只支持第1页且批次大小由站点决定，`history=recent`、`page_size=0`、`total=null`、`has_more=false`，不表示完整历史。原版 OneAPI 使用站点固定分页大小，返回 `page_size=0`、`total=null`，非空页 `has_more=true`，需空末页确定结束。所有记录受上游默认时间范围、日志保留和站点开关限制；这不是 Anchor 本地 `usage show` 或 `logs list`。
 
-查询 stdout 为 `{provider_id, key_id, remote_key_id?, revision, platform, operation, observed_at, source, http_status, failure?, balance?, key_quota?, records?, effective_rate?}`，按操作只返回对应 payload。金额为 `{value, unit}`，`unit=USD|CNY|quota|site_unit`，不猜汇率或默认换算；billing 仅按公开 `quota_display_type` 确认 USD/CNY/TOKENS，无法确认则 site_unit。额度以 `scope=account|key|billing` 区分账户、Key 和范围未确认的站点余额，字段未知为 null，不能当作0；`unlimited=true` 仅表示 Key 自身不设上限。账单含 `charged_amount`、可选 `base_amount`、`billing_source`（NewAPI 已报告 wallet/subscription 时）、历史 `rate_multiplier`、tokens、已知内建工具的 tool_charges（次数与站点原始价格）和数值明细白名单；原始提示词、IP、后台信息及原始日志正文不返回。NewAPI 的日志 id 不是稳定标识，`id_stable=false`，有 `request_id` 时可关联请求；不承诺所有平台存在该字段。原版 OneAPI 的 token 字段标记 `platform_fields_unverified`，部分非文本计费可能不是实际 token 数。当前分组倍率是查询时快照，不替代历史账单扣费，也不自动写入候选路由。
+查询 stdout 为 `{provider_id, key_id, remote_key_id?, revision, platform, operation, observed_at, source, http_status, failure?, balance?, key_quota?, records?, effective_rate?}`，按操作只返回对应 payload。金额为 `{value, unit}`，`unit=USD|CNY|quota|site_unit`，不猜汇率或默认换算；billing 仅按公开 `quota_display_type` 确认 USD/CNY/TOKENS，无法确认则 site_unit。额度以 `scope=account|key|billing` 区分账户、Key 和范围未确认的站点余额，字段未知为 null，不能当作0；`unlimited=true` 仅表示 Key 自身不设上限。账单含 `charged_amount`、可选 `base_amount`、`billing_source`（NewAPI 已报告 wallet/subscription 时）、历史 `rate_multiplier`、tokens、已知内建工具的 tool_charges（次数与站点原始价格）和数值明细白名单；原始提示词、IP、后台信息及原始日志正文不返回。NewAPI 的日志 id 不是稳定标识，`id_stable=false`，有 `request_id` 时可关联请求；不承诺所有平台存在该字段。原版 OneAPI 的 token 字段标记 `platform_fields_unverified`，部分非文本计费可能不是实际 token 数。当前分组倍率是查询时快照，不替代历史账单扣费；本地 Key 的自动核对查询缓存后参与相对倍率调度，不写旧模型倍率字段。
 
 模型查询仍用前一节 `provider models` 的输出和边界；其他查询最多8次请求（NewAPI 掩码核对包含固定 POST 读接口）、累计2 MiB响应，共用供应商超时与8秒的较小值，遵守全局／供应商并发限制，不重试、不跟随重定向，沿用核心上游传输策略（不读环境代理）。后台兼容路径和完整数据契约见 [供应商接口语义](../design/provider-interface.md#8-平台账户与计费兼容层2026-10-13当前源码)。
 
@@ -593,9 +596,10 @@ anchor recover [--id ID]
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
+| 供应商充值倍率及Key缓存相对倍率 | provider add/put --cost-multiplier、provider models/effective-rate/workspace | 当前源码已实现；默认1，自动缓存分组值，schema8；未打包发行 |
 | 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，当前源码账户／模型映射页已接分组倍率，账单页面未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
-| 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --multiplier 1 --tools --streaming | 桌面新建默认开启两项能力；CLI 默认不变。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
+| 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --tools --streaming | 桌面新建默认开启两项能力；CLI 默认不变。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |

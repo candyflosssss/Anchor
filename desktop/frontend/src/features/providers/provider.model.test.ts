@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isDirty, newDraft, toSave, validateDraft, type Provider } from './provider.model';
 import { MockProviderTransport } from './provider.mock';
-const source: Provider = { id: '摸鱼AI', homepage_url: 'https://www.example.com', base_urls: ['https://api.example.com/v1', 'https://api2.example.com/v1'], enabled: false, timeout_seconds: 90, max_concurrent: 2, revision: 4, has_secret: true };
+const source: Provider = { cost_multiplier: 1, id: '摸鱼AI', homepage_url: 'https://www.example.com', base_urls: ['https://api.example.com/v1', 'https://api2.example.com/v1'], enabled: false, timeout_seconds: 90, max_concurrent: 2, revision: 4, has_secret: true };
 const valid = () => ({ ...newDraft(), id: '新供应商', base_urls: ['https://api.example.com/v1'] });
 const signal = () => new AbortController().signal;
 describe('draft conversion aligned to current provider DTO', () => {
@@ -96,5 +96,19 @@ describe('mock is isolated, revision-aware and never retains secrets', () => {
     const mock = new MockProviderTransport(); const abort = new AbortController();
     const result = mock.list(abort.signal); abort.abort();
     await expect(result).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});
+
+
+describe('provider recharge cost factor', () => {
+  it('defaults to 1 and saves a 1:2 recharge as 0.5', () => {
+    expect(newDraft().costMultiplier).toBe('1');
+    const draft = { ...valid(), costMultiplier: '0.5' };
+    expect(validateDraft(draft)).toEqual({});
+    expect(toSave(draft).provider.cost_multiplier).toBe(0.5);
+    expect(newDraft({ ...source, cost_multiplier: 0.5 }).costMultiplier).toBe('0.5');
+  });
+  it.each(['', '0', '-1', 'NaN', 'Infinity', '1001', '0.0000001'])('rejects invalid factor %s', costMultiplier => {
+    expect(validateDraft({ ...valid(), costMultiplier }).costMultiplier).toBeDefined();
   });
 });

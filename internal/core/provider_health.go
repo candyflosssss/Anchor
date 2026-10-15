@@ -125,7 +125,7 @@ func (s *Server) finishKey(p state.Provider, k string, status int, after string,
 func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeyStatus {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := catalog.KeyStatus{ID: k.ID, Enabled: k.Enabled, State: "ready", Protocol: k.Protocol, ModelProtocols: k.ModelProtocols}
+	out := catalog.KeyStatus{Rate: k.Rate, EffectiveMultiplier: p.EffectiveKeyMultiplier(k), ID: k.ID, Enabled: k.Enabled, State: "ready", Protocol: k.Protocol, ModelProtocols: k.ModelProtocols}
 	if !k.Enabled {
 		out.State = "disabled"
 	}

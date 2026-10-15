@@ -52,6 +52,10 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
             </Field>}
             {draft.secretMode === 'clear' && <div className="warning-box"><p>清除后，依赖密钥认证的上游请求可能失败；此操作不等于停用供应商。</p><label className="check-label"><input id="secret" aria-describedby="secret-hint" aria-invalid={!!c.errors.secret} type="checkbox" checked={draft.confirmClear} onChange={event => c.changeDraft('confirmClear', event.target.checked)} />我确认清除 {source.id} 的密钥</label><p id="secret-hint" className="field-error" role="alert">{c.errors.secret}</p></div>}
           </section>}
+          <Field name="costMultiplier" title="供应商倍率" errors={c.errors}>
+            <Input {...errorProps('costMultiplier')} type="number" min="0.000001" max="1000" step="any" value={draft.costMultiplier} onChange={event => c.changeDraft('costMultiplier', event.target.value)} />
+            <p className="field-hint">默认 1。按实际支付 ÷ 到账金额填写，例如充值 1 元到账 2 元，填 0.5。最终相对倍率 = 供应商倍率 × Key 分组倍率。</p>
+          </Field>
           <div className="field-grid">
             <Field name="timeout" title="请求超时（秒）" errors={c.errors}><Input {...errorProps('timeout')} inputMode="numeric" value={draft.timeout} onChange={event => c.changeDraft('timeout', event.target.value)} /></Field>
             <Field name="concurrent" title="最大并发" errors={c.errors}><Input {...errorProps('concurrent')} inputMode="numeric" value={draft.concurrent} onChange={event => c.changeDraft('concurrent', event.target.value)} /></Field>

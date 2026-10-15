@@ -12,7 +12,9 @@
       "retry_at": 0,
       "test": null,
       "protocol": "responses",
-      "model_protocols": []
+      "model_protocols": [],
+      "rate": null,
+      "effective_multiplier": null
     }
   ],
   "models": [],

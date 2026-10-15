@@ -19,6 +19,7 @@ type Problem struct {
 	Code string `json:"code"`
 }
 type Provider struct {
+	CostMultiplier float64  `json:"cost_multiplier"`
 	ID             string   `json:"id"`
 	HomepageURL    string   `json:"homepage_url"`
 	BaseURLs       []string `json:"base_urls"`
@@ -103,6 +104,7 @@ type ProviderModelsResult struct {
 
 type Action = catalog.Action
 type ModelProtocol = catalog.ModelProtocol
+type KeyRateCache = catalog.KeyRateCache
 type KeyStatus = catalog.KeyStatus
 type Probe = catalog.Probe
 type ModelMapping = catalog.ModelMapping

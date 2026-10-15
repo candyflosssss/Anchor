@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 7 {
+	if version > 8 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -154,6 +154,19 @@ CREATE TABLE IF NOT EXISTS context_credentials (
  secret TEXT NOT NULL
 );
 PRAGMA user_version=7;
+COMMIT;`)
+		if err != nil {
+			return fail(err)
+		}
+	}
+	if version < 8 {
+		_, err = db.Exec(`BEGIN IMMEDIATE;
+CREATE TABLE IF NOT EXISTS key_rate_cache (
+ provider_id TEXT NOT NULL, key_id TEXT NOT NULL, document TEXT NOT NULL,
+ PRIMARY KEY(provider_id,key_id),
+ FOREIGN KEY(provider_id,key_id) REFERENCES provider_keys(provider_id,id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+PRAGMA user_version=8;
 COMMIT;`)
 		if err != nil {
 			return fail(err)
@@ -395,6 +408,12 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 	if current != expected {
 		return Provider{}, ErrConflict
 	}
+	if p.CostMultiplier == 0 && oldDocument != "" {
+		var old Provider
+		if json.Unmarshal([]byte(oldDocument), &old) == nil {
+			p.CostMultiplier = old.CostMultiplier
+		}
+	}
 	p.Normalize()
 	if p.Protocol == "" {
 		// Provider-level protocol is no longer user-facing; keep the stored legacy value.
@@ -436,7 +455,18 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 			}
 		}
 	}
+	if oldDocument != "" {
+		var old Provider
+		if json.Unmarshal([]byte(oldDocument), &old) == nil && strings.Join(old.URLs(), "\n") != strings.Join(p.URLs(), "\n") {
+			if _, err = tx.Exec(`DELETE FROM key_rate_cache WHERE provider_id=?`, p.ID); err != nil {
+				return Provider{}, err
+			}
+		}
+	}
 	if secret != nil {
+		if _, err = tx.Exec(`DELETE FROM key_rate_cache WHERE provider_id=? AND key_id='default' AND EXISTS(SELECT 1 FROM provider_keys WHERE provider_id=? AND id='default' AND secret!=?)`, p.ID, p.ID, *secret); err != nil {
+			return Provider{}, err
+		}
 		if *secret == "" {
 			if err = checkKeyUnreferenced(tx, p.ID, "default"); err != nil {
 				return Provider{}, err

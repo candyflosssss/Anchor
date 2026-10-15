@@ -386,7 +386,8 @@ test('catalog quick import defaults capabilities on and editing preserves opt ou
   await page.getByRole('button', { name: '编辑模型 demo-model', exact: true }).click();
   await expect(dialog.getByLabel('函数工具', { exact: true })).toBeChecked();
   await expect(dialog.getByLabel('流式输出', { exact: true })).toBeChecked();
-  await expect(dialog.getByLabel('此供应商的相对倍率')).toHaveValue('1');
+  await expect(dialog.getByLabel('此供应商的相对倍率')).toHaveCount(0);
+  await expect(dialog).toContainText('相对倍率自动取');
   await dialog.getByLabel('函数工具', { exact: true }).uncheck();
   await dialog.getByLabel('流式输出', { exact: true }).uncheck();
   await dialog.getByRole('button', { name: '保存映射', exact: true }).click();
@@ -394,4 +395,24 @@ test('catalog quick import defaults capabilities on and editing preserves opt ou
   await page.getByRole('button', { name: '编辑模型 demo-model', exact: true }).click();
   await expect(dialog.getByLabel('函数工具', { exact: true })).not.toBeChecked();
   await expect(dialog.getByLabel('流式输出', { exact: true })).not.toBeChecked();
+});
+
+test('provider recharge factor combines with automatically cached Key groups', async ({ page }) => {
+  await ready(page); await edit(page);
+  await expect(page.getByLabel('供应商倍率', { exact: true })).toHaveValue('1');
+  await page.getByLabel('供应商倍率', { exact: true }).fill('0.5');
+  await page.getByRole('button', { name: '保存配置', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByLabel('摸鱼AI 的详情');
+  await detail.getByRole('tab', { name: /^模型/ }).click();
+  await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
+  const catalog = detail.getByRole('region', { name: '上游模型目录', exact: true });
+  await expect(catalog).toContainText('分组倍率 0.8× · 相对倍率 0.4×');
+  await expect(catalog).toContainText('缓存');
+  // Cached costs remain after leaving and reopening the supplier, without refetching.
+  await page.getByRole('button', { name: '返回供应商列表', exact: true }).click();
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await page.getByRole('tab', { name: /^模型/ }).click();
+  await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('0.4×');
 });

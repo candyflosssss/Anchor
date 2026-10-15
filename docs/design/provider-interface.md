@@ -52,7 +52,7 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 规范 DTO `DiscoverProviderModels` / `ProviderModels` 定义于 `internal/catalog/models.go`，经 `internal/desktop/contract.go` 别名纳入 Go → TS 单一生成源；桌面 envelope 为 `ProviderModelsResult`，继续使用 `anchor-desktop-v1`。本次 Key 协议增量扩展查询字段及工作台动作，客户端与核心须同步升级。共享合成样例为 `desktop/contract/provider-models.json`，Mock 与 Go / TS 测试共用。
 
 - 输入为 `provider_id`、`expected_revision`（桌面 1..MAX_SAFE_INTEGER）和 `key_id`（空字符串自动查询全部启用的已存 Key，跳过停用 Key）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
-- 后端从已存快照取地址／密钥，使用 `<base_url 去尾斜杠>/models`，保留部署前缀；未带版本的根地址或自定义前缀，仅404/405或200 HTML网页时尝试同前缀 `/v1/models`，兼容 NewAPI 代理部署（例如 `/newapi/v1/models`）；已带版本路径或版本后的 `/openai` 不重复追加 `/v1`。官方 OpenAI、Anthropic、Kimi/Moonshot 和硅基流动根地址固定 `/v1/models`；DeepSeek 根地址固定 `/models`，OpenRouter 固定 `/api/v1/models`，Gemini 根地址及 `/v1beta/openai` 目录改用 `/v1beta/models`；`/v1beta` 前缀使用 `x-goog-api-key`，其他路径沿用 Key 默认协议鉴权。所有凭据只进请求头。停用供应商也允许显式查询。复用无环境代理、禁止重定向的客户端与全局16／供应商并发上限；全部路径/分页共用 `min(timeout_seconds, 8)` 秒。每个 Key 最多10次目录 HTTP请求、每页请求1000条；全部 Key 的目录与倍率抓取共用上述期限，先读取全部目录再读取倍率，不重试失败请求、后台轮询或持久缓存；完整规则见[CLI 大全](../cli/commands.md#provider-modelsdesktop10-小步)。
+- 后端从已存快照取地址／密钥，使用 `<base_url 去尾斜杠>/models`，保留部署前缀；未带版本的根地址或自定义前缀，仅404/405或200 HTML网页时尝试同前缀 `/v1/models`，兼容 NewAPI 代理部署（例如 `/newapi/v1/models`）；已带版本路径或版本后的 `/openai` 不重复追加 `/v1`。官方 OpenAI、Anthropic、Kimi/Moonshot 和硅基流动根地址固定 `/v1/models`；DeepSeek 根地址固定 `/models`，OpenRouter 固定 `/api/v1/models`，Gemini 根地址及 `/v1beta/openai` 目录改用 `/v1beta/models`；`/v1beta` 前缀使用 `x-goog-api-key`，其他路径沿用 Key 默认协议鉴权。所有凭据只进请求头。停用供应商也允许显式查询。复用无环境代理、禁止重定向的客户端与全局16／供应商并发上限；全部路径/分页共用 `min(timeout_seconds, 8)` 秒。每个 Key 最多10次目录 HTTP请求、每页请求1000条；全部 Key 的目录与倍率抓取共用上述期限，先读取全部目录再读取倍率，不重试失败请求或后台轮询，目录本身不持久缓存；逐 Key 倍率持久缓存见[倍率设计](provider-multipliers.md)；完整规则见[CLI 大全](../cli/commands.md#provider-modelsdesktop10-小步)。
 - 输出十字段：原有 provider_id、key_id、revision、http_status、elapsed_ms、models、failure，新增 partial、entries、keys。默认聚合 key_id 为空，无已存 Key 为 anonymous，显式指定时保留该 ID。全部 Key 停用或指定停用 Key 时返回 no_enabled_keys、http_status=0 和空 models/entries/keys，不回退匿名请求。models 为始终非null的模型 ID 去重排序数组；entries 为 `{id,key_ids}`，合并同一模型对应的全部启用且目录成功的可选 Key；keys 为 `{id,enabled,protocol,http_status,failure,group,group_name,multiplier,rate_basis,rate_failure}`，倍率为十进制字符串或 null。至少一个 Key 目录成功则顶层 failure 为空，partial 标记失败 Key；逐 Key 目录必须完整分页才关联模型，全部失败或聚合超限时不返回模型。接受 OpenAI/Anthropic data[].id、Gemini models[].name（去除 models/ 前缀）；全部 Key 累计目录512 KiB，最多64个 Key、每 Key 1000条原始记录、合并1000个模型、每 ID 256字节；分页循环、格式变化、后续页失败只使该 Key 失败。
 - 倍率复用 providerapi，与 Key 默认推理协议独立。sub2api 优先用每个推理 Key 读取 `/v1/sub2api/billing` 的当前有效倍率（含个人覆盖与高峰规则），无需用户 JWT；未配置平台时以一个 Key 专用请求识别 sub2api，缺接口才要求配置平台。该接口不返回组名／ID，`group` 与 `group_name` 留空，`rate_basis=key_billing`。仅404/405或200 HTML网页回退旧站用户授权查询，其他错误直接报告。旧 sub2api 与 NewAPI 自动读取账号 Key 列表并精确核对身份；NewAPI 掩码候选经固定只读 POST /api/token/{数字ID}/key 验证完整凭据后取分组与 pricing.group_ratio，Sub2API 取个人覆盖或可用组倍率和组名；OneAPI、auto 分组或缺授权不会假定1×。每 Key 最多4页账号列表（100条/页），倍率适配器最多8次请求/2 MiB响应。未知和失败用 rate_failure 标明，不写入 Anchor 映射倍率，不使目录结果丢失；多 Key 的组名也检查凭据回显。
 - 请求受理后目录失败仍返回 HTTP200 与固定分类：`no_enabled_keys`（无启用 Key，跳过目录和倍率请求）、`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
@@ -153,7 +153,7 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 - `ProviderAllowance(AccountQuery)` 接受 balance / key-quota / balance-summary，通过现有 client.QueryProvider 复用核心端点、鉴权、并发和超时。校验当前 provider revision；Key 留空时优先已启用 default，再回退首个启用 Key，OneAPI Key 额度需用户核对并输入远端整数令牌 ID。
 - 标准桌面 envelope 的 Problem 表示管理／连接失败；AccountObservation.failure 表示平台查询失败。账户 scope=account，Key scope=key，NewAPI 旧 billing scope=billing（站点决定查询范围）；amount.value 为十进制字符串，unit 保留 USD/CNY/quota，币种不明确时为 site_unit，不进行价格换算；null 为未知，unlimited=true 仅说明 Key 自身无限额，不能推导账户钱包。
 - 读取、写入、额度查询共享页面操作互斥；配置或供应商变化取消／丢弃旧查询，改变 Key 或远端 ID 清空旧观察值。余额与 Key 查询各自更新对应结果，刷新失败不把旧数值当当前结果。写入结果 unknown 或 conflict 需显式重新读取，不自动重放写入。
-- 后台根地址为空时沿用核心推导；可选地址仅由用户按真实部署填写，不自动加 `/newapi` 等平台名路径。查询不发推理请求，不将余额写入路由配置，不修改倍率。
+- 后台根地址为空时沿用核心推导；可选地址仅由用户按真实部署填写，不自动加 `/newapi` 等平台名路径。查询不发推理请求，不将余额写入路由配置；普通本地 Key 倍率查询会缓存有效分组倍率。
 
 ### 自动探测与供应商列表余额（2026-10-13，当前源码未发布）
 
@@ -163,7 +163,7 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。
 
-2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；平台倍率与已保存的候选路由倍率独立，查询不持久写回。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按来源 Key 逐项查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
+2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；当前源码进一步将本地 Key 自动核对查询持久缓存，按供应商倍率×分组倍率调度；显式远端数字ID不写缓存，旧模型倍率字段仅预留。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按来源 Key 逐项查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
 
 
 ## 9. 来源 Key与模型调度（2026-10-13，当前源码）
@@ -177,13 +177,13 @@ Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始�
 | strategy | 行为 | 无观察或失败时 |
 | --- | --- | --- |
 | priority | 固定保存顺序 | 健康／并发门禁与失败切换照常 |
-| round-robin | 候选权重为路由倍率倒数，平滑加权轮询 | 跳过不可用候选，revision变化重置权重债务 |
+| round-robin | 按供应商／模型／Key展开，权重为供应商倍率×Key缓存分组倍率的倒数，平滑加权轮询 | 跳过不可用候选，revision变化重置权重债务 |
 | cache-priority | 同一认证调用者／模型／instructions／首个input项复用最近成功供应商、上游模型和Key，TTL10分钟 | 没有有效亲和时加权轮询；冷却、配置变化或失败时切换 |
-| lowest-price | 按保存的路由倍率升序，相同倍率按保存顺序 | 不获取或推断真实单价，不自动采纳平台分组倍率 |
+| lowest-price | 按供应商倍率×Key缓存分组倍率升序，相同倍率按保存顺序 | 不推断美元单价；未知作回退，全部未知等权，零倍率优先 |
 | lowest-latency | 先按保存顺序学习无观察来源；有观察后按成功请求首字耗时的EWMA升序（旧值80%／新值20%），无首字时总耗时 | 观察TTL30分钟，过期再学习；相同耗时按保存顺序 |
 
 观测只在内存保存，重启后清空；亲和最多1024项，延迟最多4096项，按模型和供应商revision隔离，删除过期后仍满则淘汰旧项。亲和只保留SHA256摘要，包含授权调用者与最大64KiB的稳定请求片段，不保存原始令牌或正文、不额外发探测推理。只使用成功请求观测；不是上游缓存命中承诺。成功采样、不可用过滤和实际转发前的Key健康／并发复查由核心完成。
-2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；平台倍率与已保存的候选路由倍率独立，查询不持久写回。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按默认启用 Key 查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
+2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；当前源码进一步将本地 Key 自动核对查询持久缓存，按供应商倍率×分组倍率调度；显式远端数字ID不写缓存，旧模型倍率字段仅预留。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按默认启用 Key 查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
 
 ## 实时推理测试生命周期（2026-10-13，当前源码）
 
@@ -209,3 +209,7 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 重试沿用原方法、正文、Key、请求头、context 截止时间和并发名额。已带版本后缀、JSON 错误、鉴权失败、限流、重定向、网络失败、超时和已标识的 SSE 不自动重放。补路径仍是同一次逻辑推理，累计用量和日志 attempt 计数保持1，`endpoint_requests` 单独记录实际端点请求数1或2。
 
 若最终 HTTP 200 正文仍为 HTML，Probe `failure` 与网关错误码新增 `unexpected_html`；Probe 保留 `http_status=200`，网关向调用方返回502，并提示检查 API 基址（通常以 `/v1` 结尾）。其他 HTTP 错误保留原分类。日志 Evidence 增加 `endpoint_resolution=configured|v1_fallback`、`endpoint_requests`、`response_kind=html|api_or_unknown`、受限的 `upstream_content_type`；执行补路径时增加 `initial_response_kind=html`、`initial_http`。这些字段不保存 URL、凭据、页面或错误正文。共享样例 `desktop/contract/provider-probe.json` 覆盖 HTTP 200 的 HTML 失败；DTO 字段结构未变，Go／TS 需共同接受新错误枚举。
+
+## 供应商与 Key 缓存倍率（2026-10-15，当前源码）
+
+供应商新增 `cost_multiplier` 默认1，桌面编辑与 CLI 可设置；旧模型倍率输入撤下，字段保留但不参与调度。完整公式、DTO、schema8、缓存失败保留与凭据失效规则见[倍率设计](provider-multipliers.md)。本文早期未缓存观察的行为由此替代。
