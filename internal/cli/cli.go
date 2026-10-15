@@ -700,7 +700,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	strategy := f.String("strategy", "priority", "model routing strategy")
 	display := f.String("display-name", "", "display name")
 	tools := f.Bool("tools", false, "advertise function tools")
-	stream := f.Bool("streaming", false, "advertise SSE")
+	stream := f.Bool("streaming", true, "advertise SSE (disable with --streaming=false)")
 	rev := f.Int64("revision", 0, "expected current revision")
 	catalog := f.String("codex-catalog", "", "local version-matched Codex catalog JSON (max 1 MiB)")
 	source := f.String("codex-model", "", "source catalog model; verify upstream capabilities match")
@@ -802,7 +802,7 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	mr := f.Int64("model-revision", 0, "current model revision; zero creates or attaches; new aliases import exact models.dev defaults when unambiguous")
 	multiplier := f.Float64("multiplier", 0, "reserved legacy model multiplier 0.01..1000; not used for routing")
 	tools := f.Bool("tools", false, "advertise function tools")
-	stream := f.Bool("streaming", false, "advertise streaming")
+	stream := f.Bool("streaming", true, "advertise streaming (disable with --streaming=false)")
 	if err := parse(f, args[1:]); err != nil {
 		return err
 	}

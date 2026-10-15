@@ -290,7 +290,7 @@ anchor usage
 | key-delete / key-reset | target 与 approve 必填；delete 删除秘密，reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
 | strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
-| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段仅预留，当前不参与路由。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；编辑 tools/streaming 默认 false，能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
+| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段仅预留，当前不参与路由。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
 | model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，Binding 默认模型引用时409 referenced，事务回滚 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；共享 catalog 的1小时缓存与固定公开目录最多30秒/16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY/NO_PROXY，拒绝陈旧快照；更新时间为快照获取时间，仅基础价不含分档。只返回 imported_price **预览**，不保存；核对后另行 price-put |
@@ -390,13 +390,15 @@ anchor model routing --id ID --revision N --strategy RULE --candidate PROVIDER:M
 | `--strategy` | add/put默认priority；routing必填 | priority / round-robin / cache-priority / lowest-price / lowest-latency；provider strategy 仍只用于 Key 的前两种规则 |
 | `--display-name` | 空字符串 | 最多 256 字节 |
 | `--tools` | `false` | 声明函数工具能力，不等于上游验证通过 |
-| `--streaming` | `false` | 声明 SSE 能力，不等于上游验证通过 |
+| `--streaming` | `true` | 默认声明 SSE 能力；关闭传 `--streaming=false`，不等于上游验证通过 |
 | `--revision` | `0` | add 必须为 0；put 必填当前值且 ≥1，通过 list 获取 |
 | `--codex-catalog` | 未提供 | 本地完整 Codex models JSON 文件，最多 1 MiB；与下面两项同时提供 |
 | `--codex-model` | 未提供 | 源目录中唯一精确匹配的 slug；复制其完整元数据 |
 | `--codex-version` | 未提供 | 源目录/目标 Codex 的精确 `X.Y.Z` 版本；由操作者核对，不自动探测 |
 
-上游模型 ID 非空、最多 256 字节且不得含换行。put 完整替换候选、展示名、能力和 Codex 元数据，省略能力开关会设为 false，省略元数据三项会清除旧元数据；revision 加一，旧值冲突失败。此入口完整替换时策略恢复 priority、倍率恢复1；可用 provider model-put 编辑当前候选倍率及共享策略。priority 按显式候选顺序路由，round-robin 按倍率倒数分配可调度请求；倍率1和2的上游约分配2:1请求。跳过停用、Key 不可用和并发已满的供应商。结果未知的超时/传输失败和已开始输出的请求不重放。详细重试和协议边界见实施说明。
+上游模型 ID 非空、最多 256 字节且不得含换行。put 完整替换候选、展示名、能力和 Codex 元数据，省略能力开关时 tools=false、streaming=true，省略元数据三项会清除旧元数据；revision 加一，旧值冲突失败。此入口完整替换时策略恢复 priority、倍率恢复1；可用 provider model-put 编辑当前候选倍率及共享策略。priority 按显式候选顺序路由，round-robin 按倍率倒数分配可调度请求；倍率1和2的上游约分配2:1请求。跳过停用、Key 不可用和并发已满的供应商。结果未知的超时/传输失败和已开始输出的请求不重放。详细重试和协议边界见实施说明。
+
+当前源码（2026-10-15，未发布）中 `model add`、`model put` 和 `provider model-put` 的流式声明统一默认开启；需关闭时显式传 `--streaming=false`。`model put` 仍为完整替换，更新原本关闭流式的模型也须显式传 false。不会批量修改已保存映射，也不改变原始管理 API 的布尔字段语义。
 
 ```bash
 anchor model add --id anchor-code --candidate primary:upstream-model --tools --streaming
@@ -599,7 +601,7 @@ anchor recover [--id ID]
 | 供应商充值倍率及Key缓存相对倍率 | provider add/put --cost-multiplier、provider models/effective-rate/workspace | 当前源码已实现；默认1，自动缓存分组值，schema8；未打包发行 |
 | 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，当前源码账户／模型映射页已接分组倍率，账单页面未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
-| 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --tools --streaming | 桌面新建默认开启两项能力；CLI 默认不变。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
+| 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --tools --streaming | 桌面新建默认开启两项能力；CLI 流式同样默认开启，工具仍须 `--tools`。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
