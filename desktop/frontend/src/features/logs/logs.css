@@ -112,28 +112,59 @@
   .log-column-dialog-footer { padding: 14px 20px; }
 }
 
-/* Related fields share a cell; labels remain visible instead of relying on hover. */
+/* Category colors are informational, never speed/latency health thresholds. */
+.log-custom-table, .log-detail-sheet {
+  --log-time: 215 22% 38%;
+  --log-input: 221 73% 43%;
+  --log-output: 26 85% 35%;
+  --log-cache: 158 78% 27%;
+  --log-reasoning: 265 64% 43%;
+  --log-speed: 184 83% 27%;
+}
+.dark .log-custom-table, .dark .log-detail-sheet {
+  --log-time: 215 20% 75%;
+  --log-input: 213 94% 76%;
+  --log-output: 32 95% 72%;
+  --log-cache: 153 64% 67%;
+  --log-reasoning: 267 94% 81%;
+  --log-speed: 180 63% 65%;
+}
+.log-tone-time { --log-metric-color: var(--log-time); }
+.log-tone-input { --log-metric-color: var(--log-input); }
+.log-tone-output { --log-metric-color: var(--log-output); }
+.log-tone-cache { --log-metric-color: var(--log-cache); }
+.log-tone-reasoning { --log-metric-color: var(--log-reasoning); }
+.log-tone-speed { --log-metric-color: var(--log-speed); }
 .log-custom-table { table-layout: fixed; }
-.log-custom-table td { vertical-align: top; padding-top: 14px; padding-bottom: 14px; }
+.log-custom-table td { vertical-align: top; padding-top: 12px; padding-bottom: 12px; }
 .log-custom-table .log-time { white-space: normal; overflow-wrap: anywhere; }
-.log-info-block { display: grid; gap: 7px; min-width: 0; white-space: normal; line-height: 1.4; }
+.log-info-block { display: grid; gap: 8px; min-width: 0; white-space: normal; line-height: 1.5; }
+.log-block-primary { font-size: 13px; }
 .log-block-primary, .log-meta-list dd { overflow-wrap: anywhere; }
 .log-result-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
-.log-http { font-size: 10px; color: hsl(var(--muted-foreground)); }
-.log-meta-list { display: grid; gap: 4px; }
-.log-meta-list > div { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; font-size: 11px; }
-.log-meta-list dt, .log-metric-grid dt { color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 400; }
+.log-http { font-size: 11px; color: hsl(var(--muted-foreground)); }
+.log-meta-list { display: grid; gap: 5px; }
+.log-meta-list > div { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: baseline; gap: 8px; font-size: 11px; }
+.log-meta-list dt { color: hsl(var(--muted-foreground)); font-size: 11px; font-weight: 400; }
 .log-meta-list dd, .log-metric-grid dd { margin: 0; }
-.log-metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; text-align: right; line-height: 1.35; }
-.log-metric-grid > div { min-width: 0; }
-.log-metric-grid dd { margin-top: 3px; font-size: 12px; font-weight: 500; white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.log-metric-grid > div:first-child dd, .log-metric-grid > div:nth-child(2) dd { font-weight: 600; }
-.log-token-total { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; padding-top: 6px; border-top: 1px solid hsl(var(--border) / .6); color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.4; }
+.log-meta-list [class*="log-tone-"]:not(.is-unknown) dd { justify-self: start; padding: 0 5px; border-radius: 4px; color: hsl(var(--log-metric-color)); background: hsl(var(--log-metric-color) / .08); }
+.log-protocol-tag { justify-self: start; max-width: 100%; padding: 2px 6px; border: 1px solid hsl(var(--border)); border-radius: 5px; background: hsl(var(--muted) / .5); font-size: 12px; }
+.log-metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; max-width: 280px; text-align: left; line-height: 1.2; }
+.log-metric-grid > div { min-width: 0; padding: 5px 7px; border-radius: 6px; border: 1px solid hsl(var(--log-metric-color) / .13); background: hsl(var(--log-metric-color) / .055); color: hsl(var(--log-metric-color)); }
+.log-metric-grid dt { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 400; white-space: normal; }
+.log-metric-grid dt svg { flex-shrink: 0; }
+.log-metric-grid dd { margin-top: 3px; font-size: 13px; font-weight: 600; white-space: normal; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.log-metric-grid > .is-unknown { border-color: hsl(var(--border) / .65); background: hsl(var(--muted) / .3); color: hsl(var(--muted-foreground)); }
+.log-metric-grid > .is-unknown dd { font-weight: 400; font-size: 12px; }
+.log-meta-list .is-unknown dd { color: hsl(var(--muted-foreground)); }
+.log-token-block { max-width: 280px; }
+.log-token-total { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 0 2px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.4; }
 .log-properties > div > dd { min-width: 0; }
-.log-properties .log-meta-list > div, .log-properties .log-metric-grid > div { border: 0; padding: 0; }
-.log-properties .log-meta-list dt, .log-properties .log-metric-grid dt { font-size: 10px; margin-bottom: 0; }
-.log-properties .log-metric-grid dd { font-size: 12px; }
-
+.log-properties .log-meta-list dt, .log-properties .log-metric-grid dt { font-size: 11px; margin-bottom: 0; }
+.log-properties .log-metric-grid dd { font-size: 13px; }
 @media (max-width: 480px) {
   .log-detail-body .log-properties { grid-template-columns: minmax(0, 1fr); }
+}
+@media (forced-colors: active) {
+  .log-metric-grid > div { border-color: CanvasText; }
 }

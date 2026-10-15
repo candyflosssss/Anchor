@@ -4,7 +4,7 @@ import fixture from '../../contract/logs.json' with { type: 'json' };
 import type { DesktopBridge, Query } from '../src/desktop/contract.generated';
 const capture = process.env.ANCHOR_LOG_SCREENSHOTS;
 declare global { interface Window { logTest: { queries: Query[]; exports: number; settings: typeof fixture.settings; unavailable: boolean; paged: boolean } } }
-async function openLogs(page: Page) {
+async function openLogs(page: Page, data = fixture) {
   await page.addInitScript(f => {
     window.logTest = { queries: [], exports: 0, settings: f.settings, unavailable: false, paged: false };
     const result = <T,>(data: T) => ({ contract: f.contract, data, problem: null });
@@ -25,7 +25,7 @@ async function openLogs(page: Page) {
       ExportLogs: async () => { window.logTest.exports++; return result({ accepted: true }); },
     } as unknown as DesktopBridge;
     window.go = { desktop: { Bridge: api } };
-  }, fixture);
+  }, data);
   await page.goto('/');
   await page.getByRole('button', { name: '日志', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看请求 fixture_failed' })).toBeVisible();
@@ -138,4 +138,30 @@ test('retention, export, stable cursor snapshot and system correlation', async (
   await page.getByRole('button', { name: '系统日志', exact: true }).click();
   await page.getByRole('button', { name: 'fixture_failed', exact: true }).click(); await expect(dialog).toContainText('invalid_response'); await page.keyboard.press('Escape');
   await page.evaluate(() => { window.logTest.unavailable = true; }); await page.getByRole('button', { name: '刷新', exact: true }).click(); await expect(page.getByText('日志不可用', { exact: true })).toBeVisible();
+});
+
+test('colored metric tiles stay readable with realistic counts in light and dark themes', async ({ page }) => {
+  const data = structuredClone(fixture);
+  const request = data.page.requests.find(row => row.id === 'fixture_success')!;
+  Object.assign(request, { input: 104823, output: 2847, elapsed_ms: 10883, upstream_model: 'claude-sonnet-4-5-20250929' });
+  Object.assign(request.metrics, { cache_read_tokens: 98304, reasoning_tokens: 1200, time_to_first_output_ms: 1823,
+    output_generation_ms: 9060, non_reasoning_output_tokens: 1647 });
+  await openLogs(page, data);
+  const success = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
+  await expect(success).toContainText('104,823');
+  await expect(success).toContainText('10,883 ms');
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
+    const styles = await success.locator('.log-token-block .log-metric-grid > div').evaluateAll(tiles => tiles.map(tile => ({
+      color: getComputedStyle(tile).color, background: getComputedStyle(tile).backgroundColor,
+      label: tile.querySelector('dt')!.textContent,
+      fits: [...tile.querySelectorAll('dt, dd')].every(el => el.scrollWidth <= el.clientWidth && el.getBoundingClientRect().height < 22),
+    })));
+    expect(new Set(styles.map(style => style.color)).size).toBe(4);
+    expect(styles.every(style => style.background !== 'rgba(0, 0, 0, 0)' && style.fits)).toBe(true);
+    expect(styles.map(style => style.label)).toEqual(['输入', '输出', '缓存命中', '思考']);
+    expect(await success.evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(140);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (capture) await page.screenshot({ path: resolve(capture, `logs-metrics-${theme}.png`), fullPage: true });
+  }
 });

@@ -12,8 +12,8 @@ export const logColumns = [
   { id: 'provider', label: '供应商 / Key', group: '模型与路由', description: '最后一次尝试的供应商与 Key 安全标签；不显示密钥本体。', width: 130 },
   { id: 'protocol', label: '请求方式', group: '模型与路由', description: '请求与上游协议路径，以及是否流式返回。', width: 170 },
   { id: 'revision', label: '配置版本', group: '模型与路由', description: '请求当时的配置 revision 快照。', width: 105 },
-  { id: 'timing', label: '耗时与速度', group: '速度与用量', description: '总耗时、首次有效输出时间、输出耗时与输出 TPS。输出含正文和工具调用参数，不含思考、角色或心跳；总耗时含重试等待。输出 TPS 为非思考输出 Token / 首次有效输出到完成的完整流式区间，区间可能包含交错思考或等待，并非纯解码速度。', width: 190 },
-  { id: 'tokens', label: 'Token 用量', group: '速度与用量', description: '输入、输出、缓存命中、思考与输入输出合计。缓存和思考不重复累加，未报告不补零；多次尝试仅为已知小计。', width: 220 },
+  { id: 'timing', label: '耗时与速度', group: '速度与用量', description: '总耗时、首次有效输出时间、输出耗时与输出 TPS。输出含正文和工具调用参数，不含思考、角色或心跳；总耗时含重试等待。输出 TPS 为非思考输出 Token / 首次有效输出到完成的完整流式区间，区间可能包含交错思考或等待，并非纯解码速度。', width: 230 },
+  { id: 'tokens', label: 'Token 用量', group: '速度与用量', description: '输入、输出、缓存命中、思考与输入输出合计。缓存和思考不重复累加，未报告不补零；多次尝试仅为已知小计。', width: 240 },
   { id: 'attempts', label: '尝试次数', group: '结果与诊断', description: '本次根请求实际派发的上游尝试次数，允许为零。', width: 100 },
   { id: 'diagnostics', label: '错误与阶段', group: '结果与诊断', description: '稳定错误码与请求失败 / 结束阶段；未记录错误码时显示“—”。', width: 190 },
 ] as const satisfies readonly ColumnDefinition[];

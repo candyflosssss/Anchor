@@ -43,6 +43,16 @@ describe('grouped request log values', () => {
     expect(html.match(/未知/g)).toHaveLength(4);
     expect(render('tokens', { ...row, input: 0, output: 0 })).not.toContain('未知');
   });
+  it('pairs category colors with labels and decorative icons, while muting only unknown values', () => {
+    const html = render('tokens');
+    for (const tone of ['input', 'output', 'cache', 'reasoning']) expect(html).toContain(`class="log-tone-${tone}"`);
+    expect(html.match(/aria-hidden="true"/g)).toHaveLength(4);
+    expect(html).not.toContain('is-unknown');
+    const missing = render('tokens', { ...row, input: 0, output: null, metrics: undefined });
+    expect(missing).toContain('class="log-tone-input"');
+    for (const tone of ['output', 'cache', 'reasoning']) expect(missing).toContain(`class="log-tone-${tone} is-unknown"`);
+    expect(render('timing').match(/aria-hidden="true"/g)).toHaveLength(4);
+  });
   it('retains model identity, effort, key label, independent results and diagnostics', () => {
     const value = { ...row, upstreamModel: 'actual-model', reasoningEffort: null, key: 'safe-key-label',
       status: 'failed' as const, http: 200, code: 'invalid_response', stage: 'response_validate', delivery: '未输出' };
