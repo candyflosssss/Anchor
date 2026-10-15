@@ -2,6 +2,8 @@ package catalog
 
 // Explicit DTOs shared by management, CLI and desktop. Secrets appear only in Action.
 type Action struct {
+	SpeedVariants    []string `json:"speed_variants,omitempty"`
+	ServiceTier      *string  `json:"service_tier,omitempty"`
 	KeyIDs           []string `json:"key_ids"`
 	Multiplier       float64  `json:"multiplier"`
 	Protocol         string   `json:"protocol"`
@@ -60,6 +62,7 @@ type Probe struct {
 	Failure    string `json:"failure"`
 }
 type ModelMapping struct {
+	ServiceTier    string   `json:"service_tier,omitempty"`
 	KeyIDs         []string `json:"key_ids"`
 	CandidateIndex int      `json:"candidate_index"`
 	Multiplier     float64  `json:"multiplier"`

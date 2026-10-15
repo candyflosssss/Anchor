@@ -213,3 +213,8 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 ## 供应商与 Key 缓存倍率（2026-10-15，当前源码）
 
 供应商新增 `cost_multiplier` 默认1，桌面编辑与 CLI 可设置；旧模型倍率输入撤下，字段保留但不参与调度。完整公式、DTO、schema8、缓存失败保留与凭据失效规则见[倍率设计](provider-multipliers.md)。本文早期未缓存观察的行为由此替代。
+
+
+## Anchor 固定速度档位与分身（2026-10-15，源码未发布）
+
+`model-put` 新增可选 `service_tier`／`speed_variants`，Workspace 映射新增可选固定档位。普通映射与所选速度分身事务保存，核心负责校验、隔离供应商渠道及请求参数注入；前端只管理草稿并调用原有类型化 action。结构、空值、revision、原子冲突与共享样例见[速度分身契约](model-speed-variants.md)。模型专用 ID 校验允许保留速度后缀，不扩大其他用户 ID 的字符范围。GUI 和 CLI 共用同一核心路径，不调用真实付费上游来验证。

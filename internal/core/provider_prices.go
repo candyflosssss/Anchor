@@ -12,7 +12,7 @@ import (
 )
 
 func (s *Server) importPrice(ctx context.Context, alias, providerID, model string) (*catalog.Price, error) {
-	if !state.ValidID(alias) || providerID == "" || model == "" {
+	if !state.ValidModelID(alias) || providerID == "" || model == "" {
 		return nil, state.ErrInvalid
 	}
 	result, err := s.modelCatalog.Query(ctx, modeldev.ModelCatalogQuery{ProviderID: providerID, ModelID: model})

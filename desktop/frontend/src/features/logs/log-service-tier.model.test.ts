@@ -28,3 +28,12 @@ it('preserves requested versus returned tiers through mapping and copy', () => {
   row.evidence = {};
   expect(safeSummary(row)).toContain('请求档位: 未知 / 未返回');
 });
+
+it('reports Anchor policy independently from caller and upstream tiers', () => {
+  const row = requestLog({ ...fixture.page.requests[0], evidence: {
+    requested_service_tier: 'unspecified', mapping_service_tier: 'ultrafast', upstream_service_tier: 'default',
+  } } as Request);
+  expect(safeSummary(row)).toContain('请求档位: 未指定');
+  expect(safeSummary(row)).toContain('Anchor 固定档位: Ultrafast');
+  expect(safeSummary(row)).toContain('上游返回档位（最后候选）: Standard');
+});

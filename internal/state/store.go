@@ -535,6 +535,13 @@ func (s *Store) PutModel(m Model, expected int64) (Model, error) {
 	return s.PutProviderModel(m, expected, "", 0)
 }
 func (s *Store) PutProviderModel(m Model, expected int64, providerID string, providerRevision int64) (Model, error) {
+	return s.PutProviderModelVariants(m, expected, providerID, providerRevision, nil)
+}
+func (s *Store) PutProviderModelVariants(m Model, expected int64, providerID string, providerRevision int64, speeds []string) (Model, error) {
+	models, err := speedModels(m, providerID, speeds)
+	if err != nil {
+		return Model{}, err
+	}
 	if err := m.Validate(); err != nil {
 		return Model{}, err
 	}
@@ -555,8 +562,31 @@ func (s *Store) PutProviderModel(m Model, expected int64, providerID string, pro
 			return Model{}, ErrConflict
 		}
 	}
+	for i, next := range models {
+		rev := int64(0)
+		if i == 0 {
+			rev = expected
+		}
+		saved, err := putModelTx(tx, next, rev)
+		if err != nil {
+			return Model{}, err
+		}
+		if i == 0 {
+			m = saved
+		}
+	}
+	if err = tx.Commit(); err != nil {
+		return Model{}, err
+	}
+	return m, nil
+}
+
+func putModelTx(tx *sql.Tx, m Model, expected int64) (Model, error) {
+	if err := m.Validate(); err != nil {
+		return Model{}, err
+	}
 	var current int64
-	err = tx.QueryRow(`SELECT revision FROM models WHERE id=?`, m.ID).Scan(&current)
+	err := tx.QueryRow(`SELECT revision FROM models WHERE id=?`, m.ID).Scan(&current)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Model{}, err
 	}
@@ -604,9 +634,6 @@ func (s *Store) PutProviderModel(m Model, expected int64, providerID string, pro
 		}
 	}
 	if err != nil {
-		return Model{}, err
-	}
-	if err = tx.Commit(); err != nil {
 		return Model{}, err
 	}
 	return m, nil

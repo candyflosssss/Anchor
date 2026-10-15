@@ -31,7 +31,7 @@ type SaveModelSettings struct {
 }
 
 func (in SaveModelSettings) Validate() error {
-	if !naming.ValidID(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= modeldev.MaxSafeInteger || len(in.DisplayName) > 256 {
+	if !naming.ValidModelID(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= modeldev.MaxSafeInteger || len(in.DisplayName) > 256 {
 		return modeldev.ErrInvalid
 	}
 	switch in.ReferenceAction {

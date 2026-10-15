@@ -15,6 +15,7 @@ export function RequestDetail({ row, onClose, onCopy, notice }: { row: RequestLo
         <section><h3 className="log-section-title">请求</h3><dl className="log-properties">{logColumns.map(col => <div key={col.id}><dt>{col.label}</dt><dd><ColumnValue id={col.id} row={row} /></dd></div>)}</dl></section>
         <section aria-label="服务档位"><h3 className="log-section-title">服务档位</h3><dl className="log-properties">
           <div><dt>请求档位</dt><dd>{serviceTierLabel(row.evidence.requested_service_tier, true)}</dd></div>
+          {row.evidence.mapping_service_tier && <div><dt>Anchor 固定档位</dt><dd>{serviceTierLabel(row.evidence.mapping_service_tier)}</dd></div>}
           <div><dt>上游返回档位（最后候选）</dt><dd>{serviceTierLabel(row.evidence.upstream_service_tier)}</dd></div>
         </dl></section>
         <section aria-label="尝试时间线"><h3 className="log-section-title">尝试时间线 · {row.attemptCount ?? row.attempts.length}</h3>

@@ -498,6 +498,8 @@ export interface Estimate {
   usd: number | null;
 }
 export interface Action {
+  speed_variants?: string[];
+  service_tier?: string | null;
   key_ids: string[] | null;
   multiplier: number;
   protocol: string;
@@ -552,6 +554,7 @@ export interface Probe {
   failure: string;
 }
 export interface ModelMapping {
+  service_tier?: string;
   key_ids: string[];
   candidate_index: number;
   multiplier: number;

@@ -153,7 +153,7 @@ func (c *Client) DiscoverProviderModels(ctx context.Context, in catalog.Discover
 }
 
 func (c *Client) PutModel(ctx context.Context, m state.Model, revision int64) (state.Model, error) {
-	if !state.ValidID(m.ID) {
+	if !state.ValidModelID(m.ID) {
 		return state.Model{}, errors.New("invalid model ID")
 	}
 	var v state.Model
@@ -189,7 +189,7 @@ func (c *Client) AgentAction(ctx context.Context, id, action string, revision in
 }
 
 func (c *Client) SetAgentModels(ctx context.Context, id string, revision int64, model, scope string) (map[string]any, error) {
-	if !state.ValidID(id) || !state.ValidID(model) || revision < 1 || (scope != "single" && scope != "all-compatible") {
+	if !state.ValidID(id) || !state.ValidModelID(model) || revision < 1 || (scope != "single" && scope != "all-compatible") {
 		return nil, errors.New("invalid binding model policy")
 	}
 	var v map[string]any
@@ -268,7 +268,7 @@ func (c *Client) EnrollAgent(ctx context.Context, in managed.EnrollAgent) (manag
 }
 
 func (c *Client) ConfigureModelRouting(ctx context.Context, in catalog.ModelRouting) (catalog.ModelRoutingState, error) {
-	if !state.ValidID(in.ModelID) {
+	if !state.ValidModelID(in.ModelID) {
 		return catalog.ModelRoutingState{}, errors.New("invalid model ID")
 	}
 	var out catalog.ModelRoutingState

@@ -3,6 +3,7 @@ package naming
 
 import (
 	"regexp"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -16,3 +17,21 @@ func ValidID(s string) bool { return utf8.ValidString(s) && identifier.MatchStri
 
 // ValidCode preserves the ASCII contract for machine-readable error codes.
 func ValidCode(s string) bool { return asciiIdentifier.MatchString(s) }
+
+// ValidModelID additionally permits the reserved speed-variant suffixes. Other
+// user identifiers retain their original contract; nested/arbitrary parentheses
+// are not accepted and the full public model ID stays within 128 code points.
+func ValidModelID(s string) bool {
+	if ValidID(s) {
+		return true
+	}
+	if !utf8.ValidString(s) || utf8.RuneCountInString(s) > 128 {
+		return false
+	}
+	for _, suffix := range []string{"(fast)", "(ultrafast)"} {
+		if strings.HasSuffix(s, suffix) {
+			return ValidID(strings.TrimSuffix(s, suffix))
+		}
+	}
+	return false
+}

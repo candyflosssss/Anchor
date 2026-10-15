@@ -35,6 +35,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 - 正常操作 stdout 为一个 JSON 值；`logs export` 为逐条 JSONL，`logs follow` 为重复页 JSON；`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
 - 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
+- 当前源码的公开模型 ID 另允许单个 `(fast)`／`(ultrafast)` 保留后缀（完整 ID 仍最多 128 个 Unicode 码点）；其他用户名称不接受括号。此速度分身增量尚未发布，须同步升级 CLI 与核心。
 - 当前源码中 Key 名称、公开模型 ID／别名、Context／设备连接名称和 Agent Binding ID 使用相同中文命名规则。Agent ID 另有最多 64 个 UTF-8 字节的限制（中文通常每字 3 字节），用于保持托管日志与目录文件名长度安全；其余为最多 128 个 Unicode 码点。实例／授权 ID、令牌、错误码及 SSH 技术字段不采用用户名称规则。此增量已随 desktop.33 桌面 dev 安装包发布；独立 CLI 正式预发行仍为 alpha.6，源码 CLI 需重新构建。使用中文名称须同时升级客户端和运行中的核心。
 - 管理写请求不自动重试。断线、5xx、无效／超大回包可能使写入结果未知，先查询并核对 revision，不盲目重复写入。客户端以 `RequestError` 保留 HTTP 状态、受限 code 与 Unknown 标记，不把原始远端 message 或秘密写到 stderr；网络错误文案使用 `offline`，响应异常使用 `invalid_response`。退出码规则不变。
 - 密钥只从 stdin 输入；不要把真实密钥放进命令参数、历史或文档。供应商秘密目前依赖文件权限/ACL，**不是静态加密**。
@@ -275,6 +276,7 @@ anchor provider key-reset --id ID --revision N --target KEY --approve
 anchor provider strategy --id ID --revision N --strategy round-robin|priority
 anchor provider test --id ID --revision N --model UPSTREAM [--target KEY] --approve
 anchor provider model-put --id ID --revision N --target ALIAS --model UPSTREAM
+                          [--speed-variant fast|ultrafast ...] [--service-tier priority|ultrafast|'']
                           [--model-revision M] [--multiplier N] [--strategy round-robin|priority] [--tools] [--streaming]
 anchor provider model-delete --id ID --revision N --target ALIAS --model-revision M --approve
 anchor provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD
@@ -326,6 +328,21 @@ anchor model routing --id coding-main --revision 3 --strategy priority \
 anchor provider model-put --id primary --revision 2 --target coding-main \
   --model upstream-model --model-revision 4 --source-key key-main
 ```
+
+### 固定速度档位与模型分身（2026-10-15，源码未发布）
+
+`provider model-put` 可重复 `--speed-variant fast`／`--speed-variant ultrafast`，在同一事务中额外创建 `ALIAS(fast)`／`ALIAS(ultrafast)`。两者分别固定发送 `priority`／`ultrafast`，真实上游模型 ID 不变。普通映射与所有分身一起成功或整体失败：任一分身已存在（包括其他供应商）、超长／非法别名、重复选项或 revision 冲突时不保留部分写入。分身只复制当前供应商候选及来源 Key，是独立快照，不自动随普通映射同步，也不复制普通档位价格。
+
+`provider model-put --service-tier priority|ultrafast` 设置公开模型的固定档位；**省略保留**，`--service-tier=''` 显式解除固定。新建默认不固定。所有同名公开模型渠道共用档位；加入已有别名不能改变其档位，编辑须当前 `--model-revision`。`--speed-variant` 仅从未固定档位、无速度后缀的普通别名派生，两个速度参数仅用于 model-put，其他供应商动作显式传入会报错。
+
+```bash
+anchor provider model-put --id primary --revision 2 --target gpt-6.1-sol \
+  --model gpt-6.1-sol --tools --streaming --speed-variant fast --speed-variant ultrafast
+# 也可单独创建一个固定档位公开模型；引号保护括号。
+anchor model add --id 'custom-sol(fast)' --candidate primary:gpt-6.1-sol --service-tier priority
+```
+
+输出仍为 Workspace，`models[].service_tier` 非空时返回固定策略；`model list/add/put` 的模型对象同样增加可选 `service_tier`。`model add/put` 使用完整替换语义，省略该参数表示不固定，不同于 provider model-put 的局部保留语义。没有新增付费探测或 Agent 授权；分身作为普通模型供已有绑定范围与 Codex 目录导出消费。上游可能拒绝、忽略或降级，以日志上游返回档位为准；实际费用不自动估算。Responses／Chat Completions 保留参数，无法表达它的 Anthropic 转换拒绝而不静默丢弃。旧客户端／核心不支持新字段，须同步更新，不自动改写真实 Agent 配置。[完整契约](../design/model-speed-variants.md)。
 
 ### 平台兼容查询（源码 CLI；desktop.21 核心已发布）
 
@@ -395,6 +412,7 @@ anchor model routing --id ID --revision N --strategy RULE --candidate PROVIDER:M
 | `--display-name` | 空字符串 | 最多 256 字节 |
 | `--tools` | `false` | 声明函数工具能力，不等于上游验证通过 |
 | `--streaming` | `true` | 默认声明 SSE 能力；关闭传 `--streaming=false`，不等于上游验证通过 |
+| `--service-tier` | 空字符串 | 固定 `priority`（Fast）或 `ultrafast`；空值不固定、沿用请求参数。put 为完整替换，省略恢复不固定；设置固定档位会覆盖客户端请求的 service_tier，但不证明上游支持 |
 | `--revision` | `0` | add 必须为 0；put 必填当前值且 ≥1，通过 list 获取 |
 | `--codex-catalog` | 未提供 | 本地完整 Codex models JSON 文件，最多 1 MiB；与下面两项同时提供 |
 | `--codex-model` | 未提供 | 源目录中唯一精确匹配的 slug；复制其完整元数据 |

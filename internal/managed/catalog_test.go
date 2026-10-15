@@ -286,3 +286,29 @@ func TestManagerSetModelsMigrationAndConflicts(t *testing.T) {
 		t.Fatal(unchanged)
 	}
 }
+
+func TestSpeedVariantsInCodexCatalog(t *testing.T) {
+	models := []state.Model{}
+	for _, speed := range []string{"fast", "ultrafast"} {
+		id, tier, err := state.SpeedVariantID("gpt-6.1-sol", speed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		models = append(models, state.Model{ID: id, DisplayName: id, ServiceTier: tier, Codex: metadata(t)})
+	}
+	raw, ids, err := buildCatalog(models, "0.159.3")
+	if err != nil || len(ids) != 2 {
+		t.Fatal(string(raw), ids, err)
+	}
+	var got struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	for i, model := range models {
+		if got.Models[i]["slug"] != model.ID || got.Models[i]["display_name"] != model.ID || got.Models[i]["visibility"] != "list" {
+			t.Fatal(got.Models[i])
+		}
+	}
+}

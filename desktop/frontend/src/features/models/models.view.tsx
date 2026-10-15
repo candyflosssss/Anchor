@@ -33,6 +33,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
     <div className="model-availability" role="status"><span className={`channel-status state-${availability}`}>{available ? '当前可用' : unknown ? '可用性待确认' : '当前不可用'}</span><span>{available} / {candidates.length} 个渠道当前可用</span></div>
     {availability === 'unavailable' && <p className="model-unavailable-notice"><strong>无有效渠道</strong>所有来源的供应商已停用，或限定的 Key 已停用、失效、冷却或不存在。请检查供应商与 Key 开关；映射配置仍保留。</p>}
     {availability === 'unknown' && <p className="card-hint">尚未确认有效渠道，部分状态未读全或 Key 正在恢复探测；请刷新配置。</p>}
+    {g.candidates[0]?.service_tier && <p className="card-hint">Anchor 固定档位：{g.candidates[0].service_tier === 'priority' ? 'Fast' : 'Ultrafast'}；实际采用档位以请求日志中的上游返回为准。</p>}
     <p className="card-hint">可用性基于最近读取的配置与 Key 状态，不代表上游实时连通或推理一定成功。</p>
     {!g.complete && <p className="card-hint">配置正在更新，请稍候或刷新配置。</p>}
     <details className="model-sources" open={expanded} onToggle={e => setExpanded(e.currentTarget.open)}>

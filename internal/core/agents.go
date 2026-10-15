@@ -145,7 +145,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			}
 			writeJSON(w, 200, v)
 		case "set-models":
-			if !state.ValidID(in.Model) || (in.ModelScope != "single" && in.ModelScope != "all-compatible" && in.ModelScope != "all-mapped") {
+			if !state.ValidModelID(in.Model) || (in.ModelScope != "single" && in.ModelScope != "all-compatible" && in.ModelScope != "all-mapped") {
 				fail(w, 400, "invalid_model_policy", "model and explicit single, all-mapped or all-compatible model_scope required")
 				return
 			}

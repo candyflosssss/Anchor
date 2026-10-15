@@ -259,7 +259,7 @@ func (b *Bridge) ConfigureModelRouting(in ModelRouting) ModelRoutingResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := ModelRoutingResult{Contract: Contract}
-	if !state.ValidID(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= MaxSafeRevision || in.Strategy == "" || !state.ValidModelStrategy(in.Strategy) || len(in.Order) < 1 || len(in.Order) > 64 {
+	if !state.ValidModelID(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= MaxSafeRevision || in.Strategy == "" || !state.ValidModelStrategy(in.Strategy) || len(in.Order) < 1 || len(in.Order) > 64 {
 		out.Problem = &Problem{"invalid"}
 		return out
 	}

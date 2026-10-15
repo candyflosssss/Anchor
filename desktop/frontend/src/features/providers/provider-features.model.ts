@@ -1,4 +1,4 @@
-import { isValidId } from '../../lib/identifier';
+import { isValidModelId } from '../../lib/identifier';
 import { validRoutingRule } from '../models/model-routing.model';
 import type { Action, Price, Probe, Workspace, KeyRateCache } from '../../desktop/contract.generated';
 import { protocolName, ProviderProblem, type Provider } from './provider.model';
@@ -36,7 +36,8 @@ export function checkedWorkspace(w: Workspace): Workspace {
     return { rate: checkedKeyRate(k.rate), effective_multiplier: k.effective_multiplier ?? null, id: k.id, protocol: k.protocol, model_protocols: k.model_protocols.map(m => ({ model: m.model, protocol: m.protocol })), enabled: k.enabled, state: k.state, failures: k.failures, retry_at: k.retry_at, test: checkedProbe(k.test) };
   }), models: w.models.map(m => {
     if (![m.revision, m.candidate_count, m.candidate_index].every(count) || m.candidate_index >= m.candidate_count || !Array.isArray(m.key_ids) || m.key_ids.length > 64 || m.key_ids.some(id => typeof id !== 'string' || !id) || new Set(m.key_ids).size !== m.key_ids.length || typeof m.id !== 'string' || typeof m.upstream !== 'string' || typeof m.display_name !== 'string' || typeof m.tools !== 'boolean' || typeof m.streaming !== 'boolean' || !Number.isFinite(m.multiplier) || m.multiplier < 0.01 || m.multiplier > 1000 || !validRoutingRule(m.strategy)) throw new ProviderProblem('read_error');
-    return { key_ids: [...m.key_ids], candidate_index: m.candidate_index, id: m.id, display_name: m.display_name, upstream: m.upstream, tools: m.tools, streaming: m.streaming, revision: m.revision, candidate_count: m.candidate_count, multiplier: m.multiplier, strategy: m.strategy };
+    if (m.service_tier !== undefined && !['', 'priority', 'ultrafast'].includes(m.service_tier)) throw new ProviderProblem('read_error');
+    return { ...(m.service_tier !== undefined ? { service_tier: m.service_tier } : {}), key_ids: [...m.key_ids], candidate_index: m.candidate_index, id: m.id, display_name: m.display_name, upstream: m.upstream, tools: m.tools, streaming: m.streaming, revision: m.revision, candidate_count: m.candidate_count, multiplier: m.multiplier, strategy: m.strategy };
   }), usage: w.usage.map(u => {
     const { provider_id, model, requests, failures, elapsed_ms, known, input_tokens, output_tokens, cache_read, cache_write } = u;
     if (typeof provider_id !== 'string' || typeof model !== 'string' || ![requests, failures, elapsed_ms, known, input_tokens, output_tokens, cache_read, cache_write].every(count) || failures > requests || known > requests) throw new ProviderProblem('read_error');
@@ -45,7 +46,7 @@ export function checkedWorkspace(w: Workspace): Workspace {
 }
 export const healthText: Record<string, string> = { ready: '可调度', disabled: '已停用', cooling: '冷却中', invalid: '认证失效', 'half-open': '等待单次探测' };
 
-export const isValidModelAlias = isValidId;
+export const isValidModelAlias = isValidModelId;
 
 /** Plan only new mappings; existing aliases and invalid public IDs require manual editing. */
 export function catalogImportPlan(ids: string[], w: Workspace) {

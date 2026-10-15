@@ -31,6 +31,9 @@ func (s *Server) initializeModelCatalog(ctx context.Context, m *state.Model) {
 	// Explicit mapping flags are authoritative; models.dev does not declare streaming.
 	cfg.Capabilities.ToolCall, cfg.Streaming = &m.Tools, &m.Streaming
 	settings := &state.ModelSettings{Configuration: cfg, Reference: &snapshot}
+	if m.ServiceTier != "" {
+		settings.Reference = nil
+	}
 	if settings.Validate() == nil {
 		m.Settings = settings
 	}

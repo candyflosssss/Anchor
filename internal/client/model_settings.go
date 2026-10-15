@@ -9,7 +9,7 @@ import (
 
 func (c *Client) ModelSettings(ctx context.Context, in catalog.ModelSettingsQuery) (catalog.ModelSettingsState, error) {
 	var out catalog.ModelSettingsState
-	if !state.ValidID(in.ModelID) {
+	if !state.ValidModelID(in.ModelID) {
 		return out, state.ErrInvalid
 	}
 	err := c.call(ctx, "GET", "/control/v1/models/"+in.ModelID+"/settings", nil, &out)

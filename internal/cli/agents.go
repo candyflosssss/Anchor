@@ -43,7 +43,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		choices := map[string]string{}
 		for _, item := range templates {
 			alias, source, ok := strings.Cut(item, ":")
-			if !ok || !state.ValidID(alias) {
+			if !ok || !state.ValidModelID(alias) {
 				return errors.New("--template requires public-model:local-catalog-model")
 			}
 			if _, duplicate := choices[alias]; duplicate {

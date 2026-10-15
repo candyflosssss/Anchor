@@ -8,7 +8,7 @@ import (
 
 func (b *Bridge) ModelSettings(in ModelSettingsQuery) ModelSettingsResult {
 	out := ModelSettingsResult{Contract: Contract}
-	if !state.ValidID(in.ModelID) {
+	if !state.ValidModelID(in.ModelID) {
 		out.Problem = &Problem{"invalid"}
 		return out
 	}

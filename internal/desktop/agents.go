@@ -13,7 +13,7 @@ func (b *Bridge) AgentWorkspace() AgentWorkspaceResult {
 	return b.agentWorkspaceCall(nil)
 }
 func (b *Bridge) EnrollAgent(in EnrollAgent) AgentWorkspaceResult {
-	if !in.Approved || !state.ValidID(in.TargetID) || !state.ValidID(in.Model) || in.ExpectedRevision < 0 || in.ExpectedRevision >= MaxSafeRevision {
+	if !in.Approved || !state.ValidID(in.TargetID) || !state.ValidModelID(in.Model) || in.ExpectedRevision < 0 || in.ExpectedRevision >= MaxSafeRevision {
 		return AgentWorkspaceResult{Contract: Contract, Problem: &Problem{"invalid"}}
 	}
 	return b.agentWorkspaceCall(func(ctx context.Context, cl *client.Client) (AgentWorkspace, error) { return cl.EnrollAgent(ctx, in) })

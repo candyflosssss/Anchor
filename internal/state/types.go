@@ -184,7 +184,8 @@ func (c Candidate) EffectiveMultiplier() float64 {
 }
 
 type Model struct {
-	Strategy    string         `json:"strategy,omitempty"` // Empty preserves legacy ordered priority.
+	ServiceTier string         `json:"service_tier,omitempty"` // Empty forwards the caller tier; otherwise fixed by Anchor.
+	Strategy    string         `json:"strategy,omitempty"`     // Empty preserves legacy ordered priority.
 	ID          string         `json:"id"`
 	DisplayName string         `json:"display_name"`
 	Tools       bool           `json:"tools"`
@@ -207,6 +208,9 @@ func ValidModelStrategy(v string) bool {
 }
 
 func (m Model) Validate() error {
+	if !ValidServiceTier(m.ServiceTier) {
+		return errors.New("invalid model service tier")
+	}
 	if !ValidModelStrategy(m.Strategy) {
 		return errors.New("invalid model strategy")
 	}
@@ -220,7 +224,7 @@ func (m Model) Validate() error {
 			return err
 		}
 	}
-	if !ValidID(m.ID) || len(m.DisplayName) > 256 {
+	if !ValidModelID(m.ID) || len(m.DisplayName) > 256 {
 		return errors.New("invalid model ID or display name")
 	}
 	if len(m.Candidates) == 0 || len(m.Candidates) > 16 {

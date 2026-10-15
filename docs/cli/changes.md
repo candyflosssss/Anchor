@@ -420,3 +420,11 @@
 - 旧 → 新：普通 stop／系统信号仍条件恢复；显式 `--for-restart` 及桌面 InstallUpdate 使用 `shutdown {"for_restart":true}`，保留 Agent 配置、模型目录、Binding 凭据与原始恢复日志，不在升级窗口暴露旧 CCS／原供应商路由。交接输出额外包含 `bindings_preserved:true,restart_required:true`，仍以 `shutdown_complete:false` 表示仅已接受。
 - 兼容与迁移：无数据库 schema 或普通 stop 输出变化。客户端要求认证实例声明 `restart_handoff` 且回包确认保留；旧核心缺能力时退出失败且零停服写请求，不自动降级／强杀。已发布 desktop.34 不含修复，需同步升级宿主和核心；首次人工迁移仍需安排停服、重新启动与 Agent 会话核对。中途失败不自动重放或启动核心，维护取消可显式重启兼容核心后普通停服，或确认离线后 recover。不会自动改写既有会话缓存地址，也不承诺零停机。
 - 验证：全量 `go test -p 1 -timeout 180s ./... -count=1` 及 core／managed／client／cli／desktop 五包 `-race` 检查通过。隔离回归覆盖批准／参数／输出与 Context 身份、旧核心零写拒绝、保留确认缺失结果未知且不重放、真实核心退出／重启间配置／目录／原始日志／token 不变、同一地址和凭据实际代理到模拟上游，以及最终普通停服恢复原始配置、外部编辑保留、helper 启动失败和远程实例不被停止。未执行本机安装／发版／原生安装器验收。
+
+## 2026-10-15 — Anchor 固定速度档位与独立模型分身（源码未发布）
+
+- 类型：新增参数与模型 ID 扩展；不新增命令。
+- 指令与参数：`provider model-put` 新增可重复的 `--speed-variant fast|ultrafast` 和可选 `--service-tier priority|ultrafast|''`；`model add/put` 新增 `--service-tier priority|ultrafast`（空值不固定）。对应帮助、最新大全、生成桌面接口与共享样例同步。
+- 旧 → 新：普通映射仍透传调用方档位；可同一事务额外创建 `ALIAS(fast)`、`ALIAS(ultrafast)`，固定发送 `priority`、`ultrafast`，上游模型名不变。单个公开模型 ID 允许上述保留后缀，其他 ID 规则不放宽。模型设置、路由、定价及 Agent 模板入口同步接受精确分身 ID。
+- 兼容与迁移：无须重建数据，旧模型缺字段时不固定档位。`provider model-put` 省略／null 保留固定策略，显式空值解除；`model put` 为完整模型写入，省略档位会恢复不固定。须同步更新客户端与核心；旧核心不支持新字段／ID。分身是独立快照，仅复制本供应商渠道，不自动扩大 Agent 绑定范围或同步后续编辑；名称或 revision 冲突整体回滚，不自动重试。上游支持与费用由操作者确认，不发送付费探测，不复制普通档位参考价。
+- 验证：state、core、protocol、client、catalog、naming、cli、desktop、managed 九包完整测试通过；覆盖模拟上游普通／流式档位注入和降级日志、共享样例、真实 Go 桥接读写／冲突、原子回滚、CLI 帮助与请求参数、Codex 目录分身。前端类型检查、21 项定向单测、变更文件 ESLint 和 2 项单 worker Chromium 交互用例通过。首次类型检查受 256 MiB Node 堆上限失败，调整至受限 768 MiB 后通过；系统 Chrome 启动 SIGTRAP，改用已安装 Playwright headless shell 后用例通过。未调用真实付费上游，未改本机 Agent 配置，未打包、安装或发布，原生两平台窗口未验收。

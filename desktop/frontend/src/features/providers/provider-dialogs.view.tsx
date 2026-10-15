@@ -178,9 +178,13 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
   const [keyIDs, setKeyIDs] = useState<string[]>(editing?.key_ids ?? c.models?.entries.find(e => e.id === d.upstream)?.key_ids ?? []);
   const [tools, setTools] = useState(editing?.tools ?? d.tools ?? true);
   const [streaming, setStreaming] = useState(editing?.streaming ?? d.streaming ?? true);
-  const aliasError = !alias ? '' : !isValidModelAlias(alias) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
+  const [serviceTier, setServiceTier] = useState(editing?.service_tier ?? '');
+  const [speedVariants, setSpeedVariants] = useState<string[]>([]);
+  const speedError = speedVariants.some(speed => !isValidModelAlias(`${alias}(${speed})`)) ? '名称过长或已是速度分身，请缩短普通映射别名。' : speedVariants.some(speed => w.models.some(m => m.id === `${alias}(${speed})`)) ? '此供应商已有同名速度分身，请取消勾选或单独编辑。' : '';
+
+  const aliasError = !alias ? '' : !isValidModelAlias(alias) ? '1–128 个中文／字母／数字或 ._-，以字母或数字开头；模型可带 (fast)／(ultrafast) 后缀。' : !editing && w.models.some(m => m.id === alias) ? '此供应商已有同名映射；请改用「编辑」。' : '';
   const options = c.models?.models ?? [];
-  return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError) void run('model-put', { target: alias, model: upstream.trim(), key_ids: keyIDs, strategy, tools, streaming, model_revision: editing?.revision ?? 0 }); }} noValidate>
+  return <form onSubmit={e => { e.preventDefault(); if (alias && upstream.trim() && !aliasError && !speedError) void run('model-put', { target: alias, model: upstream.trim(), key_ids: keyIDs, strategy, tools, streaming, service_tier: serviceTier, speed_variants: speedVariants, model_revision: editing?.revision ?? 0 }); }} noValidate>
     <fieldset className="editor-fields" disabled={c.features.busy}>
       <div className="field"><label htmlFor="mapping-upstream">上游模型 ID</label>
         <Input id="mapping-upstream" list="mapping-upstream-options" value={upstream} autoComplete="off" onChange={e => { setUpstream(e.target.value); const source = c.models?.entries.find(v => v.id === e.target.value.trim()); setKeyIDs(source?.key_ids ?? []); if (!touched) setAlias(e.target.value); }} />
@@ -188,6 +192,17 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
       <div className="field"><label htmlFor="mapping-alias">Anchor 公开别名</label>
         <Input id="mapping-alias" value={alias} readOnly={!!editing} placeholder="例如 coding-main" autoComplete="off" aria-invalid={!!aliasError} aria-describedby={aliasError ? 'mapping-alias-hint' : undefined} onChange={e => { setAlias(e.target.value); setTouched(true); }} />
         {aliasError && <p id="mapping-alias-hint" className="field-error">{aliasError}</p>}</div>
+      <div className="field"><label htmlFor="mapping-service-tier">Anchor 固定速度档位</label>
+        <select id="mapping-service-tier" className="select-field" value={serviceTier} onChange={e => { setServiceTier(e.target.value); setSpeedVariants([]); }}>
+          <option value="">不固定（沿用请求参数）</option><option value="priority">Fast（priority）</option><option value="ultrafast">Ultrafast</option>
+        </select>
+        <p className="field-hint">固定后由 Anchor 覆盖请求的 service_tier；同名公开模型的所有渠道共用，上游模型 ID 保持不变。需要上游支持，可能增加费用。</p>
+      </div>
+      {!serviceTier && !/\((fast|ultrafast)\)$/.test(alias) && <div className="field"><label>额外创建速度分身（可选）</label>
+        {['fast', 'ultrafast'].map(speed => <label className="checkbox-row" key={speed}><input type="checkbox" checked={speedVariants.includes(speed)} onChange={e => setSpeedVariants(values => e.target.checked ? [...values, speed] : values.filter(value => value !== speed))} />{speed === 'fast' ? 'Fast' : 'Ultrafast'} · {alias || '模型别名'}({speed})</label>)}
+        <p className="field-hint">与当前映射一起保存，名称冲突时整体不保存。分身仅复制当前供应商渠道，是独立快照，后续编辑不会自动同步；不继承普通档位参考价格。</p>
+      </div>}
+      {speedError && <p className="field-error" role="alert">{speedError}</p>}
       <p className="field-hint">相对倍率自动取「供应商倍率 × 来源 Key 的缓存分组倍率」。模型倍率暂不启用。</p>
       {editing && <div className="field"><label htmlFor="mapping-strategy">公开模型调度策略</label>
         <select id="mapping-strategy" className="select-field" value={strategy} onChange={e => setStrategy(e.target.value)}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select></div>}
@@ -198,6 +213,6 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
       <label className="checkbox-row"><input type="checkbox" checked={tools} onChange={e => setTools(e.target.checked)} />函数工具</label>
       <label className="checkbox-row"><input type="checkbox" checked={streaming} onChange={e => setStreaming(e.target.checked)} />流式输出</label>
     </fieldset>
-    <Footer c={c}><Button disabled={c.features.busy || !alias || !upstream.trim() || !!aliasError}>{editing ? '保存映射' : '添加映射'}</Button></Footer>
+    <Footer c={c}><Button disabled={c.features.busy || !alias || !upstream.trim() || !!aliasError || !!speedError}>{editing ? '保存映射' : '添加映射'}</Button></Footer>
   </form>;
 }

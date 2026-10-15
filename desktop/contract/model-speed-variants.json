@@ -1,0 +1,16 @@
+{
+  "action": {
+    "provider_id": "p",
+    "expected_revision": 1,
+    "action": "model-put",
+    "target": "gpt-6.1-sol",
+    "model": "gpt-6.1-sol",
+    "tools": true,
+    "streaming": true,
+    "speed_variants": ["fast", "ultrafast"]
+  },
+  "variants": [
+    { "id": "gpt-6.1-sol(fast)", "service_tier": "priority", "upstream": "gpt-6.1-sol" },
+    { "id": "gpt-6.1-sol(ultrafast)", "service_tier": "ultrafast", "upstream": "gpt-6.1-sol" }
+  ]
+}

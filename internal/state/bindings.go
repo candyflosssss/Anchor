@@ -51,7 +51,7 @@ func (b Binding) Validate() error {
 		return ErrInvalid
 	}
 	for alias, source := range b.ModelTemplates {
-		if !ValidID(alias) {
+		if !ValidModelID(alias) {
 			return ErrInvalid
 		}
 		if _, ok := b.CodexCatalog[source]; source != "" && !ok {
@@ -65,7 +65,7 @@ func (b Binding) Validate() error {
 	if (b.ModelScope == "all-compatible" || b.CodexVersion != "") && !ValidCodexVersion(b.CodexVersion) {
 		return errors.New("all-compatible bindings require a Codex catalog version")
 	}
-	if !ValidID(b.ID) || len(b.ID) > 64 || (b.AdapterID != "codex" && b.AdapterID != "claude" && b.AdapterID != "dsh") || b.AdapterVersion != "1" || !ValidID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
+	if !ValidID(b.ID) || len(b.ID) > 64 || (b.AdapterID != "codex" && b.AdapterID != "claude" && b.AdapterID != "dsh") || b.AdapterVersion != "1" || !ValidModelID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
 		return errors.New("invalid binding: supported adapter v1, absolute approved root/executable and valid IDs required")
 	}
 	return nil

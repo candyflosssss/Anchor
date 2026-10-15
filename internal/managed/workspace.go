@@ -128,7 +128,7 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 // Enroll persists an explicitly selected target and local catalog snapshot.
 // Existing provider mappings are untouched. File writes remain Engine-owned.
 func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error) {
-	if !in.Approved || !state.ValidID(in.Model) || in.ExpectedRevision < 0 {
+	if !in.Approved || !state.ValidModelID(in.Model) || in.ExpectedRevision < 0 {
 		return state.Binding{}, state.ErrInvalid
 	}
 	targets, err := Discover(env)

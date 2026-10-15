@@ -12,7 +12,7 @@ func (s *Server) configureModelRouting(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.ModelID != r.PathValue("id") || !state.ValidID(in.ModelID) || in.ExpectedRevision < 1 || in.Strategy == "" || !state.ValidModelStrategy(in.Strategy) {
+	if in.ModelID != r.PathValue("id") || !state.ValidModelID(in.ModelID) || in.ExpectedRevision < 1 || in.Strategy == "" || !state.ValidModelStrategy(in.Strategy) {
 		fail(w, 400, "invalid", "invalid routing configuration")
 		return
 	}

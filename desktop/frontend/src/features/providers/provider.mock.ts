@@ -4,7 +4,7 @@ import accountFixture from '../../../../contract/provider-account.json';
 import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountObservation, AccountRateObservation } from './provider-account.model';
 import mappingFixture from '../../../../contract/provider-model-mapping.json';
 import workspaceFixture from '../../../../contract/provider-workspace.json';
-import { checkedWorkspace, type Action, type Workspace } from './provider-features.model';
+import { isValidModelAlias, checkedWorkspace, type Action, type Workspace } from './provider-features.model';
 import catalogFixture from '../../../../contract/provider-models.json';
 import fixture from '../../../../contract/providers.json';
 import { checkedProvider } from '../../desktop/transport';
@@ -225,6 +225,13 @@ export class MockProviderTransport implements ProviderTransport {
       case 'key-reset': { const k = w.keys.find(k => k.id === a.target); if (!a.approved || !k) throw fixtureError('invalid'); k.failures = 0; k.retry_at = 0; k.state = k.enabled ? 'ready' : 'disabled'; break; }
       case 'strategy': w.strategy = a.strategy; p.revision++; break;
       case 'model-put': {
+        const speeds = a.speed_variants ?? [];
+        const allModels = this.rows.flatMap(p => this.detail(p).models);
+        const previous = allModels.find(m => m.id === a.target);
+        const serviceTier = a.service_tier ?? previous?.service_tier ?? '';
+        if (!['', 'priority', 'ultrafast'].includes(serviceTier) || speeds.length > 2 || new Set(speeds).size !== speeds.length || speeds.some(speed => !['fast', 'ultrafast'].includes(speed) || serviceTier || !isValidModelAlias(`${a.target}(${speed})`))) throw fixtureError('invalid');
+        if (speeds.some(speed => allModels.some(m => m.id === `${a.target}(${speed})`))) throw fixtureError('conflict');
+
         const all = this.rows.map(p => this.detail(p));
         const mappings = all.flatMap(w => w.models.filter(m => m.id === a.target));
         const local = w.models.find(m => m.id === a.target);
@@ -235,13 +242,17 @@ export class MockProviderTransport implements ProviderTransport {
         if (!Number.isFinite(multiplier) || multiplier < 0.01 || multiplier > 1000) throw fixtureError('invalid');
         const strategy = a.model_revision > 0 || !shared ? a.strategy || shared?.strategy || 'round-robin' : shared.strategy;
         if (!validRoutingRule(strategy)) throw fixtureError('invalid');
+        if (shared && !a.model_revision && a.service_tier != null && serviceTier !== (shared.service_tier ?? '')) throw fixtureError('conflict');
         const revision = (shared?.revision ?? 0) + 1;
         const candidate_count = mappings.length + (local ? 0 : 1);
         const tools = a.model_revision > 0 || !shared ? a.tools : shared.tools;
         const streaming = a.model_revision > 0 || !shared ? a.streaming : shared.streaming;
-        for (const m of mappings) Object.assign(m, { revision, candidate_count, strategy, tools, streaming });
+        for (const m of mappings) Object.assign(m, { revision, candidate_count, strategy, tools, streaming, ...(serviceTier || a.service_tier != null ? { service_tier: serviceTier } : {}) });
         if (local) Object.assign(local, { upstream: a.model, multiplier, key_ids: a.key_ids ?? local.key_ids });
         else w.models.push({ key_ids: a.key_ids ?? [], candidate_index: mappings.length, id: a.target, display_name: shared?.display_name ?? a.target, upstream: a.model, multiplier, revision, candidate_count, strategy, tools, streaming });
+        const saved = w.models.find(m => m.id === a.target)!;
+        if (serviceTier || a.service_tier != null) saved.service_tier = serviceTier;
+        for (const speed of speeds) w.models.push({ ...structuredClone(saved), id: `${a.target}(${speed})`, display_name: `${saved.display_name}(${speed})`, service_tier: speed === 'fast' ? 'priority' : 'ultrafast', revision: 1, candidate_count: 1, candidate_index: 0 });
         break;
       }
       case 'model-delete': {

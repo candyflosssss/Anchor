@@ -50,7 +50,17 @@ func TypeScript() string {
 		fmt.Fprintf(&out, "export interface %s {\n", t.Name())
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
-			name := f.Tag.Get("json")
+			parts := strings.Split(f.Tag.Get("json"), ",")
+			name := parts[0]
+			if name == "-" {
+				continue
+			}
+			for _, option := range parts[1:] {
+				if option == "omitempty" {
+					name += "?"
+					break
+				}
+			}
 			typ := ts(f.Type)
 			if t.Name() == "Action" && f.Name == "KeyIDs" {
 				typ += " | null"

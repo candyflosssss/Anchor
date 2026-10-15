@@ -88,7 +88,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 	}
 	observeRequestedServiceTier(r, request)
 	var modelID string
-	if err = json.Unmarshal(request["model"], &modelID); err != nil || !state.ValidID(modelID) {
+	if err = json.Unmarshal(request["model"], &modelID); err != nil || !state.ValidModelID(modelID) {
 		fail(w, 400, "invalid_model", "a public model ID is required")
 		return
 	}
@@ -143,6 +143,13 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			apiError(w, err)
 		}
 		return
+	}
+
+	if model.ServiceTier != "" {
+		request["service_tier"], _ = json.Marshal(model.ServiceTier)
+		if t := trace(r); t != nil {
+			t.row.Evidence["mapping_service_tier"] = model.ServiceTier
+		}
 	}
 	observeRequest(r, modelID, stream, request, model.Revision)
 	if s.logs != nil {

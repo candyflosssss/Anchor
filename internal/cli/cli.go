@@ -52,7 +52,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   provider strategy --id ID --revision N --strategy round-robin|priority
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
       HTML at an unversioned base permits one /v1 fallback; still HTML returns unexpected_html.
-  provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy RULE] [--source-key ID | --all-keys] [--tools] [--streaming] [--approve]
+  provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy RULE] [--source-key ID | --all-keys] [--speed-variant fast|ultrafast ...] [--service-tier TIER] [--tools] [--streaming] [--approve]
   provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
   catalog providers [--refresh]
   catalog models --provider ID [--search TEXT --limit 50 --refresh]
@@ -75,7 +75,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   model settings --id ID [--file FILE]
   model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL...
   RULE: priority|round-robin|cache-priority|lowest-price|lowest-latency
-  model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...] [--strategy RULE] [--candidate-key INDEX:KEY]
+  model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...] [--strategy RULE] [--candidate-key INDEX:KEY] [--service-tier priority|ultrafast]
                [--display-name NAME] [--tools] [--streaming] [--revision N]
                [--codex-catalog FILE --codex-model SOURCE --codex-version X.Y.Z]
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
@@ -707,6 +707,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 		return errors.New("unknown model command")
 	}
 	f := a.flags("model " + args[0])
+	serviceTier := f.String("service-tier", "", "fixed upstream service tier: priority (Fast), ultrafast; empty forwards caller tier")
 	id := f.String("id", "", "public model ID (Chinese supported)")
 	strategy := f.String("strategy", "priority", "model routing strategy")
 	display := f.String("display-name", "", "display name")
@@ -728,7 +729,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	if args[0] == "put" && *rev < 1 {
 		return errors.New("put requires the current --revision")
 	}
-	m := state.Model{ID: *id, Strategy: *strategy, DisplayName: *display, Tools: *tools, Streaming: *stream}
+	m := state.Model{ServiceTier: *serviceTier, ID: *id, Strategy: *strategy, DisplayName: *display, Tools: *tools, Streaming: *stream}
 	if *catalog != "" || *source != "" || *version != "" {
 		if *catalog == "" || *source == "" || *version == "" {
 			return errors.New("--codex-catalog, --codex-model and --codex-version must be supplied together")
@@ -806,6 +807,9 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 	disabled := f.Bool("disabled", false, "disable key")
 	stdin := f.Bool("secret-stdin", false, "read secret from stdin; omission retains existing key")
 	strategy := f.String("strategy", "round-robin", "Key or model routing strategy")
+	var speedVariants repeated
+	f.Var(&speedVariants, "speed-variant", "atomically create an independent fast or ultrafast model sibling; repeat; model-put only")
+	serviceTier := f.String("service-tier", "", "fixed tier: priority, ultrafast, or empty to forward caller tier; model-put only; omit preserves")
 	var sourceKeys repeated
 	f.Var(&sourceKeys, "source-key", "allowed source Key ID for model-put; repeat; omit to preserve")
 	allKeys := f.Bool("all-keys", false, "clear source Key restriction on model-put")
@@ -821,7 +825,24 @@ func (a App) providerFeature(ctx context.Context, c *client.Client, args []strin
 		return errors.New("saved --id and current --revision are required")
 	}
 	in := catalog.Action{Protocol: *protocol, ProviderID: *id, ExpectedRevision: *revision, Action: args[0], Target: *target, Approved: *approve, CopyKeys: *copyKeys, Enabled: !*disabled, Strategy: *strategy, Model: *model, ModelRevision: *mr, Multiplier: *multiplier, Tools: *tools, Streaming: *stream}
+	if args[0] != "model-put" {
+		explicitTier := false
+		f.Visit(func(v *flag.Flag) {
+			if v.Name == "service-tier" {
+				explicitTier = true
+			}
+		})
+		if len(speedVariants) > 0 || explicitTier {
+			return errors.New("speed options require provider model-put")
+		}
+	}
 	if args[0] == "model-put" {
+		in.SpeedVariants = speedVariants
+		f.Visit(func(v *flag.Flag) {
+			if v.Name == "service-tier" {
+				in.ServiceTier = serviceTier
+			}
+		})
 		if *allKeys && len(sourceKeys) > 0 {
 			return errors.New("--all-keys conflicts with --source-key")
 		}

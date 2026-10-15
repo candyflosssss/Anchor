@@ -536,3 +536,7 @@ Model 接受 CNY 与 site_unit；公开元数据无法确认币种时标注「�
 共享 `use-ime-guard.ts` 按输入目标跟踪组合态，结合 `isComposing`／229 识别候选键，并在失焦时清理，以兼容部分 WebView 未发出 compositionend 的情况，避免影响下一个输入框的正常按键。DialogContent 沿用 Radix document capture 阶段的 Escape 保护；内联设备连接、设备切换密码和平台账户表单改用 `ImeForm`，组合态 Enter 不触发隐式提交。共享 Popover 同时保护候选 Enter／Escape 和组合态菜单导航，避免取消候选时误关面板、清空暂存密码；组合完成后普通提交和关闭行为不变。
 
 本轮补查未发现供应商搜索、模型目录搜索及日志搜索／供应商／模型／Key 筛选逐次改写输入文本的问题；使用 Chromium CDP 预编辑与中文提交验证值、焦点和筛选查询，并增加缺失 compositionend 后切换焦点的回归。测试使用原型或模拟桌面桥接，不连接真实 SSH／付费上游，不代表 Linux WebKitGTK、Windows 或系统输入法候选窗口已原生验收。本轮无 CLI／桥接契约变更，未生成安装包或发布更新，已运行的桌面程序不会自动获得源码修复。
+
+### Anchor 固定速度档位与模型分身（2026-10-15，源码未发布）
+
+供应商映射表单可选额外创建 Fast／Ultrafast 独立分身，也可显式编辑固定速度档位。View 仅维护表单草稿，Model／生成接口调用现有 ProviderAction，核心事务创建并在转发时注入参数。模型卡片展示固定策略，日志详情和复制摘要区分调用方、Anchor 策略及上游实际档位；不承诺供应商支持或加速费用。共享契约、快照／冲突／绑定范围语义及样例见[速度分身设计](model-speed-variants.md)。原生 Codex 入口与真实上游未验证，不自动修改当前安装或真实 Agent 配置。

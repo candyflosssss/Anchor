@@ -38,7 +38,7 @@ func (s *Server) workspace(id string) (catalog.Workspace, error) {
 	for _, m := range models {
 		for index, c := range m.Candidates {
 			if c.ProviderID == id {
-				out.Models = append(out.Models, catalog.ModelMapping{KeyIDs: append([]string{}, c.KeyIDs...), CandidateIndex: index, ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates), Multiplier: c.EffectiveMultiplier(), Strategy: m.RoutingStrategy()})
+				out.Models = append(out.Models, catalog.ModelMapping{ServiceTier: m.ServiceTier, KeyIDs: append([]string{}, c.KeyIDs...), CandidateIndex: index, ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates), Multiplier: c.EffectiveMultiplier(), Strategy: m.RoutingStrategy()})
 			}
 		}
 	}
@@ -174,7 +174,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		}
 		probe, err = s.probe(r.Context(), p, in.Target, in.Model)
 	case "model-put":
-		if !state.ValidID(in.Target) || in.Model == "" || !state.ValidModelStrategy(in.Strategy) {
+		if !state.ValidModelID(in.Target) || in.Model == "" || !state.ValidModelStrategy(in.Strategy) {
 			err = state.ErrInvalid
 			break
 		}
@@ -238,6 +238,19 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		if in.Strategy != "" && (m.Revision == 0 || in.ModelRevision > 0) {
 			m.Strategy = in.Strategy
 		}
+
+		if in.ServiceTier != nil {
+			if !state.ValidServiceTier(*in.ServiceTier) {
+				err = state.ErrInvalid
+				break
+			}
+			// Joining a shared alias cannot silently change its speed policy.
+			if m.Revision > 0 && in.ModelRevision == 0 && m.ServiceTier != *in.ServiceTier {
+				err = state.ErrConflict
+				break
+			}
+			m.ServiceTier = *in.ServiceTier
+		}
 		if m.Validate() != nil {
 			err = state.ErrInvalid
 			break
@@ -245,7 +258,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		if m.Revision == 0 {
 			s.initializeModelCatalog(r.Context(), &m)
 		}
-		_, err = s.Store.PutProviderModel(m, expected, p.ID, p.Revision)
+		_, err = s.Store.PutProviderModelVariants(m, expected, p.ID, p.Revision, in.SpeedVariants)
 	case "model-delete":
 		m, e := s.Store.Model(in.Target)
 		if e != nil {

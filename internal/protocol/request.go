@@ -98,12 +98,17 @@ func toResponses(m Object, from string) (Object, error) {
 	if from == "anthropic" {
 		keys += " system"
 	} else {
-		keys += " max_completion_tokens stream_options parallel_tool_calls"
+		keys += " max_completion_tokens stream_options parallel_tool_calls service_tier"
 	}
 	if err := allowed(m, keys); err != nil {
 		return nil, err
 	}
 	out := Object{"model": m["model"], "store": false}
+	if from == "chat-completions" {
+		if tier, ok := m["service_tier"]; ok {
+			out["service_tier"] = tier
+		}
+	}
 	for _, k := range []string{"stream", "temperature", "top_p", "parallel_tool_calls"} {
 		if v, ok := m[k]; ok {
 			out[k] = v
@@ -283,13 +288,22 @@ func toResponses(m Object, from string) (Object, error) {
 	return out, nil
 }
 func fromResponses(m Object, to string) (Object, error) {
-	if err := allowed(m, "model input instructions stream temperature top_p tools tool_choice max_output_tokens store background parallel_tool_calls"); err != nil {
+	keys := "model input instructions stream temperature top_p tools tool_choice max_output_tokens store background parallel_tool_calls"
+	if to == "chat-completions" {
+		keys += " service_tier"
+	}
+	if err := allowed(m, keys); err != nil {
 		return nil, err
 	}
 	if m["store"] == true || m["background"] == true {
 		return nil, ErrUnsupported
 	}
 	out := Object{"model": m["model"]}
+	if to == "chat-completions" {
+		if tier, ok := m["service_tier"]; ok {
+			out["service_tier"] = tier
+		}
+	}
 	for _, k := range []string{"stream", "temperature", "top_p"} {
 		if v, ok := m[k]; ok {
 			out[k] = v

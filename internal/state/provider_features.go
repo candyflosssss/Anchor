@@ -426,7 +426,7 @@ func (s *Store) Prices(id string) ([]catalog.Price, error) {
 	return out, rows.Err()
 }
 func (s *Store) PutPrice(id string, revision int64, p catalog.Price) error {
-	if !ValidID(p.Model) || len(p.Source) > 256 || strings.ContainsAny(p.Source, "\r\n") {
+	if !ValidModelID(p.Model) || len(p.Source) > 256 || strings.ContainsAny(p.Source, "\r\n") {
 		return ErrInvalid
 	}
 	values := []float64{p.InputUSD, p.OutputUSD}

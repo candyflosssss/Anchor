@@ -37,7 +37,7 @@ func (s *Server) getModelSettings(w http.ResponseWriter, r *http.Request) {
 	if !s.identity(w, r) {
 		return
 	}
-	if !state.ValidID(r.PathValue("id")) {
+	if !state.ValidModelID(r.PathValue("id")) {
 		apiError(w, state.ErrInvalid)
 		return
 	}
