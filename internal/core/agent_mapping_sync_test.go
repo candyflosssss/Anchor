@@ -5,6 +5,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
+
+	"github.com/candyflosssss/Anchor/internal/modeldev"
+	"gopkg.in/yaml.v3"
 	"strings"
 	"testing"
 
@@ -220,4 +224,89 @@ func TestAutoSyncConflictKeepsMappingAndOtherAgentsUpToDate(t *testing.T) {
 	if strings.Contains(f.logs.String(), "external") {
 		t.Fatal("private config leaked in sync logs")
 	}
+}
+
+func TestModelSettingsAutomaticallySyncDSHCapabilities(t *testing.T) {
+	f := setup(t)
+	f.add(t, "p", "https://example.invalid", "synthetic")
+	f.model(t, state.Candidate{ProviderID: "p", Model: "actual"})
+	paths := syncTestAgents(t, f)
+	cl := logClient(t, f)
+	ctx := t.Context()
+	ptrInt := func(v int64) *int64 { return &v }
+	ptrBool := func(v bool) *bool { return &v }
+	ptrString := func(v string) *string { return &v }
+	cfg := state.ModelConfiguration{
+		Limits:             modeldev.CatalogLimits{Context: ptrInt(200000)},
+		Capabilities:       modeldev.CatalogCapabilities{Vision: ptrBool(true)},
+		SupportedReasoning: []modeldev.ReasoningOption{{Type: "effort", Values: []*string{ptrString("low"), ptrString("high"), ptrString("max")}}},
+		DefaultReasoning:   &state.ReasoningDefault{Type: "effort", Value: ptrString("high")},
+	}
+	check := func(wantConfig bool) {
+		t.Helper()
+		for _, adapter := range []string{"dsh", "dsh-desktop"} {
+			var rows []struct {
+				ID     string         `yaml:"id"`
+				Config map[string]any `yaml:"config"`
+			}
+			if err := yaml.Unmarshal(syncRead(t, paths[adapter]), &rows); err != nil {
+				t.Fatal(err)
+			}
+			foundModels, foundDefault := false, false
+			for _, row := range rows {
+				if row.ID == "agent-default-model" {
+					foundDefault = true
+					want := any(nil)
+					if wantConfig {
+						want = "high"
+					}
+					if row.Config["reasoningEffort"] != want {
+						t.Fatal(adapter, "default effort", row.Config)
+					}
+				}
+				if row.ID != "llm-pi-ai" {
+					continue
+				}
+				providers := row.Config["providers"].(map[string]any)
+				models := providers["anchor-"+adapter].(map[string]any)["models"].([]any)
+				for _, model := range models {
+					entry := model.(map[string]any)
+					if entry["id"] != "public" {
+						continue
+					}
+					foundModels = true
+					if wantConfig {
+						if entry["contextWindow"] != 200000 || entry["name"] != "Configured name" || !reflect.DeepEqual(entry["input"], []any{"text", "image"}) || !reflect.DeepEqual(entry["reasoningEfforts"], map[string]any{"low": "low", "high": "high", "max": "max"}) {
+							t.Fatal(adapter, entry)
+						}
+					} else {
+						for _, key := range []string{"contextWindow", "input", "reasoningEfforts"} {
+							if _, exists := entry[key]; exists {
+								t.Fatal(adapter, "stale capability", entry)
+							}
+						}
+					}
+				}
+			}
+			if !foundModels || !foundDefault {
+				t.Fatal(adapter, "missing plugin/model")
+			}
+		}
+	}
+	m, err := f.store.Model("public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = cl.SaveModelSettings(ctx, catalog.SaveModelSettings{ModelID: m.ID, ExpectedRevision: m.Revision, DisplayName: "Configured name", Configuration: cfg, ReferenceAction: "keep"}); err != nil {
+		t.Fatal(err)
+	}
+	check(true)
+	m, err = f.store.Model("public")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = cl.SaveModelSettings(ctx, catalog.SaveModelSettings{ModelID: m.ID, ExpectedRevision: m.Revision, DisplayName: "Configured name", Configuration: state.ModelConfiguration{}, ReferenceAction: "keep"}); err != nil {
+		t.Fatal(err)
+	}
+	check(false)
 }

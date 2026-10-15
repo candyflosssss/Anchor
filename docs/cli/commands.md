@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-15
+- 最近核对：2026-10-16
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
@@ -465,7 +465,7 @@ anchor model settings --id public --file model-settings.json
 
 正整数限制不超过安全整数，上下文不小于已声明输入/输出，默认输出不超过最大输出；temperature 默认值须声明支持且在0..2。保存不改变候选、倍率、Key 范围、调度或版本匹配 Codex 模板。普通 `model put` 保留本节 settings/reference（但其他旧字段仍按其完整替换语义）；供应商编辑同步 tools/streaming。返回的新模型 revision 也用于后续路由/供应商映射编辑。
 
-Codex 同步导出可应用上下文、text/image 输入、并行调用及可表示的 effort/default；其他能力/默认调用值仅保存元数据，当前不自动改写请求。版本匹配完整模板仍必需，只投影 Codex 可表示的 effort；max/default/null 保留在上游配置，不阻断导出、不改成其他档位。`agent sync` 后重启 Agent 才读取新目录，现有会话不热更新。详见[模型参考目录契约](../design/model-catalog.md)。
+Codex 同步导出可应用上下文、text/image 输入、并行调用及可表示的 effort/default；DSH Web/Desktop 导出名称、上下文、text/image 输入、可表示的 effort/default 及显式默认输出，具体边界见下文 Agent 管理。其他能力/默认调用值仅保存元数据，不自动改写请求。版本匹配完整模板仍必需，只投影 Codex 可表示的 effort；max/default/null 保留在上游配置，不阻断导出、不改成其他档位。`agent sync` 后重启 Agent 才读取新目录，现有会话不热更新。详见[模型参考目录契约](../design/model-catalog.md)。
 
 ## 7. 本机授权
 
@@ -510,6 +510,12 @@ anchor agent sync ID --revision N
 发现范围为绝对路径 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`DSH_HOME`，以及 `~/.codex`、`~/.claude`、`~/.dsh`、`~/.gemini`、`~/.config/opencode`；Windows 另查用户 `AppData/Roaming/opencode`。同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录痕迹不证明已安装或运行。当前 Codex、Claude Code、DSH Web（`dsh`）、DSH Desktop（`dsh-desktop`）可独立托管；Gemini/OpenCode 只识别。DSH 两端共用 home，但返回不同目标 ID；Desktop 仅在 `profiles/desktop` 已存在时发现，不替桌面应用初始化 profile。
 
 `enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不依赖本地模型缓存；Codex 会生成 Anchor 自有的模型目录并设置 `model_catalog_json`，Claude/DSH 则更新各自配置内的名单。Codex 优先保留模型已声明的元数据，或复用接管前配置明确引用、且位于配置根内的本地目录中精确公开 ID／唯一上游 ID 匹配项；不改写用户目录文件，停止托管时恢复原目录指针。没有模板时导出保守模型条目，并使用 Anchor 明示的通用编程助手指令（不是官方模型模板）；Codex 不接受完全缺失指令的条目。已有指令保持不变，不借用其他模型模板，不推测上下文长度或推理档位。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
+
+DSH Web（`dsh`）与 Desktop（`dsh-desktop`）共享模型能力投影，各自写入独立 profile（当前源码未发布）：映射的 display_name → name、limits.context → contextWindow、输入 text/image 或显式 vision → input（vision=false 明确写 text）。未声明字段不编造，遵循 DSH 安装目录／路由回退；仅读取映射的生效 configuration，不直接拿 reference 快照当作已批准配置。保存模型设置会自动同步，也可用 `agent sync ID --revision N` 重试；CLI 设置入口沿用 `model settings --id ID` / `model settings --id ID --file FILE`。
+
+DSH 推理 effort 只按原值导出 `off/minimal/low/medium/high/xhigh/max`，不会把 `none/default/null` 改成 off、其他档位或省略参数；toggle/budget_tokens 也不臆造为 effort。显式 reasoning=false，或已声明选项却没有可表示的思考档位时写 reasoningEfforts=false；DSH 不接受仅 off 的字典。仅 reasoning=true 而没有选项时不伪造档位，保持 DSH 目录回退。绑定默认模型的可表示 default_reasoning 写入 agent-default-model.reasoningEffort；非默认模型的默认档位不写成路由全局默认。无可表示默认时清除该字段，避免继承旧默认模型的 effort；停服／禁用时条件恢复原值，外部编辑冲突不覆盖。
+
+DSH 的 maxTokens 同时决定输出能力和请求默认值，所以仅导出显式 default_output_tokens，不能把 limits.output 当成默认输出。独立的最大输出能力、音频／视频、默认温度、工具／并行工具及 toggle／token budget 没有在本轮转换；原模型设置保留，不影响网关路由或其他客户端投影。名单与配置落盘不等于真实客户端已加载，旧 DSH 版本未承诺兼容，仍须重启／新会话并按实际安装版本验证。
 
 Codex 目录导出把模型设置中的推理档位投影为客户端可表示的 `none/minimal/low/medium/high/xhigh`：保留原顺序，仅跳过 `max`、`default`、null 等上游原生值，不把它们改名或映射到其他强度，不因此拒绝整个模型／目录。原映射、分身及其上游设置不变；默认 effort 不可表示时，生成目录的 `default_reasoning_level` 为 null，不伪造默认档位。此规则适用于自动同步、启动迁移及手动 `agent sync`／登记；结构或权限错误仍拒绝，不吞掉真正配置冲突。
 

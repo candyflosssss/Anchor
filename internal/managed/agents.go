@@ -88,9 +88,19 @@ func (a StructuredAgent) Inspect(b state.Binding) (Inspection, error) {
 func (a StructuredAgent) desired(b state.Binding, g GatewayBinding, raw []byte) ([][]string, []any, error) {
 	ids := []string{}
 	models := []any{}
+	var defaultReasoning any
 	for _, m := range g.Models {
 		ids = append(ids, m.ID)
-		models = append(models, map[string]any{"id": m.ID, "name": m.ID})
+		if a.DSH {
+			entry, reasoning, err := dshModel(m)
+			if err != nil {
+				return nil, nil, err
+			}
+			models = append(models, entry)
+			if m.ID == b.Model {
+				defaultReasoning = reasoning
+			}
+		}
 	}
 	if len(ids) == 0 {
 		ids = append(ids, b.Model)
@@ -120,6 +130,9 @@ func (a StructuredAgent) desired(b state.Binding, g GatewayBinding, raw []byte) 
 		}
 		if !rowFound {
 			config := map[string]any{"provider": provider, "model": b.Model}
+			if defaultReasoning != nil {
+				config["reasoningEffort"] = defaultReasoning
+			}
 			if id == "llm-pi-ai" {
 				config = map[string]any{"providers": map[string]any{provider: route}}
 			}
@@ -131,8 +144,10 @@ func (a StructuredAgent) desired(b state.Binding, g GatewayBinding, raw []byte) 
 			paths = append(paths, []string{id, "config", "providers", provider})
 			after = append(after, route)
 		} else {
-			paths = append(paths, []string{id, "config", "provider"}, []string{id, "config", "model"})
-			after = append(after, provider, b.Model)
+			// Always own the default effort, including its absence. This clears
+			// a stale user/default-model effort and preserves its recovery baseline.
+			paths = append(paths, []string{id, "config", "provider"}, []string{id, "config", "model"}, []string{id, "config", "reasoningEffort"})
+			after = append(after, provider, b.Model, defaultReasoning)
 		}
 	}
 	return paths, after, nil

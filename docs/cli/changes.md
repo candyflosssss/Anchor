@@ -478,3 +478,11 @@
 - 旧 → 新：以前只在新建映射时尝试自动填充，旧映射读取直接返回空项；现在优先用已存参考快照，否则最多等待 8 秒按所有上游候选精确匹配，补空项但不写库、不递增 revision、不改 Agent。未匹配、离线、超时或不兼容显式返回状态，保留当前配置。目录唯一 canonical 所属记录不再被缺少 canonical 的第三方同名条目阻断，明确冲突仍拒绝。
 - 兼容与迁移：保存仍使用现有 SaveModelSettings JSON 和 expected_revision；新自动来源须用 set + 精确 provider/model，已存来源保持 keep。大全示例同步按 defaults_status 生成保存对象，旧前端可忽略新增字段；前端兼容旧核心缺字段。手工限制、模态/思考/并行调用声明不被补值覆盖；Fast/Ultrafast 不自动使用标准报价。
 - 验证：Go 目录解析/补值/核心/桌面/CLI/生成契约定向测试通过；公开 models.dev 下载后的兼容检查和三个基础模型解析通过；前端类型检查、定向 lint、20 项单测及 2 项模拟桌面浏览器交互通过。浏览器初次启动因临时目录路径过长失败，缩短受管磁盘目录名后通过；未进行原生窗口、真实 Agent 或付费上游验收，未打包发布。
+
+
+## 2026-10-16 — DSH 双端模型能力同步（当前源码，未发布）
+- 类型：修改。
+- 指令与参数：`model settings --id ID --file FILE`、映射管理成功后的自动同步、`agent sync`、`agent enroll/apply`；无新增命令或参数，帮助补充投影边界。
+- 旧 → 新：DSH Web/Desktop 不再只有 id/name；同步映射名称、视觉／输入模态、上下文、可表示思考档位及绑定默认模型的默认 effort。显式默认输出写 maxTokens，单独输出能力不转成请求默认。
+- 兼容与迁移：两端 profile、绑定及凭据仍独立，schema/DTO 不变；已有 journal 可安全扩展 reasoningEffort 所有权，保留原恢复值；清空元数据移除旧字段。none/default/null、toggle/budget 不重命名；显式选项无可表示思考档位时禁用 DSH reasoning，原映射保留。需更新核心；本次未打包／发布，不宣称旧 DSH 原生加载兼容。
+- 验证：共享投影、双 profile 更新／清除／默认切换／旧 journal 升级／幂等／冲突／条件恢复与管理 API 自动同步测试；实际执行结果见本次任务记录。

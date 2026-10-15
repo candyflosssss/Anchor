@@ -106,6 +106,9 @@ Agent binding names use the same characters, with a 64 UTF-8 byte limit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
 init/serve/access/context/recover/update/agent token operate locally. Business commands use the selected context.
 Codex, Claude Code user settings and independent DSH Web (dsh) / Desktop (dsh-desktop) profile management are available; runtime connection remains unverified.
+DSH Web/Desktop sync mapped display names, vision/input, context and supported off/minimal/low/medium/high/xhigh/max efforts.
+DSH defaults use the binding default model; native none/default/null and toggle/budget reasoning are not relabelled.
+DSH maxTokens exports explicit default output tokens only, not the output capacity alone.
 Codex CLI enrollment defaults to all-compatible; Claude/DSH and desktop enrollment use all-mapped.
 All-mapped reads model mappings with enabled providers, without Codex metadata/tools/streaming filters.
 Mapping/provider changes automatically refresh applied Agent model lists; agent sync remains a manual retry.

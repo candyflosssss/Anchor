@@ -379,3 +379,14 @@ DSH 仅写已有 profiles/web 下 cordis.patch.yml：llm-pi-ai 的 Anchor 命名
 Engine 的恢复/同步路径白名单仅增加 profiles/desktop/cordis.patch.yml，其他任意 profile 不放行；模型映射自动同步继续逐绑定执行。两端都只修改自己的 llm-pi-ai Anchor 命名路由和 agent-default-model；不写 home 级公共 patch、.credentials.yaml 或 Electron userData/desktop/settings.json。配置层级为 bundles → profile → home → 运行时覆盖，本适配器不探测更高层或声明真实连接有效。HMR 缺失时完全退出并重启，Desktop 关闭窗口可能只是隐藏；已有会话保留原模型，新默认值需新会话。
 
 上游依据固定到 [86a4022 Desktop 路径](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/apps/desktop/src/paths.ts)、[Desktop 生命周期](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/apps/desktop/README.zh.md)、[CLI/profile 层级](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/apps/cli/README.zh.md)。本节替代此前“仅 Web、其他 profile 不托管”的当前能力限制；真实 DSH Desktop、Linux/Windows 原生窗口及付费上游仍未验收。
+
+
+### 2026-10-16 DSH Web/Desktop 模型能力投影（当前源码，未发布）
+
+两端通过同一 dshModel 转换器读取 GatewayBinding.Models 中已有的生效 ModelSettings.Configuration，不增加 DTO、数据库字段、独立编辑器或命令。公开 ID 不改写，display_name 用于显示名；显式 limits.context 写 contextWindow；输入模态只保留 text/image，未声明模态时显式 vision=true/false 分别写 text+image/text，未知值不推测。reference 快照不直接当作生效声明。
+
+reasoningEfforts 按原值映射 off/minimal/low/medium/high/xhigh/max，保留 max（不转 xhigh）；不把 none/default/JSON null 猜成 off 或省略参数。DSH 要求字典至少含一个非 off 思考档位；显式禁用或声明选项无可表示思考档位时写 false，未声明选项则保留安装目录回退。toggle/budget_tokens 不伪造档位。仅绑定默认模型可表示的默认 effort 写 agent-default-model.config.reasoningEffort，不将其他模型默认值写成路由全局 reasoning。该字段始终纳入所有权，包括删除无效旧默认；原用户值由 journal 保留，恢复仍比较最后写入值，外部改动不覆盖。旧 journal 同步时可扩展字段，不替换首次恢复基线。
+
+maxTokens 在 DSH 同时设定模型输出能力和单次请求默认上限，因此只写显式 default_output_tokens；不能无损单独表达 limits.output，故不导出该容量。默认温度、其他输入模态和工具开关不在本轮转换，原设置不变。映射保存／路由变动自动同步、手动同步、启动接管复用相同计划／验证／恢复流程，逐绑定失败隔离；无原生客户端或真实上游验证承诺。
+
+字段语义依据固定上游 [catalog.ts](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/llm/llm-pi-ai/src/catalog.ts)、[config.ts](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/llm/llm-pi-ai/src/config.ts) 与 [agent-default-model](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/core/agent-default-model/src/index.ts)。部署的 DSH 版本仍需独立核对。
