@@ -131,7 +131,8 @@ test('desktop starts once, loads real-mode data and submits without persisting s
   await expect(page.getByText('原型场景', { exact: true })).toHaveCount(0);
   await expect(page.getByText('本机实例 · 模拟，未连接', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();
-  await expect(page.getByText('本次启动', { exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '切换设备' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '切换设备' })).not.toContainText('test-local-instance');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
   await page.getByLabel('供应商名称 / ID').fill('桌面供应商');
@@ -192,8 +193,7 @@ test('polling refreshes the authenticated source and stop capability without res
     };
   });
   await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();
-  await expect(page.getByText('复用已有核心', { exact: true })).toBeVisible({ timeout: 8000 });
-  await expect(page.getByRole('button', { name: '停止核心', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '停止核心', exact: true })).toHaveCount(0, { timeout: 8000 });
   expect(await page.evaluate(() => window.desktopTest.starts)).toBe(1);
 });
 

@@ -7,15 +7,16 @@ import { Input } from '../../components/ui/input';
 import { useConnectionController } from './use-connection-controller';
 import './connections.css';
 
-export function ConnectionsView({ onConnected, onActivity }: { onConnected: (info: SessionInfo) => void; onActivity: (busy: boolean) => void }) {
+export function ConnectionsView({ currentProfile, disabled, onConnected, onActivity }: { currentProfile?: string; disabled?: boolean; onConnected: (info: SessionInfo) => void; onActivity: (busy: boolean) => void }) {
   const c = useConnectionController(onConnected, onActivity);
-  const busy = c.pending !== null;
+  const busy = !!disabled || c.pending !== null;
+  const profiles = c.profiles.map(profile => ({ ...profile, active: profile.name === currentProfile }));
   return <main className="workspace connection-workspace">
     <div className="page-header"><div><h1>设备连接</h1><p className="text-muted-foreground">连接其他机器上的 Anchor，在这里管理它的供应商、模型与 Agent。</p></div><Button variant="outline" disabled={busy || c.loading} onClick={() => { void c.refresh(); }}>刷新</Button></div>
     {c.error && <p role="alert" className="connection-error">{desktopMessages[c.error]}</p>}
     <section aria-label="已保存的设备" className="connection-profiles">
       {c.loading && <p role="status">正在读取连接档案…</p>}
-      {c.profiles.map(profile => <article key={profile.name} className="connection-profile">
+      {profiles.map(profile => <article key={profile.name} className="connection-profile">
         {profile.transport === 'local' ? <Monitor size={20} /> : <Server size={20} />}
         <div className="min-w-0 flex-1"><strong>{profile.transport === 'local' ? '本机' : profile.name}</strong><p className="text-muted-foreground break-all">{profile.transport === 'local' ? '本机 Anchor 核心' : profile.target}</p>{profile.instance_id && <p className="text-xs text-muted-foreground break-all">实例 {profile.instance_id}</p>}</div>
         {profile.authentication === 'password' && <label className="text-xs">SSH 密码<Input type="password" autoComplete="off" aria-label={`${profile.name} 的 SSH 密码`} disabled={busy} value={c.passwords[profile.name] ?? ''} onChange={e => c.setPasswords(p => ({ ...p, [profile.name]: e.target.value }))} placeholder={profile.active ? '当前连接可直接复用' : '本次登录使用，不保存'} /></label>}

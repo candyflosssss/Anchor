@@ -47,12 +47,12 @@ export function App() {
           </BreadcrumbList></Breadcrumb>
         </div>
         <div className="flex h-full min-w-0 items-center gap-2">
-          <CoreStatus session={session} busy={busy} onExit={windowController.exit} onStop={() => setConfirmStop(true)} />
+          <CoreStatus session={session} busy={busy} onActivity={setBusy} onManage={() => navigate('connections')} onExit={windowController.exit} onStop={() => setConfirmStop(true)} />
           {!prototype && <WindowControls controller={windowController} />}
         </div>
       </header>
       {windowController.error && <p role="status" className="border-b px-4 py-2 text-xs text-destructive">{windowController.error}</p>}
-      {page === 'connections' ? <ConnectionsView onConnected={session.select} onActivity={setBusy} /> : page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage key={instanceId} environment={environment} page={page === 'agents' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
+      {page === 'connections' ? <ConnectionsView currentProfile={session.info?.profile_name} disabled={busy || session.stopping || session.phase === 'starting'} onConnected={session.select} onActivity={setBusy} /> : page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <UpdateSettings onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage key={instanceId} environment={environment} page={page === 'agents' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
         <h1 className="text-xl font-semibold">{session.phase === 'starting' ? '正在连接核心…' : session.phase === 'stopped' ? '停服请求已接受' : '当前设备暂不可用'}</h1>
         {(session.error || session.phase === 'stopped') && <p className="my-4 text-sm text-muted-foreground">{session.error ? desktopMessages[session.error] : '核心正在处理退出与配置恢复。'}</p>}
         {session.phase !== 'starting' && <Button onClick={() => void session.connect()}>重新连接当前设备</Button>}
