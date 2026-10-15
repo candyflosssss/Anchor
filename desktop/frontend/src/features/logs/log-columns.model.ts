@@ -57,3 +57,13 @@ export function outputTps(row: RequestLog): number | null {
     || row.output < 0 || row.elapsed <= 0) return null;
   return row.output / (row.elapsed / 1000);
 }
+
+// Cache usage is a last-attempt metric, while root input may include retries.
+// Only divide when both values are known to describe the same single attempt.
+export function cacheHitRate(row: RequestLog): number | null {
+  const cached = row.metrics?.cacheReadTokens;
+  if ((row.attemptCount ?? row.attempts.length) !== 1 || row.input == null || cached == null
+    || !Number.isFinite(row.input) || !Number.isFinite(cached)
+    || row.input <= 0 || cached < 0 || cached > row.input) return null;
+  return cached / row.input * 100;
+}

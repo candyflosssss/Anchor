@@ -1,7 +1,7 @@
 import { ArrowDownToLine, ArrowUpFromLine, BrainCircuit, ChevronRight, Clock3, Database, Gauge, Timer, type LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { outputTps, type LogColumnId } from './log-columns.model';
+import { cacheHitRate, outputTps, type LogColumnId } from './log-columns.model';
 import { sourceLabels, statusLabels, type RequestLog } from './log.model';
 import type { LogController } from './use-log-controller';
 import type { LogColumnsController } from './use-log-columns-controller';
@@ -9,10 +9,10 @@ import type { LogColumnsController } from './use-log-columns-controller';
 const number = (value: number | null | undefined) => value == null ? '未知' : value.toLocaleString();
 const milliseconds = (value: number | null | undefined) => value == null ? '未知' : `${value.toLocaleString()} ms`;
 type MetricTone = 'time' | 'input' | 'output' | 'cache' | 'reasoning' | 'speed';
-function Metric({ label, value, tone, icon: Icon }: { label: string; value: string; tone?: MetricTone; icon?: LucideIcon }) {
+function Metric({ label, value, tone, icon: Icon, detail }: { label: string; value: string; tone?: MetricTone; icon?: LucideIcon; detail?: string }) {
   const unknown = value === '未知';
   return <div className={`${tone ? `log-tone-${tone}` : ''}${unknown ? ' is-unknown' : ''}`}>
-    <dt>{Icon && <Icon size={12} aria-hidden="true" />}{label}</dt><dd className="mono">{value}</dd>
+    <dt>{Icon && <Icon size={12} aria-hidden="true" />}{label}</dt><dd className="mono">{value}{detail && <small className="log-metric-note">{detail}</small>}</dd>
   </div>;
 }
 export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
@@ -42,12 +42,15 @@ export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
         <Metric tone="speed" icon={Gauge} label="总TPS" value={rate === null ? '未知' : `${rate.toFixed(1)} t/s`} />
       </dl>;
     }
-    case 'tokens': return <div className="log-token-block"><dl className="log-metric-grid" aria-label="Token 用量">
-      <Metric tone="input" icon={ArrowDownToLine} label="输入" value={number(row.input)} />
-      <Metric tone="output" icon={ArrowUpFromLine} label="输出" value={number(row.output)} />
-      <Metric tone="cache" icon={Database} label="缓存命中" value={number(row.metrics?.cacheReadTokens)} />
-      <Metric tone="reasoning" icon={BrainCircuit} label="思考" value={number(row.metrics?.reasoningTokens)} />
-    </dl><div className="log-token-total"><span>{(row.attemptCount ?? row.attempts.length) > 1 ? '已知小计' : '合计'}</span><span className="mono">{number(row.input == null || row.output == null ? null : row.input + row.output)}</span></div></div>;
+    case 'tokens': {
+      const hitRate = cacheHitRate(row);
+      return <div className="log-token-block"><dl className="log-metric-grid" aria-label="Token 用量">
+        <Metric tone="input" icon={ArrowDownToLine} label="输入" value={number(row.input)} />
+        <Metric tone="output" icon={ArrowUpFromLine} label="输出" value={number(row.output)} />
+        <Metric tone="cache" icon={Database} label="缓存命中" value={number(row.metrics?.cacheReadTokens)} detail={`命中率 ${hitRate === null ? '未知' : `${hitRate.toFixed(1)}%`}`} />
+        <Metric tone="reasoning" icon={BrainCircuit} label="思考" value={number(row.metrics?.reasoningTokens)} />
+      </dl><div className="log-token-total"><span>{(row.attemptCount ?? row.attempts.length) > 1 ? '已知小计' : '合计'}</span><span className="mono">{number(row.input == null || row.output == null ? null : row.input + row.output)}</span></div></div>;
+    }
     case 'attempts': return <span className="mono">{row.attemptCount ?? row.attempts.length}</span>;
     case 'diagnostics': return <div className="log-info-block"><span className={`mono log-block-primary ${row.code ? 'text-destructive' : 'text-muted-foreground'}`}>{row.code ?? '—'}</span><dl className="log-meta-list"><Metric label="阶段" value={row.stage} /></dl></div>;
   }

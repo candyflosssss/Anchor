@@ -168,3 +168,5 @@
 @media (forced-colors: active) {
   .log-metric-grid > div { border-color: CanvasText; }
 }
+
+.log-metric-note { display: block; margin-top: 3px; font-size: 10px; line-height: 1.2; font-weight: 400; color: hsl(var(--muted-foreground)); }

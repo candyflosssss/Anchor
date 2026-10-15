@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultColumns, moveColumn, normalizeColumns, outputTps } from './log-columns.model';
+import { cacheHitRate, defaultColumns, moveColumn, normalizeColumns, outputTps } from './log-columns.model';
 import { requestFixtures } from './log.mock';
 
 describe('log column preferences', () => {
@@ -59,5 +59,24 @@ describe('end-to-end total output TPS', () => {
       expect(outputTps({ ...row, output: output as number | null })).toBeNull();
     }
     expect(outputTps({ ...row, output: 0 })).toBe(0);
+  });
+});
+
+describe('cache hit rate', () => {
+  const row = { ...requestFixtures[1], attemptCount: 1, input: 1200,
+    metrics: { ...requestFixtures[1].metrics!, cacheReadTokens: 400 } };
+  it('uses normalized input tokens as the denominator, without adding cached tokens twice', () => {
+    expect(cacheHitRate(row)).toBeCloseTo(33.3333);
+    expect(cacheHitRate({ ...row, metrics: { ...row.metrics, cacheReadTokens: 0 } })).toBe(0);
+    expect(cacheHitRate({ ...row, metrics: { ...row.metrics, cacheReadTokens: 1200 } })).toBe(100);
+  });
+  it('leaves missing, invalid, zero-denominator and mixed-attempt values unknown', () => {
+    for (const input of [null, 0, -1, NaN, Infinity]) expect(cacheHitRate({ ...row, input })).toBeNull();
+    for (const cacheReadTokens of [null, -1, NaN, Infinity, 1201]) {
+      expect(cacheHitRate({ ...row, metrics: { ...row.metrics, cacheReadTokens } })).toBeNull();
+    }
+    expect(cacheHitRate({ ...row, metrics: undefined })).toBeNull();
+    for (const attemptCount of [0, 2, 65]) expect(cacheHitRate({ ...row, attemptCount })).toBeNull();
+    expect(cacheHitRate({ ...row, attemptCount: undefined, attempts: [] })).toBeNull();
   });
 });

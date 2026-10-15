@@ -43,8 +43,8 @@ describe('grouped request log values', () => {
   it('distinguishes zero from unknown and does not infer totals with missing usage', () => {
     const html = render('tokens', { ...row, input: 0, output: null, metrics: undefined });
     expect(html).toContain('>0</dd>');
-    expect(html.match(/未知/g)).toHaveLength(4);
-    expect(render('tokens', { ...row, input: 0, output: 0 })).not.toContain('未知');
+    expect(html.match(/未知/g)).toHaveLength(5);
+    expect(render('tokens', { ...row, input: 0, output: 0 })).toContain('命中率 未知');
   });
   it('pairs category colors with labels and decorative icons, while muting only unknown values', () => {
     const html = render('tokens');
@@ -55,6 +55,13 @@ describe('grouped request log values', () => {
     expect(missing).toContain('class="log-tone-input"');
     for (const tone of ['output', 'cache', 'reasoning']) expect(missing).toContain(`class="log-tone-${tone} is-unknown"`);
     expect(render('timing').match(/aria-hidden="true"/g)).toHaveLength(4);
+  });
+  it('shows cache token count and hit percentage together without hiding unknown ratios', () => {
+    expect(render('tokens')).toContain('命中率 33.3%');
+    expect(render('tokens')).toContain('400<small');
+    expect(render('tokens', { ...row, metrics: { ...row.metrics!, cacheReadTokens: 0 } })).toContain('命中率 0.0%');
+    expect(render('tokens', { ...row, input: 400 })).toContain('命中率 100.0%');
+    expect(render('tokens', { ...row, attemptCount: 2 })).toContain('命中率 未知');
   });
   it('retains model identity, effort, key label, independent results and diagnostics', () => {
     const value = { ...row, upstreamModel: 'actual-model', reasoningEffort: null, key: 'safe-key-label',

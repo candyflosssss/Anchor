@@ -51,7 +51,7 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   });
   expect(bounds.timeWidth).toBeLessThanOrEqual(bounds.availableWidth);
   expect(bounds.timeRight).toBeLessThanOrEqual(bounds.cellRight);
-  expect(bounds.rowHeight).toBeLessThan(140);
+  expect(bounds.rowHeight).toBeLessThan(160);
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-light.png'), fullPage: true });
   await page.getByLabel('请求结果', { exact: true }).selectOption('failed');
   await expect(list.getByRole('row')).toHaveCount(2);
@@ -105,6 +105,7 @@ test('column preferences preserve collected values and survive reload', async ({
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button', { name: '查看请求 fixture_success' }).click();
   await expect(dialog.getByLabel('Token 用量')).toBeVisible();
+  await expect(dialog.getByLabel('Token 用量')).toContainText('命中率 0.0%');
   expect(await dialog.getByLabel('Token 用量').evaluate(el => el.clientWidth)).toBeGreaterThan(200);
   expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-detail-mobile.png') });
@@ -149,18 +150,20 @@ test('colored metric tiles stay readable with realistic counts in light and dark
   await openLogs(page, data);
   const success = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
   await expect(success).toContainText('104,823');
+  await expect(success.locator('.log-tone-cache')).toContainText('98,304');
+  await expect(success.locator('.log-tone-cache')).toContainText('命中率 93.8%');
   await expect(success).toContainText('10,883 ms');
   for (const theme of ['light', 'dark']) {
     await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
     const styles = await success.locator('.log-token-block .log-metric-grid > div').evaluateAll(tiles => tiles.map(tile => ({
       color: getComputedStyle(tile).color, background: getComputedStyle(tile).backgroundColor,
       label: tile.querySelector('dt')!.textContent,
-      fits: [...tile.querySelectorAll('dt, dd')].every(el => el.scrollWidth <= el.clientWidth && el.getBoundingClientRect().height < 22),
+      fits: [...tile.querySelectorAll('dt, dd')].every(el => el.scrollWidth <= el.clientWidth && el.getBoundingClientRect().height < (tile.classList.contains('log-tone-cache') ? 40 : 22)),
     })));
     expect(new Set(styles.map(style => style.color)).size).toBe(4);
     expect(styles.every(style => style.background !== 'rgba(0, 0, 0, 0)' && style.fits)).toBe(true);
     expect(styles.map(style => style.label)).toEqual(['输入', '输出', '缓存命中', '思考']);
-    expect(await success.evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(140);
+    expect(await success.evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(160);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     if (capture) await page.screenshot({ path: resolve(capture, `logs-metrics-${theme}.png`), fullPage: true });
   }
