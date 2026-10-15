@@ -2,6 +2,7 @@ package managed
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -11,15 +12,16 @@ import (
 )
 
 type GatewayBinding struct {
-	BaseURL        string
-	Model          string
-	DataDir        string
-	Ready          bool
-	Tools          bool
-	Streaming      bool
-	Models         []state.Model
-	CatalogVersion string
-	Token          string
+	BaseURL          string
+	Model            string
+	DataDir          string
+	Ready            bool
+	Tools            bool
+	Streaming        bool
+	Models           []state.Model
+	CatalogVersion   string
+	Token            string
+	CatalogTemplates map[string]json.RawMessage
 }
 type Inspection struct {
 	AdapterID           string   `json:"adapter_id"`
@@ -79,13 +81,29 @@ func (Codex) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
 	if e != nil {
 		return Plan{}, e
 	}
+	return (Codex{}).planFrom(b, g, raw, exists, "")
+}
+
+// planFrom also accepts a virtual restoration during an in-place refresh.
+func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool, ownedCatalog string) (Plan, error) {
+	if err := b.Validate(); err != nil {
+		return Plan{}, err
+	}
+	if !g.Ready || (b.ModelScope != "all-mapped" && (!g.Tools || !g.Streaming)) {
+		return Plan{}, ErrUnsafe
+	}
+	if _, err := (Codex{}).Inspect(b); err != nil {
+		return Plan{}, err
+	}
+	path := filepath.Join(b.ConfigRoot, "config.toml")
 	provider := "anchor_" + strings.NewReplacer("-", "_", ".", "_").Replace(b.ID)
 	paths := [][]string{{"model"}, {"model_provider"}, {"web_search"}, {"model_providers", provider}}
 	var catalog []byte
 	var modelIDs []string
 	var catalogPath string
-	if b.ModelScope != "all-mapped" && len(g.Models) > 0 && g.CatalogVersion != "" {
-		catalog, modelIDs, e = buildCatalog(g.Models, g.CatalogVersion)
+	var e error
+	if len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+		catalog, modelIDs, e = buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates)
 		if e != nil {
 			return Plan{}, e
 		}
@@ -94,7 +112,7 @@ func (Codex) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
 		if err != nil {
 			return Plan{}, err
 		}
-		if catalogExists {
+		if catalogExists && catalogPath != ownedCatalog {
 			return Plan{}, errors.New("reserved Anchor catalog already exists; recover or resolve conflict first")
 		}
 		paths = append(paths, []string{"model_catalog_json"})
@@ -132,11 +150,6 @@ func (Codex) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
 	p := Plan{BindingID: b.ID, ExpectedRevision: b.Revision, Model: g.Model, GatewayURL: g.BaseURL, CredentialMethod: "command-backed binding token (not embedded)", AdapterVersion: "1", Path: path, Fingerprint: fingerprint(raw, exists), Fields: paths, Reload: "restart_required", Verification: "configuration_only; effective Agent connection unknown", original: raw, existed: exists}
 	p.ModelScope = b.ModelScope
 	p.AvailableModels = modelIDs
-	if b.ModelScope == "all-mapped" {
-		for _, model := range g.Models {
-			p.AvailableModels = append(p.AvailableModels, model.ID)
-		}
-	}
 	p.CatalogPath = catalogPath
 	p.CatalogVersion = g.CatalogVersion
 	if catalogPath != "" {
@@ -171,7 +184,7 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 	if m["model"] != g.Model || m["model_provider"] != provider || !ok || table["base_url"] != g.BaseURL {
 		return out, ErrChanged
 	}
-	if b.ModelScope != "all-mapped" && len(g.Models) > 0 && g.CatalogVersion != "" {
+	if len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
 		path := filepath.Join(b.ConfigRoot, catalogName(b.ID))
 		if m["model_catalog_json"] != path {
 			return out, ErrChanged
@@ -180,7 +193,7 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 		if err != nil {
 			return out, err
 		}
-		expected, _, err := buildCatalog(g.Models, g.CatalogVersion)
+		expected, _, err := buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates)
 		if err != nil {
 			return out, err
 		}

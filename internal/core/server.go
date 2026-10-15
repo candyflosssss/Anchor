@@ -301,6 +301,7 @@ func (s *Server) Control() http.Handler {
 			apiError(w, err)
 			return
 		}
+		s.syncAgentMappings(w)
 		writeJSON(w, 200, p)
 	})
 	mux.HandleFunc("POST /control/v1/providers/{id}/discover-models", s.discoverProviderModels)
@@ -372,6 +373,7 @@ func (s *Server) Control() http.Handler {
 			apiError(w, err)
 			return
 		}
+		s.syncAgentMappings(w)
 		writeJSON(w, 200, m)
 	})
 	s.providerFeatureRoutes(mux)

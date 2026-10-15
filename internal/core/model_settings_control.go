@@ -103,5 +103,6 @@ func (s *Server) saveModelSettings(w http.ResponseWriter, r *http.Request) {
 		apiError(w, err)
 		return
 	}
+	s.syncAgentMappings(w)
 	writeJSON(w, 200, modelSettingsState(m))
 }

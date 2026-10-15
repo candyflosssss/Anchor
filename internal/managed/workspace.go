@@ -98,7 +98,7 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 	}
 	for _, b := range bindings {
 		row := ManagedAgent{ID: b.ID, AdapterID: b.AdapterID, ConfigRoot: b.ConfigRoot, Model: b.Model, Enabled: b.Enabled, Revision: b.Revision, ModelScope: b.ModelScope, CatalogVersion: b.CodexVersion, Status: statusMap[b.ID], AvailableModels: []string{}, CatalogPath: filepath.Join(b.ConfigRoot, catalogName(b.ID)), ModelTemplates: map[string]string{}}
-		if b.AdapterID != "codex" || b.ModelScope == "all-mapped" {
+		if b.AdapterID != "codex" {
 			row.CatalogPath = ""
 		}
 		for alias, source := range b.ModelTemplates {
@@ -258,6 +258,15 @@ func (m *Manager) Refresh(id string, revision int64) (Result, error) {
 	g, err := m.gateway(b)
 	if err != nil {
 		return Result{}, err
+	}
+	if current, e := m.Engine.load(id); e == nil && current.Status == "applied" {
+		r, e := m.Engine.Reconcile(b, g)
+		if e != nil {
+			m.last[id] = r
+		} else {
+			delete(m.last, id)
+		}
+		return r, e
 	}
 	// Validate the next catalog before restoring the working configuration.
 	if len(g.Models) > 0 && g.CatalogVersion != "" {

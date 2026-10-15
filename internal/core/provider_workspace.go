@@ -142,6 +142,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 			target = in.Target
 		}
 		if err == nil && in.Action == "delete" {
+			s.syncAgentMappings(w)
 			writeJSON(w, 200, catalog.Workspace{Prices: []catalog.Price{}, Estimates: []catalog.Estimate{}, ProviderID: p.ID, Deleted: true, Keys: []catalog.KeyStatus{}, Models: []catalog.ModelMapping{}, Usage: []catalog.UsageRow{}})
 			return
 		}
@@ -283,6 +284,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		apiError(w, err)
 		return
 	}
+	s.syncAgentMappings(w)
 	out, err := s.workspace(target)
 	if err != nil {
 		apiError(w, err)

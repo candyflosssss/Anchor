@@ -315,14 +315,14 @@ anchor recover
 - Binding 分开记录 default/model_scope/CodexVersion：新 CLI add 默认 all-compatible，旧记录保持 single；模型目录表示选择能力，Binding 凭据和网关检查才表示权限。可选模型动态限定到工具/流式、同精确版本元数据与 enabled 供应商候选。
 - `model add/put` 显式导入本地、精确版本目录的完整模型条目；操作者负责与实际模型能力对应。目录生成保留真实能力和指令，只改公开 slug/可选展示名、选取与 HTTP 传输字段，禁用 upgrade 自动越到未授权名称。
 - 接管生成绑定专有 JSON 目录，先持久恢复材料再写目录/配置；保留原目录指针，不覆盖已有同名文件。停止/recover 只移除内容仍相同且基础配置/独立 profile 均不再引用的自有目录；用户修改和引用均保留。
-- 目录是接管快照，网关权限是当前配置动态判断；模型变动后显式恢复/重建目录，再重启远端 app-server。`set-models` 先恢复再更新 revision，恢复冲突不改授权，token 不旋转。
+- 目录是接管快照，网关权限是当前配置动态判断；模型映射变动后核心自动原位刷新已接管目录，客户端仍需重启远端 app-server 读取变化。`set-models` 先恢复再更新 revision，恢复冲突不改授权，token 不旋转。
 - 版本 0.159.3 的隔离真实 CLI 与 app-server 验证覆盖目录列表及默认/显式模型请求，只有回环模拟上游。未验收桌面 UI、真实供应商、所有工具闭环、Windows 原生或全部网络出口接管。
 
 ## 14. 本机发现与桌面登记落地（2026-10-12 实现，desktop.21 dev 已发布）
 
 发现只检查已知用户配置根（含核心环境 CODEX_HOME），去重并报告安全/适配/缓存状态，不遍历磁盘，不执行客户端，不据目录宣称程序已安装。其他产品仅显示无适配器。Codex 读取有界的完整本地 models_cache.json，保留 client_version 和能力条目，批准前要求版本及实际能力核对。
 
-Catalog 快照和 public alias → 源 slug 选择归 Binding；空源为排除。供应商 Model 不承担每个 Agent 目录/安装版本信息。核心应用服务同时供 CLI 和薄 Wails Bridge 使用，文件修改仅走既有 Engine。在线登记立即应用；运行中映射变更可显式 sync，网关授权始终按当前模型策略；重启核验过期目录后条件恢复重建。外部覆盖、不支持 profile、目录引用或修改冲突均保留并报告。停止恢复，退出窗口不恢复，更新配置后重启 Agent。
+Catalog 快照和 public alias → 源 slug 选择归 Binding；空源为排除。供应商 Model 不承担每个 Agent 目录/安装版本信息。核心应用服务同时供 CLI 和薄 Wails Bridge 使用，文件修改仅走既有 Engine。在线登记立即应用；运行中管理入口的映射、模型设置／路由和供应商候选变化自动同步已启用且已应用的绑定，保留显式 sync 重试；网关授权始终按当前模型策略。重启核验过期目录后原位刷新，保留初始恢复基线和 Binding 凭据。外部覆盖、不支持 profile、目录引用或修改冲突均保留并报告。停止恢复，退出窗口不恢复，更新配置后重启 Agent。
 
 只读发现、明确批准登记、显式同步已提供 CLI 和 GUI；详见指令大全 §8。真实核心/Bridge 测试使用隔离合成目录，Mock UI 检查不等于 Windows 原生或真实供应商验收。
 
@@ -343,7 +343,11 @@ Catalog 快照和 public alias → 源 slug 选择归 Binding；空源为排除�
 
 此前仅 Codex 可写入、DSH 仅发现的描述由本节替代。AdapterFor 分派 codex/claude/dsh，管理器和 Engine 共用计划、字段日志、指纹及条件恢复，前端与 CLI 不自行编辑配置。
 
-all-mapped 将所有具有启用供应商的公开模型映射作为动态授权范围，无 tools/streaming/Codex 元数据筛选；默认值必须在范围内。桌面显式使用此范围，Codex CLI 原缺省兼容范围和旧 single 绑定保持。客户端的模型列表为应用时快照，通过同步刷新；无供应商映射可显示但不选用。
+all-mapped 将所有具有启用供应商的公开模型映射作为动态授权范围，无 tools/streaming/Codex 元数据筛选；默认值必须在范围内。桌面显式使用此范围，Codex CLI 原缺省兼容范围和旧 single 绑定保持。客户端的模型列表为落盘快照；管理入口保存映射（包括 Fast/Ultrafast 分身）、删除映射、保存设置／路由或改变供应商候选后自动刷新，不再依赖手动同步。无供应商映射可显示但不选用。
+
+Codex all-mapped 也导出 `anchor_<binding>.models.json` 并管理 `model_catalog_json`，不要求预先提供版本匹配缓存。优先使用明确声明的元数据；也可只读复用接管前配置指向的配置根内本地目录，按公开 ID 或唯一上游 ID 匹配，保留指令模板与已声明能力；无模板时只生成保守的模型名条目，不推断指令／context／reasoning。用户原目录不改写，恢复时还原其原始指针；不循环读取 Anchor 自己生成的旧目录，以免已清除设置残留。目录结构写入不等于已通过所有 Codex 版本原生解析验收。
+
+自动同步仅处理已启用且存在未恢复 journal 的目标，保持原 scope/default/token。逐绑定失败隔离：映射仍保存成功，其他目标继续同步，状态报告 needs_sync、overridden 或 recovery_pending；不得覆盖外部修改。默认模型不再有可用候选时暂停该目标同步，不擅自选新默认值。更新先在内存中核对／还原旧托管字段，生成下一份配置，再用包含 previous/next 写入值的 prepared journal 和条件原子替换发布；中断后恢复接受前一份或下一份 Anchor 写入值，但拒绝第三方值。不会先发布未接管配置，恢复基线始终是首次接管时的用户值。Codex／Claude 仍需重启，DSH 默认值需新会话生效；自动落盘不代表客户端实时刷新或上游认可 Fast/Ultrafast。
 
 Claude 仅写用户 settings.json 的 model/availableModels、Anthropic 基址、Binding auth 与模型默认环境变量，暂时禁用原 API key/helper 和云平台选项；停用按原字段恢复。基址使用网关 origin，避免 SDK 重复 /v1；自定义默认别名提供 custom model option，网关发现不能保证任意别名进入原生选择器。项目、策略、CLI 覆盖与实际程序连接不作探测。
 

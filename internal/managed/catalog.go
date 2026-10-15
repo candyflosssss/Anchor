@@ -13,23 +13,69 @@ import (
 func catalogName(id string) string { return "anchor_" + id + ".models.json" }
 
 func buildCatalog(models []state.Model, version string) ([]byte, []string, error) {
+	return buildCatalogTemplates(models, version, nil)
+}
+
+func buildCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage) ([]byte, []string, error) {
 	entries := []map[string]json.RawMessage{}
 	ids := []string{}
 	metadataBytes := 0
 	for _, model := range models {
-		if model.Codex == nil || model.Codex.Version != version {
-			return nil, nil, errors.New("version-matched Codex metadata required for every catalog model")
-		}
-		metadataBytes += len(model.Codex.Entry)
-		if metadataBytes > maxConfig {
-			return nil, nil, errors.New("generated catalog exceeds 1 MiB")
-		}
-		if err := model.Codex.Validate(); err != nil {
-			return nil, nil, err
-		}
+		// all-mapped is a model-name catalog, not a claim of official model
+		// capabilities. Unknown instructions/context/efforts remain unspecified;
+		// Codex keeps its built-in instruction defaults. Never clone an unrelated
+		// model's instruction template just to make an alias visible.
 		var entry map[string]json.RawMessage
-		if err := json.Unmarshal(model.Codex.Entry, &entry); err != nil {
-			return nil, nil, err
+		if version == "" && model.Codex == nil {
+			raw, _ := json.Marshal(map[string]any{
+				"display_name": model.ID, "description": "Anchor mapped model; upstream capabilities are not verified",
+				"supported_reasoning_levels": []any{}, "shell_type": "default", "priority": 0,
+				"support_verbosity": false, "experimental_supported_tools": []string{},
+				"truncation_policy": map[string]any{"mode": "tokens", "limit": 10000},
+				"input_modalities":  []string{"text"}, "context_window": nil,
+			})
+			_ = json.Unmarshal(raw, &entry)
+			// Exact public ID first, otherwise one unambiguous upstream ID.
+			// These entries come only from the operator's original local catalog.
+			source := model.ID
+			if _, ok := templates[source]; !ok {
+				source = ""
+				for _, candidate := range model.Candidates {
+					if _, ok := templates[candidate.Model]; ok {
+						if source != "" && source != candidate.Model {
+							return nil, nil, errors.New("ambiguous local Codex templates")
+						}
+						source = candidate.Model
+					}
+				}
+			}
+			if template := templates[source]; template != nil {
+				metadataBytes += len(template)
+				if metadataBytes > maxConfig {
+					return nil, nil, errors.New("generated catalog exceeds 1 MiB")
+				}
+				var supplied map[string]json.RawMessage
+				if json.Unmarshal(template, &supplied) != nil || supplied == nil {
+					return nil, nil, ErrUnsafe
+				}
+				for k, value := range supplied {
+					entry[k] = value
+				}
+			}
+		} else {
+			if model.Codex == nil || (version != "" && model.Codex.Version != version) {
+				return nil, nil, errors.New("version-matched Codex metadata required for every catalog model")
+			}
+			metadataBytes += len(model.Codex.Entry)
+			if metadataBytes > maxConfig {
+				return nil, nil, errors.New("generated catalog exceeds 1 MiB")
+			}
+			if err := model.Codex.Validate(); err != nil {
+				return nil, nil, err
+			}
+			if err := json.Unmarshal(model.Codex.Entry, &entry); err != nil {
+				return nil, nil, err
+			}
 		}
 		set := func(k string, v any) { raw, _ := json.Marshal(v); entry[k] = raw }
 		set("slug", model.ID)
@@ -98,6 +144,9 @@ func buildCatalog(models []state.Model, version string) ([]byte, []string, error
 		set("supported_in_api", true)
 		set("prefer_websockets", false)
 		set("use_responses_lite", false)
+		if err := validateCatalogEntry(entry); err != nil {
+			return nil, nil, err
+		}
 		entries = append(entries, entry)
 		ids = append(ids, model.ID)
 	}

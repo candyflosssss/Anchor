@@ -50,5 +50,6 @@ func (s *Server) configureModelRouting(w http.ResponseWriter, r *http.Request) {
 		apiError(w, err)
 		return
 	}
+	s.syncAgentMappings(w)
 	writeJSON(w, 200, catalog.ModelRoutingState{ModelID: m.ID, Revision: m.Revision, Strategy: m.RoutingStrategy(), Order: in.Order})
 }

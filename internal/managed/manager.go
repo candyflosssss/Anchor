@@ -1,6 +1,7 @@
 package managed
 
 import (
+	"encoding/json"
 	"errors"
 	"sync"
 
@@ -60,7 +61,15 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 	if b.ModelScope == "all-mapped" {
 		version = ""
 	}
-	return GatewayBinding{Token: token, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
+	var templates map[string]json.RawMessage
+	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
+		var err error
+		templates, err = m.codexTemplates(b)
+		if err != nil {
+			return GatewayBinding{}, err
+		}
+	}
+	return GatewayBinding{Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
 }
 func (m *Manager) Add(b state.Binding) (state.Binding, error) {
 	m.mu.Lock()
@@ -214,8 +223,8 @@ func (m *Manager) Status() ([]Result, error) {
 		if b.Enabled && r.Status == "unmanaged" {
 			r.Status = "pending"
 		}
-		if previous, ok := m.last[b.ID]; ok && previous.Status == "apply_failed" && (r.Status == "pending" || r.Status == "restored" || r.Status == "applied") {
-			r.Status = "apply_failed"
+		if previous, ok := m.last[b.ID]; ok && (previous.Status == "apply_failed" || previous.Status == "needs_sync" || previous.Status == "recovery_pending") && (r.Status == "pending" || r.Status == "restored" || r.Status == "applied") {
+			r.Status = previous.Status
 		}
 		out = append(out, r)
 	}
@@ -257,15 +266,12 @@ func (m *Manager) Start() ([]Result, error) {
 				if e == nil {
 					g, e = m.gateway(b)
 				}
-				if e == nil && len(g.Models) > 0 {
-					_, _, e = buildCatalog(g.Models, g.CatalogVersion)
+				if e == nil && b.AdapterID == "codex" && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+					_, _, e = buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates)
 				}
 				if e == nil {
 					if _, stale := AdapterFor(b.AdapterID).Verify(b, g); stale != nil {
-						status, e = m.Engine.Recover(b.ID)
-						if e != nil {
-							status.Status = "recovery_pending"
-						}
+						status, e = m.Engine.Reconcile(b, g)
 					}
 				}
 			}
@@ -354,7 +360,7 @@ func (m *Manager) SetModels(id string, revision int64, model, scope string) (sta
 		return b, Result{}, errors.New("Codex model requires tools and streaming")
 	}
 	if len(g.Models) > 0 && g.CatalogVersion != "" {
-		if _, _, err = buildCatalog(g.Models, g.CatalogVersion); err != nil {
+		if _, _, err = buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates); err != nil {
 			return b, Result{}, err
 		}
 	}

@@ -488,6 +488,8 @@ anchor access revoke ID
 
 ## 8. Agent 托管与独立恢复
 
+> 映射变动自动同步与 Codex all-mapped 模型目录导出已在当前源码实现，尚未随本轮打包、发布或安装；旧核心须升级后才有此行为。
+
 ### `agent discover` / `agent enroll` / `agent sync`
 
 ```text
@@ -502,13 +504,13 @@ anchor agent sync ID --revision N
 
 发现范围为绝对路径 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`DSH_HOME`，以及 `~/.codex`、`~/.claude`、`~/.dsh`、`~/.gemini`、`~/.config/opencode`；Windows 另查用户 `AppData/Roaming/opencode`。同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录痕迹不证明已安装或运行。当前 Codex、Claude Code、DSH 可托管；Gemini/OpenCode 只识别。
 
-`enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不读本地模型缓存、不生成 Codex 专有模型目录。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
+`enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不依赖本地模型缓存；Codex 会生成 Anchor 自有的模型目录并设置 `model_catalog_json`，Claude/DSH 则更新各自配置内的名单。Codex 优先保留模型已声明的元数据，或复用接管前配置明确引用、且位于配置根内的本地目录中精确公开 ID／唯一上游 ID 匹配项；不改写用户目录文件，停止托管时恢复原目录指针。没有模板时只导出保守模型条目，不推测指令、上下文长度或推理档位。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
 
 仅 Codex all-compatible 要求 tools/streaming、精确版本匹配的完整 Codex 元数据与本地 `models_cache.json`（最多4 MiB、128条，有效 `client_version=X.Y.Z`）。`--template ALIAS:SOURCE` 可重复，空源排除别名；未指定时依次使用共享元数据、精确别名或唯一上游 slug 匹配。其他范围不接受非空模板覆盖。发现时缓存缺失/无效不阻止 all-mapped 托管，兼容目录登记失败则需要核对缓存和版本，不伪造元数据。
 
 登记为新绑定创建凭据；更新保留凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需要重新 discover 检查。成功返回 workspace。默认开关关闭，初次点击展开平台设置；点「开启托管」才提交批准，成功后开关打开。设置、目录和同步全部收进对应平台折叠区域。
 
-`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。先校验新配置，再条件恢复和重新应用；第三方冲突保留并报告，失败不重放。网关授权按当前映射动态计算，客户端配置中的模型列表为应用时快照，模型变更后用 sync 更新。Codex/Claude Code 需要重启，DSH 默认模型在新会话生效。配置写入成功不证明真实请求已通过 Anchor。
+`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。正常 applied 绑定先校验并原位更新配置／目录，保留最初恢复基线与凭据，不先把用户原配置写回；其他可修复状态仍走条件恢复再应用。第三方冲突保留并报告，失败不重放。模型映射通过管理入口新增、修改、删除（含 Fast/Ultrafast 分身、模型设置／路由）以及供应商启停／候选变化后，核心会自动刷新已启用且已接管 Agent 的名单，不再要求每次手动 sync；single/all-compatible/all-mapped 仍各守原有授权范围，不扩大权限、不自动登记或复活已恢复的目标。`sync` 保留作手动重试入口。映射保存成功不因某个 Agent 同步冲突而回滚；Agent 状态会报告 needs_sync／overridden／recovery_pending，HTTP 成功响应带 `X-Anchor-Agent-Sync: applied|needs_sync`。默认模型失去可用候选时不会擅自换默认值，需先处理默认模型再同步。Codex/Claude Code 需要重启，DSH 默认模型在新会话生效。配置写入成功不证明真实请求已通过 Anchor。
 
 ### `agent add`
 

@@ -1,7 +1,6 @@
 package managed
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -51,6 +50,7 @@ type catalogArtifact struct {
 	Written []byte `json:"written"`
 }
 type journal struct {
+	Previous       *previousWrite   `json:"previous,omitempty"`
 	Schema         int              `json:"schema"`
 	BindingID      string           `json:"binding_id"`
 	AdapterVersion string           `json:"adapter_version"`
@@ -125,6 +125,14 @@ func (e *Engine) load(id string) (journal, error) {
 	}
 	if j.Catalog != nil && (filepath.Dir(j.Catalog.Path) != filepath.Dir(j.Path) || filepath.Base(j.Catalog.Path) != catalogName(id) || len(j.Catalog.Written) > maxConfig || !json.Valid(j.Catalog.Written)) {
 		return j, ErrUnsafe
+	}
+	if j.Previous != nil {
+		if j.Status != "prepared" && j.Status != "conflict" {
+			return j, ErrUnsafe
+		}
+		if a := j.Previous.Catalog; a != nil && (j.Catalog == nil || a.Path != j.Catalog.Path || len(a.Written) > maxConfig || !json.Valid(a.Written)) {
+			return j, ErrUnsafe
+		}
 	}
 	return j, nil
 }
@@ -295,7 +303,7 @@ func (e *Engine) Recover(id string) (Result, error) {
 		for i, x := range j.Edits {
 			switch {
 			case equal(values[i], x.Before):
-			case equal(values[i], x.After):
+			case equal(values[i], x.After) || previousValue(j, x.Path, values[i]):
 				edits = append(edits, Edit{Path: x.Path, Before: values[i], After: x.Before})
 			default:
 				out.Conflicts = append(out.Conflicts, x.Path)
@@ -351,6 +359,9 @@ func (e *Engine) Recover(id string) (Result, error) {
 			out.Status = "conflict"
 		}
 		j.Status = out.Status
+		if out.Status == "restored" {
+			j.Previous = nil
+		}
 		return e.save(j)
 	})
 	return out, err
@@ -383,7 +394,7 @@ func (e *Engine) Status(id string) (Result, error) {
 		if j.Status == "prepared" || j.Status == "conflict" {
 			// Original or written values are both explainable after a crash
 			// or partial restore. Only third values constitute a conflict.
-			if !equal(values[i], x.Before) && !equal(values[i], x.After) {
+			if !equal(values[i], x.Before) && !equal(values[i], x.After) && !previousValue(j, x.Path, values[i]) {
 				out.Status = "conflict"
 				out.Conflicts = append(out.Conflicts, x.Path)
 			}
@@ -397,7 +408,7 @@ func (e *Engine) Status(id string) (Result, error) {
 		if err != nil {
 			return out, err
 		}
-		if !exists || !bytes.Equal(raw, j.Catalog.Written) {
+		if !exists || !catalogWritten(j, raw) {
 			if j.Status == "applied" {
 				out.Status = "overridden"
 				out.Conflicts = append(out.Conflicts, []string{"catalog", filepath.Base(j.Catalog.Path)})
@@ -442,7 +453,7 @@ func (e *Engine) recoverCatalog(j journal, out *Result) error {
 		return nil
 	}
 	conflict := func() { out.Conflicts = append(out.Conflicts, []string{"catalog", filepath.Base(a.Path)}) }
-	if !bytes.Equal(raw, a.Written) {
+	if !catalogWritten(j, raw) {
 		conflict()
 		return nil
 	}
@@ -463,7 +474,7 @@ func (e *Engine) recoverCatalog(j journal, out *Result) error {
 	if !exists {
 		return nil
 	}
-	if !bytes.Equal(current, a.Written) {
+	if !catalogWritten(j, current) {
 		conflict()
 		return nil
 	}

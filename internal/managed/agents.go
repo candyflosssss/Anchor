@@ -140,6 +140,20 @@ func (a StructuredAgent) Plan(b state.Binding, g GatewayBinding) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
+	return a.planFrom(b, g, raw, exists, "")
+}
+
+func (a StructuredAgent) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool, _ string) (Plan, error) {
+	if err := b.Validate(); err != nil {
+		return Plan{}, err
+	}
+	if !g.Ready {
+		return Plan{}, ErrUnsafe
+	}
+	inspection, err := a.Inspect(b)
+	if err != nil {
+		return Plan{}, err
+	}
 	paths, after, err := a.desired(b, g, raw)
 	if err != nil {
 		return Plan{}, err

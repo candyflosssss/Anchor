@@ -428,3 +428,11 @@
 - 旧 → 新：普通映射仍透传调用方档位；可同一事务额外创建 `ALIAS(fast)`、`ALIAS(ultrafast)`，固定发送 `priority`、`ultrafast`，上游模型名不变。单个公开模型 ID 允许上述保留后缀，其他 ID 规则不放宽。模型设置、路由、定价及 Agent 模板入口同步接受精确分身 ID。
 - 兼容与迁移：无须重建数据，旧模型缺字段时不固定档位。`provider model-put` 省略／null 保留固定策略，显式空值解除；`model put` 为完整模型写入，省略档位会恢复不固定。须同步更新客户端与核心；旧核心不支持新字段／ID。分身是独立快照，仅复制本供应商渠道，不自动扩大 Agent 绑定范围或同步后续编辑；名称或 revision 冲突整体回滚，不自动重试。上游支持与费用由操作者确认，不发送付费探测，不复制普通档位参考价。
 - 验证：state、core、protocol、client、catalog、naming、cli、desktop、managed 九包完整测试通过；覆盖模拟上游普通／流式档位注入和降级日志、共享样例、真实 Go 桥接读写／冲突、原子回滚、CLI 帮助与请求参数、Codex 目录分身。前端类型检查、21 项定向单测、变更文件 ESLint 和 2 项单 worker Chromium 交互用例通过。首次类型检查受 256 MiB Node 堆上限失败，调整至受限 768 MiB 后通过；系统 Chrome 启动 SIGTRAP，改用已安装 Playwright headless shell 后用例通过。未调用真实付费上游，未改本机 Agent 配置，未打包、安装或发布，原生两平台窗口未验收。
+
+## 2026-10-15 — 映射保存后自动刷新已托管 Agent 模型名单（当前源码，未发布）
+
+- 类型：修改行为；没有新增命令或参数。
+- 指令与参数：`model add|put`、`model settings --file`、`model routing`、`provider add|put|model-put|model-delete|delete|rename` 等既有管理写入口，以及 `agent sync`／核心启动核验；CLI 与桌面共用核心实现。
+- 旧 → 新：网关授权原本已动态变化，但客户端名单需要手动 sync，且 Codex all-mapped 不导出目录。现在映射／设置／路由和供应商候选变化提交后，自动刷新已启用且已接管的 Codex、Claude Code、DSH；Fast/Ultrafast 独立映射也进入原 scope 允许的名单。Codex all-mapped 生成 Anchor 自有目录并管理指针，不再要求版本匹配缓存；只读复用接管前明确引用的配置根内本地模板，无模板时使用保守模型条目，不推断指令、上下文或推理能力。
+- 兼容与迁移：不扩大 scope，不旋转凭据，不自动登记或复活恢复后的目标。正常 applied 状态的自动／手动同步与启动过期快照更新改为原位条件写入，保留首次恢复基线；中断 journal 同时识别上次与下次 Anchor 写入。外部修改保留并报告，单个 Agent 失败不回滚已提交映射、不阻断其他 Agent；HTTP 通过 `X-Anchor-Agent-Sync: applied|needs_sync` 报告同步结果，状态接口沿用 needs_sync／overridden／recovery_pending。默认模型不可用时不擅自替换，处理后可手动 `agent sync`。须升级正在运行的核心；Codex／Claude 仍需重启读取变化，DSH 默认模型需新会话，文件更新不证明上游支持加速或客户端实时刷新。
+- 验证：`go test -p 1 ./internal/managed ./internal/core ./internal/cli ./internal/client ./internal/desktop ./internal/state` 通过，使用隔离状态和模拟上游。新增回归覆盖普通 PUT、分身、设置／路由、映射删除、供应商启停／删除触发、失败写入不触发、单目标冲突隔离、原始目录／指针及凭据保留、清除覆盖值、无变化不改写、旧 journal 升级、single／禁用／已恢复范围与中断前后配置／目录组合恢复。初轮测试夹具权限、无效模板字段检测及删除仍被引用供应商的断言已修正后通过。未修改本机 Agent 配置，未运行真实客户端／付费上游验收，未打包、安装或发布。

@@ -107,6 +107,7 @@ init/serve/access/context/recover/update/agent token operate locally. Business c
 Codex, Claude Code user settings and DSH web profile management are available; runtime connection remains unverified.
 Codex CLI enrollment defaults to all-compatible; Claude/DSH and desktop enrollment use all-mapped.
 All-mapped reads model mappings with enabled providers, without Codex metadata/tools/streaming filters.
+Mapping/provider changes automatically refresh applied Agent model lists; agent sync remains a manual retry.
 All-compatible requires exact-version Codex metadata and the selected local models_cache.json for enrollment.
 --codex-home remains a Codex-only alias for --config-root. No executable or upstream probing.
 Restart Codex/Claude Code after changes; DSH defaults apply to new sessions.
