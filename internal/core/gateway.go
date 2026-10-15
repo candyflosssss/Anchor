@@ -86,6 +86,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "invalid_json", "a JSON request object is required")
 		return
 	}
+	observeRequestedServiceTier(r, request)
 	var modelID string
 	if err = json.Unmarshal(request["model"], &modelID); err != nil || !state.ValidID(modelID) {
 		fail(w, 400, "invalid_model", "a public model ID is required")
@@ -220,6 +221,10 @@ func (s *Server) protocolHandler(from string) http.HandlerFunc {
 			fail(w, 413, "request_too_large", "request exceeds limit")
 			return
 		}
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(raw, &fields) == nil && fields != nil {
+			observeRequestedServiceTier(r, fields)
+		}
 		converted, err := protocol.ConvertRequest(raw, from, "responses")
 		if err != nil {
 			fail(w, 400, "unsupported_conversion", "unsupported field or content for protocol conversion")
@@ -257,6 +262,8 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		if _, exists := t.row.Evidence["model_revision"]; !exists {
 			t.row.Evidence["model_revision"] = strconv.FormatInt(t.row.Revision, 10)
 		}
+		// Do not carry a prior candidate's reported tier into a failed retry.
+		delete(t.row.Evidence, "upstream_service_tier")
 		t.row.Revision = p.Revision
 		t.row.Code = ""
 	}
@@ -327,7 +334,11 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		if err := s.Store.RecordUsage(u); err != nil {
 			s.Log.Error("usage persistence failed")
 		}
-		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "upstream_model", c.Model, "protocol", p.Protocol, "status", status, "success", success, "elapsed_ms", u.ElapsedMS)
+		reportedTier := observation.ServiceTier
+		if reportedTier == "" {
+			reportedTier = "unknown"
+		}
+		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "upstream_model", c.Model, "protocol", p.Protocol, "status", status, "success", success, "elapsed_ms", u.ElapsedMS, "requested_service_tier", requestedServiceTier(request), "upstream_service_tier", reportedTier)
 	}()
 	request["model"], _ = json.Marshal(c.Model)
 	raw, _ := json.Marshal(request)
@@ -447,9 +458,12 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		fail(w, 502, "invalid_upstream_response", "upstream response incomplete or oversized")
 		return false
 	}
+	m, decodeErr := protocol.Decode(data)
+	if decodeErr == nil {
+		observation.ServiceTier = protocol.ReadServiceTier(m, p.Protocol)
+	}
 	if p.Protocol == to {
-		m, e := protocol.Decode(data)
-		if e != nil {
+		if decodeErr != nil {
 			fail(w, 502, "invalid_upstream_response", "invalid upstream JSON")
 			return false
 		}

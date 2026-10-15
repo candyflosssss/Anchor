@@ -404,3 +404,11 @@
 - 旧 → 新：默认 false → true，与桌面新建映射一致；帮助明确使用 `--streaming=false` 关闭。`--tools` 默认 false 不变。
 - 兼容与迁移：不批量迁移已有映射，不改变管理 API 的布尔字段语义。上述命令写入时省略参数会声明流式支持；`model put` 和编辑用的 `provider model-put` 若要维持关闭状态，须显式传 `--streaming=false`。追加已有公开别名仍保留共享能力。默认开启不代表上游能力已验证。
 - 验证：CLI 模拟管理接口测试覆盖上述创建／编辑入口的省略、显式开启和显式关闭，并断言工具默认值不变；帮助回归检查默认 true 与显式关闭说明。
+
+
+## 2026-10-15 — 请求日志记录服务档位（未发布）
+
+- 类型：兼容性诊断输出扩展，无新增命令／参数。
+- 旧 → 新：`logs detail` / `logs export` 的代理请求 evidence 新增安全 `requested_service_tier` 与可选 `upstream_service_tier`，区分请求 Fast / Ultrafast 与上游实际报告，可观察降级；`logs list` 仍省略 evidence。
+- 兼容与迁移：沿用 evidence 字典，无数据库迁移；旧历史不补写；未指定、Auto、未知和 Standard 分开，不改变协议转发或付费档位选择。调用方应容忍新增 evidence 键。
+- 验证：模拟上游覆盖 JSON／SSE 的 Fast、Ultrafast、降级、未返回、自动与未知值；经现有类型化客户端验证详情与导出，未调用真实付费上游。

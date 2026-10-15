@@ -680,6 +680,8 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts/evidence 大字段，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 
+2026-10-15 当前源码（未发布）：`logs detail REQUEST_ID` 与 `logs export` 在代理请求的已有 `evidence` 字典中提供 `requested_service_tier`（入站 JSON 请求值，未指定为 `unspecified`）和可选 `upstream_service_tier`（最后候选的上游 JSON / SSE 返回值）。`priority` / `fast` 代表 Fast，`ultrafast` 代表 Ultrafast，`default` 代表 Standard；`auto` 不等于已确认 Standard 或 Fast。未知／非字符串值脱敏为固定 `unknown`，缺少上游字段表示未知，不以请求值补齐。不改变请求或跨协议能力，历史不补写；`list` 仍省略 evidence，命令参数与退出码不变。
+
 2026-10-15 当前源码（未发布）：请求 `metrics` 新增可空的 `time_to_first_output_ms`，表示从根请求开始到首个非空正文或工具调用参数增量（含 Responses 自定义工具输入）；角色、心跳、空增量、工具空壳与单独思考不计入。`time_to_first_text_ms` 继续只表示正文首字，原有正文指标继续保留，当前界面采用下述新增输出指标计算输出 TPS。旧历史缺少新字段时不补算；升级正在处理请求的核心后仅对新请求采集，旧桌面可忽略新增字段。
 
 2026-10-15 当前源码（未发布）：请求 `metrics` 新增可空的 `output_generation_ms`、`non_reasoning_output_tokens` 和布尔 `output_interval_complete`。输出耗时从首次有效正文或工具参数增量到协议完成，不含首字前等待；非思考输出 Token = 本次成功尝试的确认输出 Token − 思考 Token，包含正文和工具参数，无思考事件的 Anthropic 沿用既有规则。桌面输出 TPS = 非思考输出 Token / 输出耗时秒数，只有流式、成功完整区间、可分离且为正的 Token 和耗时时显示；纯思考、中断、缺用量或无法分离思考时未知。区间可能包含交错思考或等待，并非纯解码速度。`generation_ms/output_text_tokens/text_interval_complete` 仍为原有正文指标；旧日志不补写，桌面只对已确认的完整正文统计作兼容回退。`logs list/detail/follow/export` 沿用既有入口输出新增字段，无新命令或参数；需要升级处理请求的核心才对新记录生效。

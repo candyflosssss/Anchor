@@ -37,6 +37,8 @@
 
 2026-10-13 当前源码（未发布）修正完成响应的取消误判：协议正常结束且响应写入成功后，即使客户端在日志／用量收尾前断开，也保留 succeeded/complete；尚未完成或写入失败时的客户端取消仍保存 cancelled。已经写出 HTTP 200 数据的失败请求保存 partial；没有写出数据则 none。success/complete 只表示本机写入没有报错，不代表最终用户确认收到。历史记录不自动重判；输出 TPS 是否可计算由完整输出区间及可确认的非思考输出 Token 决定，与结果标签独立。旧 pending 在核心重新打开数据库时改为 interrupted/core_interrupted，交付结果 unknown；NORMAL WAL 在突然断电时可能丢失最近批次，不承诺断电零损失。
 
+2026-10-15 当前源码（未发布）：代理日志详情及 JSONL 导出的 `evidence.requested_service_tier` 记录入站 JSON 的 `service_tier`，未传为 `unspecified`；`evidence.upstream_service_tier` 记录最后候选的 OpenAI 兼容 JSON 或 SSE `response` / Chat Completions 对象返回值，未返回则缺省，不能用请求档位推断实际档位。`priority` / `fast` 显示 Fast，`ultrafast` 显示 Ultrafast，`default` 显示 Standard；`auto`、`flex`、`scale` 单独显示，不算已确认 Fast。未知或非字符串值只保存固定 `unknown`，不存任意原始值。SSE 后续报告覆盖先前报告（例如 priority → default）；切换候选清除前一候选的返回档位，中断／失败中已观测到的返回值仍保留。桌面详情新增“服务档位”区与复制摘要，不新增列表字段或逐尝试持久字段；列表仍省略 evidence，历史日志显示未知且不补写，probe 不据此推断档位。核心运行日志 `model request` 也输出安全的请求／上游档位；仅观测，不改写请求、不启用服务档位、不改变跨协议转换支持范围，不根据速度判断付费服务档位。
+
 ## 4. 存储、性能与保留
 
 独立 `logs.db` 与 state.db 位于同一受保护 data-dir。SQLite WAL、单写连接、两个只读连接、2048 项非阻塞队列、128 项批量、100 ms 刷新。提交时形成不可变的有界 JSON 快照；单请求上限 32 KiB、系统事件 4 KiB，队列满/超限立即丢弃并计数，转发不等待日志数据库。生产者仍承担字段整理及有界 JSON 编码成本。

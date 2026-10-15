@@ -155,6 +155,9 @@ func setLogMetrics(t *requestTrace, obs protocol.Observation, u protocol.Usage, 
 	if t == nil {
 		return
 	}
+	if obs.ServiceTier != "" {
+		t.row.Evidence["upstream_service_tier"] = obs.ServiceTier
+	}
 	if !obs.FirstOutput.IsZero() {
 		ms := obs.FirstOutput.Sub(t.start).Milliseconds()
 		t.row.Metrics.TimeToFirstOutputMS = &ms

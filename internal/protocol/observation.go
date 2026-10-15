@@ -4,6 +4,7 @@ import "time"
 
 // Observation retains timing and structural facts only, never generated content.
 type Observation struct {
+	ServiceTier string
 	FirstOutput time.Time
 	FirstText   time.Time
 	Terminal    time.Time

@@ -81,6 +81,7 @@ func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model strin
 		if e != nil {
 			return e
 		}
+		observation.observeServiceTier(m, from)
 		if m["error"] != nil || m["type"] == "error" || m["type"] == "response.failed" {
 			return errors.New("upstream stream failed")
 		}
