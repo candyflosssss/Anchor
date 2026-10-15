@@ -1,3 +1,4 @@
+import { executeMappingBatch, type MappingBatchOperation, type MappingBatchPatch, type MappingBatchReport } from './provider-mapping-batch.model';
 import { useEffect, useRef, useState } from 'react';
 import { ProviderProblem, problemText, type Provider, type ProviderTransport } from './provider.model';
 import { actionFor, catalogImportPlan, type Action, type Workspace } from './provider-features.model';
@@ -16,6 +17,7 @@ export function useProviderFeatures(p: Provider | null, transport: ProviderTrans
   const query = useRef<AbortController | null>(null); const write = useRef<AbortController | null>(null); const lock = useRef(false);
   const epoch = useRef(0); const lastId = useRef<string | null>(null);
   const recoveringConflict = useRef(false);
+  const batchStopping = useRef(false);
   const after = useRef(changed); after.current = changed;
   const begin = useRef(started); begin.current = started;
   const current = useRef(p); current.current = p;
@@ -127,7 +129,32 @@ export function useProviderFeatures(p: Provider | null, transport: ProviderTrans
     }
   }
 
+  async function runMappingBatch(snapshot: Workspace, ids: string[], operation: MappingBatchOperation, patch: MappingBatchPatch, progress: (report: MappingBatchReport) => void) {
+    const target = current.current;
+    if (!target || snapshot.provider_id !== target.id || lock.current || query.current || needsRead) return false;
+    begin.current?.();
+    lock.current = true; batchStopping.current = false; setBusy(true); setError(''); setNotice('');
+    const abort = new AbortController(); write.current = abort;
+    const generation = epoch.current;
+    const active = () => !abort.signal.aborted && generation === epoch.current;
+    try {
+      const report = await executeMappingBatch({
+        workspace: snapshot, ids, operation, patch, transport, signal: abort.signal,
+        stopping: () => batchStopping.current,
+        progress: report => { if (active()) progress(report); },
+        saved: result => { if (active()) setData(result); },
+      });
+      if (!active()) return false;
+      setNeedsRead(report.needsRead); setError(report.error);
+      // Reconcile only once. A failed/unknown write requires an explicit reread, not a replay.
+      if (!report.needsRead) await after.current(target.id, operation === 'delete' ? 'model-delete' : operation === 'edit' ? 'model-put' : 'test', target.id);
+      return true;
+    } finally {
+      if (active()) { lock.current = false; setBusy(false); write.current = null; }
+    }
+  }
+
   const visibleData = data && p && data.provider_id === p.id ? data : null;
-  return { data: visibleData, busy: busy || reading, isBusy: () => lock.current, error, notice, needsRead, refresh, run, importModels, importStatus };
+  return { data: visibleData, busy: busy || reading, isBusy: () => lock.current, error, notice, needsRead, refresh, run, importModels, importStatus, runMappingBatch, stopMappingBatch: () => { batchStopping.current = true; } };
 }
 export type ProviderFeatures = ReturnType<typeof useProviderFeatures>;

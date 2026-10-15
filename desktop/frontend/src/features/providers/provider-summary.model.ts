@@ -1,3 +1,4 @@
+import type { MappingBatchOperation } from './provider-mapping-batch.model';
 import { channelAvailability, type ChannelAvailability } from './channel-availability.model';
 import type { Probe, Workspace } from './provider-features.model';
 import type { KeyStatus } from '../../desktop/contract.generated';
@@ -7,6 +8,7 @@ import type { Provider } from './provider.model';
 export type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'unknown';
 export type DetailTab = 'overview' | 'keys' | 'models' | 'usage' | 'account';
 export type ProviderDialog =
+  | { kind: 'mapping-batch'; operation: MappingBatchOperation; workspace: Workspace; ids: string[] }
   | { kind: 'test'; model?: string; keyId?: string; keyIds?: string[] }
   | { kind: 'rename' } | { kind: 'copy' } | { kind: 'delete' }
   | { kind: 'key'; keyId?: string }

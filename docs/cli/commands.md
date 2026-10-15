@@ -659,6 +659,7 @@ anchor recover [--id ID]
 | 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，当前源码账户／模型映射页已接分组倍率，账单页面未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
 | 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --tools --streaming | 桌面新建默认开启两项能力；CLI 流式同样默认开启，工具仍须 `--tools`。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
+| 供应商模型映射多选测试／编辑／删除（桌面源码） | 读取 provider workspace 后逐项 provider test/model-put/model-delete | 无专用批量命令；桌面串行复用既有动作，显式确认用量／删除，编辑默认保留各自未改字段，能力／策略／档位仍是公开模型共享属性。采用确认时供应商及模型 revision，管理／传输错误首错停止、显示部分结果并要求重读，不自动重试；停止在当前请求完成后生效。CLI 语法、输出、默认值与退出行为不变 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |

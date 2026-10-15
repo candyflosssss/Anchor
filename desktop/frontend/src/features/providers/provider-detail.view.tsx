@@ -1,3 +1,4 @@
+import { useMappingSelection } from './use-provider-mapping-batch';
 import { KeyMultiplierView } from './key-multiplier.view';
 import { probeFailureText } from './provider-test.model';
 import { ProviderCatalogView } from './provider-catalog.view';
@@ -74,7 +75,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
       {c.detailTab === 'account' ? <ProviderAccountView c={c} /> : !w ? (!f.error && <div className="empty-state compact" role="status"><LoaderCircle className="loading-icon" size={24} /><p>正在读取 Key、模型与用量…</p></div>)
         : c.detailTab === 'overview' ? <OverviewTab c={c} p={p} w={w} />
         : c.detailTab === 'keys' ? <KeysTab c={c} w={w} disabled={blocked} ask={setAsk} />
-        : c.detailTab === 'models' ? <ModelsTab c={c} w={w} disabled={blocked} ask={setAsk} />
+        : c.detailTab === 'models' ? <ModelsTab key={w.provider_id} c={c} w={w} disabled={blocked} ask={setAsk} />
         : <UsageTab c={c} w={w} disabled={blocked} />}
     </div>
     <ConfirmAction open={!!ask} title={ask?.title ?? ''} busy={f.busy} onCancel={() => setAsk(null)} onConfirm={() => { if (ask) void f.run(ask.action, { ...ask.fields, approved: true }).then(() => setAsk(null)); }}>
@@ -157,12 +158,24 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
 }
 
 function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace; disabled: boolean; ask: (a: Ask) => void }) {
+  const selection = useMappingSelection(w);
+  const batch = (operation: 'test' | 'edit' | 'delete') => c.openDialog({ kind: 'mapping-batch', operation, workspace: structuredClone(w), ids: [...selection.ids] });
   return <div className="stack">
     <section className="detail-card">
       <div className="card-toolbar"><div><h2>模型映射</h2><p className="card-hint">供应商倍率 {c.selected?.cost_multiplier}× · 相对倍率 = 供应商倍率 × Key 缓存分组倍率</p></div>
         <Button variant="outline" disabled={disabled} onClick={() => c.openDialog({ kind: 'mapping' })}><Plus />手动添加映射</Button></div>
-      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col">来源 Key / 相对倍率</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
+      {w.models.length > 0 && <div className="card-toolbar" role="group" aria-label="模型映射批量操作">
+        <span className="card-hint" role="status">已选 {selection.ids.length} / {w.models.length} 个映射</span>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" disabled={disabled || !selection.ids.length || c.features.needsRead} onClick={() => batch('test')}><Play />批量测试</Button>
+          <Button size="sm" variant="outline" disabled={disabled || !selection.ids.length || c.features.needsRead} onClick={() => batch('edit')}><Pencil />批量编辑</Button>
+          <Button size="sm" variant="outline" disabled={disabled || !selection.ids.length || c.features.needsRead} onClick={() => batch('delete')}><Trash2 />批量删除</Button>
+          <Button size="sm" variant="ghost" disabled={disabled || !selection.ids.length} onClick={selection.clear}>清空选择</Button>
+        </div>
+      </div>}
+      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col"><input type="checkbox" aria-label="全选模型映射" checked={selection.all} disabled={disabled} ref={node => { if (node) node.indeterminate = selection.ids.length > 0 && !selection.all; }} onChange={event => selection.selectAll(event.target.checked)} /></th><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col">来源 Key / 相对倍率</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
         {w.models.map(m => <tr key={m.id}>
+          <td><input type="checkbox" aria-label={`选择模型映射 ${m.id}`} checked={selection.ids.includes(m.id)} disabled={disabled} onChange={event => selection.toggle(m.id, event.target.checked)} /></td>
           <td className="mono">{m.id}</td><td className="mono break-all">{m.upstream}</td>
           <td className="cell-hint">{[m.tools && '函数工具', m.streaming && '流式输出'].filter(Boolean).join(' · ') || '基础'}</td>
           <td className="cell-hint">{w.keys.filter(k => m.key_ids.length ? m.key_ids.includes(k.id) : k.enabled).map(k => <div key={k.id}><strong className="mono">{k.id}</strong><KeyMultiplierView value={k} /></div>)}{!w.keys.length && '匿名来源 · 倍率未知'}</td>

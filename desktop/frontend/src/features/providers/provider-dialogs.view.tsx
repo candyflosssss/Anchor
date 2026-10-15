@@ -1,3 +1,4 @@
+import { ProviderMappingBatchDialog } from './provider-mapping-batch.view';
 import { routingRules } from '../models/model-routing.model';
 import { isValidModelAlias } from './provider-features.model';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
@@ -16,12 +17,13 @@ import type { ProviderController } from './use-provider-controller';
 export function ProviderDialogs({ c }: { c: ProviderController }) {
   const d = c.dialog; const p = c.selected;
   if (!d || !p) return null;
+  if (d.kind === 'mapping-batch') return <ProviderMappingBatchDialog c={c} d={d} />;
   return <Shell key={`${p.id}:${d.kind}`} c={c} d={d} />;
 }
 
-const titles: Record<ProviderDialog['kind'], string> = { test: '测试连通', rename: '改名', copy: '复制为新供应商', delete: '删除供应商', key: 'Key', mapping: '模型映射' };
+const titles: Record<ProviderDialog['kind'], string> = { 'mapping-batch': '批量操作模型映射', test: '测试连通', rename: '改名', copy: '复制为新供应商', delete: '删除供应商', key: 'Key', mapping: '模型映射' };
 
-function Shell({ c, d }: { c: ProviderController; d: ProviderDialog }) {
+function Shell({ c, d }: { c: ProviderController; d: Exclude<ProviderDialog, { kind: 'mapping-batch' }> }) {
   const [tried, setTried] = useState(false);
   const f = c.features;
   const close = () => { if (!f.busy || !f.data) c.closeDialog(); };
