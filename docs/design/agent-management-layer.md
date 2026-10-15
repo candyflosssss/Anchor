@@ -354,3 +354,8 @@ Claude 仅写用户 settings.json 的 model/availableModels、Anthropic 基址�
 DSH 仅写已有 profiles/web 下 cordis.patch.yml：llm-pi-ai 的 Anchor 命名路由通过 openai-completions、/v1 基址和 Authorization Binding token，agent-default-model 指向公开映射。已存在路由只改本绑定字段，缺失行按整行所有权创建/恢复。保留未知插件、其他路由和 YAML 注释/标量标签，拒绝含 insert、别名/合并或重复键的复杂文档。
 
 两个新适配器的配置含受限网关 token，原子发布前设置当前用户权限；不写供应商密钥，管理 DTO 不暴露 token。DSH 自定义 header 不提供客户端日志脱敏保证。Claude/Codex 重启客户端；DSH 默认值需新会话。Gemini/OpenCode、其他 profile、真实客户端端到端和原生 Windows 仍未验收。
+
+
+### 2026-10-15 desktop.37 dev 发布状态
+
+映射变动自动同步、Codex all-mapped 自有目录与安全原位更新已随 desktop.37 发布到 dev 在线更新渠道。六包 Go 回归已通过；本次完成双平台编译、打包、在线投放与 Linux 默认源实际下载，未安装本机或验收真实 Codex／Claude／DSH 原生加载。名单落盘不等于客户端加载或真实付费上游可用；用户需升级核心并重启对应客户端。独立 CLI 公开预发行仍为 alpha.6。

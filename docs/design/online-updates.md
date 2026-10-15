@@ -1,8 +1,8 @@
 # 在线更新 v1
 
-- 日期：2026-10-15；**`0.1.0-dev.desktop.36` 已于北京时间 2026-10-15 16:03:45 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
-- 本版新增可选 Fast／Ultrafast 独立模型分身，由 Anchor 显式固定上游服务档位，日志区分调用方／策略／上游实际值；不保证供应商支持或费用，也不强开 Codex 原生速度菜单。构建 revision `f7e961f405a1515f89b412051937fe9d0ecd202c`，SOURCE.json dirty=false。两平台生产构建、六附件大小／digest、vendored 源码／元数据及 tag 核对通过；隔离目录默认源从 `.35` 发现 `.36` 并实际下载 Linux 包，大小／SHA256校验通过。未安装本机或验收原生安装器／真实付费上游。详见[当前在线 dev 版 `.36`](../release/desktop.md#当前在线-dev-版-36)。
-- **首次迁移限制**：沿用 `.35` 的安全 `restart_handoff` 交接；desktop.34 及更早版不含修复，不能反向修复旧升级器。旧版可检查／下载，但首次迁移须备份、安排维护窗口、普通停止旧核心／退出全部界面、手动安装 `.36` 并重新打开，核对核心与 Agent 真实连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；主机与核心均升级后，后续更新才使用保留交接。仍有停机窗口，不自动启动核心或重载既有 Codex 会话；沿用 schema8，无数据库降级。
+- 日期：2026-10-15；**`0.1.0-dev.desktop.37` 已于北京时间 2026-10-15 17:00:56 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
+- 模型映射设置新增「速度与分身」入口；映射新增／修改／删除后自动同步已托管 Agent，Codex all-mapped 生成 Anchor 自有模型目录。保留原用户目录、恢复基线及凭据；不强开 Codex 原生速度菜单，不保证上游支持、权限或费用。 构建 revision `45ac60087a4a046cbcc47c46f22dae19d880fd2b`，SOURCE.json dirty=false。Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.36` 发现／实际下载 Linux 包通过。复用功能任务六包 Go、27 项单元测试、8 项浏览器测试与类型／定向 lint 结果；本轮未重跑完整套件，未安装本机、未执行原生 Codex／Claude／DSH 加载、原生窗口／安装器／apply 或真实付费上游验收。 详见[当前在线 dev 版 `.37`](../release/desktop.md#当前在线-dev-版-37)。
+- **首次迁移限制**：沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.37` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺自动启动核心或既有会话重连。Codex／Claude 需重启（含对应 app-server）加载新名单，DSH 默认模型需新会话；远端核心另行升级。 沿用 schema8，无数据库降级。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 

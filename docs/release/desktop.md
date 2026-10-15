@@ -1,11 +1,11 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-15。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.36`，北京时间 2026-10-15 16:03:45 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：供应商映射表单可选额外创建 Fast／Ultrafast 独立模型，Anchor 固定注入 `priority`／`ultrafast` 服务档位；普通模型不变。日志区分调用方、Anchor 策略与上游实际档位，并含已提交的日志布局／缓存命中率改进。不强开 Codex 原生速度菜单，不保证供应商支持、权限或价格；详见[模型分身](../design/model-speed-variants.md)。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.36` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；不承诺零停机、自动启动或既有会话重连。
-- 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。远端核心须另行升级。
-- 验证：干净隔离源码 `f7e961f405a1515f89b412051937fe9d0ecd202c`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.35` 发现／实际下载 Linux 包通过。复用功能任务九包 Go、21 项 Vitest、两项 Playwright、类型与定向 ESLint 结果，发布轮次未重跑套件、未安装本机、未执行原生窗口／安装器／apply 或真实付费上游验收。本机后续升级事实与本地验收边界见第 3 节。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.37`，北京时间 2026-10-15 17:00:56 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：模型映射设置新增「速度与分身」入口；映射新增／修改／删除后自动同步已托管 Agent，Codex all-mapped 生成 Anchor 自有模型目录。保留原用户目录、恢复基线及凭据；不强开 Codex 原生速度菜单，不保证上游支持、权限或费用。 详见[模型分身](../design/model-speed-variants.md)与[Agent 托管](../design/agent-management-layer.md)。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.37` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺自动启动核心或既有会话重连。Codex／Claude 需重启（含对应 app-server）加载新名单，DSH 默认模型需新会话；远端核心另行升级。
+- 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
+- 验证：干净隔离源码 `45ac60087a4a046cbcc47c46f22dae19d880fd2b`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.36` 发现／实际下载 Linux 包通过。复用功能任务六包 Go、27 项单元测试、8 项浏览器测试与类型／定向 lint 结果；本轮未重跑完整套件，未安装本机、未执行原生 Codex／Claude／DSH 加载、原生窗口／安装器／apply 或真实付费上游验收。
 
 ## 1. 安装与使用行为
 
@@ -28,7 +28,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.36_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.37_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -85,7 +85,17 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 ## 3. 产物、在线投放与实际构建状态
 
 
-### 当前在线 dev 版 `.36`
+### 当前在线 dev 版 `.37`
+
+`0.1.0-dev.desktop.37` 从干净隔离 worktree 的 `45ac60087a4a046cbcc47c46f22dae19d880fd2b` 构建，于北京时间 2026-10-15 17:00:56 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.37)（非 latest），tag 指向实际构建提交，未混入工作区未提交余额改动。
+
+模型映射设置新增「速度与分身」入口；映射新增／修改／删除后自动同步已托管 Agent，Codex all-mapped 生成 Anchor 自有模型目录。保留原用户目录、恢复基线及凭据；不强开 Codex 原生速度菜单，不保证上游支持、权限或费用。
+
+本地输出 `dist/desktop/0.1.0-dev.desktop.37/`，`publication/` 六附件含 Windows NSIS、Ubuntu24.04 AMD64 deb、flat 更新清单、对应源码（含 Go vendor）、许可／构建元数据 ZIP 和总校验清单。BUILD.json 保留构建时验证事实，在线投放结果另行记录。
+
+Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.36` 发现／实际下载 Linux 包通过。复用功能任务六包 Go、27 项单元测试、8 项浏览器测试与类型／定向 lint 结果；本轮未重跑完整套件，未安装本机、未执行原生 Codex／Claude／DSH 加载、原生窗口／安装器／apply 或真实付费上游验收。 本次只发布，没有替换本机程序、重启真实核心或改动真实 Agent 配置；本机仍为 `.36`。
+
+### 历史在线 dev 版 `.36`
 
 `0.1.0-dev.desktop.36` 从干净隔离 worktree 的 `f7e961f405a1515f89b412051937fe9d0ecd202c` 构建，于北京时间 2026-10-15 16:03:45 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.36)（非 latest），tag 指向实际构建提交，未混入工作区未提交的余额界面改动。
 
