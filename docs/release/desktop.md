@@ -1,12 +1,12 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-15。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.37`，北京时间 2026-10-15 17:00:56 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：模型映射设置新增「速度与分身」入口；映射新增／修改／删除后自动同步已托管 Agent，Codex all-mapped 生成 Anchor 自有模型目录。保留原用户目录、恢复基线及凭据；不强开 Codex 原生速度菜单，不保证上游支持、权限或费用。 详见[模型分身](../design/model-speed-variants.md)与[Agent 托管](../design/agent-management-layer.md)。
-- 本机后续安装：CLI／核心／GUI 已为 `.37`，但 Codex 目录导出因 `max`／`default` 推理档位失败，Agent 管理 partial；见下方本机升级记录，不能视为 Codex 名单修复验收通过。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.37` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺自动启动核心或既有会话重连。Codex／Claude 需重启（含对应 app-server）加载新名单，DSH 默认模型需新会话；远端核心另行升级。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.39`，北京时间 2026-10-15 17:39:27 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：修复 Codex 目录被上游 `max/default/null` effort 或无指令条目整份拒绝的问题：仅投影客户端可表示的档位，无模板条目使用明示的 Anchor 通用编程助手指令；不修改已有模板、不删除模型／速度分身、不把 max 改成 xhigh。 映射变动自动同步已托管 Agent，保留原用户目录、首次恢复基线、默认模型及凭据。
+- 本机安装与原生目录：本机 CLI／核心／GUI 已升级为 `.39`，core／gateway／agent management 均 ready，Codex／DSH 均 applied。Codex 自有目录与网关均为 12 个模型，默认仍为 `gpt-6.1-sol(fast)`；手动 `agent sync` applied，配置、目录与 journal 无变化。独立 CODEX_HOME 的原生 codex-cli 0.162.1 app-server `initialize + model/list` 已解析实际生成目录，12 个模型与网关完全一致，含普通／Fast／Ultrafast。仅本地名单 RPC，未创建线程、未发推理请求，未重启当前用户 Codex。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查、下载。沿用 `.35` 的 `restart_handoff` 安全保留交接；**desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.39` 并重新打开、核对实际 Agent 连接。** 新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺自动启动核心或既有会话重连。Codex／Claude 需重启（含对应 app-server）加载新名单，DSH 默认模型需新会话；远端核心另行升级。
 - 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
-- 验证：干净隔离源码 `45ac60087a4a046cbcc47c46f22dae19d880fd2b`（SOURCE.json dirty=false），Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、标签指向及默认源从 `.36` 发现／实际下载 Linux 包通过。复用功能任务六包 Go、27 项单元测试、8 项浏览器测试与类型／定向 lint 结果；本轮未重跑完整套件，未安装本机、未执行原生 Codex／Claude／DSH 加载、原生窗口／安装器／apply 或真实付费上游验收。
+- 验证：干净隔离源码 `7e4a721347ae0c53b01457114589131ba328f785`（SOURCE.json dirty=false）。六包 Go 回归通过，新增用例后 managed／CLI 再次通过；Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过。六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision、默认源从 `.37` 发现并真实下载 Linux 安装包通过；Windows 附件 digest 与本地一致。 未执行 Windows 原生安装、原生 GUI 窗口可见性、系统安装器／应用内 apply、真实付费上游或当前 Codex 会话自动重载验收；不保证上游加速权限、速度或费用。
 
 ## 1. 安装与使用行为
 
@@ -29,7 +29,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.37_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.39_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -85,8 +85,22 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
+### 当前在线 dev 版 `.39`
 
-### 当前在线 dev 版 `.37`
+`0.1.0-dev.desktop.39` 从干净隔离 worktree 的 `7e4a721347ae0c53b01457114589131ba328f785` 构建，于北京时间 2026-10-15 17:39:27 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.39)（非 latest）。tag 指向构建提交，不混入未提交余额界面改动。
+
+修复 Codex 目录被上游 `max/default/null` effort 或无指令条目整份拒绝的问题：仅投影客户端可表示的档位，无模板条目使用明示的 Anchor 通用编程助手指令；不修改已有模板、不删除模型／速度分身、不把 max 改成 xhigh。
+
+输出 `dist/desktop/0.1.0-dev.desktop.39/`，publication 六附件包括 Windows NSIS、Ubuntu24.04 AMD64 deb、flat 清单、含 vendor 源码、许可／构建元数据 ZIP 与校验清单。六包 Go 回归通过，新增用例后 managed／CLI 再次通过；Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过。六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision、默认源从 `.37` 发现并真实下载 Linux 安装包通过；Windows 附件 digest 与本地一致。
+
+**本机修复已验收**：本机 CLI／核心／GUI 已升级为 `.39`，core／gateway／agent management 均 ready，Codex／DSH 均 applied。Codex 自有目录与网关均为 12 个模型，默认仍为 `gpt-6.1-sol(fast)`；手动 `agent sync` applied，配置、目录与 journal 无变化。独立 CODEX_HOME 的原生 codex-cli 0.162.1 app-server `initialize + model/list` 已解析实际生成目录，12 个模型与网关完全一致，含普通／Fast／Ultrafast。仅本地名单 RPC，未创建线程、未发推理请求，未重启当前用户 Codex。 state.db schema8、quick_check／foreign_key_check、配置行、settings、owner token 与绑定凭据均保持；用户原目录哈希、首次恢复基线和已有 edits.before 保留。受限临时核心／GUI 服务均 active，运行 ELF 哈希匹配本版产物；未设置持久服务或登录自启动。保护备份：`/home/mosaki/.config/anchor/backups/pre-desktop39-20261015-173838/`（不提交秘密内容）。沿用 restart_handoff，仍有停机窗口，不承诺现有会话自动重连。
+
+**中间构建 `.38` 未上线**：本轮先构建并安装 `.38`，已修复 effort 导出、托管达到 ready，但隔离原生 Codex 检查发现无模板模型缺少指令导致整份目录被拒。未将该包发布；补齐明示通用指令并回归后构建、发布与安装 `.39`。保留 `.38` 产物和失败证据，不能把 `.38` 的程序替换当成完整名单修复。
+
+未执行 Windows 原生安装、原生 GUI 窗口可见性、系统安装器／应用内 apply、真实付费上游或当前 Codex 会话自动重载验收；不保证上游加速权限、速度或费用。 当前 Codex 进程仍可能缓存旧名单，需用户完全退出并重开相应客户端／app-server；本轮不终止当前会话。
+
+
+### 历史在线 dev 版 `.37`
 
 `0.1.0-dev.desktop.37` 从干净隔离 worktree 的 `45ac60087a4a046cbcc47c46f22dae19d880fd2b` 构建，于北京时间 2026-10-15 17:00:56 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.37)（非 latest），tag 指向实际构建提交，未混入工作区未提交余额改动。
 

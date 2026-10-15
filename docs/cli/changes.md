@@ -437,7 +437,7 @@
 - 兼容与迁移：不扩大 scope，不旋转凭据，不自动登记或复活恢复后的目标。正常 applied 状态的自动／手动同步与启动过期快照更新改为原位条件写入，保留首次恢复基线；中断 journal 同时识别上次与下次 Anchor 写入。外部修改保留并报告，单个 Agent 失败不回滚已提交映射、不阻断其他 Agent；HTTP 通过 `X-Anchor-Agent-Sync: applied|needs_sync` 报告同步结果，状态接口沿用 needs_sync／overridden／recovery_pending。默认模型不可用时不擅自替换，处理后可手动 `agent sync`。须升级正在运行的核心；Codex／Claude 仍需重启读取变化，DSH 默认模型需新会话，文件更新不证明上游支持加速或客户端实时刷新。
 - 验证：`go test -p 1 ./internal/managed ./internal/core ./internal/cli ./internal/client ./internal/desktop ./internal/state` 通过，使用隔离状态和模拟上游。新增回归覆盖普通 PUT、分身、设置／路由、映射删除、供应商启停／删除触发、失败写入不触发、单目标冲突隔离、原始目录／指针及凭据保留、清除覆盖值、无变化不改写、旧 journal 升级、single／禁用／已恢复范围与中断前后配置／目录组合恢复。初轮测试夹具权限、无效模板字段检测及删除仍被引用供应商的断言已修正后通过。未修改本机 Agent 配置，未运行真实客户端／付费上游验收，未打包、安装或发布。
 
-## 2026-10-15 — Codex 目录兼容上游原生推理档位（desktop.38 待发布源码）
+## 2026-10-15 — Codex 目录兼容上游原生推理档位（desktop.39 已发布；desktop.38 仅中间本地构建）
 
 - 类型：修改行为；不新增命令或参数。
 - 指令与参数：`agent enroll`、`agent sync ID --revision N` 及启动／映射自动同步。
@@ -445,10 +445,10 @@
 - 兼容与迁移：原配置、用户目录、首次恢复基线、凭据和默认模型保持；升级核心时可迁移旧 all-mapped journal，或使用现有 `sync` 手动重试。仍需重新加载 Codex 的模型名单，真实字段冲突继续拒绝。
 - 验证：六包 Go 回归通过；新增混合／仅原生／null／默认档位投影和旧 journal 启动迁移、手动同步、设置保存、恢复回归；本轮打包和本机验收另见 release 记录。
 
-## 2026-10-15 — Codex 无模板条目提供明示通用指令（desktop.39 待发布源码）
+## 2026-10-15 — Codex 无模板条目提供明示通用指令（desktop.39 已发布）
 
 - 类型：修改行为；不新增命令或参数。
 - 指令与参数：`agent enroll`、`agent sync ID --revision N` 及启动／映射自动同步。
 - 旧 → 新：all-mapped 中完全缺失指令的模型条目会让原生 Codex 0.162.1 拒绝整份目录并回退内置名单。现在仅在无上游／本地模板指令时补入 Anchor 明示的通用编程助手指令；不冒充官方模板、不借用其他模型指令、已有指令不改。
 - 兼容与迁移：只更新 Anchor 自有目录，保留用户目录、首次恢复基线、默认模型与凭据；须重新加载 Codex 名单。损坏的模板字段仍拒绝，严格版本匹配元数据规则不变。
-- 验证：隔离原生 Codex 0.162.1 的 initialize + model/list 已用修正样本验证 12 项包含速度分身，未创建线程或发付费请求；最终包与本机验收另见本轮 release 记录。
+- 验证：隔离原生 Codex 0.162.1 的 initialize + model/list 已用修正样本验证 12 项包含速度分身，未创建线程或发付费请求；最终 `.39` 双平台包已上线、本机已安装，实际生成目录通过原生 model/list 12 项一致性核验；手动 sync applied 且无改写。详见本轮 release 记录。
