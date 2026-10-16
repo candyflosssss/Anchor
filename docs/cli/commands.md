@@ -6,7 +6,7 @@
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.41 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.42 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -79,7 +79,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `provider test` | 显式最小推理测试 | 核心在线；已存供应商/模型 ID；须 approve |
 | `provider model-put` / `model-delete` | 工作台模型映射写入/删除 | 核心在线；供应商与模型 revision；删除须 approve |
 | `provider price-put` / `price-import` | 保存单价 / models.dev 预览 | 核心在线；当前 revision；导入不自动保存 |
-| `logs stats` | 请求趋势全范围聚合（用量／TPS／错误率／缓存／耗时） | 所选 Context 核心在线且支持 stats 接口；当前源码未发布 |
+| `logs stats` | 请求趋势全范围聚合（用量／TPS／错误率／缓存／耗时） | 所选 Context 核心在线且支持 stats 接口；desktop.42 宿主／核心已发布，命令使用兼容源码 CLI，alpha.6 不含 |
 | `logs list` | 结构化日志分页/筛选 | 所选 Context 核心在线，支持日志接口 |
 | `logs detail REQUEST_ID` | 完整安全请求详情 | 对应记录仍在保留期 |
 | `logs follow` | 每 2 秒输出日志页快照 | 核心在线；可重复更新记录 |
@@ -741,7 +741,7 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | max-requests | 初始 50,000，100–200,000 |
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
 
-`stats`（2026-10-16 当前源码，未打包发布）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
+`stats`（2026-10-16 已随 desktop.42 dev 宿主／核心发布；命令由兼容源码 CLI 提供，独立公开 alpha.6 CLI 不含，桌面程序不提供通用 CLI）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
 
 values 的 requests 包括 pending/cancelled；completed=succeeded+failed+interrupted，errors=failed+interrupted，error_rate=errors/completed×100，pending/cancelled 不计错误率分母。用量只累加输入输出均已知请求，input_tokens/output_tokens/total_tokens 是已知小计并带 usage_samples；总量不另加缓存或思考。tps 是成功且输出已知／总耗时>0样本的 sum(output)×1000/sum(elapsed_ms)，不是桶或请求速率简单平均；cache_hit_rate 是单次尝试且输入>0、0≤cache≤input已知样本的 sum(cache)/sum(input)×100。latency_ms 和 first_output_ms 是有效观测均值，首字回退旧正文首字，各指标带样本数。没有相应观测时为 null，明确观测零保留0；空桶不补造 TPS／用量／率。summary 使用同一查询原始累加器，非桶均值。统计受日志保留和 health 丢弃／写入失败限制，不代表永久消费账本，详见[日志趋势口径](../design/logging.md#9-请求趋势统计2026-10-16当前源码未打包)。
 

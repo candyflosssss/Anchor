@@ -141,4 +141,6 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 ## 请求趋势只读桥接（2026-10-16，当前源码未打包）
 
+**发行补记（2026-10-16）**：本节标题的“当前源码未打包”记录功能提交时状态；本功能现已随 [desktop.42 dev](../release/desktop.md#当前在线-dev-版-42) 发布，两平台安装包与清单已投放。未自动安装或替换运行程序，Linux WebKitGTK／Windows 原生窗口及安装验收仍未执行。
+
 新增 `LogStats(LogStatsQuery) LogStatsResult`，复用当前已授权连接与标准 Result；DTO 别名由 logbook 规范源经 desktop/contract.go 纳入生成，TS 不手改，共享样例 `desktop/contract/log-stats.json`。方法只读、最多5秒，查询全部匹配保留请求，不采用列表游标或快照。核心 stats 查询最多3秒／90天／600桶；错误与旧核心无接口均返回 problem，不回退模拟数据、不新增上游请求或持久累计表。页面 Controller 负责15秒轮询、暂停、刷新、条件变化和卸载后的旧结果丢弃；切换实例沿用页面卸载和连接隔离。详细字段、指标分母和空值语义见[日志趋势设计](logging.md#9-请求趋势统计2026-10-16当前源码未打包)。本轮隔离 Go 调用链与模拟浏览器验收不等于 Linux／Windows 原生窗口验收，未更新已运行的安装程序或核心。
