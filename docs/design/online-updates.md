@@ -1,10 +1,10 @@
 # 在线更新 v1
 
-- 日期：2026-10-16；**`0.1.0-dev.desktop.44` 已于北京时间 2026-10-16 18:24:42 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
-- 线上 `.44` 日志支持按 Agent 类型、Agent 绑定、项目、会话分类汇总；四维精确筛选、真实历史候选、分类下钻联动列表／多尺度趋势／JSONL 导出，详情与复制显示归属。默认不分类，按请求量展示前100组并标明总组数，总体统计仍覆盖完整范围。Agent／绑定仅从已认证托管 Binding 自动归属；**项目／会话尚未自动识别**，需调用端显式提供 `X-Anchor-Project`／`X-Anchor-Session` 安全标识，未上报与旧日志保持“未识别”，不猜测或回填。 构建 revision `08daad1c618bebc3b6a7fbc08bc5c19039888a53`，SOURCE.json dirty=false。Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.43` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 详见[当前在线 dev 版 `.44`](../release/desktop.md#当前在线-dev-版-44)。
-- 本地开发版 `.45`：从干净源码 `78d06f0cc5a89bccb1c490d3ac899fe190e8f291` 生成两平台安装包并完成本机升级，含稀疏曲线连接和 Codex 原生会话／同机项目识别；旧日志不回填。本轮未创建 Release／标签或在线清单，默认 dev 源仍为 `.44`。详见[本地交付记录](../release/desktop.md#local-desktop45)。
-- 当前本机安装：2026-10-16 19:09，CLI／核心／GUI 由 `.44` 统一更新为 `.45`。先备份后正常保留交接，恢复原有受限 transient user units；core／gateway ready、桌面进程运行，运行 ELF 哈希与同版构建一致。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收；未发布 `.45` 在线更新，SSH 远端未更新。
-- **首次迁移限制**：沿用 `.35` 的 `restart_handoff`；desktop.34 及更早版首次迁移须备份、安排维护窗口、普通停止旧核心并退出全部界面，手动安装 `.44` 后重新打开并核对 Agent 连接。缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不保证会话自动重连，远端核心另行升级。沿用 state.db schema8；日志库新增幂等表达式索引，无数据库降级。
+- 日期：2026-10-16；**`0.1.0-dev.desktop.45` 已于北京时间 2026-10-16 20:03:09 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
+- 日志趋势只跨无请求空桶用淡虚线连接真实采样，不补零／插值／外推，有请求但指标未知仍断线；认证 Codex Binding 可采集原生线程 UUID，并按线程只读关联同机项目元数据，显式 Anchor 标签优先。项目以可读名称加摘要区分，会话使用真实线程 ID；不读取标题／正文、不保存完整路径，旧日志不回填、缺失／跨机元数据不猜项目。保留多尺度曲线、历史候选、四维分类／筛选和 JSONL 导出。
+- 构建与投放：复用干净源码 `78d06f0cc5a89bccb1c490d3ac899fe190e8f291` 的同版双平台包（SOURCE.json dirty=false），本次仅补齐发行附件并上线，不重新打包。六附件大小／SHA256 digest、对应源码逐文件内容与构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过；默认 GitHub dev 源从 `.44` 发现并真实下载 `.45` Linux 安装包，大小／SHA256 校验通过，Windows GitHub 附件 digest 与本地一致。未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名。 详见[当前在线 dev 版 `.45`](../release/desktop.md#当前在线-dev-版-45)。
+- 当前本机安装：2026-10-16 19:09已将 CLI／核心／GUI 由 `.44` 统一更新为 `.45`，核心／网关就绪，原有配置、凭据、实例身份、恢复基线及 Codex 模型覆盖保留；本次在线投放未重启本机或修改用户更新配置。用户目录安装不代表系统安装器／应用内 apply 或原生窗口验收；SSH 远端未更新。
+- **首次迁移限制**：沿用 `.35` 的 `restart_handoff`；desktop.34 及更早版首次迁移须备份、安排维护窗口、普通停止旧核心并退出全部界面，手动安装 `.45` 后重新打开并核对 Agent 连接。缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不保证会话自动重连，远端核心另行升级。沿用 state.db schema8；日志库保留幂等表达式索引，旧归属不回填，无数据库降级。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 

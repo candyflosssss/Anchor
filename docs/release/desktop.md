@@ -1,13 +1,13 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-16。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.44`，北京时间 2026-10-16 18:24:42 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 线上 `.44` 范围：日志支持按 Agent 类型、Agent 绑定、项目、会话分类汇总；四维精确筛选、真实历史候选、分类下钻联动列表／多尺度趋势／JSONL 导出，详情与复制显示归属。默认不分类，按请求量展示前100组并标明总组数，总体统计仍覆盖完整范围。Agent／绑定仅从已认证托管 Binding 自动归属；**项目／会话尚未自动识别**，需调用端显式提供 `X-Anchor-Project`／`X-Anchor-Session` 安全标识，未上报与旧日志保持“未识别”，不猜测或回填。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.44` 并重新打开，核对 Agent 连接。新宿主对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，SSH 远端核心另行升级。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.45`，北京时间 2026-10-16 20:03:09 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与 flat 清单同版投放。
+- 线上 `.45` 范围：日志趋势只跨无请求空桶用淡虚线连接真实采样，不补零／插值／外推，有请求但指标未知仍断线；认证 Codex Binding 可采集原生线程 UUID，并按线程只读关联同机项目元数据，显式 Anchor 标签优先。项目以可读名称加摘要区分，会话使用真实线程 ID；不读取标题／正文、不保存完整路径，旧日志不回填、缺失／跨机元数据不猜项目。保留多尺度曲线、历史候选、四维分类／筛选和 JSONL 导出。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.45` 并重新打开，核对 Agent 连接。新宿主对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，SSH 远端核心另行升级。
 - 沿用 state.db schema8；日志库增加幂等表达式索引，不重写历史归属，无数据库降级。
-- 线上 `.44` 构建：干净隔离源码 `08daad1c618bebc3b6a7fbc08bc5c19039888a53`（SOURCE.json dirty=false），不混入工作区未提交的余额改动。复用该功能提交已通过的 logbook／core／desktop／cli／client 五包回归、TypeScript、ESLint、48项前端单测和19项单 worker 日志浏览器测试，本轮不重复全量、race或浏览器测试。
-- 线上 `.44` 验证：Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.43` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。
-- 当前本机安装：2026-10-16 19:09，CLI／核心／GUI 由 `.44` 统一更新为 `.45`。先备份后正常保留交接，恢复原有受限 transient user units；core／gateway ready、桌面进程运行，运行 ELF 哈希与同版构建一致。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收；未发布 `.45` 在线更新，SSH 远端未更新。
+- 线上 `.45` 构建：复用干净源码 `78d06f0cc5a89bccb1c490d3ac899fe190e8f291`（SOURCE.json dirty=false）的现有同版双平台包，不重新打包、不混入未提交的余额缓存／刷新增量。复用既有六包 Go 回归、49项日志单测、typecheck／定向 ESLint 和20项受控桥接浏览器回归，本轮不重复测试。
+- 线上 `.45` 验证：六附件大小／SHA256 digest、对应源码逐文件内容与构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过；默认 GitHub dev 源从 `.44` 发现并真实下载 `.45` Linux 安装包，大小／SHA256 校验通过，Windows GitHub 附件 digest 与本地一致。未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名。
+- 当前本机安装：2026-10-16 19:09，CLI／核心／GUI 由 `.44` 统一更新为 `.45`。先备份后正常保留交接，恢复原有受限 transient user units；core／gateway ready、桌面进程运行，运行 ELF 哈希与同版构建一致。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收；同版 `.45` 已投放 dev 在线更新，SSH 远端未更新。
 
 ## 1. 安装与使用行为
 
@@ -30,7 +30,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.44_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.45_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -88,13 +88,13 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 <a id="local-desktop45"></a>
 
-### 本地开发版 `.45`（未在线投放）
+### 当前在线 dev 版 `.45`
 
-`0.1.0-dev.desktop.45` 从干净隔离源码 `78d06f0cc5a89bccb1c490d3ac899fe190e8f291` 构建（SOURCE.json dirty=false），本轮只打包并升级本机，**未创建 Release／标签、未上传资产或更新在线清单**；默认 GitHub dev 源仍为 `.44`，SSH 远端不在本轮范围。
+`0.1.0-dev.desktop.45` 从干净隔离源码 `78d06f0cc5a89bccb1c490d3ac899fe190e8f291` 构建（SOURCE.json dirty=false），先于2026-10-16 19:09完成本地打包／本机升级，再于北京时间 2026-10-16 20:03:09 将同一版本发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.45)（非 latest）。六附件已同版投放，tag 指向实际构建提交；本次不重新构建或重启本机，SSH 远端不在范围。
 
 日志趋势只跨无请求空桶以淡虚线连接真实采样，不补零／插值，不连接有请求但指标未知的桶。已认证 Codex Binding 可读取原生线程 UUID，并按该线程只读关联同机 Codex 项目元数据；显式 Anchor 标签优先，不保存完整路径、会话标题或正文。旧日志不回填，缺失／跨机元数据不猜项目；候选、分类、筛选和导出复用现有日志接口。源码及包不包含工作区未提交的余额缓存／刷新增量。
 
-产物位于 `dist/desktop/0.1.0-dev.desktop.45/`，含两平台安装包、SOURCE／BUILD 元数据与平台 SHA256SUMS；本地升级另保存 `local-install/BUILD-local.json`、`verification-local.json` 和 `verification-final.json`。没有生成在线清单或 publication 六附件集合，构建元数据中的未安装／未发布／未原生验收状态保留构建时事实，不事后改写。
+产物位于 `dist/desktop/0.1.0-dev.desktop.45/`，含两平台安装包、SOURCE／BUILD 元数据与平台 SHA256SUMS；本地升级另保存 `local-install/BUILD-local.json`、`verification-local.json` 和 `verification-final.json`。已补齐 publication 六附件：同版两平台安装包、flat 更新清单、含 Go vendor 的对应源码、许可／构建元数据 ZIP 和 SHA256SUMS；构建元数据中的未安装／未发布／未原生验收状态保留构建时事实，实际发布与下载验收另存 publication/，不事后改写 BUILD.json。
 
 | 平台 | 安装包 | 字节数 | SHA256 |
 | --- | --- | ---: | --- |
@@ -103,11 +103,15 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 生产构建的 Go／TypeScript 契约比对、TypeScript／Vite、Windows／Ubuntu 24.04 AMD64 编译及 NSIS／deb 打包通过；两平台 SHA256SUMS、源码元数据与 deb 版本／架构／GUI payload 核验通过。首次打包因隔离源码缺少 npm 依赖在 preflight 退出，未产出包；受限执行 `npm ci` 后从同一干净提交重跑成功。另从同版锁定源码离线受限编译本机 CLI。复用功能提交的六包 Go 回归、49项日志前端单测、typecheck／定向 ESLint、20项单 worker 日志浏览器测试及隔离 Codex 0.162.1 对本地模拟 SSE 上游的原生元数据验证；本轮不重复全量、race或浏览器测试。
 
+**在线投放补记（2026-10-16 20:03:09）**：本次复用原安装包，仅生成发布附件并上传公开；未改写安装包或移动旧标签。六附件大小／SHA256 digest、对应源码逐文件内容与构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过；默认 GitHub dev 源从 `.44` 发现并真实下载 `.45` Linux 安装包，大小／SHA256 校验通过，Windows GitHub 附件 digest 与本地一致。未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名。 GitHub latest 保持不变。首次按 tag 查询新草稿得到404，已按唯一 release ID确认并续传同一草稿，无重复创建或覆盖资产。隔离验证不修改用户更新配置，不调用 apply／安装器，不请求模型上游。
+
 **本机升级（2026-10-16 19:09）**：备份 `/home/mosaki/.config/anchor/backups/pre-desktop45-20261016-190847`（目录0700、文件0600）；正常 `stop --approve --for-restart` 收到 bindings_preserved 确认，等待旧核心与监听面退出后，原子替换用户目录 CLI／GUI，恢复同名受限 transient user units（Restart=no，无新增持久 unit 或登录自启动）。观察期未获得空闲窗口，仍按正常停服流程最多10秒排空，不强杀；升级有停机窗口，不承诺既有请求零中断或会话自动重连。
 
-当前本机安装：2026-10-16 19:09，CLI／核心／GUI 由 `.44` 统一更新为 `.45`。先备份后正常保留交接，恢复原有受限 transient user units；core／gateway ready、桌面进程运行，运行 ELF 哈希与同版构建一致。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收；未发布 `.45` 在线更新，SSH 远端未更新。 state.db 保持 schema8，quick_check／foreign_key_check 通过；本地 `/v1/models` HTTP 200、受管目录与 token helper 校验通过，系统日志 JSONL 共57条仅内存解析、不保存正文。19:38 只读复核 CLI／核心版本、两 unit、运行 ELF 与备份权限通过，原有管理状态保持。未执行系统安装器、应用内 apply、Windows／Linux 原生窗口交互、既有 Codex 会话重载或真实付费上游推理验收；原生归属验证复用隔离测试，不冒充真实生产新请求验收。
+当前本机安装：2026-10-16 19:09，CLI／核心／GUI 由 `.44` 统一更新为 `.45`。先备份后正常保留交接，恢复原有受限 transient user units；core／gateway ready、桌面进程运行，运行 ELF 哈希与同版构建一致。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收；同版 `.45` 已投放 dev 在线更新，SSH 远端未更新。 state.db 保持 schema8，quick_check／foreign_key_check 通过；本地 `/v1/models` HTTP 200、受管目录与 token helper 校验通过，系统日志 JSONL 共57条仅内存解析、不保存正文。19:38 只读复核 CLI／核心版本、两 unit、运行 ELF 与备份权限通过，原有管理状态保持。未执行系统安装器、应用内 apply、Windows／Linux 原生窗口交互、既有 Codex 会话重载或真实付费上游推理验收；原生归属验证复用隔离测试，不冒充真实生产新请求验收。
 
-### 当前在线 dev 版 `.44`
+<a id="当前在线-dev-版-44"></a>
+
+### 历史 dev 版 `.44`
 
 `0.1.0-dev.desktop.44` 从干净隔离 worktree 的 `08daad1c618bebc3b6a7fbc08bc5c19039888a53` 构建，于北京时间 2026-10-16 18:24:42 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.44)（非 latest）。tag 指向实际构建提交，SOURCE.json dirty=false，不指向后续发行文档提交。
 
