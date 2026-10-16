@@ -106,6 +106,7 @@ const SidebarProvider = React.forwardRef<
     // Adds a keyboard shortcut to toggle the sidebar.
     React.useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
+        if (event.isComposing || event.keyCode === 229) return
         if (event.target instanceof Element && event.target.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=alertdialog]")) return
         if (
           event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
@@ -218,7 +219,7 @@ const Sidebar = React.forwardRef<
           >
             <SheetHeader className="sr-only">
               <SheetTitle>工作台导航</SheetTitle>
-              <SheetDescription>供应商管理导航；其他功能尚未开放。</SheetDescription>
+              <SheetDescription>设备连接、概览、供应商、模型映射、Agent 托管、日志与设置。</SheetDescription>
             </SheetHeader>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>

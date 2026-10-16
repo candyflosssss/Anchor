@@ -28,7 +28,8 @@ describe('mapping model settings form', () => {
     const html = render({ state, provider: 'lab', model: 'vision-reasoner' });
     expect(html).toContain('models.dev / lab / vision-reasoner');
     expect(html).toContain('<dt>输入</dt><dd>0</dd>'); expect(html).toContain('<dt>缓存读取</dt><dd>未知</dd>');
-    expect(html).toContain('USD / 百万 tokens'); expect(html).toContain('分段价格（1 档）');
+    expect(html).toContain('USD / 百万 tokens'); expect(html).toContain('按单次输入量选择整次请求单价');
+    expect(html).toContain('&gt; 250,000');
     expect(html).toContain('value="lab" selected');
   });
   it('locks editing after an uncertain write until the user reads again', () => {

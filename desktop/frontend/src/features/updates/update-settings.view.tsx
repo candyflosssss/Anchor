@@ -8,8 +8,8 @@ import { useUpdateController } from './use-update-controller';
 export function UpdateSettings({ onActivity }: { onActivity: (busy: boolean) => void }) {
   const c = useUpdateController(!prototype, onActivity);
   const busy = c.busy;
-  return <section className="mx-auto w-full max-w-3xl space-y-6 p-6" aria-label="在线更新">
-    <div><h1 className="text-2xl font-semibold">在线更新</h1></div>
+  return <section className="space-y-4" aria-labelledby="updates-title">
+    <h2 id="updates-title" className="text-base font-semibold">在线更新</h2>
     {prototype ? <p role="status" className="rounded-lg border p-4 text-sm text-muted-foreground">在线更新仅在桌面模式提供。</p> : <>
       <div className="space-y-4 rounded-lg border p-5">
         <dl className="grid gap-3 text-sm sm:grid-cols-[6rem_1fr]">

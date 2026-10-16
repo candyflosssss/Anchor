@@ -35,3 +35,5 @@
 - 桌面窗口控制是 Anchor 自行添加的宿主适配，不是官方 Block 自带能力：在原 header 中加入拖动区域和最小化 / 最大化 / 关闭按钮，图标复用现有 lucide-react，样式沿用 neutral 语义变量；浏览器原型隐藏窗口按钮。
 
 - 2026-10-12 日志设计预览复用既有 Button / Input / Table / Sheet / Dialog 和 neutral 主题，未新增 registry 获取或依赖。Sheet 新增可选 `closeLabel`，日志使用“关闭请求详情”，侧栏保持“关闭导航”；请求详情扩展到 620px，并恢复打开按钮的键盘焦点。
+
+- 2026-10-16 UI 复核继续使用以上 v3 来源，无新增依赖或 registry 文件。外观选项抽为 Anchor 共享组件，设置页复用同一偏好；折叠按钮保留 32px 点击区，顶栏在原型与桌面中均固定。浅色次要文字调整为 neutral `#6E6E6E`，满足灰底上的文字对比度；未改变官方 Sidebar 的宽度、导航层级和移动 Sheet 结构。

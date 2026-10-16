@@ -51,7 +51,7 @@ export function ProviderList({ c, summaries, balances, onEdit, onCreate, childre
       </TableBody></Table></div>
       {c.phase === 'loading' && <div className="empty-state" role="status"><LoaderCircle className="loading-icon" size={28} /><h2>正在读取供应商</h2><p>加载当前实例的配置…</p></div>}
       {c.phase === 'error' && <div className="empty-state"><Unplug size={32} /><h2>暂时无法展示供应商</h2></div>}
-      {c.phase === 'ready' && !c.visible.length && <div className="empty-state"><Server size={32} /><h2>{c.providers.length ? '没有匹配的供应商' : '添加你的第一个供应商'}</h2><Button variant={c.providers.length ? 'outline' : 'default'} disabled={c.blocked} onClick={() => { if (c.providers.length) { c.setSearch(''); c.setFilter('all'); } else onCreate(); }}>{c.providers.length ? '清除筛选' : '添加供应商'}</Button></div>}
+      {c.phase === 'ready' && !c.visible.length && <div className="empty-state"><Server size={32} /><h2>{c.providers.length ? '没有匹配的供应商' : '添加你的第一个供应商'}</h2><Button variant="outline" disabled={c.blocked} onClick={() => { if (c.providers.length) { c.setSearch(''); c.setFilter('all'); } else onCreate(); }}>{c.providers.length ? '清除筛选' : '添加供应商'}</Button></div>}
       {c.phase === 'ready' && c.providers.length > 0 && <footer className="table-footer"><span>显示 {c.visible.length} / {c.providers.length} 个供应商</span></footer>}
     </section>
   </div>;

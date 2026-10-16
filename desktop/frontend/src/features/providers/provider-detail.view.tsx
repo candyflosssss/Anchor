@@ -105,7 +105,7 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
         <Check ok={w.models.length > 0} title="模型映射" detail={w.models.length ? `已映射 ${w.models.length} 个公开模型` : '暂无模型映射'}
           action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.setDetailTab('models')}>{w.models.length ? '查看映射' : '映射模型'}</Button>} />
         <Check ok={!!probe && !probe.failure} warn={!probe} title="推理测试" detail={probe ? `${probe.failure ? '失败' : '成功'} · ${probe.model} · ${formatAgo(probe.at)}` : '尚未测试'}
-          action={<Button size="sm" variant={probe && !probe.failure ? 'outline' : 'default'} disabled={disabled} onClick={() => c.openDialog({ kind: 'test' })}><Play />{probe ? '重新测试' : '测试连通'}</Button>} />
+          action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.openDialog({ kind: 'test' })}><Play />{probe ? '重新测试' : '测试连通'}</Button>} />
       </ul>
     </section>
     <section className="detail-card"><h2>配置</h2>

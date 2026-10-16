@@ -44,7 +44,7 @@ export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivit
   const loading = c.phase === 'loading';
   const banner = c.problem && !c.dialog ? <ProblemBanner code={c.problem} message={c.problemMessage} disabled={c.busy || !!c.editor} onReload={() => void c.load()} /> : null;
   return <>
-    {page === 'overview' ? <Overview summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onCreate={() => { onNavigate('providers'); edit(); }} onShowProviders={() => onNavigate('providers')} onShowModels={() => onNavigate('models')}>{banner}</Overview>
+    {page === 'overview' ? <Overview summaries={summaries} loading={loading} readFailed={c.phase === 'error'} disabled={c.blocked} onOpen={open} onCreate={() => { onNavigate('providers'); edit(); }} onShowProviders={() => onNavigate('providers')} onShowModels={() => onNavigate('models')}>{banner}</Overview>
       : page === 'models' ? <ModelsView transport={environment.transport} routing={routing} rates={rates} summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onShowProviders={() => onNavigate('providers')}>{banner}</ModelsView>
       : c.selected && !c.quickId ? <div className="workspace">{banner}<Notice text={c.features.notice || c.notice} /><ProviderDetail c={c} summary={summary} onEdit={() => edit(c.selected ?? undefined)} /></div>
       : <ProviderList c={c} summaries={summaries} balances={balances} onEdit={edit} onCreate={() => edit()}>{banner}<Notice text={c.notice} /></ProviderList>}

@@ -1,7 +1,8 @@
 // Adapted from official sidebar-07 (MIT); see SHADCN_SOURCES.md.
-import { Anchor, ArrowLeftRight, Bot, FileText, LayoutDashboard, Monitor, Moon, PlugZap, Settings2, Sun, Server } from 'lucide-react';
+import { Anchor, ArrowLeftRight, Bot, FileText, LayoutDashboard, PlugZap, Settings2, Server } from 'lucide-react';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar } from '../ui/sidebar';
 import { prototype } from '../../desktop/environment';
+import { AppearanceControl } from './appearance-control';
 import type { Appearance } from '../../app/use-appearance';
 
 export type Page = 'overview' | 'providers' | 'models' | 'logs' | 'agents' | 'settings' | 'connections';
@@ -26,7 +27,7 @@ export function AppSidebar({ appearance, setAppearance, page, onNavigate, busy }
     </SidebarMenu></SidebarGroupContent></SidebarGroup></SidebarContent>
     <SidebarFooter>
       <SidebarMenu><SidebarMenuItem><SidebarMenuButton tooltip="设置 / 在线更新" aria-label="设置 / 在线更新" disabled={busy} isActive={page === 'settings'} aria-current={page === 'settings' ? 'page' : undefined} onClick={() => { onNavigate('settings'); if (isMobile) setOpenMobile(false); }}><Settings2 /><span>设置</span></SidebarMenuButton></SidebarMenuItem></SidebarMenu>
-      <div className="appearance-control" role="group" aria-label="外观设置">{([['light', Sun, '浅色'], ['dark', Moon, '深色'], ['system', Monitor, '跟随系统']] as const).map(([value, Icon, title]) => <button key={value} aria-label={title} title={title} aria-pressed={appearance === value} onClick={() => setAppearance(value)}><Icon size={16} /></button>)}</div>
+      <AppearanceControl value={appearance} onChange={setAppearance} />
       {prototype && <div className="px-2 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">Mock 设计预览</div>}
     </SidebarFooter><SidebarRail />
   </Sidebar>;
