@@ -1,13 +1,13 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-16。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.43`，北京时间 2026-10-16 17:41:46 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：日志搜索／供应商／模型／Key／HTTP／错误码／阶段提供基于当前时间范围保留历史的快速候选及出现次数；修复趋势图悬停时间点，保留用量、TPS、错误率、缓存命中率等多尺度曲线；新增 Agent 托管失败安全诊断，并包含网关 32 MiB 请求体修复。已有「导出」可按当前时间及筛选条件保存请求／系统日志 JSONL，包含新诊断事件，不限当前页。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.43` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，SSH 远端核心另行升级。
-- 沿用 state.db schema8，无新增迁移；从更早版本首次启动前请备份，旧程序不能打开已迁移数据库，无数据库降级。
-- 构建：干净隔离源码 `ff229b6e2786f128b4d9542b006a59a9f74a5ec8`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用本轮功能已通过的 Go 定向／三包完整回归、TypeScript、ESLint、63项前端单测和18项单 worker 日志浏览器测试，本轮不重复全量或浏览器测试。
-- 验证：Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.42` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。
-- 当前本机安装：2026-10-16 17:43，经用户明确要求，CLI／核心由 `.42.gateway32.1`、GUI 由 `.42` 统一更新为 `.43`。先备份后正常保留交接，恢复受限 transient user units；core／gateway ready、桌面进程运行。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、请求七字段及系统事件候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.44`，北京时间 2026-10-16 18:24:42 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：日志支持按 Agent 类型、Agent 绑定、项目、会话分类汇总；四维精确筛选、真实历史候选、分类下钻联动列表／多尺度趋势／JSONL 导出，详情与复制显示归属。默认不分类，按请求量展示前100组并标明总组数，总体统计仍覆盖完整范围。Agent／绑定仅从已认证托管 Binding 自动归属；**项目／会话尚未自动识别**，需调用端显式提供 `X-Anchor-Project`／`X-Anchor-Session` 安全标识，未上报与旧日志保持“未识别”，不猜测或回填。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.44` 并重新打开，核对 Agent 连接。新宿主对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，SSH 远端核心另行升级。
+- 沿用 state.db schema8；日志库增加幂等表达式索引，不重写历史归属，无数据库降级。
+- 构建：干净隔离源码 `08daad1c618bebc3b6a7fbc08bc5c19039888a53`（SOURCE.json dirty=false），不混入工作区未提交的余额改动。复用该功能提交已通过的 logbook／core／desktop／cli／client 五包回归、TypeScript、ESLint、48项前端单测和19项单 worker 日志浏览器测试，本轮不重复全量、race或浏览器测试。
+- 验证：Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.43` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。
+- 当前本机安装：2026-10-16 18:26，CLI／核心／GUI 由 `.43` 统一更新为 `.44`。先备份后正常保留交接，恢复受限 transient user units；core／gateway ready、桌面进程运行。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收。
 
 ## 1. 安装与使用行为
 
@@ -30,7 +30,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.43_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.44_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -86,7 +86,30 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.43`
+### 当前在线 dev 版 `.44`
+
+`0.1.0-dev.desktop.44` 从干净隔离 worktree 的 `08daad1c618bebc3b6a7fbc08bc5c19039888a53` 构建，于北京时间 2026-10-16 18:24:42 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.44)（非 latest）。tag 指向实际构建提交，SOURCE.json dirty=false，不指向后续发行文档提交。
+
+日志支持按 Agent 类型、Agent 绑定、项目、会话分类汇总；四维精确筛选、真实历史候选、分类下钻联动列表／多尺度趋势／JSONL 导出，详情与复制显示归属。默认不分类，按请求量展示前100组并标明总组数，总体统计仍覆盖完整范围。Agent／绑定仅从已认证托管 Binding 自动归属；**项目／会话尚未自动识别**，需调用端显式提供 `X-Anchor-Project`／`X-Anchor-Session` 安全标识，未上报与旧日志保持“未识别”，不猜测或回填。
+
+保留既有日志快速候选、图表悬停时间点、用量／TPS／错误率／缓存命中率多尺度曲线与按条件导出。四维只读 CLI 过滤和 `logs stats --group-by` 由兼容源码 CLI 提供，本机同步安装该版 CLI；独立公开 CLI 仍为 alpha.6，桌面程序不提供通用 CLI。宿主与核心须一起更新，SSH 远端核心不会随本机更新自动升级。
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.44/`；publication 六附件包括两平台安装包、flat 更新清单、含 vendor 的对应源码、许可／构建元数据 ZIP 与 SHA256SUMS。
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.44-windows-amd64-setup.exe` | 8,287,474 | `9c7b3a6d77045981d0a8c2f797df0bb8899ec70c3956a961e00b754d7b35286a` |
+| linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.44_amd64.deb` | 6,091,992 | `c0777b1ceb8aebb155b2687e864ad95e779ad59e2596bef3523baeebe46b859d` |
+
+Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.43` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 复用该功能提交已通过的 logbook／core／desktop／cli／client 五包回归、TypeScript、ESLint、48项前端单测和19项单 worker 日志浏览器测试，本轮不重复全量、race或浏览器测试。 首次构建在许可收集阶段因容器不可见的依赖软链接失败，未产出安装包或上传；改为复制真实依赖后从同一干净提交重新打包成功。保留原 BUILD.json 的未原生验收／构建时未发布状态，实际投放与本机验证另存 `publication/`、`local-install/`。
+
+**本机升级记录（2026-10-16 18:26）**：从同版 vendored 源码离线受限构建 CLI，GUI ELF 与发布 deb 内容逐字节一致。备份位于 `/home/mosaki/.config/anchor/backups/pre-desktop44-20261016-182553`，目录0700、文件0600；以 `stop --approve --for-restart` 正常保留交接后原子替换用户目录程序，恢复原有受限 transient user units，不新增持久服务或登录自启动。升级前观察到空闲窗口，再执行认证保留交接。
+
+当前本机安装：2026-10-16 18:26，CLI／核心／GUI 由 `.43` 统一更新为 `.44`。先备份后正常保留交接，恢复受限 transient user units；core／gateway ready、桌面进程运行。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收。 state.db schema8、quick_check／foreign_key_check 通过；本地模型目录 HTTP 200，与受管目录一致；系统日志导出逐行 JSON 解析通过，共 58 条，仅保存计数不落盘正文。保留原始用户模型目录、恢复基线与用户模型覆盖，没有重新接管或请求付费推理。未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。 未验收既有 Codex 会话自动重载。
+
+<a id="当前在线-dev-版-43"></a>
+
+### 历史 dev 版 `.43`
 
 `0.1.0-dev.desktop.43` 从干净隔离 worktree 的 `ff229b6e2786f128b4d9542b006a59a9f74a5ec8` 构建，于北京时间 2026-10-16 17:41:46 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.43)（非 latest）。tag 指向实际构建提交，SOURCE.json dirty=false，不指向后续发行文档提交。
 

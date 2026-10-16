@@ -87,7 +87,7 @@ ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置�
 
 ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径；创建目标目录的600权限 partial，流式写入、Sync/Close/Rename，失败清理任务自己的部分文件；取消返回 accepted=false。列偏好在前端保存，不送核心；缺桥接或读取失败不使用 mock。核心日志生命周期独立于窗口，宿主退出不停止日志采集。具体语义和边界见[日志实现](logging.md)。
 
-2026-10-16 当前源码（未发布）：复用 LogStats / Logs / ExportLogs / LogSuggestions，Request 与 Query 增加可选归属字段，StatsQuery 可选 group_by，Stats 增加分组汇总。旧调用不携带新条件时保持原行为；选择归属条件或分类需对应核心支持，不对旧核心静默吞掉筛选。规范源与生成类型、共享样例和边界详见[日志归属契约](logging.md#11-归属与分类统计2026-10-16当前源码未发布)。不新增任意文件读取／客户端扫描入口。
+2026-10-16 desktop.44 dev 已发布：复用 LogStats / Logs / ExportLogs / LogSuggestions，Request 与 Query 增加可选归属字段，StatsQuery 可选 group_by，Stats 增加分组汇总。旧调用不携带新条件时保持原行为；选择归属条件或分类需对应核心支持，不对旧核心静默吞掉筛选。规范源与生成类型、共享样例和边界详见[日志归属契约](logging.md#11-归属与分类统计2026-10-16desktop44-dev-已发布)。不新增任意文件读取／客户端扫描入口。
 
 ## Agent 托管增量（2026-10-12 实现，desktop.21 dev 已发布）
 

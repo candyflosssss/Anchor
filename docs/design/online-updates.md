@@ -1,9 +1,9 @@
 # 在线更新 v1
 
-- 日期：2026-10-16；**`0.1.0-dev.desktop.43` 已于北京时间 2026-10-16 17:41:46 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
-- 日志搜索／供应商／模型／Key／HTTP／错误码／阶段提供基于当前时间范围保留历史的快速候选及出现次数；修复趋势图悬停时间点，保留用量、TPS、错误率、缓存命中率等多尺度曲线；新增 Agent 托管失败安全诊断，并包含网关 32 MiB 请求体修复。已有「导出」可按当前时间及筛选条件保存请求／系统日志 JSONL，包含新诊断事件，不限当前页。 构建 revision `ff229b6e2786f128b4d9542b006a59a9f74a5ec8`，SOURCE.json dirty=false。Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.42` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 详见[当前在线 dev 版 `.43`](../release/desktop.md#当前在线-dev-版-43)。
-- 当前本机安装：2026-10-16 17:43，经用户明确要求，CLI／核心由 `.42.gateway32.1`、GUI 由 `.42` 统一更新为 `.43`。先备份后正常保留交接，恢复受限 transient user units；core／gateway ready、桌面进程运行。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、请求七字段及系统事件候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收。 未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。
-- **首次迁移限制**：沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.43` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。沿用 schema8，无数据库降级。
+- 日期：2026-10-16；**`0.1.0-dev.desktop.44` 已于北京时间 2026-10-16 18:24:42 发布到默认 GitHub Releases 的 dev 渠道**，为非 latest 的 prerelease，两平台安装包与 flat 清单同版投放。
+- 日志支持按 Agent 类型、Agent 绑定、项目、会话分类汇总；四维精确筛选、真实历史候选、分类下钻联动列表／多尺度趋势／JSONL 导出，详情与复制显示归属。默认不分类，按请求量展示前100组并标明总组数，总体统计仍覆盖完整范围。Agent／绑定仅从已认证托管 Binding 自动归属；**项目／会话尚未自动识别**，需调用端显式提供 `X-Anchor-Project`／`X-Anchor-Session` 安全标识，未上报与旧日志保持“未识别”，不猜测或回填。 构建 revision `08daad1c618bebc3b6a7fbc08bc5c19039888a53`，SOURCE.json dirty=false。Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.43` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 详见[当前在线 dev 版 `.44`](../release/desktop.md#当前在线-dev-版-44)。
+- 当前本机安装：2026-10-16 18:26，CLI／核心／GUI 由 `.43` 统一更新为 `.44`。先备份后正常保留交接，恢复受限 transient user units；core／gateway ready、桌面进程运行。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收。 未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。
+- **首次迁移限制**：沿用 `.35` 的 `restart_handoff`；desktop.34 及更早版首次迁移须备份、安排维护窗口、普通停止旧核心并退出全部界面，手动安装 `.44` 后重新打开并核对 Agent 连接。缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不保证会话自动重连，远端核心另行升级。沿用 state.db schema8；日志库新增幂等表达式索引，无数据库降级。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 

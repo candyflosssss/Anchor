@@ -163,7 +163,7 @@ DTO 规范源为 `internal/desktop/contract.go` 的 logbook 类型别名；`cmd/
 CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](../cli/commands.md#12-请求与系统日志当前源码基础能力自-desktop16-dev)。测试采用隔离核心与浏览器受控桥接；desktop.43 已发布并完成本机用户目录升级，Linux WebKitGTK／Windows 原生窗口未验收。
 
 
-## 11. 归属与分类统计（2026-10-16，当前源码未发布）
+## 11. 归属与分类统计（2026-10-16，desktop.44 dev 已发布）
 
 请求记录新增可选 `agent`、`binding`、`project`、`session`。只读归属信息与模型／供应商路由无关，不改变请求内容、鉴权或重试规则。
 
@@ -176,3 +176,5 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 `LogStats(StatsQuery)` 增加可选 `group_by=agent|binding|project|session`。沿既有授权、实例校验、3秒查询限制和90天／600桶限制，仍对筛选范围的所有保留请求统计，不受页大小／游标影响。回复增加 `group_by`、`groups:[{value,values}]`、`group_count`；每组复用 StatsValues 的原始累加器，Token／TPS／错误率／缓存命中率遵循同一分母和 null 规则，不能平均各请求的百分比或 TPS。空 `value` 单独代表未识别。组按请求数降序、同数按值升序，至多返回100组；group_count 表示完整组数，summary 与 buckets 始终覆盖所有匹配请求，**不是**前100组的合计。没有分组时响应省略分组字段。
 
 桌面 Go DTO 与生成的 TypeScript 类型同源；共享样例 `desktop/contract/log-dimensions.json` 同时用于存储与前端验证。分类选择属于 hook Controller，Model 构造与验证类型化查询，View 仅展示分类表和发出筛选动作；新维度在全局过滤状态中保存，点击组后列表／曲线／导出保持一致。默认不分类；旧核心缺少字段时不伪装成有效分组，显式选择新分类失败提示核心版本，不回退 Mock。CLI 同步支持 `logs stats --group-by` 和相关筛选，具体命令见[最新指令大全](../cli/commands.md)。
+
+该增量已随 desktop.44 宿主／核心发布到默认 dev 在线源，并完成本机 CLI／核心／GUI 同版用户目录升级；项目／会话仍需调用端显式上报，未实现自动识别。双平台生产包与 Linux 在线下载校验通过，原生窗口／系统安装器未验收。
