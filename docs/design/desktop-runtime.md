@@ -157,4 +157,4 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 ## 多轮对话测试（2026-10-16，当前源码未发布）
 
-新增受控 `ProviderChat` 桥接与核心 `/control/v1/providers/{id}/chat`；start/read/cancel 使用 `ChatRequest` 与既有 `ProbeProgressResult`，只允许所选已存供应商、准确 Key 和纯文本多轮消息。固定目标、不自动重试、不保存聊天正文；沿用管理鉴权、实例核验和协议转换。既有 Probe/CLI test 不变，旧宿主／核心明确不支持，不回退 Mock。限制、取消、脱敏和共享样例见[对话测试契约](chat-testing.md)。
+新增受控 `ProviderChat` 桥接与核心 `/control/v1/providers/{id}/chat`；start/read/cancel 使用 `ChatRequest` 与既有 `ProbeProgressResult`，只允许所选已存供应商、准确 Key 和纯文本多轮消息。固定目标、不自动重试、不保存聊天正文；可选 `ChatRequest.reasoning_effort`（空／省略为默认），按所选 Key 的实际模型协议发送原生参数，UI 修改深度不清空上下文。沿用管理鉴权、实例核验和协议转换。既有 Probe/CLI test 不变，旧宿主／核心明确不支持，不回退 Mock。限制、取消、脱敏和共享样例见[对话测试契约](chat-testing.md)。

@@ -32,9 +32,15 @@ func TestProviderChatCLI(t *testing.T) {
 	}
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
+			Reasoning struct {
+				Effort string `json:"effort"`
+			} `json:"reasoning"`
 			Input []catalog.ChatMessage `json:"input"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.Reasoning.Effort != "xhigh" {
+			t.Error("CLI lost reasoning effort")
+		}
 		if len(body.Input) != 3 {
 			t.Error("CLI lost history")
 		}
@@ -55,7 +61,7 @@ func TestProviderChatCLI(t *testing.T) {
 	}
 	var out, diagnostics bytes.Buffer
 	app := App{In: strings.NewReader(`[{"role":"user","content":"first"},{"role":"assistant","content":"second"},{"role":"user","content":"third"}]`), Out: &out, Err: &diagnostics}
-	err = app.Run(context.Background(), []string{"--data-dir", dir, "provider", "chat", "--id", "p", "--revision", "1", "--key", "default", "--model", "demo", "--approve"})
+	err = app.Run(context.Background(), []string{"--data-dir", dir, "provider", "chat", "--id", "p", "--revision", "1", "--key", "default", "--model", "demo", "--reasoning-effort", "xhigh", "--approve"})
 	if err != nil {
 		t.Fatal(err, diagnostics.String())
 	}
@@ -69,6 +75,7 @@ func TestProviderChatCLIRejectsInvalidInput(t *testing.T) {
 		input string
 		args  []string
 	}{
+		{`[{"role":"user","content":"hello"}]`, []string{"--id", "p", "--revision", "1", "--key", "default", "--model", "m", "--approve", "--reasoning-effort", "invalid"}},
 		{`[{"role":"user","content":"hello"}]`, []string{"--id", "p", "--revision", "1", "--key", "default", "--model", "m"}},
 		{`[{"role":"system","content":"hello"}]`, []string{"--id", "p", "--revision", "1", "--key", "default", "--model", "m", "--approve"}},
 		{`[] true`, []string{"--id", "p", "--revision", "1", "--key", "default", "--model", "m", "--approve"}},

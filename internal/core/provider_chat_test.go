@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/logbook"
 )
 
 func chatInput(t *testing.T) catalog.ChatRequest {
@@ -60,72 +61,107 @@ func awaitChat(t *testing.T, f *fixture, in catalog.ChatRequest, done func(catal
 }
 func TestProviderChatProtocolsHistoryAndPrivacy(t *testing.T) {
 	for _, protocol := range []string{"responses", "chat-completions", "anthropic"} {
-		t.Run(protocol, func(t *testing.T) {
-			f := setup(t)
-			in := chatInput(t)
-			messages := append([]catalog.ChatMessage(nil), in.Messages...)
-			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				raw, _ := io.ReadAll(r.Body)
-				var body map[string]any
-				_ = json.Unmarshal(raw, &body)
-				if body["stream"] != true || !strings.Contains(string(raw), messages[0].Content) || !strings.Contains(string(raw), messages[2].Content) {
-					t.Errorf("missing history or streaming: %s", raw)
-				}
-				if protocol == "anthropic" {
-					if r.Header.Get("x-api-key") != "synthetic-chat-secret" {
+		for _, effort := range []string{"", "high", "max"} {
+			t.Run(protocol+"/"+effort, func(t *testing.T) {
+				f := setup(t)
+				in := chatInput(t)
+				in.ReasoningEffort = effort
+				messages := append([]catalog.ChatMessage(nil), in.Messages...)
+				up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					raw, _ := io.ReadAll(r.Body)
+					var body map[string]any
+					_ = json.Unmarshal(raw, &body)
+					if body["stream"] != true || !strings.Contains(string(raw), messages[0].Content) || !strings.Contains(string(raw), messages[2].Content) {
+						t.Errorf("missing history or streaming: %s", raw)
+					}
+					expectedField := map[string]string{"responses": "reasoning", "chat-completions": "reasoning_effort", "anthropic": "output_config"}[protocol]
+					for _, field := range []string{"reasoning", "reasoning_effort", "output_config", "thinking"} {
+						value, present := body[field]
+						if effort == "" || field != expectedField {
+							if present {
+								t.Errorf("unexpected %s: %v", field, value)
+							}
+						} else {
+							got, _ := value.(string)
+							if object, ok := value.(map[string]any); ok {
+								got, _ = object["effort"].(string)
+							}
+							if got != effort {
+								t.Errorf("native %s = %v, want %s", field, value, effort)
+							}
+						}
+					}
+					if protocol == "anthropic" {
+						if r.Header.Get("x-api-key") != "synthetic-chat-secret" {
+							t.Error("wrong key")
+						}
+					} else if r.Header.Get("Authorization") != "Bearer synthetic-chat-secret" {
 						t.Error("wrong key")
 					}
-				} else if r.Header.Get("Authorization") != "Bearer synthetic-chat-secret" {
-					t.Error("wrong key")
+					w.Header().Set("Content-Type", "application/json")
+					switch protocol {
+					case "responses":
+						io.WriteString(w, `{"id":"r","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"reply synthetic-chat-secret"}]}],"usage":{"input_tokens":4,"output_tokens":2}}`)
+					case "chat-completions":
+						io.WriteString(w, `{"id":"r","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"reply synthetic-chat-secret"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":2}}`)
+					case "anthropic":
+						io.WriteString(w, `{"id":"r","type":"message","role":"assistant","content":[{"type":"text","text":"reply synthetic-chat-secret"}],"stop_reason":"end_turn","usage":{"input_tokens":4,"output_tokens":2}}`)
+					}
+				}))
+				defer up.Close()
+				f.add(t, "p", up.URL, "synthetic-chat-secret")
+				if protocol != "responses" {
+					if err := f.store.MutateProvider("p", 1, "key-put", "default", "", "", true, false, protocol); err != nil {
+						t.Fatal(err)
+					}
+					in.ExpectedRevision = 2
 				}
-				w.Header().Set("Content-Type", "application/json")
-				switch protocol {
-				case "responses":
-					io.WriteString(w, `{"id":"r","object":"response","status":"completed","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"reply synthetic-chat-secret"}]}],"usage":{"input_tokens":4,"output_tokens":2}}`)
-				case "chat-completions":
-					io.WriteString(w, `{"id":"r","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"reply synthetic-chat-secret"},"finish_reason":"stop"}],"usage":{"prompt_tokens":4,"completion_tokens":2}}`)
-				case "anthropic":
-					io.WriteString(w, `{"id":"r","type":"message","role":"assistant","content":[{"type":"text","text":"reply synthetic-chat-secret"}],"stop_reason":"end_turn","usage":{"input_tokens":4,"output_tokens":2}}`)
+				first := chatCall(t, f, in)
+				in.Action = "read"
+				in.RunID = first.RunID
+				in.Messages = nil
+				out := awaitChat(t, f, in, func(p catalog.ProbeProgress) bool { return p.Status != "running" })
+				if out.Result == nil || out.Result.Failure != "" || out.Text != "reply [redacted]" {
+					t.Fatalf("final: %+v", out)
 				}
-			}))
-			defer up.Close()
-			f.add(t, "p", up.URL, "synthetic-chat-secret")
-			if protocol != "responses" {
-				if err := f.store.MutateProvider("p", 1, "key-put", "default", "", "", true, false, protocol); err != nil {
+				if err := f.core.logs.Flush(t.Context()); err != nil {
 					t.Fatal(err)
 				}
-				in.ExpectedRevision = 2
-			}
-			first := chatCall(t, f, in)
-			in.Action = "read"
-			in.RunID = first.RunID
-			in.Messages = nil
-			out := awaitChat(t, f, in, func(p catalog.ProbeProgress) bool { return p.Status != "running" })
-			if out.Result == nil || out.Result.Failure != "" || out.Text != "reply [redacted]" {
-				t.Fatalf("final: %+v", out)
-			}
-			if err := f.core.logs.Flush(t.Context()); err != nil {
-				t.Fatal(err)
-			}
-			// Check every task-created state/log file for prompt and generated content.
-			for _, forbidden := range []string{"请记住我们在测试对话", "reply synthetic-chat-secret", "reply [redacted]"} {
-				if strings.Contains(f.logs.String(), forbidden) {
-					t.Fatal("chat content leaked to system logs")
+				logs, err := f.core.logs.List(t.Context(), logbook.Query{Source: "probe"})
+				if err != nil || len(logs.Requests) != 1 {
+					t.Fatalf("logs: %+v %v", logs, err)
 				}
-				_ = filepath.WalkDir(f.store.Dir, func(path string, entry os.DirEntry, err error) error {
-					if err == nil && !entry.IsDir() {
-						data, err := os.ReadFile(path)
-						if err != nil {
-							t.Fatal(err)
-						}
-						if strings.Contains(string(data), forbidden) {
-							t.Fatalf("chat content leaked to %s", entry.Name())
-						}
+				row, err := f.core.logs.Detail(t.Context(), logs.Requests[0].ID)
+				if err != nil || !row.ReasoningObserved {
+					t.Fatalf("reasoning log: %+v %v", row, err)
+				}
+				if effort == "" {
+					if row.ReasoningEffort != nil {
+						t.Fatal("default effort invented")
 					}
-					return err
-				})
-			}
-		})
+				} else if row.ReasoningEffort == nil || *row.ReasoningEffort != effort {
+					t.Fatalf("lost effort: %+v", row)
+				}
+				// Check every task-created state/log file for prompt and generated content.
+				for _, forbidden := range []string{"请记住我们在测试对话", "reply synthetic-chat-secret", "reply [redacted]"} {
+					if strings.Contains(f.logs.String(), forbidden) {
+						t.Fatal("chat content leaked to system logs")
+					}
+					_ = filepath.WalkDir(f.store.Dir, func(path string, entry os.DirEntry, err error) error {
+						if err == nil && !entry.IsDir() {
+							data, err := os.ReadFile(path)
+							if err != nil {
+								t.Fatal(err)
+							}
+							if strings.Contains(string(data), forbidden) {
+								t.Fatalf("chat content leaked to %s", entry.Name())
+							}
+						}
+						return err
+					})
+				}
+			})
+		}
 	}
 }
 func TestProviderChatStreamCancelAfterRevisionChange(t *testing.T) {
@@ -266,5 +302,47 @@ func TestChatRedactionDoesNotExpandBeyondPublicLimit(t *testing.T) {
 	raw := []byte("data: {\"type\":\"response.output_text.delta\",\"delta\":\"xxxxxxxxxx\"}\n\n")
 	if _, err := output.Write(raw); err == nil {
 		t.Fatal("redaction expansion exceeded public output limit")
+	}
+}
+
+func TestChatEffortUsesKeyModelProtocol(t *testing.T) {
+	f := setup(t)
+	var calls atomic.Int32
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		config, ok := body["output_config"].(map[string]any)
+		if r.URL.Path != "/messages" || !ok || config["effort"] != "xhigh" || body["reasoning"] != nil || body["thinking"] != nil {
+			t.Errorf("wrong native override: %s %+v", r.URL.Path, body)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"id":"r","type":"message","role":"assistant","content":[{"type":"text","text":"OK"}],"stop_reason":"end_turn"}`)
+	}))
+	defer up.Close()
+	f.add(t, "p", up.URL, "synthetic-chat-secret")
+	in := chatInput(t)
+	if err := f.store.PutKeyModelProtocol("p", 1, "default", in.Model, "anthropic"); err != nil {
+		t.Fatal(err)
+	}
+	in.ExpectedRevision = 2
+	for _, effort := range []string{"none", "minimal", "unknown"} {
+		in.ReasoningEffort = effort
+		raw, _ := json.Marshal(in)
+		resp := request(t, "POST", f.control.URL+"/control/v1/providers/p/chat", f.owner, string(raw))
+		resp.Body.Close()
+		if resp.StatusCode != 400 {
+			t.Fatalf("effort %s got %d", effort, resp.StatusCode)
+		}
+	}
+	if calls.Load() != 0 {
+		t.Fatal("unsupported effort reached upstream")
+	}
+	in.ReasoningEffort = "xhigh"
+	first := chatCall(t, f, in)
+	in.Action, in.RunID, in.Messages = "read", first.RunID, nil
+	out := awaitChat(t, f, in, func(p catalog.ProbeProgress) bool { return p.Status != "running" })
+	if out.Result == nil || out.Result.Failure != "" || out.Text != "OK" || calls.Load() != 1 {
+		t.Fatalf("override: %+v", out)
 	}
 }

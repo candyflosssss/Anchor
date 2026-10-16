@@ -219,6 +219,7 @@ export interface ChatRequest {
   action: string;
   key_id: string;
   model: string;
+  reasoning_effort?: string;
   run_id: string;
   approved: boolean;
   messages: ChatMessage[];

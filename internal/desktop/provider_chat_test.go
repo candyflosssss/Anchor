@@ -16,9 +16,15 @@ func TestProviderChatBridge(t *testing.T) {
 	requireReady(t, b)
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body struct {
+			Reasoning struct {
+				Effort string `json:"effort"`
+			} `json:"reasoning"`
 			Input []ChatMessage `json:"input"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.Reasoning.Effort != "high" {
+			t.Error("bridge lost reasoning effort")
+		}
 		if len(body.Input) != 3 {
 			t.Error("bridge lost history")
 		}

@@ -4,14 +4,23 @@ import fixture from '../../../../contract/chat.json';
 import workspaceFixture from '../../../../contract/provider-workspace.json';
 import catalogFixture from '../../../../contract/provider-models.json';
 import { CONTRACT, type DesktopBridge, type ProbeProgress, type Workspace } from '../../desktop/contract.generated';
-import { DesktopChatTransport, chatMessages, chatModels, messageProblem } from './chat.model';
+import { DesktopChatTransport, chatProtocol, chatReasoningLevels, chatMessages, chatModels, messageProblem } from './chat.model';
 import { MockChatTransport } from './chat.mock';
 
 const signal = () => new AbortController().signal;
 describe('text chat contract', () => {
+  it('offers native effort levels using the selected Key model override', () => {
+    const key = { ...workspaceFixture.keys[0], protocol: 'responses', model_protocols: [{ model: 'claude-demo', protocol: 'anthropic' }] };
+    expect(chatProtocol(key, 'claude-demo')).toBe('anthropic');
+    expect(chatProtocol(key, 'other-model')).toBe('responses');
+    expect(chatProtocol(undefined, 'other-model')).toBe('responses');
+    expect(chatReasoningLevels(chatProtocol(key, 'claude-demo')).map(level => level.value)).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+    for (const protocol of ['responses', 'chat-completions']) expect(chatReasoningLevels(protocol).map(level => level.value)).toEqual(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
+  });
   it('uses the shared fixture and preserves complete history', async () => {
     const api = { ProviderChat: async () => ({ contract: CONTRACT, data: fixture.progress, problem: null }) } as unknown as DesktopBridge;
     const result = await new DesktopChatTransport(() => api).request(fixture.request, signal());
+    expect(fixture.request.reasoning_effort).toBe('high');
     expect(result.text).toBe(fixture.progress.text);
     expect(result.key_id).toBe(fixture.request.key_id);
   });

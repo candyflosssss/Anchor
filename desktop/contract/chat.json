@@ -1,7 +1,8 @@
 {
   "request": {
     "provider_id": "chat-demo", "expected_revision": 1, "action": "start",
-    "key_id": "default", "model": "demo-model", "run_id": "", "approved": true,
+    "key_id": "default", "model": "demo-model",
+    "reasoning_effort": "high", "run_id": "", "approved": true,
     "messages": [
       { "role": "user", "content": "你好" },
       { "role": "assistant", "content": "你好，有什么可以帮你？" },

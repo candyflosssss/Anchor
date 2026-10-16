@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { ConfirmAction } from '../../components/shared/confirm-action';
 import { prototype, type ProviderEnvironment } from '../../desktop/environment';
-import { DesktopChatTransport, type ChatTransport } from './chat.model';
+import { chatProtocol, chatReasoningLevels, DesktopChatTransport, type ChatTransport } from './chat.model';
 import { MockChatTransport } from './chat.mock';
 import { useChat, useChatOptions } from './use-chat';
 
@@ -42,13 +42,13 @@ export function ChatWorkspace({ environment }: { environment: ProviderEnvironmen
       {!options.loading && !options.error && !options.providers.length && <p className="mt-2 text-sm text-muted-foreground">请先在“供应商”页面添加并启用供应商。</p>}
     </section>
     <Conversation key={`${options.providerId}/${revision}/${options.keyId}/${options.model}`} transport={transport}
-      providerId={options.providerId} revision={revision} keyId={options.keyId} model={options.model}
+      providerId={options.providerId} revision={revision} keyId={options.keyId} model={options.model} protocol={chatProtocol(options.workspace?.keys.find(k => k.id === options.keyId), options.model)}
       ready={ready && !!options.keyId && !!options.model.trim()} onBusy={setBusy} />
   </main>;
 }
 
-function Conversation({ transport, providerId, revision, keyId, model, ready, onBusy }: {
-  transport: ChatTransport; providerId: string; revision: number; keyId: string; model: string; ready: boolean; onBusy: (busy: boolean) => void;
+function Conversation({ transport, providerId, revision, keyId, model, protocol, ready, onBusy }: {
+  transport: ChatTransport; providerId: string; revision: number; keyId: string; model: string; protocol: string; ready: boolean; onBusy: (busy: boolean) => void;
 }) {
   const chat = useChat(transport);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -72,7 +72,15 @@ function Conversation({ transport, providerId, revision, keyId, model, ready, on
   }
   function send() { follow.current = true; setCopied(-1); void chat.send(providerId, revision, keyId, model); }
   return <section className="flex min-h-[420px] min-w-0 flex-1 flex-col overflow-hidden rounded-lg border" aria-label="测试对话">
-    <div className="flex items-center justify-between gap-2 border-b px-4 py-3"><span className="text-sm font-medium">当前对话</span><Button variant="ghost" size="sm" disabled={chat.busy || !chat.turns.length} onClick={() => setConfirmClear(true)}><Trash2 className="mr-2 size-4" />清空对话</Button></div>
+    <div className="space-y-2 border-b px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3"><span className="text-sm font-medium">当前对话</span><div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-sm"><span className="shrink-0">思考深度</span><select aria-label="思考深度" aria-describedby="chat-effort-help" className={selectClass} disabled={chat.busy || !ready} value={chat.reasoningEffort} onChange={e => chat.setReasoningEffort(e.target.value)}>
+          <option value="">默认（不指定）</option>{chatReasoningLevels(protocol).map(level => <option key={level.value} value={level.value}>{level.label}</option>)}
+        </select></label>
+        <Button variant="ghost" size="sm" disabled={chat.busy || !chat.turns.length} onClick={() => setConfirmClear(true)}><Trash2 className="mr-2 size-4" />清空对话</Button>
+      </div></div>
+      <p id="chat-effort-help" className="text-xs text-muted-foreground">调整深度不清空对话，下一轮生效。支持的档位由上游模型决定，较高深度可能增加耗时和费用。{protocol === 'anthropic' && ' Anthropic 使用原生 effort，不额外开启 thinking。'}</p>
+    </div>
     <div ref={scroll} role="log" aria-label="对话消息" aria-live="off" className="min-h-[220px] max-h-[55vh] flex-1 space-y-6 overflow-y-auto p-4 md:p-6" onScroll={() => { const el = scroll.current; if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
       {!chat.turns.length && <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 text-center text-muted-foreground"><MessageSquare className="size-8" /><p className="text-sm">{ready ? '发送一条消息，开始测试对话' : '先选择供应商、Key 和模型'}</p><p className="text-xs">仅保留当前页面会话，不保存聊天记录</p></div>}
       {chat.turns.map((turn, index) => <div key={index} className="space-y-4">

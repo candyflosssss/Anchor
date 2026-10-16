@@ -24,6 +24,7 @@ type ChatRequest struct {
 	Action           string        `json:"action"`
 	KeyID            string        `json:"key_id"`
 	Model            string        `json:"model"`
+	ReasoningEffort  string        `json:"reasoning_effort,omitempty"`
 	RunID            string        `json:"run_id"`
 	Approved         bool          `json:"approved"`
 	Messages         []ChatMessage `json:"messages"`
@@ -41,6 +42,9 @@ func (in ChatRequest) Validate() error {
 			return errors.New("invalid chat request")
 		}
 	case "start":
+		if !ValidChatReasoningEffort(in.ReasoningEffort) {
+			return errors.New("invalid chat reasoning effort")
+		}
 		if !in.Approved || in.RunID != "" || in.KeyID == "" || len(in.KeyID) > 512 || in.Model == "" || len(in.Model) > 256 || strings.TrimSpace(in.Model) != in.Model || strings.ContainsAny(in.Model, "\r\n\x00") || !utf8.ValidString(in.Model) {
 			return errors.New("invalid chat request")
 		}
@@ -65,4 +69,14 @@ func (in ChatRequest) Validate() error {
 		return errors.New("invalid chat request")
 	}
 	return nil
+}
+
+// Empty preserves the upstream default; supported levels still depend on the model.
+func ValidChatReasoningEffort(effort string) bool {
+	switch effort {
+	case "", "none", "minimal", "low", "medium", "high", "xhigh", "max":
+		return true
+	default:
+		return false
+	}
 }

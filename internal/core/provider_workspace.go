@@ -303,10 +303,10 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 }
 
 func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, model string, notify func(string, string)) (*catalog.Probe, error) {
-	return s.inferenceObserved(ctx, p, keyID, model, nil, nil, notify)
+	return s.inferenceObserved(ctx, p, keyID, model, "", nil, nil, notify)
 }
 
-func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID, model string, messages []catalog.ChatMessage, selectedKey *state.ProviderKey, notify func(string, string)) (*catalog.Probe, error) {
+func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID, model, reasoningEffort string, messages []catalog.ChatMessage, selectedKey *state.ProviderKey, notify func(string, string)) (*catalog.Probe, error) {
 	key := state.ProviderKey{ID: "anonymous", Enabled: true, Protocol: p.Protocol}
 	if selectedKey != nil {
 		key = *selectedKey
@@ -341,6 +341,9 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	callerCtx := ctx
 	stream := notify != nil
 	row := logbook.Request{ID: id, StartedAtMS: start.UnixMilli(), Status: "pending", Source: "probe", ReasoningObserved: true, Stream: &stream, UpstreamModel: model, Model: model, Protocol: p.Protocol, Provider: p.ID, Key: key.ID, Revision: p.Revision, Delivery: "none", Stage: "route", Attempts: []logbook.Attempt{}, Evidence: map[string]string{"sent_service_tier": "not_sent", "fast_triggered": "unknown"}}
+	if reasoningEffort != "" {
+		row.ReasoningEffort = &reasoningEffort
+	}
 	if s.logs != nil {
 		s.logs.Request(row)
 	}
@@ -440,6 +443,14 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	body, err := protocol.ConvertRequest(raw, "responses", p.Protocol)
 	if err != nil {
 		return nil, err
+	}
+	// Apply the selected native option only after text conversion. The general
+	// cross-protocol converter deliberately refuses lossy reasoning conversion.
+	if reasoningEffort != "" {
+		body, err = chatReasoningBody(body, p.Protocol, reasoningEffort)
+		if err != nil {
+			return nil, err
+		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, min(time.Duration(p.TimeoutSeconds)*time.Second, timeout))
 	defer cancel()
@@ -567,4 +578,26 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 		}
 	}
 	return out, nil
+}
+
+func chatReasoningBody(body []byte, protocolName, effort string) ([]byte, error) {
+	var request map[string]any
+	if !catalog.ValidChatReasoningEffort(effort) || json.Unmarshal(body, &request) != nil {
+		return nil, state.ErrInvalid
+	}
+	switch protocolName {
+	case "responses":
+		request["reasoning"] = map[string]string{"effort": effort}
+	case "chat-completions":
+		request["reasoning_effort"] = effort
+	case "anthropic":
+		if effort == "none" || effort == "minimal" {
+			return nil, state.ErrInvalid
+		}
+		// Effort does not imply enabling thinking or inventing a token budget.
+		request["output_config"] = map[string]string{"effort": effort}
+	default:
+		return nil, state.ErrInvalid
+	}
+	return json.Marshal(request)
 }

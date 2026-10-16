@@ -66,6 +66,7 @@ function pause(signal: AbortSignal) {
 export function useChat(transport: ChatTransport) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
+  const [reasoningEffort, setReasoningEffort] = useState('');
   const [busy, setBusy] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [error, setError] = useState('');
@@ -92,7 +93,7 @@ export function useChat(transport: ChatTransport) {
     const index = turns.length;
     setTurns(current => [...current, { content, reply: '', status: 'running' }]);
     const abort = new AbortController(); request.current = abort;
-    const input: ChatRequest = { provider_id: providerId, expected_revision: revision, key_id: keyId, model: model.trim(), action: 'start', run_id: '', approved: true, messages };
+    const input: ChatRequest = { provider_id: providerId, expected_revision: revision, key_id: keyId, model: model.trim(), action: 'start', run_id: '', approved: true, messages, ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}) };
     const update = (reply: string, status: ChatTurn['status']) => setTurns(current => current.map((t, i) => i === index ? { ...t, reply, status } : t));
     let reply = '';
     try {
@@ -128,5 +129,5 @@ export function useChat(transport: ChatTransport) {
       catch { if (live.current) { setStopping(false); setError('未能确认停止状态，生成将在超时后结束。'); } }
     }
   }
-  return { turns, draft, setDraft, busy, stopping, error, elapsed, clear, send, stop };
+  return { turns, draft, setDraft, reasoningEffort, setReasoningEffort, busy, stopping, error, elapsed, clear, send, stop };
 }

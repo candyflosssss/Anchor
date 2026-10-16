@@ -31,6 +31,8 @@ func TestChatSharedFixtureAndValidation(t *testing.T) {
 		func(in *ChatRequest) { in.KeyID = "" },
 		func(in *ChatRequest) { in.Model = "m\nheader" },
 		func(in *ChatRequest) { in.Model = " m" },
+		func(in *ChatRequest) { in.ReasoningEffort = "extreme" },
+		func(in *ChatRequest) { in.ReasoningEffort = " high" },
 		func(in *ChatRequest) { in.Messages = nil },
 		func(in *ChatRequest) { in.Messages = []ChatMessage{{"system", "not allowed"}} },
 		func(in *ChatRequest) { in.Messages = []ChatMessage{{"user", "one"}, {"user", "two"}} },
@@ -51,5 +53,19 @@ func TestChatSharedFixtureAndValidation(t *testing.T) {
 	in.Messages = nil
 	if in.Validate() != nil {
 		t.Fatal("cannot cancel run without message history")
+	}
+}
+
+func TestChatReasoningLevels(t *testing.T) {
+	in := ChatRequest{ProviderID: "p", ExpectedRevision: 1, KeyID: "default", Model: "m", Approved: true, Action: "start", Messages: []ChatMessage{{"user", "hi"}}}
+	for _, effort := range []string{"", "none", "minimal", "low", "medium", "high", "xhigh", "max"} {
+		in.ReasoningEffort = effort
+		if err := in.Validate(); err != nil {
+			t.Fatalf("effort %q: %v", effort, err)
+		}
+		raw, _ := json.Marshal(in)
+		if effort == "" && strings.Contains(string(raw), "reasoning_effort") {
+			t.Fatal("default effort must be omitted")
+		}
 	}
 }

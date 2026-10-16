@@ -7,8 +7,8 @@ import providerFixture from '../../contract/providers.json' with { type: 'json' 
 import { CONTRACT, type ChatRequest, type DesktopBridge, type ProbeProgress } from '../src/desktop/contract.generated';
 
 declare global { interface Window { chatTest: { requests: ChatRequest[]; mode: 'success' | 'waiting' | 'failure' | 'unknown'; delayStart: boolean; release: boolean; catalogFails: boolean } } }
-async function host(page: Page) {
-  await page.addInitScript(({ contract, chat, workspace, catalog, provider, mapping }) => {
+async function host(page: Page, modelProtocol = '') {
+  await page.addInitScript(({ contract, chat, workspace, catalog, provider, mapping, modelProtocol }) => {
     window.chatTest = { requests: [], mode: 'success', delayStart: false, release: false, catalogFails: false };
     const state = window.chatTest;
     const session = { instance_id: 'chat-test-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
@@ -26,7 +26,7 @@ async function host(page: Page) {
       Start: async () => ({ contract, data: session, problem: null }), Status: async () => ({ contract, data: session, problem: null }),
       Providers: async () => ({ contract, data: rows, problem: null }),
       ProviderWorkspace: async ({ provider_id }: { provider_id: string }) => ({ contract, data: { ...workspace, provider_id, revision: 1,
-        keys: [{ ...workspace.keys[0], id: 'default', enabled: true }, { ...workspace.keys[0], id: 'second', enabled: true, protocol: 'chat-completions' }],
+        keys: [{ ...workspace.keys[0], id: 'default', enabled: true, model_protocols: modelProtocol ? [{ model: 'demo-model', protocol: modelProtocol }] : [] }, { ...workspace.keys[0], id: 'second', enabled: true, protocol: 'chat-completions' }],
         models: [{ ...mapping, key_ids: ['default'], upstream: 'demo-model' }, { ...mapping, key_ids: ['second'], upstream: 'second-model' }],
       }, problem: null }),
       DiscoverProviderModels: async (input: { provider_id: string; key_id: string; expected_revision: number }) => ({ contract, data: state.catalogFails ? null : { ...catalog.success,
@@ -48,7 +48,7 @@ async function host(page: Page) {
       },
     };
     window.go = { desktop: { Bridge: new Proxy(api, { get: (target, key) => target[key as keyof typeof target] ?? (async () => ({ contract, data: null, problem: { code: 'unsupported' } })) }) as unknown as DesktopBridge } };
-  }, { contract: CONTRACT, chat: chatFixture, workspace: workspaceFixture, catalog: catalogFixture, provider: providerFixture.providers[0], mapping: mappingFixture });
+  }, { contract: CONTRACT, chat: chatFixture, workspace: workspaceFixture, catalog: catalogFixture, provider: providerFixture.providers[0], mapping: mappingFixture, modelProtocol });
   await page.goto('/'); await page.getByRole('button', { name: '对话测试', exact: true }).click();
   await expect(page.getByLabel('对话模型', { exact: true })).toHaveValue('demo-model');
   await expect(page.getByLabel('对话消息输入')).toBeEnabled();
@@ -60,12 +60,17 @@ async function send(page: Page, content = '第一条消息') {
 test('multi-turn streaming, copy, clear and target reset', async ({ page, context }) => {
   await host(page); await send(page);
   await expect(page.getByRole('button', { name: '停止生成', exact: true })).toBeVisible();
+  await expect(page.getByLabel('思考深度', { exact: true })).toBeDisabled();
   await expect(page.getByRole('article', { name: '助手回复' })).toContainText('完整回复');
   await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
+  await page.getByLabel('思考深度', { exact: true }).selectOption('high');
+  await expect(page.getByRole('article', { name: '你的消息' })).toHaveCount(1);
   await send(page, '继续刚才的话题');
   await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
   const starts = await page.evaluate(() => window.chatTest.requests.filter(r => r.action === 'start'));
   expect(starts).toHaveLength(2);
+  expect(starts[0]).not.toHaveProperty('reasoning_effort');
+  expect(starts[1].reasoning_effort).toBe('high');
   expect(starts[1].messages).toEqual([{ role: 'user', content: '第一条消息' }, { role: 'assistant', content: '完整回复' }, { role: 'user', content: '继续刚才的话题' }]);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.getByRole('button', { name: '复制第 2 条回复' }).click();
@@ -132,4 +137,20 @@ test('narrow dark layout stays within viewport', async ({ page }) => {
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: process.env.ANCHOR_CHAT_SCREENSHOT, fullPage: true });
   }
+});
+
+
+test('reasoning levels follow the Key model protocol override and default can be restored', async ({ page }) => {
+  await host(page, 'anthropic');
+  const effort = page.getByLabel('思考深度', { exact: true });
+  await expect(effort).toHaveValue('');
+  expect(await effort.locator('option').evaluateAll(options => options.map(option => (option as HTMLOptionElement).value))).toEqual(['', 'low', 'medium', 'high', 'xhigh', 'max']);
+  await effort.selectOption('max');
+  await send(page); await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
+  await effort.selectOption('');
+  await send(page, '使用模型默认深度'); await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
+  const starts = await page.evaluate(() => window.chatTest.requests.filter(r => r.action === 'start'));
+  expect(starts[0].reasoning_effort).toBe('max');
+  expect(starts[1]).not.toHaveProperty('reasoning_effort');
+  expect(starts[1].messages).toHaveLength(3);
 });

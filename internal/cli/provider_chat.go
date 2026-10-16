@@ -19,11 +19,15 @@ func (a App) providerChat(ctx context.Context, c *client.Client, args []string) 
 	revision := f.Int64("revision", 0, "current provider revision")
 	key := f.String("key", "", "exact enabled saved Key ID, or anonymous")
 	model := f.String("model", "", "upstream model ID")
+	effort := f.String("reasoning-effort", "", "upstream effort: none|minimal|low|medium|high|xhigh|max; omit for model default (Anthropic: low..max)")
 	approve := f.Bool("approve", false, "confirm upstream inference cost")
 	if err := parse(f, args); err != nil {
 		return err
 	}
-	in := catalog.ChatRequest{ProviderID: *id, ExpectedRevision: *revision, KeyID: *key, Model: *model, Approved: *approve, Action: "start", Messages: []catalog.ChatMessage{{Role: "user", Content: "validation"}}}
+	if !catalog.ValidChatReasoningEffort(*effort) {
+		return errors.New("invalid --reasoning-effort: use none|minimal|low|medium|high|xhigh|max, or omit for model default")
+	}
+	in := catalog.ChatRequest{ReasoningEffort: *effort, ProviderID: *id, ExpectedRevision: *revision, KeyID: *key, Model: *model, Approved: *approve, Action: "start", Messages: []catalog.ChatMessage{{Role: "user", Content: "validation"}}}
 	if in.Validate() != nil {
 		return errors.New("provider chat requires --id, --revision, --key, --model and --approve")
 	}

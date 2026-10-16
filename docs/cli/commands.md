@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-16
+- 最近核对：2026-10-17
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
@@ -402,11 +402,12 @@ sub2api Key 直接倍率结果的 `basis=key_billing`，`group` 和 `group_name`
 ### 固定目标的多轮文本对话（当前源码，未发布）
 
 ```text
-anchor provider chat --id ID --revision N --key KEY --model MODEL --approve
+anchor provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve
 ```
 
 - 用途：与桌面“对话测试”复用同一核心接口，单次提交完整多轮上下文，等待并输出最终安全 `ProbeProgress` JSON；不是终端交互聊天。不需要先创建公开模型映射。
 - 参数：四个目标参数和 `--approve` 均必填，没有隐式 Key 选择。`--key` 为启用的已存 Key ID；仅没有任何已存 Key 时可为 `anonymous`。`--model` 为上游 ID（最多256 UTF-8字节），非公开模型别名。`--revision` 来自 `provider list/workspace` 的当前供应商 revision。
+- 思考深度：可选 `--reasoning-effort none|minimal|low|medium|high|xhigh|max`，省略／空值时不发送原生参数，保留模型默认值（不等于关闭思考）。按所选 Key 的模型协议覆盖使用 Responses `reasoning.effort`、Chat Completions `reasoning_effort` 或 Anthropic `output_config.effort`；Anthropic 只接受 low/medium/high/xhigh/max，不强制开启 thinking 或推算 token 预算。档位实际支持由上游模型决定，不支持时安全报错、不降级重发；较高档位可能增加耗时与费用。4096输出token与超时上限不变。新增字段需要同步升级 CLI／宿主／核心，旧核心严格拒绝而不忽略。
 - 输入：stdin 必须为一个 JSON 数组，元素只有 `role` 与 `content` 文本，user/assistant 从 user 开始交替，以 user 结束；1..80条、内容累计最多64 KiB UTF-8，编码后的 stdin 最多128 KiB。没有系统提示词、工具、附件或密钥参数。示例：
 
   ```bash
@@ -686,7 +687,7 @@ anchor recover [--id ID]
 | 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --tools --streaming | 桌面新建默认开启两项能力；CLI 流式同样默认开启，工具仍须 `--tools`。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
 | 供应商模型映射多选测试／编辑／删除（desktop.40 dev） | 读取 provider workspace 后逐项 provider test/model-put/model-delete | 无专用批量命令；桌面串行复用既有动作，显式确认用量／删除，编辑默认保留各自未改字段，能力／策略／档位仍是公开模型共享属性。采用确认时供应商及模型 revision，管理／传输错误首错停止、显示部分结果并要求重读，不自动重试；停止在当前请求完成后生效。CLI 语法、输出、默认值与退出行为不变 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
-| 多轮文本对话测试（当前源码，未发布） | provider chat --id ID --revision N --key KEY --model MODEL --approve；stdin 为完整消息数组 | 共享核心与桌面 ProviderChat；CLI 输出最终 JSON，不单独提供终端交互／流式展示命令，复制和清空为页面生命周期 |
+| 多轮文本对话测试（当前源码，未发布） | provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve；stdin 为完整消息数组，支持可选原生思考深度 | 共享核心与桌面 ProviderChat；CLI 输出最终 JSON，不单独提供终端交互／流式展示命令，复制和清空为页面生命周期 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示，此展示不新增 CLI 契约；冷却/熔断为内部机制 |

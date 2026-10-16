@@ -65,7 +65,7 @@ func (s *Server) providerChat(w http.ResponseWriter, r *http.Request) {
 			selected = key
 		}
 	}
-	if !valid {
+	if !valid || (selected.EffectiveProtocol(in.Model) == "anthropic" && (in.ReasoningEffort == "none" || in.ReasoningEffort == "minimal")) {
 		apiError(w, state.ErrInvalid)
 		return
 	}
@@ -111,7 +111,7 @@ func (s *Server) providerChat(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer close(run.done)
 		defer cancel()
-		result, err := s.inferenceObserved(ctx, p, in.KeyID, in.Model, in.Messages, &selected, func(phase, text string) {
+		result, err := s.inferenceObserved(ctx, p, in.KeyID, in.Model, in.ReasoningEffort, in.Messages, &selected, func(phase, text string) {
 			s.mu.Lock()
 			run.progress.Phase = phase
 			run.progress.Text = text
