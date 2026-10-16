@@ -746,7 +746,7 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | max-requests | 初始 50,000，100–200,000 |
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
 
-`suggestions`（2026-10-16 当前源码新增，未发布）只读查询所选 Context 的保留日志候选，需要 owner 管理授权、正确实例身份及兼容核心；不会调用上游或写配置。参数：`--kind` 默认 requests（system 只支持 search）；`--field` 默认 search，可选 provider/model/key/http/code/stage；`--prefix` 默认空、区分大小写、最长512字节，不支持通配符；`--since` 默认1h、范围(0,2160h]；`--limit` 默认20、范围1..100。此命令不接收列表的其他过滤或分页参数。
+`suggestions`（2026-10-16 已随 desktop.43 dev 宿主／核心发布；命令由兼容源码 CLI 提供，公开独立 alpha.6 CLI 不含）只读查询所选 Context 的保留日志候选，需要 owner 管理授权、正确实例身份及兼容核心；不会调用上游或写配置。参数：`--kind` 默认 requests（system 只支持 search）；`--field` 默认 search，可选 provider/model/key/http/code/stage；`--prefix` 默认空、区分大小写、最长512字节，不支持通配符；`--since` 默认1h、范围(0,2160h]；`--limit` 默认20、范围1..100。此命令不接收列表的其他过滤或分页参数。
 
 输出 `{items:[{value,count}],has_more}`：基于整个时间范围而非当前页，空值不列出，按次数降序、相同次数按值升序。search 对应请求 ID／模型／供应商／Key／错误码，system 为事件名；单条请求同一值只计一次。HTTP 候选是字符串，Key 只包含日志安全 ID。超上限 has_more=true，使用更长前缀缩小；无匹配成功输出空数组。旧核心不支持、鉴权／身份错误、非法字段／范围和存储故障均非零退出，不伪装成空历史。例：`anchor logs suggestions --field model --prefix gpt --since 24h`。桌面搜索与各文本过滤复用此接口；已有精确过滤／前缀搜索语义不变。
 

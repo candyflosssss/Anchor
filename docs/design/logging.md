@@ -49,7 +49,7 @@
 桌面增加“发送档位”“加速状态”显示块：原始 JSON 值为主，青色闪电标 Fast、紫色火箭标 Ultrafast，辅以文字和确认／不匹配状态。`auto`、`flex`、`scale` 单独显示，不算已确认 Fast。核心运行日志 `model request` 只输出安全规范化的请求／派发／返回档位与 fast_triggered，不输出任意原值。本改动仅观测，不改写请求、不启用服务档位、不改变跨协议转换支持范围。
 
 
-### Agent 托管失败诊断（2026-10-16，当前源码未发布）
+### Agent 托管失败诊断（2026-10-16，desktop.43 dev 已发布）
 
 Agent 管理接口在处理 workspace、enroll、add、inspect、plan、sync、set-models、apply、restore、enable/disable 时返回的操作错误，现在通过系统事件 `agent.operation_failed` 记录，级别 `warn`、来源 `core`。inspect 读取托管状态失败但仍返回降级状态时也记录，动作标为 `inspect-status`。正常成功操作不新增失败事件；请求格式、鉴权、实例身份等前置拒绝不在本次诊断范围内。启动和自动同步仍沿用现有状态/汇总事件，本次不声称完整覆盖后台生命周期。
 
@@ -147,10 +147,10 @@ DTO 规范源为 `internal/desktop/contract.go` 的 logbook 类型别名；`cmd/
 
 空桶请求数为0；无用量、速度或率的样本仍为 null，曲线断开，不连接未知段，也不补0。整个范围没有请求和读取失败分别展示，后者不伪装成空历史。总览直接使用相同查询的累加器，不平均各桶比率。
 
-本轮验证与平台边界记于当前任务记录：Go 隔离管理链路与浏览器模拟 Wails 绑定分别验收，不代表 Linux WebKitGTK／Windows 原生窗口已验收。两平台安装包和在线更新已随 desktop.42 发布；本轮未安装或替换运行核心，使用此功能需同步更新桌面宿主与核心。
+本轮验证与平台边界记于当前任务记录：Go 隔离管理链路与浏览器模拟 Wails 绑定分别验收，不代表 Linux WebKitGTK／Windows 原生窗口已验收。两平台安装包和在线更新已随 desktop.42 首次发布；desktop.43 已按用户要求完成本机宿主与核心同步升级，原生窗口验收仍未执行。
 
 
-## 10. 筛选与搜索候选（2026-10-16，当前源码未发布）
+## 10. 筛选与搜索候选（2026-10-16，desktop.43 dev 已发布）
 
 `POST /control/v1/logs/suggestions` 是只读 owner 管理接口，校验当前实例身份，最多3秒；不调用供应商，不读取请求正文、证据 JSON、真实密钥或当前供应商配置，只查询保留日志的标识列。Wails `LogSuggestions` 复用 client，最多5秒，DTO 由 Go 生成 TS，共享样例 `desktop/contract/log-suggestions.json`。
 
@@ -160,4 +160,4 @@ DTO 规范源为 `internal/desktop/contract.go` 的 logbook 类型别名；`cmd/
 
 前端仅焦点框请求，180ms 防抖；值、页签、时间范围变化或卸载后丢弃旧响应，连接切换由实例键卸载。选择候选立即走既有精确过滤／前缀搜索；手动输入一直可用。候选失败／旧核心无接口不让整个日志页失败；不持久化候选，不伪造值。中文组合输入期间不查询或用 Enter 误选。无新时间／结果／来源枚举。
 
-CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](../cli/commands.md#12-请求与系统日志当前源码基础能力自-desktop16-dev)。测试采用隔离核心与浏览器受控桥接；未发布安装包，Linux WebKitGTK／Windows 原生窗口未验收。
+CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](../cli/commands.md#12-请求与系统日志当前源码基础能力自-desktop16-dev)。测试采用隔离核心与浏览器受控桥接；desktop.43 已发布并完成本机用户目录升级，Linux WebKitGTK／Windows 原生窗口未验收。

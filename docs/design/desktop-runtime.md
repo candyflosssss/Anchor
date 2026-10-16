@@ -143,11 +143,11 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 **发行补记（2026-10-16）**：本节标题的“当前源码未打包”记录功能提交时状态；本功能现已随 [desktop.42 dev](../release/desktop.md#当前在线-dev-版-42) 发布，两平台安装包与清单已投放。未自动安装或替换运行程序，Linux WebKitGTK／Windows 原生窗口及安装验收仍未执行。
 
-新增 `LogStats(LogStatsQuery) LogStatsResult`，复用当前已授权连接与标准 Result；DTO 别名由 logbook 规范源经 desktop/contract.go 纳入生成，TS 不手改，共享样例 `desktop/contract/log-stats.json`。方法只读、最多5秒，查询全部匹配保留请求，不采用列表游标或快照。核心 stats 查询最多3秒／90天／600桶；错误与旧核心无接口均返回 problem，不回退模拟数据、不新增上游请求或持久累计表。页面 Controller 负责15秒轮询、暂停、刷新、条件变化和卸载后的旧结果丢弃；切换实例沿用页面卸载和连接隔离。详细字段、指标分母和空值语义见[日志趋势设计](logging.md#9-请求趋势统计2026-10-16当前源码未打包)。本轮隔离 Go 调用链与模拟浏览器验收不等于 Linux／Windows 原生窗口验收，未更新已运行的安装程序或核心。
+新增 `LogStats(LogStatsQuery) LogStatsResult`，复用当前已授权连接与标准 Result；DTO 别名由 logbook 规范源经 desktop/contract.go 纳入生成，TS 不手改，共享样例 `desktop/contract/log-stats.json`。方法只读、最多5秒，查询全部匹配保留请求，不采用列表游标或快照。核心 stats 查询最多3秒／90天／600桶；错误与旧核心无接口均返回 problem，不回退模拟数据、不新增上游请求或持久累计表。页面 Controller 负责15秒轮询、暂停、刷新、条件变化和卸载后的旧结果丢弃；切换实例沿用页面卸载和连接隔离。详细字段、指标分母和空值语义见[日志趋势设计](logging.md#9-请求趋势统计2026-10-16当前源码未打包)。隔离 Go 调用链与模拟浏览器验收不等于 Linux／Windows 原生窗口验收；desktop.43 已按用户要求完成本机宿主与核心同步升级。
 
 
-## 日志候选桥接（2026-10-16，当前源码未发布）
+## 日志候选桥接（2026-10-16，desktop.43 dev 已发布）
 
 新增 `LogSuggestions(LogSuggestionsQuery) LogSuggestionsResult`，Go DTO 与生成 TS 同源，共享样例为 `desktop/contract/log-suggestions.json`。宿主校验输入并复用现有连接、owner 凭据与实例身份，调用 client 的只读 `/control/v1/logs/suggestions`，宿主5秒／核心3秒超时。仅暴露固定日志标识列、去重值与出现次数，不能从 JS 传 SQL、正文列或任意 URL。候选按时间范围查询所有保留行，不受页面游标及其他字段过滤限制。
 
-这是 additive 方法，未改 `anchor-desktop-v1` 既有调用；旧宿主缺方法／旧核心不支持时前端明确显示候选不可用并保留手动筛选，不回退 Mock。前端按实例键卸载清理旧请求，中文输入及过期结果由局部 Controller 处理。接口、上限与排序见[日志设计](logging.md#10-筛选与搜索候选2026-10-16当前源码未发布)。未构建／安装／发布本轮桌面包，原生两平台未验收。
+这是 additive 方法，未改 `anchor-desktop-v1` 既有调用；旧宿主缺方法／旧核心不支持时前端明确显示候选不可用并保留手动筛选，不回退 Mock。前端按实例键卸载清理旧请求，中文输入及过期结果由局部 Controller 处理。接口、上限与排序见[日志设计](logging.md#10-筛选与搜索候选2026-10-16desktop43-dev-已发布)。desktop.43 已完成双平台打包、dev 发布和本机用户目录升级；原生两平台窗口未验收。

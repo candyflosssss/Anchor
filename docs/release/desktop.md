@@ -1,14 +1,13 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-16。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.42`，北京时间 2026-10-16 16:35:25 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：请求日志页新增请求量、Token 用量、总 TPS、错误率、缓存命中率、平均耗时与首字延迟趋势，复用全部匹配保留历史而非当前分页；范围15分钟至90天，自动或10秒至1天粒度、最多600桶，支持15秒刷新／暂停／手动刷新、鼠标和键盘查点、浅／深主题与窄屏。未知观测保持 null／断线，已知0保留0；沿用 schema8，无新增数据库迁移或上游调用。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.42` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。
-- 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
-- 构建：干净隔离源码 `43f2c41d378c4d4c38f382a5512e64a8f1c417e8`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用功能提交已通过的 logbook／core／desktop／cli／client 五包 Go 测试、TypeScript、275项完整前端单测、ESLint 和11项单 worker 日志 Playwright；本轮不重复全量或浏览器测试。
-- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.41` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
-
-- 当前本机安装：2026-10-16 16:46，按用户明确要求将用户目录中的 CLI／核心／GUI 从 `.40` 升为 `.42`；核心与网关 ready、桌面进程运行。保留原有 Codex 模型覆盖（overridden，Agent 汇总维持 partial）及 DSH applied 状态，未强制重新托管；配置、凭据和原始恢复基线保持。六档范围与自动粒度的只读日志统计通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收，详见当前版本下方记录。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.43`，北京时间 2026-10-16 17:41:46 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：日志搜索／供应商／模型／Key／HTTP／错误码／阶段提供基于当前时间范围保留历史的快速候选及出现次数；修复趋势图悬停时间点，保留用量、TPS、错误率、缓存命中率等多尺度曲线；新增 Agent 托管失败安全诊断，并包含网关 32 MiB 请求体修复。已有「导出」可按当前时间及筛选条件保存请求／系统日志 JSONL，包含新诊断事件，不限当前页。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.43` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，SSH 远端核心另行升级。
+- 沿用 state.db schema8，无新增迁移；从更早版本首次启动前请备份，旧程序不能打开已迁移数据库，无数据库降级。
+- 构建：干净隔离源码 `ff229b6e2786f128b4d9542b006a59a9f74a5ec8`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用本轮功能已通过的 Go 定向／三包完整回归、TypeScript、ESLint、63项前端单测和18项单 worker 日志浏览器测试，本轮不重复全量或浏览器测试。
+- 验证：Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.42` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。
+- 当前本机安装：2026-10-16 17:43，经用户明确要求，CLI／核心由 `.42.gateway32.1`、GUI 由 `.42` 统一更新为 `.43`。先备份后正常保留交接，恢复受限 transient user units；core／gateway ready、桌面进程运行。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、请求七字段及系统事件候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收。
 
 ## 1. 安装与使用行为
 
@@ -31,7 +30,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.42_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.43_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -87,7 +86,30 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.42`
+### 当前在线 dev 版 `.43`
+
+`0.1.0-dev.desktop.43` 从干净隔离 worktree 的 `ff229b6e2786f128b4d9542b006a59a9f74a5ec8` 构建，于北京时间 2026-10-16 17:41:46 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.43)（非 latest）。tag 指向实际构建提交，SOURCE.json dirty=false，不指向后续发行文档提交。
+
+日志搜索／供应商／模型／Key／HTTP／错误码／阶段提供基于当前时间范围保留历史的快速候选及出现次数；修复趋势图悬停时间点，保留用量、TPS、错误率、缓存命中率等多尺度曲线；新增 Agent 托管失败安全诊断，并包含网关 32 MiB 请求体修复。已有「导出」可按当前时间及筛选条件保存请求／系统日志 JSONL，包含新诊断事件，不限当前页。
+
+候选查询覆盖全部匹配时间范围而非当前分页，不受其他字段过滤限制；默认20项，按次数降序／值升序，支持手动输入、键盘选择和中文组合输入。对应只读 CLI `logs suggestions` 与 Wails 桥接同版交付；公开独立 CLI 仍为 alpha.6，桌面程序不提供通用 CLI。宿主与核心需一起更新；SSH 远端核心不随本机更新自动升级。Agent 诊断只记录阶段、原因等白名单字段，不记录配置内容或秘密，不修改现有 API 错误码或配置保护策略。
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.43/`；publication 六附件包括两平台安装包、flat 更新清单、含 vendor 对应源码、许可／构建元数据 ZIP 与 SHA256SUMS。
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.43-windows-amd64-setup.exe` | 8,281,237 | `fd7c22df6b643a522b16bdcd544f093379ccd169e7b19529c3ae40e59b7dd8ad` |
+| linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.43_amd64.deb` | 6,086,664 | `b6c8d799e60eab81cf3c86d12f06bbf902c6d1345da2add3f97b68e54f7ca8cf` |
+
+Go／TypeScript 契约比对、TypeScript／Vite 与双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.42` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。复用本轮功能已通过的 Go 定向回归、managed／logbook／core 三包完整回归、TypeScript、ESLint、63项前端单测和18项单 worker 日志浏览器测试。构建时保留原 BUILD.json 的未原生验收／未发布状态，发布与实际安装验证分别另存 `publication/`、`local-install/`。
+
+**本机升级记录（2026-10-16 17:43）**：从同版 vendored 源码离线受限构建 CLI，GUI ELF 与发布 deb 内容逐字节一致。备份位于 `/home/mosaki/.config/anchor/backups/pre-desktop43-20261016-174222`，目录0700、文件0600；以 `stop --approve --for-restart` 正常保留交接后原子替换用户目录程序，恢复原有受限 transient user units，不新增持久服务或登录自启动。30秒观察未捕获空闲窗口，随后按授权执行正常10秒排空停服，未强杀进程；不承诺更新期间请求无中断。
+
+当前本机安装：2026-10-16 17:43，经用户明确要求，CLI／核心由 `.42.gateway32.1`、GUI 由 `.42` 统一更新为 `.43`。先备份后正常保留交接，恢复受限 transient user units；core／gateway ready、桌面进程运行。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、请求七字段及系统事件候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收。state.db schema8、quick_check／foreign_key_check 通过，本地模型目录 HTTP 200；系统日志导出逐行 JSON 解析通过，共 52 条，验证只保存计数而不落盘日志正文。保留原始用户模型目录与恢复基线，没有强制重新托管或请求付费上游。未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名，下载成功不等于原生安装成功。未验收既有 Codex 会话自动重载。
+
+<a id="当前在线-dev-版-42"></a>
+
+### 历史 dev 版 `.42`
 
 `0.1.0-dev.desktop.42` 从干净隔离 worktree 的 `43f2c41d378c4d4c38f382a5512e64a8f1c417e8` 构建，于北京时间 2026-10-16 16:35:25 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.42)（非 latest）。tag 指向实际构建提交，不指向后续发行文档提交；SOURCE.json dirty=false。
 
@@ -104,7 +126,7 @@ TPS 按成功请求输出 Token／总耗时加权，错误率分母排除 pendin
 | linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.42_amd64.deb` | 6,074,256 | `43fb15c9d611962f33bbe2cb0da619c2011ceb5f837e71a629d8bf41221c0a92` |
 | windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.42-windows-amd64-setup.exe` | 8,273,322 | `5a192975047cc51af1028848b59f92946da678150e6a88c403fcccaf84ed518c` |
 
-Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.41` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 复用功能提交已通过的 logbook／core／desktop／cli／client 五包 Go 测试、TypeScript、275项完整前端单测、ESLint 和11项单 worker 日志 Playwright；本轮不重复全量或浏览器测试。
+Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.41` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。复用功能提交已通过的 logbook／core／desktop／cli／client 五包 Go 测试、TypeScript、275项完整前端单测、ESLint 和11项单 worker 日志 Playwright；本轮不重复全量或浏览器测试。
 
 打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 未改真实 Agent 配置。BUILD.json 保留构建时 public_release=false 与未原生安装验收的原始事实；发布与默认源下载证据另存 publication。
 
@@ -127,7 +149,7 @@ Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台生产�
 | linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.41_amd64.deb` | 6,062,508 | `6d552517f83bd3f0ec7276e786bc6199bb2fccc26323b8fd3735a108d3aafafb` |
 | windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.41-windows-amd64-setup.exe` | 8,262,139 | `8186b56e02455d3aee9ad673b76a0fd39d588426a6dbbd2dc721925948a91b98` |
 
-Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.40` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 复用功能提交已通过的 protocol／core／desktop／cli 四包 Go 测试、TypeScript／定向 ESLint、37 项日志单测与 9 项单 worker Playwright；本轮不重复全量或浏览器测试。
+Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.40` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。复用功能提交已通过的 protocol／core／desktop／cli 四包 Go 测试、TypeScript／定向 ESLint、37 项日志单测与 9 项单 worker Playwright；本轮不重复全量或浏览器测试。
 
 本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 未改真实 Agent 配置；独立公开 CLI 仍为 alpha.6，读取新增日志证据须兼容源码 CLI／新版核心。BUILD.json 保留构建时 public_release=false 与未原生安装验收的原始事实，发布与下载证据另存 publication。工作区未提交的余额缓存／工作台改动未包含在包中。
 
@@ -158,7 +180,7 @@ CLI 和受认证核心均报告 `.40`，核心与 GUI 的运行 ELF 哈希匹配
 
 输出 `dist/desktop/0.1.0-dev.desktop.39/`，publication 六附件包括 Windows NSIS、Ubuntu24.04 AMD64 deb、flat 清单、含 vendor 源码、许可／构建元数据 ZIP 与校验清单。六包 Go 回归通过，新增用例后 managed／CLI 再次通过；Go／TypeScript 契约比对、TypeScript／Vite 生产构建、双平台编译／打包通过。六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision、默认源从 `.37` 发现并真实下载 Linux 安装包通过；Windows 附件 digest 与本地一致。
 
-**本机修复已验收**：本机 CLI／核心／GUI 已升级为 `.39`，core／gateway／agent management 均 ready，Codex／DSH 均 applied。Codex 自有目录与网关均为 12 个模型，默认仍为 `gpt-6.1-sol(fast)`；手动 `agent sync` applied，配置、目录与 journal 无变化。独立 CODEX_HOME 的原生 codex-cli 0.162.1 app-server `initialize + model/list` 已解析实际生成目录，12 个模型与网关完全一致，含普通／Fast／Ultrafast。仅本地名单 RPC，未创建线程、未发推理请求，未重启当前用户 Codex。 state.db schema8、quick_check／foreign_key_check、配置行、settings、owner token 与绑定凭据均保持；用户原目录哈希、首次恢复基线和已有 edits.before 保留。受限临时核心／GUI 服务均 active，运行 ELF 哈希匹配本版产物；未设置持久服务或登录自启动。保护备份：`/home/mosaki/.config/anchor/backups/pre-desktop39-20261015-173838/`（不提交秘密内容）。沿用 restart_handoff，仍有停机窗口，不承诺现有会话自动重连。
+**本机修复已验收**：本机 CLI／核心／GUI 已升级为 `.39`，core／gateway／agent management 均 ready，Codex／DSH 均 applied。Codex 自有目录与网关均为 12 个模型，默认仍为 `gpt-6.1-sol(fast)`；手动 `agent sync` applied，配置、目录与 journal 无变化。独立 CODEX_HOME 的原生 codex-cli 0.162.1 app-server `initialize + model/list` 已解析实际生成目录，12 个模型与网关完全一致，含普通／Fast／Ultrafast。仅本地名单 RPC，未创建线程、未发推理请求，未重启当前用户 Codex。state.db schema8、quick_check／foreign_key_check、配置行、settings、owner token 与绑定凭据均保持；用户原目录哈希、首次恢复基线和已有 edits.before 保留。受限临时核心／GUI 服务均 active，运行 ELF 哈希匹配本版产物；未设置持久服务或登录自启动。保护备份：`/home/mosaki/.config/anchor/backups/pre-desktop39-20261015-173838/`（不提交秘密内容）。沿用 restart_handoff，仍有停机窗口，不承诺现有会话自动重连。
 
 **中间构建 `.38` 未上线**：本轮先构建并安装 `.38`，已修复 effort 导出、托管达到 ready，但隔离原生 Codex 检查发现无模板模型缺少指令导致整份目录被拒。未将该包发布；补齐明示通用指令并回归后构建、发布与安装 `.39`。保留 `.38` 产物和失败证据，不能把 `.38` 的程序替换当成完整名单修复。
 
