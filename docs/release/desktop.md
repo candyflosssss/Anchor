@@ -6,9 +6,9 @@
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.42` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。
 - 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
 - 构建：干净隔离源码 `43f2c41d378c4d4c38f382a5512e64a8f1c417e8`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用功能提交已通过的 logbook／core／desktop／cli／client 五包 Go 测试、TypeScript、275项完整前端单测、ESLint 和11项单 worker 日志 Playwright；本轮不重复全量或浏览器测试。
-- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.41` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
+- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.41` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
 
-- 上一版本机升级：2026-10-16 01:18，按用户明确要求将用户目录中的 CLI／核心／GUI 从 `.39` 升为 `.40`；核心、网关、Agent 托管均 ready，Codex／DSH 均 applied，配置与原始恢复基线保留。此为用户目录安装，不是系统安装器／应用内 apply 验收，详见下方本机升级记录。
+- 当前本机安装：2026-10-16 16:46，按用户明确要求将用户目录中的 CLI／核心／GUI 从 `.40` 升为 `.42`；核心与网关 ready、桌面进程运行。保留原有 Codex 模型覆盖（overridden，Agent 汇总维持 partial）及 DSH applied 状态，未强制重新托管；配置、凭据和原始恢复基线保持。六档范围与自动粒度的只读日志统计通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收，详见当前版本下方记录。
 
 ## 1. 安装与使用行为
 
@@ -106,7 +106,11 @@ TPS 按成功请求输出 Token／总耗时加权，错误率分母排除 pendin
 
 Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台生产编译／打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC 与 tag revision 校验通过；默认源从 `.41` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 复用功能提交已通过的 logbook／core／desktop／cli／client 五包 Go 测试、TypeScript、275项完整前端单测、ESLint 和11项单 worker 日志 Playwright；本轮不重复全量或浏览器测试。
 
-本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 未改真实 Agent 配置。BUILD.json 保留构建时 public_release=false 与未原生安装验收的原始事实；发布与默认源下载证据另存 publication。
+打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 未改真实 Agent 配置。BUILD.json 保留构建时 public_release=false 与未原生安装验收的原始事实；发布与默认源下载证据另存 publication。
+
+**本机升级记录（2026-10-16 16:46）**：按用户明确要求，复用已校验的 `.42` Linux ELF（与发布 deb 内容一致），从同版 vendored 源码离线受限构建 CLI，将 `~/.local/bin/anchor` 与 `anchor-desktop` 从 `.40` 原子替换为 `.42`。先备份数据库、程序、凭据和恢复材料，关闭旧 GUI，再通过 `stop --approve --for-restart` 保留交接；正常退出后恢复受限 transient user units，不新增持久服务或开机自启动。备份位于 `~/.config/anchor/backups/pre-desktop42-20261016-164634/`，目录0700、文件0600。
+
+实际运行 CLI／核心版本与两进程 ELF 哈希匹配 `.42`，core／gateway ready；Codex 原有模型覆盖保留、DSH 仍 applied，Agent 汇总维持升级前的 partial，未强行改写为正常托管。配置表、settings、实例身份、凭据、用户目录与原始恢复基线保持；state.db schema8、数据库 quick_check／foreign_key_check、备份完整性和权限通过。真实只读日志统计在15分钟、1小时、24小时、7天、30天、90天及自动粒度通过；本地模型目录返回200，未请求付费上游。安装与发布证据分开保存于 `local-install/` 和 `publication/`；没有重新发布线上版本或改写原 BUILD.json。未执行系统安装器、应用内 apply、原生窗口可见性或现有 Codex 会话自动重载验收。
 
 ### 历史 dev 版 `.41`
 
