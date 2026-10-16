@@ -1,13 +1,12 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-16。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.45`，北京时间 2026-10-16 20:03:09 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与 flat 清单同版投放。
-- 线上 `.45` 范围：日志趋势只跨无请求空桶用淡虚线连接真实采样，不补零／插值／外推，有请求但指标未知仍断线；认证 Codex Binding 可采集原生线程 UUID，并按线程只读关联同机项目元数据，显式 Anchor 标签优先。项目以可读名称加摘要区分，会话使用真实线程 ID；不读取标题／正文、不保存完整路径，旧日志不回填、缺失／跨机元数据不猜项目。保留多尺度曲线、历史候选、四维分类／筛选和 JSONL 导出。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.45` 并重新打开，核对 Agent 连接。新宿主对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，SSH 远端核心另行升级。
-- 沿用 state.db schema8；日志库增加幂等表达式索引，不重写历史归属，无数据库降级。
-- 线上 `.45` 构建：复用干净源码 `78d06f0cc5a89bccb1c490d3ac899fe190e8f291`（SOURCE.json dirty=false）的现有同版双平台包，不重新打包、不混入未提交的余额缓存／刷新增量。复用既有六包 Go 回归、49项日志单测、typecheck／定向 ESLint 和20项受控桥接浏览器回归，本轮不重复测试。
-- 线上 `.45` 验证：六附件大小／SHA256 digest、对应源码逐文件内容与构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过；默认 GitHub dev 源从 `.44` 发现并真实下载 `.45` Linux 安装包，大小／SHA256 校验通过，Windows GitHub 附件 digest 与本地一致。未执行系统安装器／应用内 apply、Linux／Windows 原生窗口或真实付费上游验收；安装器未签名。
-- 当前本机安装：2026-10-16 19:09，CLI／核心／GUI 由 `.44` 统一更新为 `.45`。先备份后正常保留交接，恢复原有受限 transient user units；core／gateway ready、桌面进程运行，运行 ELF 哈希与同版构建一致。原有 Codex 模型覆盖（overridden，Agent 汇总 partial）与 DSH applied 保持，配置、凭据、实例身份和原始恢复基线保持。六档日志统计、四维分类及未识别过滤、请求十一字段与系统候选、真实系统日志 JSONL 导出通过。此为用户目录安装，不是系统安装器／应用内 apply 或原生窗口验收；同版 `.45` 已投放 dev 在线更新，SSH 远端未更新。
+- 更新：2026-10-17。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.46`，北京时间 2026-10-17 01:04:25 发布；非 latest 的 prerelease，两平台包与 flat 清单同版投放。
+- 本版范围：托管 Agent 的「保存并应用」与独立同步合并为「更新配置」，一次确认更新默认模型、最新映射及托管连接。显式接管会先保存外部变化值作为恢复基线，后台／启动不覆盖第三方修改；日志趋势面板支持收起。
+- 构建：干净隔离提交 `0d9f8479cba2c7c6ca0b58af1c3c9b313154d79f`；不包含工作区未提交的代理／mihomo、余额与打包器改动。沿用 state.db schema8，无数据库降级。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff；desktop.34 及更早版首次仍须备份、停止旧核心并退出界面，再人工安装新版。升级有停机窗口，不承诺会话自动重连，SSH 远端另行升级。
+- 在线验证：六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.45` 为当前版发现并真实下载 `.46` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。
+- 当前本机安装：本机 CLI／核心／GUI 已于2026-10-17 01:06统一升级为 `.46`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop46-20261017-010601`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持；Codex conflict／DSH applied 与升级前一致，不借安装自动重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
 
 ## 1. 安装与使用行为
 
@@ -30,7 +29,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.45_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.46_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -86,9 +85,26 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
+### 当前在线 dev 版 `.46`
+
+本版于北京时间 2026-10-17 01:04:25 发布为非 latest 的 dev prerelease，源码 `0d9f8479cba2c7c6ca0b58af1c3c9b313154d79f`，SOURCE.json dirty=false。 安装包、flat 清单、含 Go vendor 的对应源码、许可／构建元数据与 SHA256SUMS 共六附件同版投放，原构建元数据保留打包时事实。
+
+产物：`dist/desktop/0.1.0-dev.desktop.46/`；生产契约比对、TypeScript／Vite、Windows 与 Ubuntu 24.04 AMD64 编译、NSIS／deb 打包通过。Linux deb 版本 `0.1.0~dev.desktop.46`、架构 amd64、GUI payload 哈希与本地 ELF 一致。复用功能提交的四包 Go 测试、typecheck、16项 Agent Model 单测、定向 lint 与22项单 worker 桥接测试，本轮不重复全量／race／浏览器测试。
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.46-windows-amd64-setup.exe` | 8,360,723 | `488623f18b799c981571f111564adc15a3f0981689368f6986f42ef3c4e3b255` |
+| linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.46_amd64.deb` | 6,161,752 | `bd49bd265bb438b9ca4eb0b0d075f5e063a402a95704981ec0100421fe7a752f` |
+
+六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.45` 为当前版发现并真实下载 `.46` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。
+
+**本机更新**：本机 CLI／核心／GUI 已于2026-10-17 01:06统一升级为 `.46`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop46-20261017-010601`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持；Codex conflict／DSH applied 与升级前一致，不借安装自动重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。 首次本机备份预检发现 Codex 生成目录已被外部删除，在停服前安全退出；改为保留该缺失状态后完成更新，没有补写或接管。
+
 <a id="local-desktop45"></a>
 
-### 当前在线 dev 版 `.45`
+<a id="当前在线-dev-版-45"></a>
+
+### 历史在线 dev 版 `.45`
 
 `0.1.0-dev.desktop.45` 从干净隔离源码 `78d06f0cc5a89bccb1c490d3ac899fe190e8f291` 构建（SOURCE.json dirty=false），先于2026-10-16 19:09完成本地打包／本机升级，再于北京时间 2026-10-16 20:03:09 将同一版本发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.45)（非 latest）。六附件已同版投放，tag 指向实际构建提交；本次不重新构建或重启本机，SSH 远端不在范围。
 

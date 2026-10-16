@@ -391,7 +391,7 @@ maxTokens 在 DSH 同时设定模型输出能力和单次请求默认上限，�
 
 字段语义依据固定上游 [catalog.ts](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/llm/llm-pi-ai/src/catalog.ts)、[config.ts](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/llm/llm-pi-ai/src/config.ts) 与 [agent-default-model](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/core/agent-default-model/src/index.ts)。部署的 DSH 版本仍需独立核对。
 
-### 2026-10-17 外部配置漂移后的显式重新接管（当前源码，未打包发布）
+### 2026-10-17 外部配置漂移后的显式重新接管（desktop.46 dev 已发布）
 
 - 后台 `Reconcile`、启动和映射自动同步继续校验上次写入，不抢改第三方值；单绑定失败隔离，不阻断核心或其他绑定。
 - 显式 `Refresh` / `agent sync` / `ManageAgent(action=sync)` 使用 `Reapply`：相同批准范围内，对 applied 或无未完成 previous journal 的 conflict 重新生成并原位写入。未变化字段沿用原恢复值，被外部改变的字段采用当前值作为恢复值；不改变 scope、默认模型策略、revision 或凭据。已有 conflict 可走该入口，不再只能手改文件解除死结；set-models 的 scope 变更仍先按原规则恢复；登记更新采用下述统一流程。
@@ -401,7 +401,7 @@ maxTokens 在 DSH 同时设定模型输出能力和单次请求默认上限，�
 - 写入前先保存 previous/next prepared journal，最终配置与目录分别按读取快照校验，不覆盖此后并发编辑。未完成 previous journal 不直接重新接管，须先核对恢复结果。
 - 桌面现将原「保存并应用」和独立同步合并为「更新配置」，确认当前默认模型及恢复规则后只调用一次 EnrollAgent。既有 ManageAgent(sync) 仍提供受控能力，但页面不再单独展示。失败重读且不自动重放。无新增 DTO 字段／接口。CLI 具体兼容变化见[最新指令大全](../cli/commands.md)。
 
-### 2026-10-17 统一更新配置（当前源码，未打包发布）
+### 2026-10-17 统一更新配置（desktop.46 dev 已发布）
 
 - Enroll 仍同时支持新登记与按当前 revision 更新。在线更新已应用／无 previous 的 conflict 时，不先 Recover 再 Apply，而是在保存新策略后用新 Binding 和最新 GatewayBinding 执行 Reapply；不依赖旧默认仍可用，也不在文件中发布中间恢复态。Codex all-compatible → all-mapped 及旧 single → 自动模型名单可在保留原有字段所有权的前提下更新；Reapply 仍拒绝丢弃旧字段／目录所有权。
 - 成功更新递增 revision，保留绑定 ID／凭据／operation／原始恢复内容，现有映射不改。新目标、已恢复目标及未完成写入仍遵循原登记／条件恢复流程，不将损坏或未完成 journal 当作批准。
