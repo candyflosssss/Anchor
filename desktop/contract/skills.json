@@ -1,0 +1,112 @@
+{
+  "contract": "anchor-desktop-v1",
+  "workspace": {
+    "revision": 3,
+    "library": [
+      {
+        "id": "skill-fixture",
+        "name": "example",
+        "versions": [
+          {
+            "number": 1,
+            "parent": 0,
+            "baseline": 0,
+            "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "created_at": "2026-10-16T12:00:00Z",
+            "origin": "create",
+            "files": [
+              {
+                "path": "SKILL.md",
+                "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "size": 10,
+                "executable": false
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "scopes": [
+      {
+        "id": "scope-fixture",
+        "agent": "shared",
+        "kind": "project",
+        "root": "/fixture/project/.agents/skills",
+        "project": "/fixture/project",
+        "origin": "registered"
+      }
+    ],
+    "sources": [
+      {
+        "id": "source-fixture",
+        "scope_id": "scope-fixture",
+        "path": "/fixture/project/.agents/skills/existing",
+        "name": "existing",
+        "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "skill_id": "skill-fixture",
+        "baseline": 1,
+        "status": "source_changed"
+      }
+    ],
+    "mounts": [
+      {
+        "id": "mount-fixture",
+        "skill_id": "skill-fixture",
+        "version": 1,
+        "scope_id": "scope-fixture",
+        "path": "/fixture/project/.agents/skills/example",
+        "target": "/fixture/anchor/skills/library/skill-fixture/v1",
+        "status": "linked"
+      }
+    ],
+    "warnings": []
+  },
+  "detail": {
+    "skill_id": "skill-fixture",
+    "version": 1,
+    "source_id": "",
+    "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "files": [
+      {
+        "path": "SKILL.md",
+        "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "size": 10,
+        "executable": false
+      }
+    ],
+    "differences": [
+      {
+        "path": "SKILL.md",
+        "change": "added",
+        "before": "",
+        "after": "# Example\n",
+        "binary": false,
+        "truncated": false
+      }
+    ],
+    "file": "SKILL.md",
+    "content": "# Example\n",
+    "editable": true
+  },
+  "create": {
+    "action": "create",
+    "expected_revision": 3,
+    "approved": true,
+    "skill_id": "",
+    "source_id": "",
+    "scope_id": "",
+    "mount_id": "",
+    "name": "new-example",
+    "version": 0,
+    "project_path": "",
+    "expected_hash": "",
+    "edits": [
+      {
+        "path": "SKILL.md",
+        "content": "# Example\n",
+        "executable": false,
+        "delete": false
+      }
+    ]
+  }
+}

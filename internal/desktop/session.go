@@ -95,7 +95,7 @@ func problem(err error, writing bool) *Problem {
 			return &Problem{"unauthorized"}
 		case 409:
 			switch r.Code {
-			case "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe":
+			case "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe", "skill_unsafe", "skill_changed", "skill_link_unavailable":
 				return &Problem{r.Code}
 			}
 			if r.Code == "referenced" {
@@ -103,6 +103,9 @@ func problem(err error, writing bool) *Problem {
 			}
 			return &Problem{"conflict"}
 		case 400:
+			if r.Code == "skill_limit" {
+				return &Problem{"skill_limit"}
+			}
 			return &Problem{"invalid"}
 		case 404:
 			return &Problem{"unsupported"}

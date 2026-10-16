@@ -1,3 +1,4 @@
+import { SkillsView } from '../features/skills/skills.view';
 // Layout adapted from official shadcn sidebar-07 (MIT); see SHADCN_SOURCES.md.
 import { useCallback, useMemo, useState } from 'react';
 import { createEnvironment, prototype } from '../desktop/environment';
@@ -20,7 +21,7 @@ import { useWindowController } from '../features/window/use-window-controller';
 import { WindowControls } from '../features/window/window-controls.view';
 import { cn } from '../lib/utils';
 
-const pageTitle: Record<Page, string> = { connections: '设备连接', overview: '概览', providers: '供应商', models: '模型映射', logs: '日志', chat: '对话测试', agents: 'Agent 托管', settings: '设置' };
+const pageTitle: Record<Page, string> = { connections: '设备连接', overview: '概览', providers: '供应商', models: '模型映射', logs: '日志', chat: '对话测试', agents: 'Agent 托管', settings: '设置', skills: 'Skills' };
 
 export function App() {
   const { appearance, setAppearance } = useAppearance();
@@ -53,7 +54,7 @@ export function App() {
         </div>
       </header>
       {windowController.error && <p role="status" className="border-b px-4 py-2 text-xs text-destructive">{windowController.error}</p>}
-      {page === 'connections' ? <ConnectionsView currentProfile={session.info?.profile_name} disabled={busy || session.stopping || session.phase === 'starting'} onConnected={session.select} onActivity={setBusy} /> : page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'chat' && (prototype || session.phase === 'ready') ? <ChatWorkspace key={session.info?.instance_id ?? session.phase} environment={environment} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <SettingsPage appearance={appearance} setAppearance={setAppearance} onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage key={instanceId} environment={environment} page={page === 'agents' || page === 'chat' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
+      {page === 'connections' ? <ConnectionsView currentProfile={session.info?.profile_name} disabled={busy || session.stopping || session.phase === 'starting'} onConnected={session.select} onActivity={setBusy} /> : page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'chat' && (prototype || session.phase === 'ready') ? <ChatWorkspace key={session.info?.instance_id ?? session.phase} environment={environment} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'skills' && (prototype || session.phase === 'ready') ? <SkillsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <SettingsPage appearance={appearance} setAppearance={setAppearance} onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage key={instanceId} environment={environment} page={page === 'agents' || page === 'chat' || page === 'skills' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
         <h1 className="text-xl font-semibold">{session.phase === 'starting' ? '正在连接核心…' : session.phase === 'stopped' ? '停服请求已接受' : '当前设备暂不可用'}</h1>
         {(session.error || session.phase === 'stopped') && <p className="my-4 text-sm text-muted-foreground">{session.error ? desktopMessages[session.error] : '核心正在处理退出与配置恢复。'}</p>}
         {session.phase !== 'starting' && <Button onClick={() => void session.connect()}>重新连接当前设备</Button>}

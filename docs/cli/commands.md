@@ -17,6 +17,8 @@
 
 2026-10-16 核对增量：上下文价格分档建议与平价导入保护已随 desktop.40 dev 宿主／核心发布；独立公开 CLI 仍为 alpha.6，不含这些增量；行为及迁移见下文模型设置与参考目录章节。
 
+2026-10-17 源码增量：新增 Skill 中心库／来源差异／固定版本软链接管理，尚未打包发布，见 §14。
+
 ## 1. 调用与公共约定
 
 下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。公开 Release 是安装源；实际公开版本及平台附件见发行页。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
@@ -28,7 +30,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
 | `--ssh-password-stdin` | 从 stdin 读取本次 SSH 密码（最多 8192 bytes，去掉末尾 CR/LF，非空），仅本次使用，不保存；SSH add 时选择密码模式，已保存密码 Context 每次管理请求重新提供。不能与供应商 `--secret-stdin` 同用 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
@@ -110,6 +112,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `agent disable` | 条件恢复并禁用绑定授权 | 核心在线；当前 Binding revision |
 | `agent set-models` | 显式更新默认模型与模型授权范围 | 核心在线；当前 Binding revision；先条件恢复 |
 | `agent token` | Codex 认证命令专用秘密 stdout | 本机；enabled Binding；无需核心在线 |
+| `skill` | 中心库扫描、导入／创建／版本编辑、固定挂载管理；完整参数见 §14 | 兼容核心在线，写操作需 revision 与 approve（源码未发布） |
 | `recover` | 核心离线时独立恢复 | 本机；必须取得实例锁 |
 
 所有 `context` 子命令均编辑/使用本地 Context 库，不接受 `--context` 作为远程编辑目标。不存在静默回退到其他实例的行为。
@@ -697,6 +700,7 @@ anchor recover [--id ID]
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；desktop.45 dev 已发布认证 Codex 原生线程及同机项目元数据关联，其他客户端仍需显式标签；历史不回填 |
+| Skill 中心库、来源差异、固定版本链接 | skill 管理子命令（§14） | 当前源码未发布；非全盘扫描；无自动原件替换、合并或批量升级 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
@@ -840,3 +844,45 @@ anchor catalog estimate --provider PROVIDER_ID --model MODEL_ID \
 ```
 
 这是能力默认值和日志参考价的共享基础。目前已提供核心、CLI、桌面桥接与前端 Model 方法；映射表单显式导入与模型参考快照已接入当前源码（§6）；日志逐请求比价及逐请求价格快照尚未接入。仅估算文本 token，不推断音视频、图像专用费、请求费、路由倍率、折扣或平台账单。详见[模型参考目录契约](../design/model-catalog.md)。
+
+## 14. Skill 中心库
+
+`--content-stdin` 不能与 `--ssh-password-stdin` 共用标准输入；命令会在读取输入前拒绝该组合。
+
+（当前源码，未发布）
+
+需要兼容的客户端与核心（能力 `skill_library_v1`）、所选 Context 的 owner 管理凭据；没有本轮安装包或发布版本。路径属于**所选核心所在设备**，不是 CLI／桌面宿主；不依赖 Agent 网关接管。输出均为 JSON；成功退出0，参数、授权、冲突或安全检查失败非零。完整模型与限制见 [Skill 设计](../design/skills.md)。
+
+```text
+anchor skill scan
+anchor skill list
+anchor skill inspect SKILL_ID --version N [--against N] [--file PATH]
+anchor skill diff SKILL_ID --version N [--against N] [--file PATH]
+anchor skill inspect --source SOURCE_ID [--against N] [--file PATH]
+anchor skill diff --source SOURCE_ID [--against N] [--file PATH]
+anchor skill register-project ABSOLUTE_PATH --revision R --approve
+anchor skill import SOURCE_ID --hash HASH [--skill SKILL_ID] [--name NAME] --revision R --approve
+anchor skill create NAME --content-stdin --revision R --approve
+anchor skill save SKILL_ID --version N [--file PATH] (--content-stdin | --delete-file) [--executable] --revision R --approve
+anchor skill link SKILL_ID --version N --scope SCOPE_ID [--name NAME] --revision R --approve
+anchor skill update MOUNT_ID --version N --revision R --approve
+anchor skill unlink MOUNT_ID --revision R --approve
+anchor skill delete SKILL_ID --revision R --approve
+```
+
+| 命令 | 参数、输出与副作用 |
+| --- | --- |
+| scan / list | 同义、无子参数，只读输出 workspace：revision、library、scopes、sources、mounts、warnings；不初始化中心库、不写版本、不替换或重建链接 |
+| inspect / diff | 仅接受 Skill ID + 正数版本或 `--source` 二选一。输出清单、hash、文件级差异及可选文件内容；`--against` 默认0，来源用导入基线，库查询用空树（看该版本完整新增）；可指定同 Skill 的另一版本。`--file` 默认空，不读文本；显式读取最多48 KiB的 UTF-8 文件并标记 editable，其他文件只返回元数据。两命令目前输出相同结构，不是行级 unified diff |
+| register-project | 已存在、安全且非磁盘根的绝对项目目录；登记后只读扫描共享与 Claude 项目 Skill 根，不递归整盘，不改项目权限 |
+| import | 必需 fresh source hash，校验源未变化；默认新建身份，已关联来源沿用身份。首次可 `--skill` 归入已有身份；不能静默改已有关联。新身份默认用来源目录名，可 `--name` 指定可移植名；复制完整树，不动原件。明确保存不同快照，完全相同内容复用已有版本 |
+| create | 名称仅可移植 ASCII 1–64字节；从 stdin 创建 `SKILL.md` v1，默认不可执行；不自动安装。stdin 不去掉末尾换行。可选公共 `--file` 只能为默认 `SKILL.md`，其他值拒绝 |
+| save | `--version` 必须是库最新版本（不是 revision）；单次编辑一个文件，默认 `--file SKILL.md`。stdin 与 delete-file 二选一，不能删除 SKILL.md；生成新快照，不改旧版本／现有挂载。`--executable` 默认false，保存脚本时保留执行位须明确指定；Windows不保留POSIX执行位。增加新文件用尚不存在的相对路径 |
+| link | 作用域 ID 来自 scan，版本必填；目录名默认 Skill 名，可 `--name`。只向不存在的目标创建固定版本软链接；已有文件、目录、链接一律冲突，不自动接管或替换 |
+| update | 只把指定受管挂载切换到给定版本；较小版本即回滚，其他挂载不变；挂载被外部替换时拒绝 |
+| unlink | 精确匹配受管目标才删除链接；目标已缺失则仅移除记录；外部文件／链接拒绝，不删除中心库或原件 |
+| delete | 存在任何挂载记录时拒绝；移除库索引和来源关联，磁盘快照保留作恢复数据（无自动清理），不删除项目／Agent 原件 |
+
+所有写动作必须 `--revision R --approve`，R 来自最近的 scan/action workspace；导入另需来源 hash。版本冲突需重读与重新确认；传输失败结果未知时先核对，不自动重试。并发写有全局 revision 与文件锁，挂载有恢复 intent；扫描不执行恢复，下一次明确操作可能先完成之前已批准事务并要求刷新 revision。
+
+发现范围为共享目录、已有配置目录证据下 Codex／Claude／Gemini／OpenCode 的已知全局位置、Codex 有界工作区索引及手动登记项目；不声称所有 Agent／项目全量发现，外部软链接只列出不跟随。单树8 MiB／256文件；编辑文本48 KiB，API JSON请求128 KiB；完整预算及不支持路径见设计。Windows软链接权限失败不退化为复制。中心库使用 `--data-dir` 对应核心状态目录下的 `skills/`。

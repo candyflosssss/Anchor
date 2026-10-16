@@ -61,6 +61,9 @@ async function host(page: Page, rateMappings = false) {
         return { contract, data: { ...account.balance, provider_id: input.provider_id, revision: input.expected_revision, platform: settings(input.provider_id).platform, operation: input.operation, key_id: 'anonymous', remote_key_id: input.remote_key_id, failure,
           allowance: failure ? null : { ...account.balance.allowance, scope: input.operation === 'balance' ? 'account' : 'key', remaining: { value: '9007199254740993123', unit: 'quota' } } }, problem: null };
       },
+      SkillWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      SkillDetail: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ManageSkill: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       AgentWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       EnrollAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ManageAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),

@@ -64,6 +64,11 @@ func ConnectWithDialer(ctx context.Context, c state.Context, token string, dial 
 }
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 func (c *Client) call(ctx context.Context, method, path string, in, out any) error {
+	return c.callLimited(ctx, method, path, in, out, 1<<20)
+}
+
+// callLimited keeps larger catalog responses explicitly bounded per capability.
+func (c *Client) callLimited(ctx context.Context, method, path string, in, out any, limit int64) error {
 	var b []byte
 	var err error
 	if in != nil {
@@ -86,8 +91,8 @@ func (c *Client) call(ctx context.Context, method, path string, in, out any) err
 		return &RequestError{Code: "offline", Unknown: method != http.MethodGet}
 	}
 	defer response.Body.Close()
-	b, err = io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
-	if err != nil || len(b) > 1<<20 {
+	b, err = io.ReadAll(io.LimitReader(response.Body, limit+1))
+	if err != nil || int64(len(b)) > limit {
 		return &RequestError{Code: "invalid_response", Unknown: method != http.MethodGet}
 	}
 	if response.StatusCode != 200 {

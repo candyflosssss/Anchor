@@ -97,6 +97,13 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   agent apply ID --revision N --fingerprint SHA256
   agent sync|restore|enable|disable ID --revision N
   agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|all-mapped|single
+  skill scan | list                  Read-only Skill inventory and immutable library
+  skill inspect | diff [ID]           Inspect snapshots or --source ID; see CLI docs
+  skill register-project PATH        Add an explicitly approved project root
+  skill import SOURCE                Copy source; requires --hash, --revision, --approve
+  skill create NAME | save ID         Save a snapshot with --content-stdin
+  skill link ID | update MOUNT        Explicitly mount a fixed --version
+  skill unlink MOUNT | delete ID      Remove owned link / unreferenced library entry
   agent token ID                     Credential-helper stdout (local, raw secret)
   recover [--id ID]                   Conditional recovery with core stopped
   update config | configure [--channel alpha|beta|rc|stable|dev]
@@ -208,6 +215,9 @@ func (a App) Run(ctx context.Context, args []string) error {
 		for _, arg := range args {
 			if arg == "--secret-stdin" {
 				return errors.New("SSH and provider secrets cannot share stdin")
+			}
+			if arg == "--content-stdin" {
+				return errors.New("SSH password and Skill content cannot share stdin")
 			}
 		}
 		raw, err := io.ReadAll(io.LimitReader(a.In, 8193))
@@ -374,6 +384,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.output(v)
 	case "agent":
 		return a.agents(ctx, cl, args[1:])
+	case "skill":
+		return a.skills(ctx, cl, args[1:])
 	case "usage":
 		if len(args) != 1 {
 			return errors.New("usage takes no arguments")

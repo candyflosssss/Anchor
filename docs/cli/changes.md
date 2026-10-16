@@ -573,3 +573,11 @@
 - 旧 → 新：原有文本对话新增每轮原生 effort；桌面提供选择器，改档位不丢失上下文，生成中禁用。Responses / Chat Completions / Anthropic 按 Key 的实际模型协议发送各自原生字段；Anthropic 启动前拒绝 none/minimal，不额外启用 thinking 或推算 token 预算。具体模型不支持时明确失败，不静默忽略或自动重发。日志记录显式深度但不记录聊天正文；既有 probe/test 不变。
 - 兼容与迁移：新增可选 `ChatRequest.reasoning_effort`，旧客户端省略时行为不变；启用新字段需同步升级核心／宿主／CLI，旧核心可能严格拒绝该字段，不回退或绕过；不改持久配置，不打包／发布。
 - 验证：本轮合成上游的契约、核心、桥接、CLI、前端类型／Model和浏览器检查的实际结果见同轮任务记录；不请求真实付费上游，不以浏览器替代原生桌面验收。
+
+## 2026-10-17 — Skill 中心库与固定版本软链接（当前源码，未发布）
+
+- 类型：新增用户管理命令与桌面入口。
+- 指令与参数：新增 `skill scan/list`、`inspect/diff`、`register-project`、`import`、`create`、`save`、`link`、`update`、`unlink`、`delete`；完整语法见指令大全 §14。写操作必须带最新 `--revision` 和 `--approve`，导入另需 `--hash`；文本从 `--content-stdin` 输入（48 KiB 上限），不能与 SSH 密码共用 stdin。
+- 旧 → 新：此前没有独立 Skill 管理；现在只读发现已知 Agent 目录及 Codex 已保存／手动登记项目，将现有内容复制入中心库，不修改原件。新内容在中心库创建，显式安装到空位置才生成固定版本软链接；发现差异只标待处理，明确保存／导入才产生快照，相同内容复用已有版本。项目挂载不自动升级、补建或替换已有内容。
+- 兼容与迁移：新增 `<核心数据目录>/skills/` 独立格式 1 索引与快照，不迁移 Agent 配置或更改数据库 schema；需同步更新核心和客户端。来源有界扫描而非全盘穷举；库删除保留磁盘快照；Windows 需系统允许软链接，不退化成复制。远端 Context 的项目路径属于远端核心。当前没有新安装包或公开发行。
+- 验证：以最新已提交基线 `5fac9d1` 隔离集成本任务改动，全部 Go 包测试、前端类型检查、33 文件／292 项单元测试、lint、3 项隔离 Chromium headless shell 桥接交互测试通过（系统 Chrome 启动失败，改用本机已有 headless shell）；Windows AMD64 Skill 测试程序交叉编译通过。补充 stdin 冲突回归、CLI 测试、前端类型／4 项 Skill 单测／lint 通过。未操作真实 Agent 配置、未请求付费上游；浏览器模拟与交叉编译不代表双平台原生 Wails／Agent 验收。
