@@ -126,6 +126,17 @@ export function checkedSession(info: SessionInfo): SessionInfo {
 export const desktopSession = {
   start: async () => checkedSession(await call(() => bridge().Start())),
   status: async () => checkedSession(await call(() => bridge().Status())),
+  restart: async (info: SessionInfo) => {
+    // A malformed post-mutation result is unknown, never a retryable read error.
+    try {
+      const next = checkedSession(await call(() => bridge().RestartCore({ instance_id: info.instance_id, approved: true }), true));
+      if (next.instance_id !== info.instance_id || next.transport !== 'local') throw new DesktopProblem('unknown');
+      return next;
+    } catch (error) {
+      if (error instanceof DesktopProblem && error.code !== 'read_error') throw error;
+      throw new DesktopProblem('unknown');
+    }
+  },
   stop: async (info: SessionInfo) => {
     const result = await call(() => bridge().StopCore({ instance_id: info.instance_id, approved: true }), true);
     if (result.accepted !== true) throw new DesktopProblem('unknown');

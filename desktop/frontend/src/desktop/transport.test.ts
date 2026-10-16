@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import restartFixture from '../../../contract/core-restart.json';
 import catalogFixture from '../../../contract/provider-models.json';
 import fixture from '../../../contract/providers.json';
 import { CONTRACT, PROBLEM_CODES, type DesktopBridge, type ProvidersResult, type Provider, type SessionResult } from './contract.generated';
@@ -24,6 +25,7 @@ function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
     DiscoverProviderModels: vi.fn(async () => ({ contract: CONTRACT, data: catalogFixture.success, problem: null })),
     SaveProvider: vi.fn(async () => ({ contract: CONTRACT, data: publicRow, problem: null })),
     ExitDesktop: vi.fn(async () => ({ contract: CONTRACT, data: { accepted: true }, problem: null })),
+    RestartCore: async () => ({ contract: CONTRACT, data: null, problem: { code: 'unsupported' } }),
     StopCore: vi.fn(async () => ({ contract: CONTRACT, data: { accepted: true }, problem: null })),
     UpdateStatus: vi.fn(), CheckUpdate: vi.fn(), DownloadUpdate: vi.fn(), InstallUpdate: vi.fn(),
     ...overrides,
@@ -100,5 +102,33 @@ describe('upstream directory desktop boundary', () => {
     const abort = new AbortController();
     const transport = new DesktopProviderTransport(() => testBridge({ DiscoverProviderModels: async () => { abort.abort(); return { contract: CONTRACT, data: catalogFixture.success, problem: null }; } }));
     await expect(transport.discover(catalogFixture.input, abort.signal)).rejects.toMatchObject({ code: 'read_error' });
+  });
+});
+
+
+describe('core restart boundary', () => {
+  it('shares the approved local identity and requires ready confirmation', async () => {
+    const restart = vi.fn(async () => restartFixture.success);
+    vi.stubGlobal('window', { go: { desktop: { Bridge: testBridge({ RestartCore: restart }) } } });
+    const info = checkedSession(restartFixture.success.data);
+    await expect(desktopSession.restart(info)).resolves.toEqual(info);
+    expect(restart).toHaveBeenCalledExactlyOnceWith(restartFixture.request);
+  });
+  it.each(['identity', 'unsupported', 'conflict', 'startup_failed', 'unknown'] as const)('preserves %s without replay', async code => {
+    expect(restartFixture.errors[code]).toEqual({ code });
+    const restart = vi.fn(async (): Promise<SessionResult> => ({ contract: CONTRACT, data: null, problem: { code } }));
+    vi.stubGlobal('window', { go: { desktop: { Bridge: testBridge({ RestartCore: restart }) } } });
+    await expect(desktopSession.restart(checkedSession(session))).rejects.toMatchObject({ code });
+    expect(restart).toHaveBeenCalledTimes(1);
+  });
+  it.each(['starting', 'wrong-identity', 'ssh', 'rejected'] as const)('treats %s post-write responses as unknown', async value => {
+    const data = { ...session, ...(value === 'starting' ? { phase: 'starting' } : value === 'wrong-identity' ? { instance_id: 'other' } : value === 'ssh' ? { transport: 'ssh' } : {}) };
+    const restart = vi.fn(async () => {
+      if (value === 'rejected') throw new Error('disconnected');
+      return { contract: CONTRACT, data, problem: null };
+    });
+    vi.stubGlobal('window', { go: { desktop: { Bridge: testBridge({ RestartCore: restart }) } } });
+    await expect(desktopSession.restart(checkedSession(session))).rejects.toMatchObject({ code: 'unknown' });
+    expect(restart).toHaveBeenCalledTimes(1);
   });
 });

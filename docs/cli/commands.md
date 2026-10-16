@@ -4,6 +4,7 @@
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
+- `restart --approve [--timeout 30s]` 与桌面「重启核心／恢复本机核心」已在当前源码实现，尚未打包发布；desktop.46 与 alpha.6 不含这些入口。在线重启要求已有核心支持 `restart_handoff`，离线恢复不新建状态目录。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
 - 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.46 已发布到默认 GitHub 源的 dev 渠道**，并已完成本机 CLI／核心／GUI 同版升级。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
@@ -61,6 +62,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `update apply --approve` | 原位更新本机 CLI，保留上一版 | 已下载、核心已退出、用户可写安装路径；不自动重启 |
 | `init` | 初始化本机状态 | 本机；核心不应占用该状态目录 |
 | `serve` | 前台运行核心 | 本机已初始化 |
+| `restart --approve [--timeout 30s]` | 本机重启／离线恢复，成功等待 ready | 本机已初始化；拒绝显式 `--context`；在线核心需支持 restart_handoff |
 | `context add` | 登记本机或 SSH 实例 | 本机已初始化；SSH 目标已安装支持 bootstrap 的 Anchor |
 | `context bootstrap` | 远端账户初始化／启动核心并签发管理授权 | 本机操作；明确 `--show-once`；输出含秘密 |
 | `context use` | 选择默认 Context | 本机；名称已登记 |
@@ -179,6 +181,19 @@ anchor [--context NAME] stop --approve [--for-restart]
 - **维护／升级交接**：`stop --approve --for-restart` 仍需批准，只停止所选核心，**不启动替代进程、不安装更新**。客户端先核验认证实例的 `restart_handoff` 能力；缺少能力则退出 1，零停服写请求，绝不退回普通停服。请求体为 `{"for_restart":true}`；核心冻结托管修改并保留当前 Agent 配置、模型目录、Binding 凭据与原始恢复日志，再排空退出，不短暂切回接管前的地址。
 - 交接成功 stdout 在普通结果上增加 `"bindings_preserved":true,"restart_required":true`；必须同时收到 `accepted:true` 和 `bindings_preserved:true`，缺失／无效确认按结果未知失败，不重放。结果仍是 `shutdown_complete:false`，不证明核心已退出或新核心 ready。调用方等待退出后，用相同数据目录、监听地址和可兼容的新程序启动 `serve`／桌面核心；新核心核验并复用日志，不把 Anchor 的当前配置记作原始基线。
 - 交接不是零停机：核心未启动期间网关不可用；放弃维护时，可重新启动兼容核心后普通 `stop --approve`，或确认核心离线后使用 `recover` 条件恢复。不要将 `--for-restart` 用于最终卸载／永久停服。Ctrl+C／SIGTERM 仍执行普通停服恢复；历史会话缓存的旧提供商／地址不会自动迁移，配置校验成功不等于实际连接验证。
+
+### `restart`（当前源码，未打包发布）
+
+```bash
+anchor [--data-dir DIR] restart --approve [--timeout 30s]
+```
+
+- 仅操作 `--data-dir` 对应的本机状态，不受 CLI 默认 Context 影响，显式提供非空 `--context` 会失败。要求已有数据库与本机 owner 凭据，不隐式初始化；不支持 SSH 远程重启。
+- `--approve` 必需，默认 false；`--timeout` 为 Go duration，默认 `30s`，范围 `1s..30s`，覆盖停服、等待退出和新核心就绪的总时间。无位置参数。未知参数、缺少确认或超时参数越界在操作前失败。
+- 在线时先核验实例身份/API/授权和 `restart_handoff`，只发送一次保留配置的正常停服请求；收到 `accepted:true` 与 `bindings_preserved:true` 后等待旧核心释放实例锁，再用**当前 CLI 可执行文件**启动同目录的独立 `serve` 子进程。原有配置、模型目录、Binding 凭据和恢复日志保留；不恢复到旧代理后再接管。
+- 离线时只在同一实例身份的生命周期锁可获取后尝试拉起；身份不符、401/403、不兼容核心、并发启动/升级、未知端口占用或停服超时均失败，不强杀、不抢端口、不改用普通 Stop、不自动重试写操作。若已停服但启动失败，托管配置可能仍指向暂不可用的 Anchor；应先检查状态与端口，再显式恢复，不伪报成功。
+- 成功退出0，stdout 为 `{"ready":true,"instance_id":"…","process_id":123,"recovered":false}`；离线恢复时 `recovered:true`。只有同身份实例的 `/status` 已报告 ready 才输出成功，不代表真实付费上游已验证。失败退出1、诊断 stderr；写入响应异常为结果未知，不自动重放。
+- 与 `stop --approve --for-restart` 的区别：后者只停、不拉起；本命令完成停服到 ready 的完整流程。会短暂中断请求；不升级程序、不注册/重配系统服务或自启动、不重启 Codex/Claude/DSH，也不迁移客户端缓存的旧地址。外部服务管理器的自动重拉仍受同实例锁保护，不保证替代进程一定由本命令创建。
 
 ## 4. Context 与状态
 
@@ -687,6 +702,7 @@ anchor recover [--id ID]
 | 初始化、启动、停服、版本/帮助 | init / serve / stop --approve / version / help | CLI 已提供；serve 仍为前台；无后台服务管理 |
 | 桌面自动后台启动／复用 | 开发宿主已实现；原生两平台待验收 | 自动启动协调属于宿主机制，不要求单独命令；详见[桌面运行契约](../design/desktop-runtime.md) |
 | 桌面窗口最小化／最大化／还原／关闭／托盘／退出界面 | 桌面自定义顶栏、系统托盘及「本机实例」弹层中的「退出界面」；原生行为未验收 | 本机窗口展示行为，不新增 CLI 命令；desktop.14 起普通关闭隐藏到托盘，单击图标恢复，菜单可退出界面；最小化按钮保留任务栏行为，无可用托盘时关闭直接退出宿主，均不停止核心 |
+| 本机重启与离线恢复 | `restart --approve [--timeout 30s]`；桌面设备菜单「重启核心」及掉线页「恢复本机核心」 | 当前源码，未打包发布；共用本机重启协调层，保留托管状态，等待 ready；远程重启未提供，不能断线回退本机 |
 | 托盘停止本机核心并退出 Anchor | 当前源码托盘「退出 Anchor（同时停止本机核心）」；未打包发布／原生验收 | 确认本机实例与影响后，复用普通鉴权停服并等待本机核心生命周期锁释放，再退出窗口和托盘；始终不停止远程核心。核心停服已有 `stop --approve`，CLI 仍按所选 Context 操作且仅返回请求接受，不新增／改变 CLI 契约；宿主退出为本机展示行为，取消／失败保持界面，无强杀或自动重试 |
 | 桌面单实例／重复启动恢复 | 桌面宿主已实现；原生两平台待验收 | 当前用户只运行一个 GUI 与托盘；重复打开恢复已有窗口，不新增管理命令。宿主锁独立于 `--data-dir`；后台核心和安装 helper 沿用原生命周期 |
 | 开机自启动设置 | 未实现；无 GUI 开关或 CLI | 独立、默认不启用；未来实现需同步提供 CLI，安装和启动宿主不自动注册服务 |

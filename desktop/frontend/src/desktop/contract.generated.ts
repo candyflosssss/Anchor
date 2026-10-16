@@ -962,6 +962,7 @@ export interface DesktopBridge {
   ProviderRate(input1: AccountQuery): Promise<AccountRateObservationResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;
+  RestartCore(input1: ConfirmStop): Promise<SessionResult>;
   SaveModelSettings(input1: SaveModelSettings): Promise<ModelSettingsResult>;
   SaveProvider(input1: SaveProvider): Promise<SaveResult>;
   SaveProviderAccount(input1: SaveAccountSettings): Promise<AccountSettingsResult>;

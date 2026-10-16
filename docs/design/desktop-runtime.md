@@ -6,7 +6,7 @@
 
 ## 1. 宿主接口
 
-规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Connections、ConnectSSH、UseConnection、Providers、SaveProvider、StopCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
+规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Connections、ConnectSSH、UseConnection、Providers、SaveProvider、StopCore、RestartCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
 
 每个结果带 `contract=anchor-desktop-v1`、data 与 problem；problem 仅含白名单 code，不返回原始错误、路径、管理令牌或供应商秘密。列表始终为数组。返回 Provider revision 为 1..Number.MAX_SAFE_INTEGER；写入 expected_revision 为 0..MAX_SAFE_INTEGER-1，且等于输入 provider.revision，超范围拒绝。SaveProvider 的 secret=null 保留、空字符串清除、非空替换；只入不出。写入发生网络/响应异常时返回 unknown，不自动重试；409 为 conflict、认证失败为 unauthorized。
 
@@ -21,6 +21,17 @@ GUI 在当前用户的默认 Anchor 配置目录取得独立的 `desktop-host.lo
 子进程不使用窗口 context、标准输入输出管道或父进程死亡信号；Windows 隐藏控制台并创建独立进程组，Linux 使用独立 session。从 desktop.14 起，普通关闭请求（自定义关闭按钮或系统关闭）隐藏到系统托盘，点击托盘图标可还原；无可用托盘时直接退出宿主。「退出界面」经 ExitDesktop 真正退出宿主，只取消本次查询并释放客户端，不停止核心。已有正常核心可以复用，不接管其外部服务管理器。连接来源对照已认证 instance 响应的 process_id 与本次子进程 PID，CLI 并发赢得实例锁时标为复用；旧核心无该字段同样保守复用。PID 仅用于来源标记，绝不替代身份／授权或用于强杀；Status 轮询刷新来源与停服能力。
 
 Status 只查询，不启动／重启；核心退出后 UI 禁写，用户明确重新连接时才再次 Start。StopCore 须明确确认当前实例身份，通过带管理鉴权和 X-Anchor-Instance 的 POST /control/v1/shutdown 请求核心正常停服。返回 accepted 仅代表请求接受，不等于退出或恢复成功；UI 随后转为断开，不显示“恢复成功”。CLI 对应 `stop --approve`，无强杀和自动重试。
+
+### 本机重启与恢复（2026-10-17 源码，未打包发布）
+
+`RestartCore(ConfirmStop) -> SessionResult` 为有副作用的本机宿主操作，复用 `approved:true` 与非空 `instance_id`。请求样例与返回见 `desktop/contract/core-restart.json`；Go Bridge 方法/DTO 生成 TS，Go 与 TS 测试共用样例。只允许当前选中的本机实例；活动或持久选中远程连接均拒绝，不因 SSH 掉线启动/停止本机。前端记住最后已核验的目标身份以提供离线恢复，不把它当在线状态；尚未取得身份时使用现有明确重新连接入口。
+
+CLI 与桌面共用 `connection.RestartLocal`：读取已有本机状态、核对确认身份及 owner 凭据，持有 `desktop-start.lock` 和 `remote-start.lock` 协调启动/更新/SSH bootstrap。在线时要求 `restart_handoff`，一次 StopForRestart 保留 Agent 配置、目录、凭据与恢复日志；等待旧 `instance.lock` 可取得后，重新核对状态/凭据未被替换，再启动宿主指定的同一可执行文件核心模式。离线只允许恢复同身份，不初始化、强杀或接管外部服务管理器。总期限最多30秒（桌面 StartTimeout 加10秒，但共享层仍上限30秒）。未知写结果不启动替代核心、不重发；旧核心无能力返回 unsupported，无普通 Stop 降级。启动失败/超时返回 startup_failed，端口身份/授权错误保持原分类。
+
+仅替代实例已认证、同身份且 Status 为 ready 才返回 SessionInfo；不把 shutdown accepted 当成功。设备菜单「重启核心」、本机断线页/菜单「恢复本机核心」均确认短暂中断与配置保留；提交中禁用再次重启、停止与切设备，显示进度，成功重新挂载业务页面并提示就绪。轮询结果用 generation 隔离，重启前的失败不得覆盖新连接。未知结果只提供「检查核心状态」只读核对，不直接重放；失败不回退 Mock。
+
+本轮源码已有隔离真实核心和模拟边界验证；不修改真实 Agent 文件、不请求付费上游、不打包发布或原生验收。该操作不修正供应商模型分组、不重启客户端；缓存了旧代理地址的 Codex/app-server 仍需其自身重新加载。
+
 
 首次启动仅复用已批准的托管策略，不新增 Agent 授权。安装器沿用本契约，不在安装期间启动核心或登记服务；用户级开机自启动未实现，也不显示假开关，保持默认关闭。无图形环境继续使用 CLI。
 

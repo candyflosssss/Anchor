@@ -125,6 +125,7 @@ async function host(page: Page, rateMappings = false) {
         return { contract, data: saved, problem: null };
       },
       ExitDesktop: async () => ({ contract: CONTRACT, data: { accepted: true }, problem: null }),
+      RestartCore: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       StopCore: async input => {
         if (!input.approved || input.instance_id !== data.instance_id) return { contract, data: null, problem: { code: 'invalid' } };
         counters.stops++; return { contract, data: { accepted: true }, problem: null };

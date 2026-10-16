@@ -15,11 +15,11 @@ export const desktopMessages: Record<ProblemCode, string> = {
   referenced: '项目仍有引用，无法删除。',
   offline: '当前设备核心不可用，请重新连接。',
   unauthorized: '管理凭据不可用，请重新连接设备以完成 SSH 鉴权，或检查本机实例权限。',
-  identity: '实例身份或接口版本不匹配。未连接、覆盖或停止该进程。',
+  identity: '实例身份或接口版本不匹配，已拒绝继续操作；未强杀或覆盖进程。',
   startup_failed: '核心启动失败或未在期限内就绪。请检查运行时依赖、目录权限和监听端口；不会强杀占用进程。',
   unsupported: '桌面接口不可用或版本不兼容。请使用正式桌面入口，浏览器不能操作本机核心。',
   read_error: '无法读取本机实例状态。请检查后重新连接。',
-  unknown: '停服请求结果未知。请先检查核心状态，不要重复提交。',
+  unknown: '操作结果未知。请先检查核心状态，不要重复提交。',
   invalid: '操作未通过校验，未提交变更。',
   conflict: '配置已发生变更，请重新读取。',
   closed: '桌面会话已关闭。',
@@ -38,6 +38,11 @@ export const desktopMessages: Record<ProblemCode, string> = {
 };
 export function useDesktopSession() {
   const [info, setInfo] = useState<SessionInfo | null>(null);
+  // Remember only target identity, not a healthy connection, across outages.
+  const [target, setTarget] = useState<SessionInfo | null>(null);
+  const [restarting, setRestarting] = useState(false);
+  const [restartFailed, setRestartFailed] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [phase, setPhase] = useState<'starting' | 'ready' | 'error' | 'stopped'>(prototype ? 'ready' : 'starting');
   const [error, setError] = useState<ProblemCode | null>(null);
   const [stopping, setStopping] = useState(false);
@@ -46,11 +51,12 @@ export function useDesktopSession() {
   const starting = useRef<Promise<SessionInfo> | null>(null);
   const stopLock = useRef(false);
   const connect = useCallback(async () => {
+    if (stopLock.current) return;
     const epoch = ++generation.current;
-    setPhase('starting'); setError(null);
+    setPhase('starting'); setError(null); setNotice(null); setRestartFailed(false);
     starting.current ??= desktopSession.start();
     const request = starting.current;
-    try { const next = await request; if (active.current && epoch === generation.current) { setInfo(next); setPhase('ready'); } }
+    try { const next = await request; if (active.current && epoch === generation.current) { setInfo(next); setTarget(next); setPhase('ready'); } }
     catch (e) { if (active.current && epoch === generation.current) { setInfo(null); setError(e instanceof DesktopProblem ? e.code : 'startup_failed'); setPhase('error'); } }
     finally { if (starting.current === request) starting.current = null; }
   }, []);
@@ -73,12 +79,47 @@ export function useDesktopSession() {
     return () => { canceled = true; window.clearInterval(interval); };
   }, [phase, info?.instance_id, info?.profile_name]);
   async function stop() {
-    if (!info || stopLock.current) return;
-    stopLock.current = true; setStopping(true); generation.current++;
+    if (!info || stopLock.current || starting.current) return;
+    stopLock.current = true; setStopping(true); setNotice(null); setRestartFailed(false); generation.current++;
     try { await desktopSession.stop(info); if (active.current) { setInfo(null); setPhase('stopped'); setError(null); } }
     catch (e) { if (active.current) { setInfo(null); setError(e instanceof DesktopProblem ? e.code : 'unknown'); setPhase('error'); } }
     finally { stopLock.current = false; if (active.current) setStopping(false); }
   }
-  const select = useCallback((next: SessionInfo) => { generation.current++; setInfo(next); setPhase('ready'); setError(null); }, []);
-  return { info, phase, error, stopping, connect, stop, select };
+  async function restart() {
+    if (!target || target.transport !== 'local' || stopLock.current || starting.current || error === 'unknown') return;
+    stopLock.current = true; setRestartFailed(false); setRestarting(true); setNotice(null); setError(null);
+    const epoch = ++generation.current;
+    setInfo(null); setPhase('starting');
+    try {
+      const next = await desktopSession.restart(target);
+      if (active.current && generation.current === epoch) {
+        setInfo(next); setTarget(next); setPhase('ready'); setNotice('核心已恢复，服务已就绪。');
+      }
+    } catch (e) {
+      if (active.current && generation.current === epoch) {
+        setInfo(null); setRestartFailed(true); setError(e instanceof DesktopProblem ? e.code : 'unknown'); setPhase('error');
+      }
+    } finally { stopLock.current = false; if (active.current) setRestarting(false); }
+  }
+  // Unknown writes are reconciled by a read, not Start or another restart.
+  async function check() {
+    if (stopLock.current || starting.current) return;
+    stopLock.current = true;
+    const epoch = ++generation.current;
+    setPhase('starting');
+    try {
+      const next = await desktopSession.status();
+      if (active.current && generation.current === epoch) { setInfo(next); setTarget(next); setPhase('ready'); setError(null); }
+    } catch (e) {
+      if (active.current && generation.current === epoch) { setInfo(null); setError(e instanceof DesktopProblem ? e.code : 'read_error'); setPhase('error'); }
+    } finally { stopLock.current = false; }
+  }
+  const select = useCallback((next: SessionInfo) => { generation.current++; setInfo(next); setTarget(next); setPhase('ready'); setError(null); setNotice(null); setRestartFailed(false); }, []);
+  const restartMessages: Partial<Record<ProblemCode, string>> = {
+    unsupported: '当前核心版本不支持安全重启，请先升级核心；未降级为普通停服。',
+    conflict: '另一个启动、重启或更新操作正在进行，请等待后检查核心状态。',
+    startup_failed: '核心重启未完成，可能仍在退出或尚未就绪。请检查状态、端口和运行日志；不会强杀。',
+  };
+  const errorMessage = error ? (restartFailed ? restartMessages[error] ?? desktopMessages[error] : desktopMessages[error]) : null;
+  return { info, target, phase, error, errorMessage, stopping, restarting, notice, connect, check, stop, restart, select };
 }

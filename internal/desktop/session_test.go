@@ -37,7 +37,7 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
-	if len(os.Args) == 4 && os.Args[3] == "--core" {
+	if len(os.Args) == 4 && (os.Args[3] == "--core" || os.Args[3] == "serve") {
 		err := (cli.App{Out: io.Discard, Err: io.Discard, In: strings.NewReader("")}).Run(context.Background(), []string{"--data-dir", os.Args[2], "serve"})
 		if err != nil {
 			os.Exit(1)
