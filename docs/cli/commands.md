@@ -80,6 +80,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `provider model-put` / `model-delete` | 工作台模型映射写入/删除 | 核心在线；供应商与模型 revision；删除须 approve |
 | `provider price-put` / `price-import` | 保存单价 / models.dev 预览 | 核心在线；当前 revision；导入不自动保存 |
 | `logs stats` | 请求趋势全范围聚合（用量／TPS／错误率／缓存／耗时） | 所选 Context 核心在线且支持 stats 接口；desktop.42 宿主／核心已发布，命令使用兼容源码 CLI，alpha.6 不含 |
+| `logs suggestions` | 日志筛选／搜索候选值与出现次数 | 所选 Context 核心在线；当前源码新增，需兼容 CLI／核心，未发布 |
 | `logs list` | 结构化日志分页/筛选 | 所选 Context 核心在线，支持日志接口 |
 | `logs detail REQUEST_ID` | 完整安全请求详情 | 对应记录仍在保留期 |
 | `logs follow` | 每 2 秒输出日志页快照 | 核心在线；可重复更新记录 |
@@ -671,7 +672,7 @@ anchor recover [--id ID]
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
-| 真实日志查询、详情、导出、保留管理 | logs list/stats/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
+| 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
@@ -723,6 +724,8 @@ anchor logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50
 anchor logs stats [--since 1h] [--interval 0s|10s|30s|1m|5m|15m|1h|6h|24h]
   [--status VALUE] [--source proxy|probe] [--provider ID] [--model NAME]
   [--key ID] [--http N] [--code VALUE] [--stage VALUE] [--search PREFIX]
+anchor logs suggestions [--kind requests|system] [--field search|provider|model|key|http|code|stage]
+  [--prefix VALUE] [--since 1h] [--limit 20]
 anchor logs detail REQUEST_ID
 anchor logs settings
 anchor logs configure [--days N] [--system-days N] [--max-requests N]
@@ -742,6 +745,10 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | days / system-days | 查询当前值再修改；初始均 7，范围 1–90 |
 | max-requests | 初始 50,000，100–200,000 |
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
+
+`suggestions`（2026-10-16 当前源码新增，未发布）只读查询所选 Context 的保留日志候选，需要 owner 管理授权、正确实例身份及兼容核心；不会调用上游或写配置。参数：`--kind` 默认 requests（system 只支持 search）；`--field` 默认 search，可选 provider/model/key/http/code/stage；`--prefix` 默认空、区分大小写、最长512字节，不支持通配符；`--since` 默认1h、范围(0,2160h]；`--limit` 默认20、范围1..100。此命令不接收列表的其他过滤或分页参数。
+
+输出 `{items:[{value,count}],has_more}`：基于整个时间范围而非当前页，空值不列出，按次数降序、相同次数按值升序。search 对应请求 ID／模型／供应商／Key／错误码，system 为事件名；单条请求同一值只计一次。HTTP 候选是字符串，Key 只包含日志安全 ID。超上限 has_more=true，使用更长前缀缩小；无匹配成功输出空数组。旧核心不支持、鉴权／身份错误、非法字段／范围和存储故障均非零退出，不伪装成空历史。例：`anchor logs suggestions --field model --prefix gpt --since 24h`。桌面搜索与各文本过滤复用此接口；已有精确过滤／前缀搜索语义不变。
 
 `stats`（2026-10-16 已随 desktop.42 dev 宿主／核心发布；命令由兼容源码 CLI 提供，独立公开 alpha.6 CLI 不含，桌面程序不提供通用 CLI）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
 

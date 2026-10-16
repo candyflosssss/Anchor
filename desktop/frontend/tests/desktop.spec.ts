@@ -63,6 +63,7 @@ async function host(page: Page, rateMappings = false) {
       AgentWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       EnrollAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ManageAgent: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      LogSuggestions: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogStats: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Logs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       LogDetail: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),

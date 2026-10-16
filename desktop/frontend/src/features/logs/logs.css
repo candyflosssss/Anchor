@@ -1,7 +1,7 @@
 .log-workspace { max-width: 1560px; padding: 24px; }
 .log-page-header { display: flex; justify-content: space-between; align-items:center; gap:16px; margin-bottom: 20px; }
 .log-page-header > div { flex-wrap:wrap; }
-.log-filters > input { width: 160px; flex: 1 1 140px; max-width:280px; }
+.log-filters > input, .log-filter-input { width: 160px; flex: 1 1 140px; max-width:280px; }
 .log-preview-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: hsl(var(--muted-foreground)); border: 1px solid hsl(var(--border)); border-radius: 5px; padding: 3px 7px; }
 .log-preview-notice { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 24px; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--muted) / .4); color: hsl(var(--muted-foreground)); font-size: 12px; }
 .log-tabs-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid hsl(var(--border)); }
@@ -240,3 +240,15 @@
   .log-chart-x > span:nth-child(2) { display: none; }
   .log-chart-legend { gap: 8px; padding: 10px 0; }
 }
+
+/* Local overlays stay in the filter bar; values wrap instead of widening it. */
+.log-filter-input { position: relative; min-width: 0; }
+.log-filter-input input { padding-right: 26px; }
+.log-filter-chevron { position: absolute; right: 9px; top: 12px; pointer-events: none; color: hsl(var(--muted-foreground)); }
+.log-filter-popover { position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 30; padding: 4px; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--popover)); color: hsl(var(--popover-foreground)); box-shadow: 0 8px 24px #0002; }
+.log-filter-popover ul { max-height: 240px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
+.log-filter-popover [role="option"] { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.log-filter-popover [aria-selected="true"] { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); outline: 1px solid hsl(var(--border)); outline-offset: -1px; }
+.log-filter-value { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
+.log-filter-count { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; font-size: 11px; }
+.log-filter-state { padding: 8px; color: hsl(var(--muted-foreground)); font-size: 11px; }

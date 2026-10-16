@@ -127,3 +127,16 @@ DTO 规范源为 `internal/desktop/contract.go` 的 logbook 类型别名；`cmd/
 空桶请求数为0；无用量、速度或率的样本仍为 null，曲线断开，不连接未知段，也不补0。整个范围没有请求和读取失败分别展示，后者不伪装成空历史。总览直接使用相同查询的累加器，不平均各桶比率。
 
 本轮验证与平台边界记于当前任务记录：Go 隔离管理链路与浏览器模拟 Wails 绑定分别验收，不代表 Linux WebKitGTK／Windows 原生窗口已验收。两平台安装包和在线更新已随 desktop.42 发布；本轮未安装或替换运行核心，使用此功能需同步更新桌面宿主与核心。
+
+
+## 10. 筛选与搜索候选（2026-10-16，当前源码未发布）
+
+`POST /control/v1/logs/suggestions` 是只读 owner 管理接口，校验当前实例身份，最多3秒；不调用供应商，不读取请求正文、证据 JSON、真实密钥或当前供应商配置，只查询保留日志的标识列。Wails `LogSuggestions` 复用 client，最多5秒，DTO 由 Go 生成 TS，共享样例 `desktop/contract/log-suggestions.json`。
+
+输入为 `{kind,field,prefix,since_ms,before_ms,limit}`：kind 默认 requests；field 必填，允许 search/provider/model/key/http/code/stage。system 仅支持 search（事件名）。前缀区分大小写、最长512字节，百分号／下划线不是通配符。默认最近1小时至现在，包含起止时间，最多90天；limit 默认20，范围1..100。不接受页码、游标、状态或其他字段条件，故在选择某一值后仍可清空文本查看同一时间范围的其他值。
+
+输出 `{items:[{value,count}],has_more}`；去重、跳过空值／未知 HTTP，按出现次数降序再按值升序稳定排序。HTTP 返回十进制字符串，Key 是安全日志 ID；请求 search 合并请求 ID、模型、供应商、Key 与错误码，一条请求中重复出现相同值只计一次。候选仅来自根请求，与列表筛选列一致，不混入未用于列表筛选的尝试字段。总数超 limit 时 has_more=true，可输入更长前缀；没有匹配返回空数组而非错误。保留策略、丢弃与写入失败也限制候选范围，不代表永久历史。
+
+前端仅焦点框请求，180ms 防抖；值、页签、时间范围变化或卸载后丢弃旧响应，连接切换由实例键卸载。选择候选立即走既有精确过滤／前缀搜索；手动输入一直可用。候选失败／旧核心无接口不让整个日志页失败；不持久化候选，不伪造值。中文组合输入期间不查询或用 Enter 误选。无新时间／结果／来源枚举。
+
+CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](../cli/commands.md#12-请求与系统日志当前源码基础能力自-desktop16-dev)。测试采用隔离核心与浏览器受控桥接；未发布安装包，Linux WebKitGTK／Windows 原生窗口未验收。

@@ -63,3 +63,9 @@ func (c *Client) LogStats(ctx context.Context, q logbook.StatsQuery) (logbook.St
 	err := c.call(ctx, "POST", "/control/v1/logs/stats", q, &v)
 	return v, err
 }
+
+func (c *Client) LogSuggestions(ctx context.Context, q logbook.SuggestionsQuery) (logbook.Suggestions, error) {
+	var v logbook.Suggestions
+	err := c.call(ctx, "POST", "/control/v1/logs/suggestions", q, &v)
+	return v, err
+}

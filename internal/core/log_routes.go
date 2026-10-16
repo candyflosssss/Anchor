@@ -28,6 +28,23 @@ func (s *Server) logRoutes(m *http.ServeMux) {
 		}
 		return true
 	}
+	m.HandleFunc("POST /control/v1/logs/suggestions", func(w http.ResponseWriter, r *http.Request) {
+		if !s.identity(w, r) || !ready(w) {
+			return
+		}
+		var q logbook.SuggestionsQuery
+		if !decode(w, r, &q) {
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		v, err := s.logs.Suggest(ctx, q)
+		if err != nil {
+			logError(w, err)
+			return
+		}
+		writeJSON(w, 200, v)
+	})
 	m.HandleFunc("POST /control/v1/logs/stats", func(w http.ResponseWriter, r *http.Request) {
 		if !s.identity(w, r) {
 			return

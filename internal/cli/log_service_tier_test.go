@@ -66,6 +66,15 @@ func TestLogServiceTierCLI(t *testing.T) {
 	if row.ID == "" || row.Evidence["upstream_service_tier_raw"] != `"provider-turbo"` || row.Evidence["fast_triggered"] != "unknown" || len(row.Evidence) > 5 || len(row.Attempts) != 0 {
 		t.Fatalf("invalid list evidence: %+v", row)
 	}
+	var suggestions logbook.Suggestions
+	if err := json.Unmarshal([]byte(run("", "logs", "suggestions", "--field", "provider", "--prefix", "p", "--since", "1h", "--limit", "20")), &suggestions); err != nil || len(suggestions.Items) != 1 || suggestions.Items[0].Value != "p" || suggestions.Items[0].Count != 1 {
+		t.Fatal(suggestions, err)
+	}
+	for _, args := range [][]string{{"--field", "document"}, {"--kind", "system", "--field", "key"}, {"--limit", "101"}, {"--since", "0s"}} {
+		if err := (App{Out: io.Discard, Err: io.Discard}).Run(context.Background(), append([]string{"--data-dir", dir, "logs", "suggestions"}, args...)); err == nil {
+			t.Fatal("invalid suggestions accepted", args)
+		}
+	}
 	var stats logbook.Stats
 	if err := json.Unmarshal([]byte(run("", "logs", "stats", "--source", "probe", "--since", "1h", "--interval", "1m")), &stats); err != nil || stats.Summary.Requests != 1 || len(stats.Buckets) != 60 {
 		t.Fatal(stats, err)

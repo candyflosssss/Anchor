@@ -7,6 +7,32 @@ import (
 	"time"
 )
 
+func (b *Bridge) LogSuggestions(q LogSuggestionsQuery) LogSuggestionsResult {
+	s := b.session
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := LogSuggestionsResult{Contract: Contract}
+	if q.Validate() != nil {
+		out.Problem = &Problem{"invalid"}
+		return out
+	}
+	ctx, cancel := context.WithTimeout(s.ctx, 5*time.Second)
+	defer cancel()
+	cl, _, err := s.connection(ctx)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	defer cl.Close()
+	v, err := cl.LogSuggestions(ctx, q)
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	out.Data = &v
+	return out
+}
+
 func (b *Bridge) LogStats(q LogStatsQuery) LogStatsResult {
 	s := b.session
 	s.mu.Lock()

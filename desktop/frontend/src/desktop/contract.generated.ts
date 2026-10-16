@@ -608,6 +608,27 @@ export interface WorkspaceResult {
   data: Workspace | null;
   problem: Problem | null;
 }
+export interface SuggestionsQuery {
+  kind: string;
+  field: string;
+  prefix: string;
+  since_ms: number;
+  before_ms: number;
+  limit: number;
+}
+export interface Suggestion {
+  value: string;
+  count: number;
+}
+export interface Suggestions {
+  items: Suggestion[];
+  has_more: boolean;
+}
+export interface LogSuggestionsResult {
+  contract: string;
+  data: Suggestions | null;
+  problem: Problem | null;
+}
 export interface StatsQuery {
   filter: Query;
   interval_ms: number;
@@ -785,6 +806,7 @@ export interface DesktopBridge {
   LogDetail(input1: string): Promise<LogDetailResult>;
   LogSettings(): Promise<LogSettingsResult>;
   LogStats(input1: StatsQuery): Promise<LogStatsResult>;
+  LogSuggestions(input1: SuggestionsQuery): Promise<LogSuggestionsResult>;
   Logs(input1: Query): Promise<LogsResult>;
   ManageAgent(input1: ManageAgent): Promise<AgentWorkspaceResult>;
   ModelCatalog(input1: ModelCatalogQuery): Promise<ModelCatalogResult>;

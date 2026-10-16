@@ -30,6 +30,12 @@ export function systemLog(row: Event): SystemLog {
     source: row.source as SystemLog['source'], event: row.event, message: Object.entries(row.fields ?? {}).map(([k,v]) => `${k}=${v}`).join(' · '), requestId: row.request_id || undefined };
 }
 export const logService = {
+  async suggestions(query: import('../../desktop/contract.generated').SuggestionsQuery) {
+    const value = await call(() => bridge().LogSuggestions(query));
+    if (!Array.isArray(value.items) || value.items.length > 100 || typeof value.has_more !== 'boolean' || value.items.some(item =>
+      !item || typeof item.value !== 'string' || !item.value || !Number.isSafeInteger(item.count) || item.count < 1)) throw new DesktopProblem('read_error');
+    return value;
+  },
   stats: async (query: import('../../desktop/contract.generated').StatsQuery) => checkedStats(await call(() => bridge().LogStats(query))),
   async list(query: Query): Promise<Page> { const p = await call(() => bridge().Logs(query)); if (!Array.isArray(p.requests) || !Array.isArray(p.events) || !p.health) throw new DesktopProblem('read_error'); p.requests.forEach(requestLog); p.events.forEach(systemLog); return p; },
   detail: async (id: string) => requestLog(await call(() => bridge().LogDetail(id))),

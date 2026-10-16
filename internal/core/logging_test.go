@@ -53,12 +53,38 @@ func TestRealLogsQueryDetailExportRetentionAndIdentity(t *testing.T) {
 	if err != nil || len(p.Requests) != 1 {
 		t.Fatalf("%+v %v", p, err)
 	}
+	suggestions, err := c.LogSuggestions(t.Context(), logbook.SuggestionsQuery{Field: "provider"})
+	if err != nil || len(suggestions.Items) != 1 || suggestions.Items[0].Value != "p" || suggestions.Items[0].Count != 1 {
+		t.Fatalf("suggestions: %+v %v", suggestions, err)
+	}
+	if _, err := c.LogSuggestions(t.Context(), logbook.SuggestionsQuery{Field: "document"}); err == nil {
+		t.Fatal("invalid suggestions field accepted")
+	}
 	stats, err := c.LogStats(t.Context(), logbook.StatsQuery{Filter: logbook.Query{Model: "public", Provider: "p"}})
 	if err != nil || stats.Summary.Requests != 1 || stats.Summary.TotalTokens == nil || *stats.Summary.TotalTokens != 19 {
 		t.Fatalf("statistics: %+v %v", stats, err)
 	}
 	if _, err = c.LogStats(t.Context(), logbook.StatsQuery{IntervalMS: 123}); err == nil {
 		t.Fatal("invalid statistics interval accepted")
+	}
+	for _, auth := range []bool{false, true} {
+		req, _ := http.NewRequest("POST", f.control.URL+"/control/v1/logs/suggestions", strings.NewReader(`{"field":"provider"}`))
+		if auth {
+			req.Header.Set("Authorization", "Bearer "+f.owner)
+			req.Header.Set("X-Anchor-Instance", "wrong-instance")
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		want := http.StatusUnauthorized
+		if auth {
+			want = http.StatusConflict
+		}
+		if resp.StatusCode != want {
+			t.Fatalf("suggestions owner/instance validation: got %d want %d", resp.StatusCode, want)
+		}
 	}
 	r, err := c.LogDetail(t.Context(), id)
 	if err != nil || r.Status != "succeeded" || r.HTTP == nil || *r.HTTP != 200 || r.AttemptCount != 1 || r.Input == nil || *r.Input != 12 || r.ReasoningEffort == nil || *r.ReasoningEffort != "high" || r.Metrics.TimeToFirstTextMS != nil {

@@ -9,19 +9,20 @@ import { useLogController, type LogController } from './use-log-controller';
 import { RequestTable } from './log-request-table.view';
 import { LogColumnSettings } from './log-columns.view';
 import { useLogColumnsController } from './use-log-columns-controller';
+import { LogFilterInput } from './log-filter-input.view';
 import { LogStatsView } from './log-stats.view';
 import './logs.css';
 function Filters({ c }: { c: LogController }) {
   return <div className="log-filters">
-    <Input aria-label="搜索日志" placeholder="搜索" value={c.filters.query} onChange={e => c.filter('query', e.target.value)} />
+    <LogFilterInput label="搜索日志" placeholder="搜索" field="search" kind={c.tab} window={c.filters.window} revision={c.revision} value={c.filters.query} onChange={value => c.filter('query', value)} />
     <select aria-label="日志时间范围" className="select-field" value={c.filters.window} onChange={e => c.filter('window', e.target.value)}>
       <option value="15">最近 15 分钟</option><option value="60">最近 1 小时</option><option value="1440">最近 24 小时</option><option value="10080">最近 7 天</option><option value="43200">最近 30 天</option><option value="129600">最近 90 天</option>
     </select>
     {c.tab === 'requests' ? <>
       <select aria-label="请求结果" className="select-field" value={c.filters.status} onChange={e => c.filter('status', e.target.value)}><option value="all">全部结果</option>{Object.entries(statusLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select>
       <select aria-label="日志来源" className="select-field" value={c.filters.source} onChange={e => c.filter('source', e.target.value)}><option value="all">全部来源</option><option value="proxy">代理请求</option><option value="probe">推理测试</option></select>
-      <Input aria-label="供应商筛选" placeholder="供应商" value={c.filters.provider === 'all' ? '' : c.filters.provider} onChange={e => c.filter('provider', e.target.value || 'all')} />
-      {(['model','key','http','code','stage'] as const).map(k => <Input key={k} aria-label={`${k}筛选`} placeholder={{ model:'模型', key:'Key', http:'HTTP', code:'错误码', stage:'阶段' }[k]} value={c.filters[k]} onChange={e => c.filter(k,e.target.value)} />)}
+      <LogFilterInput label="供应商筛选" placeholder="供应商" field="provider" kind={c.tab} window={c.filters.window} revision={c.revision} value={c.filters.provider === 'all' ? '' : c.filters.provider} onChange={value => c.filter('provider', value || 'all')} />
+      {(['model','key','http','code','stage'] as const).map(k => <LogFilterInput key={k} label={`${k}筛选`} placeholder={{ model:'模型', key:'Key', http:'HTTP', code:'错误码', stage:'阶段' }[k]} field={k} kind={c.tab} window={c.filters.window} revision={c.revision} value={c.filters[k]} onChange={value => c.filter(k,value)} />)}
     </> : <select aria-label="日志级别" className="select-field" value={c.level} onChange={e => { c.setLevel(e.target.value); c.refresh(); }}><option value="all">全部级别</option><option value="info">INFO</option><option value="warn">WARN</option><option value="error">ERROR</option></select>}
     <Button variant="ghost" size="sm" onClick={c.resetFilters}>重置</Button>
   </div>;

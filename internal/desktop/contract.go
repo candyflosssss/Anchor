@@ -127,6 +127,14 @@ type LogMetrics = logbook.Metrics
 type LogAttempt = logbook.Attempt
 type RequestLog = logbook.Request
 type SystemLog = logbook.Event
+type LogSuggestionsQuery = logbook.SuggestionsQuery
+type LogSuggestion = logbook.Suggestion
+type LogSuggestions = logbook.Suggestions
+type LogSuggestionsResult struct {
+	Contract string          `json:"contract"`
+	Data     *LogSuggestions `json:"data"`
+	Problem  *Problem        `json:"problem"`
+}
 type LogQuery = logbook.Query
 type LogPage = logbook.Page
 type LogHealth = logbook.Health

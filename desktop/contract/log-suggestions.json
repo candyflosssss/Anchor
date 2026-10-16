@@ -1,0 +1,5 @@
+{
+  "contract": "anchor-desktop-v1",
+  "query": { "kind": "requests", "field": "provider", "prefix": "provider-", "since_ms": 1760000000000, "before_ms": 1760003600000, "limit": 20 },
+  "suggestions": { "items": [{ "value": "provider-a", "count": 12 }, { "value": "provider-b", "count": 3 }], "has_more": false }
+}

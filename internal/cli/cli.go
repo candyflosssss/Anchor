@@ -60,6 +60,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   catalog estimate --provider ID --model MODEL [--input-tokens N --output-tokens N]
                    [--cache-read-tokens N --cache-write-tokens N --reasoning-tokens N --refresh]
   provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
+  logs suggestions [--field search|provider|model|key|http|code|stage] [--prefix value] [--since 1h] [--limit 20] [--kind requests|system]
   logs stats [--since 1h] [--interval 1m] [request filters]
   logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
       [--cursor N] [--until N] [--status RESULT] [--source SOURCE] [--provider ID]

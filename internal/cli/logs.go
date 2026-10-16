@@ -10,9 +10,33 @@ import (
 
 func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("logs requires list, stats, detail, follow, export, settings or configure")
+		return errors.New("logs requires list, stats, suggestions, detail, follow, export, settings or configure")
 	}
 	switch args[0] {
+	case "suggestions":
+		f := a.flags("logs suggestions")
+		q := logbook.SuggestionsQuery{}
+		f.StringVar(&q.Kind, "kind", "requests", "requests|system (system supports only search)")
+		f.StringVar(&q.Field, "field", "search", "search|provider|model|key|http|code|stage")
+		f.StringVar(&q.Prefix, "prefix", "", "case-sensitive value prefix")
+		f.IntVar(&q.Limit, "limit", 20, "maximum candidates (1..100)")
+		since := f.Duration("since", time.Hour, "lookback duration (up to 2160h)")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		if *since <= 0 || *since > 90*24*time.Hour {
+			return errors.New("since must be in (0,90d]")
+		}
+		now := time.Now()
+		q.SinceMS, q.BeforeMS = now.Add(-*since).UnixMilli(), now.UnixMilli()
+		if q.Validate() != nil {
+			return logbook.ErrInvalid
+		}
+		v, err := c.LogSuggestions(ctx, q)
+		if err != nil {
+			return err
+		}
+		return a.output(v)
 	case "detail":
 		if len(args) != 2 {
 			return errors.New("logs detail requires request ID")

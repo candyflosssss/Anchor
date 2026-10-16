@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import suggestionsFixture from '../../../../contract/log-suggestions.json';
 import fixture from '../../../../contract/logs.json';
 import type { Request } from '../../desktop/contract.generated';
 import { logService, requestLog } from './log.service';
@@ -64,4 +65,20 @@ it('preserves legacy interval metrics without using them for total TPS', () => {
   // Missing non-reasoning usage does not invalidate a confirmed total output.
   row.metrics.non_reasoning_output_tokens = null;
   expect(outputTps(requestLog(row))).toBeCloseTo(120 / 2.1);
+});
+
+
+it('shares the suggestions contract and forwards only a scoped query', async () => {
+  const suggestions = vi.fn(async () => ({ contract: suggestionsFixture.contract, data: suggestionsFixture.suggestions, problem: null }));
+  vi.stubGlobal('window', { go: { desktop: { Bridge: { LogSuggestions: suggestions } } } });
+  expect(await logService.suggestions(suggestionsFixture.query)).toEqual(suggestionsFixture.suggestions);
+  expect(suggestions).toHaveBeenCalledWith(suggestionsFixture.query);
+});
+it('rejects missing and malformed suggestion responses', async () => {
+  vi.stubGlobal('window', {});
+  await expect(logService.suggestions(suggestionsFixture.query)).rejects.toMatchObject({ code: 'unsupported' });
+  for (const data of [null, { items: null }, { items: [{ value: '', count: 1 }], has_more: false }, { items: [{ value: 'x', count: -1 }], has_more: false }]) {
+    vi.stubGlobal('window', { go: { desktop: { Bridge: { LogSuggestions: async () => ({ contract: fixture.contract, data, problem: null }) } } } });
+    await expect(logService.suggestions(suggestionsFixture.query)).rejects.toMatchObject({ code: 'read_error' });
+  }
 });

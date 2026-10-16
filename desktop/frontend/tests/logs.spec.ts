@@ -1,13 +1,14 @@
+import suggestionsFixture from '../../contract/log-suggestions.json' with { type: 'json' };
 import statsFixture from '../../contract/log-stats.json' with { type: 'json' };
 import { expect, test, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
 import fixture from '../../contract/logs.json' with { type: 'json' };
 import type { DesktopBridge, Query } from '../src/desktop/contract.generated';
 const capture = process.env.ANCHOR_LOG_SCREENSHOTS;
-declare global { interface Window { logTest: { queries: Query[]; statsQueries: import('../src/desktop/contract.generated').StatsQuery[]; statsUnavailable: boolean; statsEmpty: boolean; exports: number; settings: typeof fixture.settings; unavailable: boolean; paged: boolean } } }
+declare global { interface Window { logTest: { queries: Query[]; statsQueries: import('../src/desktop/contract.generated').StatsQuery[]; statsUnavailable: boolean; statsEmpty: boolean; exports: number; settings: typeof fixture.settings; unavailable: boolean; paged: boolean; suggestionQueries: import('../src/desktop/contract.generated').SuggestionsQuery[]; suggestionsUnavailable: boolean; suggestionDelays: Record<string, number> } } }
 async function openLogs(page: Page, data = fixture) {
-  await page.addInitScript(({ f, sf }) => {
-    window.logTest = { queries: [], statsQueries: [], statsUnavailable: false, statsEmpty: false, exports: 0, settings: f.settings, unavailable: false, paged: false };
+  await page.addInitScript(({ f, sf, suggestions }) => {
+    window.logTest = { queries: [], statsQueries: [], statsUnavailable: false, statsEmpty: false, exports: 0, settings: f.settings, unavailable: false, paged: false, suggestionQueries: [], suggestionsUnavailable: false, suggestionDelays: {} };
     const result = <T,>(data: T) => ({ contract: f.contract, data, problem: null });
     const session = { instance_id: 'logs-isolated', phase: 'ready', source: 'started', can_stop: true };
     const rows = f.page.requests.map(r => ({ ...r, started_at_ms: Date.now() }));
@@ -19,6 +20,20 @@ async function openLogs(page: Page, data = fixture) {
         if (q.kind === 'system') return result(f.system);
         const selected = rows.filter(r => (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
         return result({ ...f.page, requests: selected.map(r => ({ ...r, attempts: [], evidence: Object.fromEntries(Object.entries(r.evidence).filter(([key]) => ['sent_service_tier', 'sent_service_tier_raw', 'upstream_service_tier', 'upstream_service_tier_raw', 'fast_triggered'].includes(key))) })), latest: q.cursor ? 3 : 2, has_more: window.logTest.paged && !q.cursor, next_cursor: 1 });
+      },
+      LogSuggestions: async (q: import('../src/desktop/contract.generated').SuggestionsQuery) => {
+        window.logTest.suggestionQueries.push(q);
+        const delay = window.logTest.suggestionDelays[q.prefix];
+        if (delay) await new Promise(resolve => setTimeout(resolve, delay));
+        if (window.logTest.suggestionsUnavailable) return { contract: f.contract, data: null, problem: { code: 'offline' } };
+        const fields: Record<string, { value: string; count: number }[]> = {
+          provider: suggestions.suggestions.items,
+          search: [{ value: 'historic-request', count: 1 }, ...rows.map(r => ({ value: r.id, count: 1 }))],
+          model: [{ value: 'historical-model', count: 22 }], key: [{ value: 'work-key', count: 12 }],
+          http: [{ value: '200', count: 12 }, { value: '429', count: 3 }], code: [{ value: 'invalid_response', count: 3 }], stage: [{ value: 'respond', count: 12 }],
+        };
+        const items = q.kind === 'system' ? [{ value: 'core.ready', count: 1 }] : fields[q.field] ?? [];
+        return result({ items: items.filter(v => v.value.startsWith(q.prefix)), has_more: false });
       },
       LogStats: async (q: import('../src/desktop/contract.generated').StatsQuery) => {
         window.logTest.statsQueries.push(q);
@@ -37,7 +52,7 @@ async function openLogs(page: Page, data = fixture) {
       ExportLogs: async () => { window.logTest.exports++; return result({ accepted: true }); },
     } as unknown as DesktopBridge;
     window.go = { desktop: { Bridge: api } };
-  }, { f: data, sf: statsFixture });
+  }, { f: data, sf: statsFixture, suggestions: suggestionsFixture });
   await page.goto('/');
   await page.getByRole('button', { name: '日志', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看请求 fixture_failed' })).toBeVisible();
@@ -77,9 +92,9 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   if (capture) await page.screenshot({ path: resolve(capture, 'logs-failure-detail.png') });
   await page.keyboard.press('Escape'); await expect(detail).toBeHidden(); await expect(opener).toBeFocused();
   await page.getByRole('button', { name: '重置', exact: true }).click();
-  await page.getByLabel('供应商筛选').fill('provider-a');
+  await page.getByLabel('供应商筛选', { exact: true }).fill('provider-a');
   await expect(page.getByRole('button', { name: '查看请求 fixture_success' })).toBeVisible();
-  await page.getByLabel('搜索日志').fill('no-such-request'); await expect(page.getByText('暂无日志', { exact: true })).toBeVisible();
+  await page.getByLabel('搜索日志', { exact: true }).fill('no-such-request'); await expect(page.getByText('暂无日志', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '重置', exact: true }).click();
   await page.getByRole('button', { name: '深色', exact: true }).click();
   await expect(page.locator('html')).toHaveClass(/dark/);
@@ -221,7 +236,7 @@ test('log search and name filters keep Chinese preedit across query refreshes', 
     ['model筛选', 'model', '中文模型'],
     ['key筛选', 'key', '中文密钥'],
   ] as const) {
-    const input = page.getByRole('textbox', { name: label, exact: true });
+    const input = page.getByRole('combobox', { name: label, exact: true });
     await input.fill('');
     await input.focus();
     await session.send('Input.imeSetComposition', { text: 'zhong ', selectionStart: 6, selectionEnd: 6 });
@@ -400,9 +415,9 @@ test('trend tooltip shows local timestamps and clips a partial bucket to the que
 test('trend errors and empty history are explicit and stale filter responses are discarded', async ({ page }) => {
   await openLogs(page);
   const trends = page.getByRole('region', { name: '请求运行趋势' });
-  await page.getByLabel('供应商筛选').fill('slow-provider');
+  await page.getByLabel('供应商筛选', { exact: true }).fill('slow-provider');
   await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.filter.provider)).toBe('slow-provider');
-  await page.getByLabel('供应商筛选').fill('local');
+  await page.getByLabel('供应商筛选', { exact: true }).fill('local');
   await expect(trends.getByRole('button', { name: /请求量/ })).toContainText('3');
   await page.waitForTimeout(650);
   await expect(trends.getByRole('button', { name: /请求量/ })).not.toContainText('999');
@@ -414,4 +429,96 @@ test('trend errors and empty history are explicit and stale filter responses are
   await page.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(trends).toContainText('所选范围内暂无请求');
   await expect(trends.getByRole('button', { name: /已知用量/ })).toContainText('—');
+});
+
+test('filter suggestions use full-range values, counts, mouse and keyboard without self-filtering', async ({ page }) => {
+  await openLogs(page);
+  const provider = page.getByRole('combobox', { name: '供应商筛选', exact: true });
+  await provider.click();
+  const list = page.getByRole('listbox', { name: '供应商筛选候选' });
+  await expect(list.getByRole('option')).toHaveCount(2);
+  await expect(list.getByRole('option').first()).toContainText('provider-a');
+  await expect(list.getByLabel('12 条日志')).toBeVisible();
+  await provider.press('ArrowDown'); await provider.press('ArrowDown'); await provider.press('Enter');
+  await expect(provider).toHaveValue('provider-b');
+  await expect(provider).toBeFocused(); await expect(list).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.logTest.queries.at(-1)?.provider)).toBe('provider-b');
+  await provider.fill(''); await expect(list.getByRole('option')).toHaveCount(2);
+  await list.getByRole('option').first().click(); await expect(provider).toHaveValue('provider-a');
+  const model = page.getByRole('combobox', { name: 'model筛选' });
+  await model.click();
+  await expect(page.getByRole('option', { name: /historical-model/ })).toBeVisible();
+  await page.getByRole('option', { name: /historical-model/ }).click();
+  await expect(model).toHaveValue('historical-model');
+  const query = await page.evaluate(() => window.logTest.suggestionQueries.at(-1)!);
+  expect(query.field).toBe('model'); expect(query.limit).toBe(20);
+  expect(query.before_ms - query.since_ms).toBe(3600000);
+  expect(query).not.toHaveProperty('provider'); expect(query).not.toHaveProperty('cursor');
+  for (const [label, value] of [['key筛选', 'work-key'], ['http筛选', '429'], ['code筛选', 'invalid_response'], ['stage筛选', 'respond']]) {
+    const input = page.getByRole('combobox', { name: label }); await input.click();
+    await page.getByRole('option', { name: new RegExp(value) }).click(); await expect(input).toHaveValue(value);
+  }
+  await page.getByRole('button', { name: '重置', exact: true }).click();
+  await expect(provider).toHaveValue(''); await expect(model).toHaveValue('');
+  await page.getByLabel('日志时间范围').selectOption('1440'); await provider.click();
+  await expect(list.getByRole('option')).toHaveCount(2);
+  const range = await page.evaluate(() => window.logTest.suggestionQueries.at(-1)!);
+  expect(range.before_ms - range.since_ms).toBe(86400000);
+});
+
+test('suggestions discard slow responses and keep manual input on unavailable cores', async ({ page }) => {
+  await openLogs(page);
+  await page.evaluate(() => { window.logTest.suggestionDelays['provider-'] = 700; });
+  const provider = page.getByRole('combobox', { name: '供应商筛选', exact: true });
+  await provider.fill('provider-');
+  await expect.poll(() => page.evaluate(() => window.logTest.suggestionQueries.some(q => q.prefix === 'provider-'))).toBe(true);
+  await provider.fill('provider-b');
+  const list = page.getByRole('listbox', { name: '供应商筛选候选' });
+  await expect(list.getByRole('option')).toHaveCount(1);
+  await page.waitForTimeout(800);
+  await expect(list.getByRole('option')).toHaveCount(1);
+  await expect(list).not.toContainText('provider-a');
+  await provider.press('Escape'); await expect(list).toBeHidden(); await expect(provider).toHaveValue('provider-b');
+  await provider.fill('not-recorded'); await expect(page.getByText('暂无匹配候选', { exact: true })).toBeVisible();
+  await page.evaluate(() => { window.logTest.suggestionsUnavailable = true; });
+  await provider.fill('manual-provider');
+  await expect(page.getByText('候选不可用，可手动输入')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => window.logTest.queries.at(-1)?.provider)).toBe('manual-provider');
+  await provider.press('Tab'); await expect(list).toBeHidden();
+});
+
+test('search suggestions respect IME composition and system-log search fields', async ({ page }) => {
+  await openLogs(page);
+  const search = page.getByRole('combobox', { name: '搜索日志', exact: true });
+  await search.click();
+  const list = page.getByRole('listbox', { name: '搜索日志候选' });
+  await expect(page.getByRole('option', { name: /historic-request/ })).toBeVisible();
+  const count = await page.evaluate(() => window.logTest.suggestionQueries.length);
+  await search.dispatchEvent('compositionstart');
+  await search.fill('中文'); await search.press('Enter');
+  await expect(list).toBeHidden(); await page.waitForTimeout(250);
+  expect(await page.evaluate(() => window.logTest.suggestionQueries.length)).toBe(count);
+  await search.dispatchEvent('compositionend', { data: '中文' });
+  await expect(search).toHaveValue('中文');
+  await expect.poll(() => page.evaluate(() => window.logTest.suggestionQueries.at(-1)?.prefix)).toBe('中文');
+  await page.getByRole('button', { name: '系统日志', exact: true }).click();
+  await search.click();
+  await page.getByRole('option', { name: /core.ready/ }).click();
+  await expect(search).toHaveValue('core.ready');
+  expect(await page.evaluate(() => window.logTest.suggestionQueries.at(-1)?.kind)).toBe('system');
+});
+
+test('suggestion popovers stay inside narrow viewports in both themes', async ({ page }) => {
+  await openLogs(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const theme of ['浅色', '深色']) {
+    await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === '深色');
+    await page.getByRole('combobox', { name: 'stage筛选' }).click();
+    const list = page.getByRole('listbox', { name: 'stage筛选候选' });
+    await expect(list.getByRole('option')).toHaveCount(1);
+    const box = await page.locator('.log-filter-popover').boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    if (capture) await page.screenshot({ path: resolve(capture, `log-suggestions-${theme}.png`), fullPage: true });
+    await page.keyboard.press('Escape');
+  }
 });
