@@ -76,6 +76,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `provider delete` / `rename` / `copy` | 删除、改名、复制供应商 | 核心在线；当前 revision；删除/改名须 approve |
 | `provider key-put` / `key-delete` / `key-reset` / `key-model-protocol` | 多 Key 管理、默认协议与模型覆盖、状态恢复 | 核心在线；当前 revision；删除/恢复须 approve |
 | `provider strategy` | 配置轮流或优先使用 Key | 核心在线；当前 revision |
+| `provider chat` | 固定供应商／Key／上游模型的多轮文本推理 | 核心在线；当前 revision、准确启用 Key、stdin 消息数组；须 approve；当前源码新增，未发布 |
 | `provider test` | 显式最小推理测试 | 核心在线；已存供应商/模型 ID；须 approve |
 | `provider model-put` / `model-delete` | 工作台模型映射写入/删除 | 核心在线；供应商与模型 revision；删除须 approve |
 | `provider price-put` / `price-import` | 保存单价 / models.dev 预览 | 核心在线；当前 revision；导入不自动保存 |
@@ -398,6 +399,26 @@ sub2api Key 直接倍率结果的 `basis=key_billing`，`group` 和 `group_name`
 
 管理错误（参数、实例、授权、revision、Key 不存在）非零退出且不请求上游。上游能力失败仍输出 JSON 并退出0，需检查 `failure`，包括 `platform_required`、`auth_required`、`remote_key_required`、`key_not_found`、`unsupported`、`unsupported_key_filter`、`unsupported_pagination`、`unknown`、`authentication`、`permission_denied`、`rate_limited`、`http_error`、`network`、`timeout`、`busy`、`too_large`、`invalid_response`、`upstream_rejected`。失败不返回可用额度或账单；自动核对分组倍率失败时可保留已知分组但 multiplier=null，上游错误正文不暴露。
 
+### 固定目标的多轮文本对话（当前源码，未发布）
+
+```text
+anchor provider chat --id ID --revision N --key KEY --model MODEL --approve
+```
+
+- 用途：与桌面“对话测试”复用同一核心接口，单次提交完整多轮上下文，等待并输出最终安全 `ProbeProgress` JSON；不是终端交互聊天。不需要先创建公开模型映射。
+- 参数：四个目标参数和 `--approve` 均必填，没有隐式 Key 选择。`--key` 为启用的已存 Key ID；仅没有任何已存 Key 时可为 `anonymous`。`--model` 为上游 ID（最多256 UTF-8字节），非公开模型别名。`--revision` 来自 `provider list/workspace` 的当前供应商 revision。
+- 输入：stdin 必须为一个 JSON 数组，元素只有 `role` 与 `content` 文本，user/assistant 从 user 开始交替，以 user 结束；1..80条、内容累计最多64 KiB UTF-8，编码后的 stdin 最多128 KiB。没有系统提示词、工具、附件或密钥参数。示例：
+
+  ```bash
+  printf '%s' '[{"role":"user","content":"你好"},{"role":"assistant","content":"你好"},{"role":"user","content":"继续对话"}]' |
+    anchor provider chat --id 示例供应商 --revision 1 --key default --model demo-model --approve
+  ```
+
+- 作用域／前置条件：所选 Context 的在线核心、已核验身份及管理授权；供应商启用，Key准确且启用，需要兼容源码 CLI/宿主/核心。旧 alpha.6／desktop.45 不含本能力。
+- 输出／退出：最终 progress 包含目标、run_id、状态、累计文本、毫秒耗时和安全 result，不输出密钥、原始上游错误或提示词。成功返回0；输入/鉴权/配置冲突/网络失败返回非0；上游推理失败或取消时先输出最终 JSON，再以非0退出并提示检查 result.failure。
+- 副作用／限制：会发送真实上游请求并计费，记入 probe 请求元数据和 test:模型用量；不修改供应商、Key或模型配置，不把聊天正文落盘。固定目标不故障切换、不自动重发；沿用既有单次 `/v1` HTML 兼容行为。请求最多120秒且受供应商较短超时限制，固定4096输出token，输出最多64 KiB；上游读取最多8 MiB。取消／中断尽力取消已知 run，不回滚费用。完整生命周期见[对话测试契约](../design/chat-testing.md)。
+
+
 ## 6. 公开模型与候选路由
 
 2026-10-15 源码行为修复（未发布）：`model add` 及 `provider model-put` 创建全新公开别名时，共享核心自动尝试 models.dev 精确匹配候选的**上游模型 ID**，最多等待 3 秒，复用缓存。无歧义且所有候选解析为同一目录记录时，将上下文、输入/输出上限、能力、原生思考范围与完整参考价格快照写入模型 `settings`，同次创建 revision 仍为 1。显式 provider/model 身份或目录声明的唯一 canonical 所属记录可消歧；其他同名条目缺少 canonical 不再阻止选择所属记录，但显式冲突仍拒绝；不按本地供应商名、公开别名或模型名前缀猜测。下载失败、目录陈旧、未匹配、歧义和多候选不一致时正常创建但不自动填值，可用 `model settings --file FILE` 的 set 来源显式导入。更新/追加已有别名不覆盖设置，tools/streaming 仍按显式映射标记。仅请求公开目录，不带推理凭据；参考价格不写入供应商实际计费单价。
@@ -665,6 +686,7 @@ anchor recover [--id ID]
 | 目录快速／全部导入（桌面） | 复用 provider model-put --id ID --revision N --target ALIAS --model UPSTREAM --tools --streaming | 桌面新建默认开启两项能力；CLI 流式同样默认开启，工具仍须 `--tools`。暂无专用批量命令，可读取 provider models/workspace 后逐项 model-put；跳过已有上游、非法或占用别名，首错停止并重读，禁止盲目重放 |
 | 供应商模型映射多选测试／编辑／删除（desktop.40 dev） | 读取 provider workspace 后逐项 provider test/model-put/model-delete | 无专用批量命令；桌面串行复用既有动作，显式确认用量／删除，编辑默认保留各自未改字段，能力／策略／档位仍是公开模型共享属性。采用确认时供应商及模型 revision，管理／传输错误首错停止、显示部分结果并要求重读，不自动重试；停止在当前请求完成后生效。CLI 语法、输出、默认值与退出行为不变 |
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
+| 多轮文本对话测试（当前源码，未发布） | provider chat --id ID --revision N --key KEY --model MODEL --approve；stdin 为完整消息数组 | 共享核心与桌面 ProviderChat；CLI 输出最终 JSON，不单独提供终端交互／流式展示命令，复制和清空为页面生命周期 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示，此展示不新增 CLI 契约；冷却/熔断为内部机制 |

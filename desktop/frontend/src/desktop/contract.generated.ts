@@ -209,6 +209,20 @@ export interface ModelRoutingResult {
   data: ModelRoutingState | null;
   problem: Problem | null;
 }
+export interface ChatMessage {
+  role: string;
+  content: string;
+}
+export interface ChatRequest {
+  provider_id: string;
+  expected_revision: number;
+  action: string;
+  key_id: string;
+  model: string;
+  run_id: string;
+  approved: boolean;
+  messages: ChatMessage[];
+}
 export interface ProbeRequest {
   provider_id: string;
   expected_revision: number;
@@ -830,6 +844,7 @@ export interface DesktopBridge {
   ProviderAccountSettings(input1: WorkspaceQuery): Promise<AccountSettingsResult>;
   ProviderAction(input1: Action): Promise<WorkspaceResult>;
   ProviderAllowance(input1: AccountQuery): Promise<AccountObservationResult>;
+  ProviderChat(input1: ChatRequest): Promise<ProbeProgressResult>;
   ProviderProbe(input1: ProbeRequest): Promise<ProbeProgressResult>;
   ProviderRate(input1: AccountQuery): Promise<AccountRateObservationResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;

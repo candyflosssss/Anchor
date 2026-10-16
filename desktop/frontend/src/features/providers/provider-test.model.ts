@@ -12,13 +12,13 @@ export function modelsForKey(catalog: ProviderModels, key: string): string[] {
   return catalog.entries.filter(entry => entry.key_ids.includes(key)).map(entry => entry.id);
 }
 
-export function checkedProgress(value: ProbeProgress, input: ProbeRequest): ProbeProgress {
+export function checkedProgress(value: ProbeProgress, input: ProbeRequest, maxTextBytes = 16384): ProbeProgress {
   if (!value || value.provider_id !== input.provider_id || value.revision !== input.expected_revision ||
     typeof value.run_id !== 'string' || !value.run_id || (input.run_id && value.run_id !== input.run_id) ||
     typeof value.key_id !== 'string' || typeof value.model !== 'string' ||
     (input.action === 'start' && (value.key_id !== input.key_id || value.model !== input.model)) ||
     !['running', 'completed', 'cancelled'].includes(value.status) || !['connecting', 'receiving', 'complete'].includes(value.phase) ||
-    typeof value.text !== 'string' || new TextEncoder().encode(value.text).length > 16384 ||
+    typeof value.text !== 'string' || new TextEncoder().encode(value.text).length > maxTextBytes ||
     !Number.isSafeInteger(value.elapsed_ms) || value.elapsed_ms < 0 ||
     (value.status === 'running' ? value.result !== null : !value.result)) throw new ProviderProblem('read_error');
   const result = value.result;

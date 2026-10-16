@@ -307,6 +307,7 @@ func (s *Server) Control() http.Handler {
 	})
 	mux.HandleFunc("POST /control/v1/providers/{id}/discover-models", s.discoverProviderModels)
 	mux.HandleFunc("POST /control/v1/providers/{id}/probe", s.providerProbe)
+	mux.HandleFunc("POST /control/v1/providers/{id}/chat", s.providerChat)
 	mux.HandleFunc("POST /control/v1/models/{id}/routing", s.configureModelRouting)
 	mux.HandleFunc("GET /control/v1/models/{id}/settings", s.getModelSettings)
 	mux.HandleFunc("POST /control/v1/models/{id}/settings", s.saveModelSettings)

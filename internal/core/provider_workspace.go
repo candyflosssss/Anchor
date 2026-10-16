@@ -303,25 +303,33 @@ func (s *Server) probe(ctx context.Context, p state.Provider, keyID, model strin
 }
 
 func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, model string, notify func(string, string)) (*catalog.Probe, error) {
-	keys, err := s.Store.ProviderKeys(p.ID)
-	if err != nil {
-		return nil, err
-	}
+	return s.inferenceObserved(ctx, p, keyID, model, nil, nil, notify)
+}
+
+func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID, model string, messages []catalog.ChatMessage, selectedKey *state.ProviderKey, notify func(string, string)) (*catalog.Probe, error) {
 	key := state.ProviderKey{ID: "anonymous", Enabled: true, Protocol: p.Protocol}
-	if len(keys) > 0 {
-		found := false
-		for _, k := range keys {
-			if k.ID == keyID || (keyID == "" && k.Enabled) {
-				key = k
-				found = true
-				break
-			}
+	if selectedKey != nil {
+		key = *selectedKey
+	} else {
+		keys, err := s.Store.ProviderKeys(p.ID)
+		if err != nil {
+			return nil, err
 		}
-		if !found {
+		if len(keys) > 0 {
+			found := false
+			for _, k := range keys {
+				if k.ID == keyID || (keyID == "" && k.Enabled) {
+					key = k
+					found = true
+					break
+				}
+			}
+			if !found {
+				return nil, state.ErrInvalid
+			}
+		} else if keyID != "" && keyID != "anonymous" {
 			return nil, state.ErrInvalid
 		}
-	} else if keyID != "" && keyID != "anonymous" {
-		return nil, state.ErrInvalid
 	}
 	p.Protocol = key.EffectiveProtocol(model)
 	out := &catalog.Probe{Revision: p.Revision, KeyID: key.ID, Model: model, At: time.Now().Unix()}
@@ -418,12 +426,22 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 		return out, nil
 	}
 	defer s.release(p.ID)
-	raw, _ := json.Marshal(map[string]any{"model": model, "input": "Reply OK.", "max_output_tokens": 16, "store": false, "stream": stream})
+	input := any("Reply OK.")
+	timeout := 10 * time.Second
+	maxTokens, maxText, maxBody := 16, 16384, int64(1<<20)
+	if messages != nil {
+		input = messages
+		timeout = 120 * time.Second
+		maxTokens = 4096
+		maxText = catalog.ChatMaxOutputBytes
+		maxBody = 8 << 20
+	}
+	raw, _ := json.Marshal(map[string]any{"model": model, "input": input, "max_output_tokens": maxTokens, "store": false, "stream": stream})
 	body, err := protocol.ConvertRequest(raw, "responses", p.Protocol)
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, min(time.Duration(p.TimeoutSeconds)*time.Second, 10*time.Second))
+	ctx, cancel := context.WithTimeout(ctx, min(time.Duration(p.TimeoutSeconds)*time.Second, timeout))
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(p.BaseURL, "/")+protocol.Endpoint(p.Protocol), bytes.NewReader(body))
 	if err != nil {
@@ -469,9 +487,9 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 	if notify != nil {
 		notify("receiving", "")
 		if strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
-			output := &probeOutput{header: http.Header{}, secret: key.Secret, notify: notify}
+			output := &probeOutput{header: http.Header{}, secret: key.Secret, limit: maxText, strict: messages != nil, notify: notify}
 			observation := &protocol.Observation{}
-			u, err = protocol.StreamObserved(output, io.LimitReader(resp.Body, (1<<20)+1), p.Protocol, "responses", model, observation)
+			u, err = protocol.StreamObserved(output, io.LimitReader(resp.Body, maxBody+1), p.Protocol, "responses", model, observation)
 			recordReturnedServiceTier(row.Evidence, observation.ServiceTier, observation.ServiceTierRaw, key.Secret)
 			stage = "response_validate"
 			if err != nil || observation.Status == "failed" || observation.Status == "incomplete" {
@@ -480,15 +498,26 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 			if ctx.Err() != nil {
 				out.Failure = "timeout"
 			}
+			if messages != nil && strings.TrimSpace(output.text) == "" {
+				out.Failure = "invalid_response"
+			}
+			value := publicProbeText(output.text, key.Secret, false)
+			if messages != nil && len(value) > maxText {
+				out.Failure = "invalid_response"
+			}
 			if out.Failure == "" {
-				notify("receiving", publicProbeText(output.text, key.Secret, false))
+				notify("receiving", value)
 			}
 			return out, nil
 		}
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
 		out.Failure = "network"
+		return out, nil
+	}
+	if int64(len(data)) > maxBody {
+		out.Failure = "invalid_response"
 		return out, nil
 	}
 	stage = "response_validate"
@@ -515,11 +544,23 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 					}
 				}
 				value := text.String()
-				if len(value) > 16384 {
-					value = value[:16384]
+				if len(value) > maxText {
+					if messages != nil {
+						out.Failure = "invalid_response"
+						return out, nil
+					}
+					value = value[:maxText]
+				}
+				if messages != nil && strings.TrimSpace(value) == "" {
+					out.Failure = "invalid_response"
+					return out, nil
 				}
 				if key.Secret != "" {
 					value = strings.ReplaceAll(value, key.Secret, "[redacted]")
+				}
+				if messages != nil && len(value) > maxText {
+					out.Failure = "invalid_response"
+					return out, nil
 				}
 				notify("receiving", value)
 			}

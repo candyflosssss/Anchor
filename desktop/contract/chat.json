@@ -1,0 +1,17 @@
+{
+  "request": {
+    "provider_id": "chat-demo", "expected_revision": 1, "action": "start",
+    "key_id": "default", "model": "demo-model", "run_id": "", "approved": true,
+    "messages": [
+      { "role": "user", "content": "你好" },
+      { "role": "assistant", "content": "你好，有什么可以帮你？" },
+      { "role": "user", "content": "请记住我们在测试对话。" }
+    ]
+  },
+  "progress": {
+    "provider_id": "chat-demo", "revision": 1, "run_id": "synthetic-chat-run",
+    "key_id": "default", "model": "demo-model", "status": "completed", "phase": "complete",
+    "text": "好的，我们正在测试多轮对话。", "elapsed_ms": 120,
+    "result": { "revision": 1, "key_id": "default", "model": "demo-model", "at": 1700000000, "http_status": 200, "elapsed_ms": 120, "failure": "" }
+  }
+}

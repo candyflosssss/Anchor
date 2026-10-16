@@ -13,6 +13,7 @@ import (
 )
 
 type probeRun struct {
+	chat     bool
 	progress catalog.ProbeProgress
 	started  time.Time
 	cancel   context.CancelFunc
@@ -70,7 +71,7 @@ func (s *Server) providerProbe(w http.ResponseWriter, r *http.Request) {
 			s.probeRuns = map[string]*probeRun{}
 		}
 		for token, old := range s.probeRuns {
-			if time.Since(old.started) > time.Minute {
+			if !old.chat && time.Since(old.started) > time.Minute {
 				old.cancel()
 				delete(s.probeRuns, token)
 			}
@@ -123,7 +124,7 @@ func (s *Server) providerProbe(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	run := s.probeRuns[in.RunID]
-	if run == nil || run.progress.ProviderID != p.ID || run.progress.Revision != p.Revision {
+	if run == nil || run.chat || run.progress.ProviderID != p.ID || run.progress.Revision != p.Revision {
 		s.mu.Unlock()
 		apiError(w, state.ErrNotFound)
 		return
@@ -146,6 +147,8 @@ type probeOutput struct {
 	pending string
 	text    string
 	secret  string
+	limit   int
+	strict  bool
 	notify  func(string, string)
 }
 
@@ -173,11 +176,18 @@ func (w *probeOutput) Write(b []byte) (int, error) {
 		if json.Unmarshal([]byte(strings.TrimPrefix(line, "data: ")), &event) != nil || event.Type != "response.output_text.delta" {
 			continue
 		}
-		if len(w.text)+len(event.Delta) > 16384 {
+		limit := w.limit
+		if limit == 0 {
+			limit = 16384
+		}
+		if len(w.text)+len(event.Delta) > limit {
 			return 0, errors.New("probe output too large")
 		}
 		w.text += event.Delta
 		text := publicProbeText(w.text, w.secret, true)
+		if w.strict && len(text) > limit {
+			return 0, errors.New("probe public output too large")
+		}
 		w.notify("receiving", text)
 	}
 	return len(b), nil

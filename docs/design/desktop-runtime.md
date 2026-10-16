@@ -153,3 +153,8 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 新增 `LogSuggestions(LogSuggestionsQuery) LogSuggestionsResult`，Go DTO 与生成 TS 同源，共享样例为 `desktop/contract/log-suggestions.json`。宿主校验输入并复用现有连接、owner 凭据与实例身份，调用 client 的只读 `/control/v1/logs/suggestions`，宿主5秒／核心3秒超时。仅暴露固定日志标识列、去重值与出现次数，不能从 JS 传 SQL、正文列或任意 URL。候选按时间范围查询所有保留行，不受页面游标及其他字段过滤限制。
 
 这是 additive 方法，未改 `anchor-desktop-v1` 既有调用；旧宿主缺方法／旧核心不支持时前端明确显示候选不可用并保留手动筛选，不回退 Mock。前端按实例键卸载清理旧请求，中文输入及过期结果由局部 Controller 处理。接口、上限与排序见[日志设计](logging.md#10-筛选与搜索候选2026-10-16desktop43-dev-已发布)。desktop.43 已完成双平台打包、dev 发布和本机用户目录升级；原生两平台窗口未验收。
+
+
+## 多轮对话测试（2026-10-16，当前源码未发布）
+
+新增受控 `ProviderChat` 桥接与核心 `/control/v1/providers/{id}/chat`；start/read/cancel 使用 `ChatRequest` 与既有 `ProbeProgressResult`，只允许所选已存供应商、准确 Key 和纯文本多轮消息。固定目标、不自动重试、不保存聊天正文；沿用管理鉴权、实例核验和协议转换。既有 Probe/CLI test 不变，旧宿主／核心明确不支持，不回退 Mock。限制、取消、脱敏和共享样例见[对话测试契约](chat-testing.md)。

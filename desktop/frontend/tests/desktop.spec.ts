@@ -30,6 +30,7 @@ async function host(page: Page, rateMappings = false) {
  UseConnection: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ModelCatalog: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       EstimateModelCost: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ProviderChat: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderProbe: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderAccountSettings: async input => ({ contract, data: settings(input.provider_id), problem: null }),
       SaveProviderAccount: async input => {

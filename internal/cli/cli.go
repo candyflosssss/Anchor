@@ -50,6 +50,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   provider key-model-protocol --id ID --revision N --target KEY --model MODEL [--protocol PROTOCOL|inherit]
   provider key-delete|key-reset --id ID --revision N --target KEY --approve
   provider strategy --id ID --revision N --strategy round-robin|priority
+  provider chat --id ID --revision N --key KEY --model MODEL --approve
+      Read a JSON user/assistant message array from stdin; print the final transient reply.
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
       HTML at an unversioned base permits one /v1 fallback; still HTML returns unexpected_html.
   provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy RULE] [--source-key ID | --all-keys] [--speed-variant fast|ultrafast ...] [--service-tier TIER] [--tools] [--streaming] [--approve]
@@ -551,6 +553,8 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 		return errors.New("provider requires list, models, add or put")
 	}
 	switch args[0] {
+	case "chat":
+		return a.providerChat(ctx, c, args[1:])
 	case "platform", "platform-put", "detect-platform", "balance-summary", "balance", "key-quota", "usage-records", "effective-rate":
 		return a.providerPlatform(ctx, c, args)
 	}

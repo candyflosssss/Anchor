@@ -364,3 +364,7 @@ type ConnectionProfilesResult struct {
 	Data     []ConnectionProfile `json:"data"`
 	Problem  *Problem            `json:"problem"`
 }
+
+// Text-only conversation tests use the shared core validation and transient progress.
+type ChatMessage = catalog.ChatMessage
+type ChatRequest = catalog.ChatRequest
