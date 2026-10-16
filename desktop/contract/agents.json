@@ -69,5 +69,13 @@
     "agent_catalog_invalid",
     "agent_config_conflict",
     "agent_config_unsafe"
-  ]
+  ],
+  "update": {
+    "target_id": "codex-fixture",
+    "model": "public",
+    "expected_revision": 1,
+    "model_templates": {},
+    "approved": true,
+    "model_scope": "all-mapped"
+  }
 }

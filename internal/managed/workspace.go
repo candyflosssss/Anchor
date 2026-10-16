@@ -2,6 +2,7 @@ package managed
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -126,7 +127,9 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 }
 
 // Enroll persists an explicitly selected target and local catalog snapshot.
-// Existing provider mappings are untouched. File writes remain Engine-owned.
+// Existing provider mappings are untouched. Updates explicitly reapply the
+// submitted settings and current mappings, preserving external recovery values.
+// File writes remain Engine-owned.
 func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error) {
 	if !in.Approved || !state.ValidModelID(in.Model) || in.ExpectedRevision < 0 {
 		return state.Binding{}, state.ErrInvalid
@@ -208,18 +211,30 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 			return b, err
 		}
 	}
+	reapply := false
 	if b.Revision == 0 {
 		b, err = m.Store.AddBinding(b)
 	} else {
 		if _, err := AdapterFor(b.AdapterID).Inspect(b); err != nil {
 			return b, err
 		}
-		restored, e := m.Engine.Recover(b.ID)
-		if e != nil {
+		current, e := m.Engine.load(b.ID)
+		if e != nil && !errors.Is(e, os.ErrNotExist) {
 			return b, e
 		}
-		if restored.Status == "conflict" {
-			return b, withDiagnostic(ErrChanged, "recovery", "recovery_conflict", "")
+		// A live explicit update uses the submitted policy, not the previously
+		// saved default model. Reapply keeps external values as recovery baselines
+		// without temporarily publishing a restored configuration. Incomplete
+		// writes still require ordinary recovery; they are never blindly reclaimed.
+		reapply = m.ready && e == nil && current.Previous == nil && (current.Status == "applied" || current.Status == "conflict")
+		if !reapply {
+			restored, e := m.Engine.Recover(b.ID)
+			if e != nil {
+				return b, e
+			}
+			if restored.Status == "conflict" {
+				return b, withDiagnostic(ErrChanged, "recovery", "recovery_conflict", "")
+			}
 		}
 		b, err = m.Store.UpdateBindingCatalog(b, in.ExpectedRevision)
 	}
@@ -228,9 +243,21 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	}
 	delete(m.last, b.ID)
 	if m.ready {
-		r, e := m.apply(b.ID, b.Revision, "")
+		var r Result
+		var e error
+		if reapply {
+			g, e = m.gateway(b)
+			if e == nil {
+				r, e = m.Engine.Reapply(b, g)
+			}
+		} else {
+			r, e = m.apply(b.ID, b.Revision, "")
+		}
 		if e != nil {
-			m.last[b.ID] = Result{BindingID: b.ID, Status: "apply_failed"}
+			if r.Status != "recovery_pending" {
+				r = Result{BindingID: b.ID, Status: "apply_failed"}
+			}
+			m.last[b.ID] = r
 			return b, e
 		}
 		m.last[b.ID] = r

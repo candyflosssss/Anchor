@@ -394,9 +394,15 @@ maxTokens 在 DSH 同时设定模型输出能力和单次请求默认上限，�
 ### 2026-10-17 外部配置漂移后的显式重新接管（当前源码，未打包发布）
 
 - 后台 `Reconcile`、启动和映射自动同步继续校验上次写入，不抢改第三方值；单绑定失败隔离，不阻断核心或其他绑定。
-- 显式 `Refresh` / `agent sync` / `ManageAgent(action=sync)` 使用 `Reapply`：相同批准范围内，对 applied 或无未完成 previous journal 的 conflict 重新生成并原位写入。未变化字段沿用原恢复值，被外部改变的字段采用当前值作为恢复值；不改变 scope、默认模型策略、revision 或凭据。已有 conflict 可走该入口，不再只能手改文件解除死结；登记／set-models 的 scope 变更仍先按原规则恢复，可先重新接管再变更策略。
+- 显式 `Refresh` / `agent sync` / `ManageAgent(action=sync)` 使用 `Reapply`：相同批准范围内，对 applied 或无未完成 previous journal 的 conflict 重新生成并原位写入。未变化字段沿用原恢复值，被外部改变的字段采用当前值作为恢复值；不改变 scope、默认模型策略、revision 或凭据。已有 conflict 可走该入口，不再只能手改文件解除死结；set-models 的 scope 变更仍先按原规则恢复；登记更新采用下述统一流程。
 - journal 的可选 `planning_before` 保留初次规划的结构基线，与后来采用的外部恢复值分开，避免新增 DSH 整行／Anchor provider 在重复同步时被当成未经授权的既有对象。对象字段重新应用生成键，保留其他外部扩展。原 `Original`、operation ID 和未变字段基线不重置；兼容读取无这些可选字段的旧 schema1 journal。
 - 已跟踪的生成目录被修改／删除可重建；可选 original/existed 保存重新接管时的外部字节／缺失状态，恢复只在当前仍是已知写入值时还原。外部坏 JSON 可以备份恢复，不作为新的模型元数据读取。
 - TOML journal 是所有权依据，不依赖 `anchor:begin/end` 注释永久存在。标记被序列化器丢弃后，对普通、quoted 和嵌套 provider section 定位并逐段修改，避免重复声明显式 `[model_providers]`。完整语义比对和最终字节级条件写入不放宽；无法定位、语法／路径／权限不安全仍拒绝。
 - 写入前先保存 previous/next prepared journal，最终配置与目录分别按读取快照校验，不覆盖此后并发编辑。未完成 previous journal 不直接重新接管，须先核对恢复结果。
-- 桌面将同步入口显示为「重新接管并同步」，始终先确认将重设哪些已批准设置及恢复规则；Controller 仅通过既有受控 ManageAgent 接口提交，失败重读且不自动重放。无新增 DTO 字段／接口。CLI 具体兼容变化见[最新指令大全](../cli/commands.md)。
+- 桌面现将原「保存并应用」和独立同步合并为「更新配置」，确认当前默认模型及恢复规则后只调用一次 EnrollAgent。既有 ManageAgent(sync) 仍提供受控能力，但页面不再单独展示。失败重读且不自动重放。无新增 DTO 字段／接口。CLI 具体兼容变化见[最新指令大全](../cli/commands.md)。
+
+### 2026-10-17 统一更新配置（当前源码，未打包发布）
+
+- Enroll 仍同时支持新登记与按当前 revision 更新。在线更新已应用／无 previous 的 conflict 时，不先 Recover 再 Apply，而是在保存新策略后用新 Binding 和最新 GatewayBinding 执行 Reapply；不依赖旧默认仍可用，也不在文件中发布中间恢复态。Codex all-compatible → all-mapped 及旧 single → 自动模型名单可在保留原有字段所有权的前提下更新；Reapply 仍拒绝丢弃旧字段／目录所有权。
+- 成功更新递增 revision，保留绑定 ID／凭据／operation／原始恢复内容，现有映射不改。新目标、已恢复目标及未完成写入仍遵循原登记／条件恢复流程，不将损坏或未完成 journal 当作批准。
+- 策略保存与文件应用不是跨资源事务。应用失败返回错误，策略可能已更新；保留 recovery_pending，不将 prepared 写入误报为普通失败。客户端只读回当前状态后由用户决定下一步，不自动重复调用。后台映射同步和启动流程仍保守，不覆盖第三方修改。

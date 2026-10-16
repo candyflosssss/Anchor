@@ -11,6 +11,7 @@
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
 - Agent discover/enroll/sync 在源码 CLI 中，桌面托管入口与核心已随 desktop.21 dev 发布；alpha.6 CLI 不含，需使用兼容客户端与核心。
+- 2026-10-17 Agent 统一更新增量：`agent enroll --revision N` 按当前所选模型更新配置与最新映射，也能保存外部恢复基线；桌面合并为「更新配置」，仅当前源码，现有安装包不含，见 §8。
 - 2026-10-17 Agent 恢复增量：`agent sync` 明确重新接管已批准字段并保存外部恢复基线，后台同步仍不覆盖第三方修改；仅当前源码，现有安装包不含，见 §8。
 - 平台兼容查询（sub2api / NewAPI / 原版 OneAPI）的核心接口已随 desktop.21 dev 发布，命令由源码 CLI 提供，alpha.6 CLI 不含，已安装桌面程序不提供通用 CLI。新增 schema5，旧程序不能打开升级后的数据库，客户端与核心需一起升级；desktop.22 的桌面平台配置／账户余额／Key 额度页已发布，desktop.25新增独立分组倍率查询；请求账单桌面页仍未接入。
 - desktop.23 已交付全部启用 Key 的模型目录合并与逐 Key 分组倍率显示，停用 Key 不查询；复用 `provider models`，命令契约见下文。desktop.25已交付来源Key范围、模型排序／调度设置与账户分组倍率查询；独立账单桌面页仍未接入。
@@ -101,8 +102,8 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `access list` | 查看授权元数据 | 本机已初始化，无需核心在线 |
 | `access revoke` | 撤销授权 | 本机已初始化，无需核心在线 |
 | `agent discover` | 只读识别本地已知配置目录及托管状态 | 新版核心在线；不证明安装或运行 |
-| `agent enroll` | 批准 Codex 托管并复用已有模型映射 | 新版核心在线；完整本地缓存；更新须当前 revision |
-| `agent sync` | 条件恢复并同步当前模型目录 | 核心在线、Binding enabled、当前 revision |
+| `agent enroll` | 登记或统一更新托管配置、默认模型与映射 | 新版核心；all-compatible 需完整缓存；更新须当前 revision |
+| `agent sync` | 重新应用已批准配置并同步当前模型目录 | 核心在线、Binding enabled、当前 revision |
 | `agent add` | 明确批准并登记 Codex 基础配置目标 | 核心在线；配置根存在；默认 all-compatible 需版本匹配元数据 |
 | `agent list` | 查询 Binding 元数据 | 所选 Context 的核心在线 |
 | `agent inspect` | 查看配置层检查与托管状态 | 核心在线；Binding 已登记 |
@@ -569,9 +570,11 @@ Codex 目录导出把模型设置中的推理档位投影为客户端可表示�
 
 仅 Codex all-compatible 要求 tools/streaming、精确版本匹配的完整 Codex 元数据与本地 `models_cache.json`（最多4 MiB、128条，有效 `client_version=X.Y.Z`）。`--template ALIAS:SOURCE` 可重复，空源排除别名；未指定时依次使用共享元数据、精确别名或唯一上游 slug 匹配。其他范围不接受非空模板覆盖。发现时缓存缺失/无效不阻止 all-mapped 托管，兼容目录登记失败则需要核对缓存和版本，不伪造元数据。
 
-登记为新绑定创建凭据；更新保留凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需要重新 discover 检查。成功返回 workspace。默认开关关闭，初次点击展开平台设置；点「开启托管」才提交批准，成功后开关打开。设置、目录和同步全部收进对应平台折叠区域。
+登记为新绑定创建凭据；更新保留凭据。在线核心保存后立即应用；更新已应用配置时按本次选择原位重新接管，其他状态遵循条件恢复／应用规则。可能出现配置应用失败但登记已保存，需要重新 discover 检查。成功返回 workspace。默认开关关闭，初次点击展开平台设置；点「开启托管」才提交批准，成功后开关打开。设置、目录和同步全部收进对应平台折叠区域。
 
-`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。**2026-10-17 当前源码起，显式 `agent sync ID --revision N` 是重新接管请求**：对已应用或条件恢复后 conflict 的绑定，重新应用既有批准范围内的连接、默认模型和目录；受影响字段若被外部改过，先把当前值保存为下次恢复基线，未变化字段仍保留原基线。不先向客户端发布临时恢复配置，不吸收 Anchor 自己上次写入值为原值；对象字段保留生成键之外的外部扩展。生成目录被修改（含内容损坏）或删除也可重建，停用时还原其外部内容／缺失状态。完整配置语法错误、不支持的 profile／传输、危险路径、权限或未完成 journal 的错误仍拒绝，不能用 sync 盲目覆盖。revision 不匹配和写入前再次发生修改仍失败，失败不重放。重新登记或 set-models 遇外部冲突时，可先在现有策略下 sync 解除冲突，再重新选择策略。旧版本 sync 遇外部修改只报冲突；本语义需升级核心，桌面同步入口会先确认影响。未新增命令或参数。
+**2026-10-17 当前源码的统一更新**：桌面将「保存并应用」和独立同步合并为「更新配置」，确认后一次提交当前选择的默认模型与 revision。CLI 等价入口为 `agent enroll --target ID --model MODEL --revision N --model-scope all-mapped --approve`；新目标 revision 为0。在线且 journal 已应用或为可重新接管的 conflict 时，以本次设置和最新映射原位更新，外部改过的托管字段／生成目录保存为恢复基线，未变字段保留原基线。无需先 sync 再 enroll，成功递增 revision、不旋转凭据、不改现有映射。无改动也可提交以更新列表／修复托管配置。已恢复、待应用或未完成 journal 仍走原受控恢复／应用流程；语法、权限、不安全配置、并发文件变化继续拒绝。策略保存后应用可能失败，需重新 discover 核对新 revision 和状态，不自动重复旧请求。仅源码生效，旧安装包需同步升级核心与客户端。
+
+`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。**2026-10-17 当前源码起，显式 `agent sync ID --revision N` 是重新接管请求**：对已应用或条件恢复后 conflict 的绑定，重新应用既有批准范围内的连接、默认模型和目录；受影响字段若被外部改过，先把当前值保存为下次恢复基线，未变化字段仍保留原基线。不先向客户端发布临时恢复配置，不吸收 Anchor 自己上次写入值为原值；对象字段保留生成键之外的外部扩展。生成目录被修改（含内容损坏）或删除也可重建，停用时还原其外部内容／缺失状态。完整配置语法错误、不支持的 profile／传输、危险路径、权限或未完成 journal 的错误仍拒绝，不能用 sync 盲目覆盖。revision 不匹配和写入前再次发生修改仍失败，失败不重放。set-models 遇外部冲突时，可先在现有策略下 sync 解除冲突，再重新选择策略；enroll 更新已应用配置已合并重新接管，无需先 sync。旧版本 sync 遇外部修改只报冲突；本语义需升级核心，桌面「更新配置」会先确认当前选择与影响。未新增命令或参数。
 
 **后台自动同步及启动仍不抢回外部修改**。映射、模型设置／路由和供应商候选变化后，核心自动刷新已启用且已接管 Agent 的名单；single/all-compatible/all-mapped 各守原有范围，不扩大权限、不自动登记或复活已恢复目标。单个 Agent 冲突不回滚映射保存，不影响其他绑定；状态报告 needs_sync／overridden／recovery_pending，HTTP 成功响应带 `X-Anchor-Agent-Sync: applied|needs_sync`。默认模型失去可用候选时不会擅自换默认值，需先处理默认模型再同步。`sync` 同时作为手动重试和明确重新接管入口。Codex/Claude Code 需要重启，DSH 默认模型在新会话生效；配置落盘成功不证明真实请求已通过 Anchor。
 

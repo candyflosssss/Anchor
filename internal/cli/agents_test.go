@@ -73,7 +73,7 @@ func TestAgentTokenAndIndependentRecovery(t *testing.T) {
 	}
 }
 func TestAgentHelpMatchesLifecycle(t *testing.T) {
-	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh|dsh-desktop", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version", "DSH Web/Desktop sync mapped display names, vision/input, context", "off/minimal/low/medium/high/xhigh/max", "native none/default/null and toggle/budget reasoning are not relabelled", "DSH maxTokens exports explicit default output tokens only", "without overwriting external changes", "agent sync explicitly reclaims approved fields and catalogs"} {
+	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh|dsh-desktop", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version", "DSH Web/Desktop sync mapped display names, vision/input, context", "off/minimal/low/medium/high/xhigh/max", "native none/default/null and toggle/budget reasoning are not relabelled", "DSH maxTokens exports explicit default output tokens only", "without overwriting external changes", "agent sync explicitly reclaims approved fields and catalogs", "agent enroll updates the selected default and latest mappings, reclaiming approved fields"} {
 		if !strings.Contains(help, s) {
 			t.Fatal("missing help", s)
 		}
@@ -248,7 +248,24 @@ func TestCLIDiscoverEnrollSync(t *testing.T) {
 	}
 	run(true, "agent", "sync", id, "--revision", "1")
 	run(false, "agent", "enroll", "--target", id, "--model", "public", "--approve")
-	run(true, "agent", "disable", id, "--revision", "1")
+	run(true, "model", "add", "--id", "second", "--candidate", "p:fixture-source")
+	config, err = os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed = bytes.Replace(config, []byte(`model = "public"`), []byte(`model = "external"`), 1)
+	if err := os.WriteFile(configPath, changed, 0600); err != nil {
+		t.Fatal(err)
+	}
+	run(false, "agent", "enroll", "--target", id, "--model", "second", "--revision", "0", "--model-scope", "all-mapped", "--approve")
+	output = run(true, "agent", "enroll", "--target", id, "--model", "second", "--revision", "1", "--model-scope", "all-mapped", "--approve")
+	if json.Unmarshal([]byte(output), &workspace) != nil || workspace.Bindings[0].Model != "second" || workspace.Bindings[0].Revision != 2 || workspace.Bindings[0].Status != "applied" || len(workspace.Bindings[0].AvailableModels) != 2 {
+		t.Fatal("CLI unified update did not apply draft and mappings", output)
+	}
+	run(true, "agent", "disable", id, "--revision", "2")
+	if raw, err := os.ReadFile(configPath); err != nil || !bytes.Contains(raw, []byte(`model = "external"`)) {
+		t.Fatal("CLI update lost external recovery baseline", err)
+	}
 	if _, err = os.Stat(filepath.Join(root, "anchor_"+id+".models.json")); !os.IsNotExist(err) {
 		t.Fatal("catalog not restored", err)
 	}

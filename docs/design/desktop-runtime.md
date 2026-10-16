@@ -93,6 +93,8 @@ ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径�
 
 受控新增 AgentWorkspace / EnrollAgent / ManageAgent，DTO 来源为 managed 应用服务，在 contract.go 中声明并生成 TS；共享样例为 desktop/contract/agents.json。2026-10-13 当前源码的 AgentModel 增加 available_targets（始终为数组）：核心使用与登记/网关一致的 BindingModels 自动策略计算每个映射可用的目标 ID，包含已有共享元数据、精确缓存匹配、tools/streaming 与启用供应商检查；预览不读取旧目标级覆盖，表示本次按已有映射重新登记后的策略。桌面只消费该结果，不自行匹配或让用户重复选模板。登记仅收集发现目标 ID、默认模型、期望 revision 和明确批准，提交空 model_templates；核心/CLI 保留高级模板覆盖兼容。操作只允许 sync/enable/disable。前端不能指定配置路径、可执行程序或认证令牌，宿主不扫描目录、不写 Agent 文件，均复用 client 到核心的管理鉴权和实例身份校验。超时15秒；写失败按既有 problem 规则，结果未知不重放，Controller 重读状态。
 
+2026-10-17 当前源码（未打包）统一配置更新：已登记目标将「保存并应用」和独立同步合并为「更新配置」。确认显示当前所选默认模型，Controller 冻结草稿并只调用一次 EnrollAgent（target_id、model、expected_revision、all-mapped、空 model_templates、approved=true）；不通过连续的 ManageAgent(sync)／EnrollAgent 拼接业务。核心校验 revision 和新策略后，在线且已有 applied／可重新接管 conflict journal 时按新模型与最新映射 Reapply，保留凭据、原 operation 和恢复基线；成功递增 revision。未变化字段保留原值，第三方变化值保存为恢复值，停用仍按条件恢复。CLI enroll 同样生效，sync 保留只同步已有策略且不增加 revision 的语义。字段形状与契约标识不变；共享样例增加 update 请求。写失败可能已保存策略，前端只重读并保留有效草稿，不自动补发。
+
 2026-10-15 当前源码（未发布）诊断补充：HTTP 409 不再全部投影为 conflict；ProblemCodes 白名单新增 agent_config_conflict、agent_config_unsafe、agent_model_unavailable、agent_catalog_invalid、agent_operation_failed，分别表示外部修改、安全编辑受限、默认模型不可用、目录生成失败和未分类失败，普通 revision 冲突仍为 conflict。核心仅发送固定安全消息，原始错误 cause 留在本地错误链；未知写结果仍优先为 unknown。Go DTO 规范与生成 TS 同步，不透传任意后台错误码或原文。Controller 失败后保持／展开对应目标并重读，只有重读成功才宣称已重新读取；重读失败清空旧工作区并提示结果未确认。enabled 只表示托管策略，不代表 applied；未 applied 的 enabled 绑定在折叠行仍显示真实状态。desktop.39 不含本次修复，Windows 截图的具体根因不能从旧通用红字确认。
 
 启动/停止仍由 Session 管理；进入页面要求核心 ready，核心启动只应用已批准 enabled 目标，不自动批准发现结果。GUI enable 先更新 enabled/revision，再 sync，新状态可能部分成功，因此失败后读取核对。正常停服条件恢复；关闭窗口保持核心运行。桌面可执行程序支持适配器精确 token helper 入口，在创建窗口前分派 CLI 凭据读取。

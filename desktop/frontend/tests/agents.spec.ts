@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
         window.agentTest.enrolls.push(input);
         if (window.agentTest.failWrite) return { contract: f.contract, data: null, problem: { code: window.agentTest.failureCode ?? 'conflict' } };
         const target = data.targets.find(t => t.id === input.target_id)!;
-        data.bindings = [...data.bindings.filter(b => b.id !== target.id), { ...f.workspace.bindings[0], id: target.id, adapter_id: target.agent, config_root: target.config_root, model_scope: input.model_scope, model: input.model, model_templates: input.model_templates }];
+        data.bindings = [...data.bindings.filter(b => b.id !== target.id), { ...f.workspace.bindings[0], id: target.id, adapter_id: target.agent, config_root: target.config_root, model_scope: input.model_scope, model: input.model, model_templates: input.model_templates, revision: input.expected_revision + 1, status: 'applied' }];
         return result(data);
       },
       ManageAgent: async (input: ManageAgent) => {
@@ -44,7 +44,7 @@ async function openSettings(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Codex 托管设置', exact: true }).click();
 }
 
-test('compact platform list, inline enrollment, sync and conditional disable', async ({ page }) => {
+test('compact platform list, unified configuration update and conditional disable', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await expect(page.getByRole('switch')).toHaveCount(6);
   await expect(page.getByRole('region', { name: 'Codex 托管设置' })).toHaveCount(0);
@@ -61,14 +61,17 @@ test('compact platform list, inline enrollment, sync and conditional disable', a
   expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll]);
   await openSettings(page);
   await expect(page.getByText('配置已应用', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('外部修改会先保存为恢复基线');
+  await page.getByRole('button', { name: '更新配置', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('外部值会先保存');
   expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
   await page.getByRole('button', { name: '取消', exact: true }).click();
   expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
-  await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
+  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll]);
+  await expect(page.getByRole('button', { name: '保存并应用', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '重新接管并同步', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '更新配置', exact: true }).click();
   await page.getByRole('button', { name: '确认变更', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => window.agentTest.actions)).toEqual([fixture.sync]);
+  await expect.poll(() => page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll, fixture.update]);
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   const dialog = page.getByRole('alertdialog'); await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -76,27 +79,27 @@ test('compact platform list, inline enrollment, sync and conditional disable', a
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   await dialog.getByRole('button', { name: '确认变更', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).not.toBeChecked();
-  expect(await page.evaluate(() => window.agentTest.actions[1])).toEqual({ ...fixture.sync, action: 'disable' });
+  expect(await page.evaluate(() => window.agentTest.actions[0])).toEqual({ ...fixture.sync, expected_revision: 2, action: 'disable' });
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).toBeChecked();
-  expect(await page.evaluate(() => window.agentTest.actions[2])).toEqual({ ...fixture.sync, expected_revision: 2, action: 'enable' });
+  expect(await page.evaluate(() => window.agentTest.actions[1])).toEqual({ ...fixture.sync, expected_revision: 3, action: 'enable' });
   expect(errors).toEqual([]);
 });
 
 for (const status of ['overridden', 'conflict']) {
-  test(`explicit sync recovers ${status} through a confirmed action`, async ({ page }) => {
+  test(`configuration update recovers ${status} through the same confirmed action`, async ({ page }) => {
     await openSettings(page);
     await page.getByRole('button', { name: '开启托管', exact: true }).click();
     await page.evaluate(status => { window.agentTest.data.bindings[0].status = status; }, status);
     await page.getByRole('button', { name: '重新识别', exact: true }).click();
     await openSettings(page);
     await expect(page.getByRole('region', { name: 'Codex 托管设置' })).toContainText('可重新接管');
-    await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
-    await expect(page.getByRole('alertdialog')).toContainText('后台同步不会自动抢回外部修改');
+    await page.getByRole('button', { name: '更新配置', exact: true }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('当前选择更新连接配置，并同步最新模型列表');
     expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
     await page.getByRole('button', { name: '确认变更', exact: true }).click();
-    await expect.poll(() => page.evaluate(() => window.agentTest.actions)).toEqual([fixture.sync]);
-    expect(await page.evaluate(() => window.agentTest.enrolls.length)).toBe(1);
+    await expect.poll(() => page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll, fixture.update]);
+    expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
     await openSettings(page);
     await expect(page.getByText('配置已应用', { exact: true })).toBeVisible();
   });
@@ -137,8 +140,9 @@ test('unavailable mapping is excluded from defaults without a redundant model li
   await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
   await expect(page.getByLabel('默认模型', { exact: true }).getByRole('option', { name: 'unavailable', exact: true })).toHaveCount(0);
   await expect(page.getByText('暂不可用：', { exact: false })).toHaveCount(0);
-  await page.getByRole('button', { name: '保存并应用', exact: true }).click();
-  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([{ ...fixture.enroll, expected_revision: 1 }]);
+  await page.getByRole('button', { name: '更新配置', exact: true }).click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.update]);
 });
 
 test('no compatible mappings gives a reason and blocks enrollment', async ({ page }) => {
@@ -230,11 +234,12 @@ test('DSH Web and Desktop at the same home keep independent switches and actions
   await expect(web).not.toBeChecked();
   await expect(desktop).toBeChecked();
   await page.getByRole('button', { name: 'DSH Desktop 托管设置', exact: true }).click();
-  await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
+  await page.getByRole('button', { name: '更新配置', exact: true }).click();
   await page.getByRole('button', { name: '确认变更', exact: true }).click();
   expect(await page.evaluate(() => window.agentTest.actions)).toMatchObject([
-    { binding_id: 'dsh', action: 'disable' }, { binding_id: 'dsh-desktop', action: 'sync' },
+    { binding_id: 'dsh', action: 'disable' },
   ]);
+  expect(await page.evaluate(() => window.agentTest.enrolls.at(-1))).toMatchObject({ target_id: 'dsh-desktop', expected_revision: 1, model_scope: 'all-mapped' });
 });
 
 for (const [code, message] of [
@@ -276,3 +281,47 @@ test('partial enable exposes application failure even though policy is enabled',
   await expect(page.getByLabel('Codex 托管状态', { exact: true })).toHaveText('应用失败');
   expect(await page.evaluate(() => window.agentTest.actions.length)).toBe(1);
 });
+
+test('configuration update applies the current draft and fresh mappings in a single write', async ({ page }) => {
+  await openSettings(page);
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await page.evaluate(() => {
+    window.agentTest.data.models.push({ ...window.agentTest.data.models[0], id: 'new-model' });
+    window.agentTest.data.bindings[0].status = 'needs_sync';
+  });
+  await page.getByRole('button', { name: '重新识别', exact: true }).click();
+  await openSettings(page);
+  await page.getByLabel('默认模型', { exact: true }).selectOption('new-model');
+  await page.getByRole('button', { name: '更新配置', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('默认模型：new-model');
+  expect(await page.evaluate(() => window.agentTest.enrolls.length)).toBe(1);
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll, { ...fixture.update, model: 'new-model' }]);
+  expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+  await openSettings(page);
+  await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('new-model');
+});
+
+for (const failureCode of ['conflict', 'unknown'] as const) {
+  test(`configuration update ${failureCode} rereads without replaying or losing the draft`, async ({ page }) => {
+    await openSettings(page);
+    await page.getByRole('button', { name: '开启托管', exact: true }).click();
+    const reads = await page.evaluate(failureCode => {
+      window.agentTest.data.models.push({ ...window.agentTest.data.models[0], id: 'new-model' });
+      window.agentTest.failWrite = true;
+      window.agentTest.failureCode = failureCode;
+      return window.agentTest.reads;
+    }, failureCode);
+    await page.getByRole('button', { name: '重新识别', exact: true }).click();
+    await openSettings(page);
+    await page.getByLabel('默认模型', { exact: true }).selectOption('new-model');
+    await page.getByRole('button', { name: '更新配置', exact: true }).click();
+    await page.getByRole('button', { name: '确认变更', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('已重新读取');
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('new-model');
+    expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll, { ...fixture.update, model: 'new-model' }]);
+    expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+    expect(await page.evaluate(() => window.agentTest.reads)).toBe(reads + 2);
+  });
+}

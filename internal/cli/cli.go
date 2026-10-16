@@ -130,6 +130,7 @@ Codex CLI enrollment defaults to all-compatible; Claude/DSH and desktop enrollme
 All-mapped reads model mappings with enabled providers, without Codex metadata/tools/streaming filters.
 Mapping/provider changes refresh applied Agent model lists without overwriting external changes.
 agent sync explicitly reclaims approved fields and catalogs; external values become recovery baselines.
+agent enroll updates the selected default and latest mappings, reclaiming approved fields when the gateway is ready.
 Unset model context stays within the first models.dev input-price band when known; explicit limits are retained.
 Long-context pricing is selected by actual request input (including cache), not the configured window.
 provider price-import rejects context-tiered prices; use model-catalog model/estimate or model settings references.

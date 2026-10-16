@@ -76,6 +76,13 @@ describe('Agent contract and controlled transport', () => {
     expect(enroll).toHaveBeenCalledExactlyOnceWith(fixture.enroll);
     expect(manage).toHaveBeenCalledExactlyOnceWith(fixture.sync);
   });
+  it('uses a single enrollment request for an approved configuration update', async () => {
+    const enroll = vi.fn(api().EnrollAgent), manage = vi.fn(api().ManageAgent);
+    const service = createAgentService(() => api({ EnrollAgent: enroll, ManageAgent: manage }));
+    await service.enroll(fixture.update);
+    expect(enroll).toHaveBeenCalledExactlyOnceWith(fixture.update);
+    expect(manage).not.toHaveBeenCalled();
+  });
   it.each([
     { bindings: [{ ...fixture.workspace.bindings[0], revision: Number.MAX_SAFE_INTEGER + 1 }] },
     { bindings: [{ ...fixture.workspace.bindings[0], model_templates: { public: 42 } }] },

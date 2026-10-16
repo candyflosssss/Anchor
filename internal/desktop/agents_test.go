@@ -21,11 +21,12 @@ func TestSharedAgentContract(t *testing.T) {
 		Workspace AgentWorkspace `json:"workspace"`
 		Enroll    EnrollAgent    `json:"enroll"`
 		Sync      ManageAgent    `json:"sync"`
+		Update    EnrollAgent    `json:"update"`
 	}
 	if err = json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatal(err)
 	}
-	if fixture.Contract != Contract || len(fixture.Workspace.Targets) != 1 || len(fixture.Workspace.Models) != 1 || len(fixture.Workspace.Bindings) != 1 || !fixture.Enroll.Approved || fixture.Sync.Action != "sync" {
+	if fixture.Contract != Contract || len(fixture.Workspace.Targets) != 1 || len(fixture.Workspace.Models) != 1 || len(fixture.Workspace.Bindings) != 1 || !fixture.Enroll.Approved || fixture.Sync.Action != "sync" || !fixture.Update.Approved || fixture.Update.ExpectedRevision != fixture.Workspace.Bindings[0].Revision || fixture.Update.ModelScope != "all-mapped" {
 		t.Fatal("contract drift")
 	}
 	encoded, _ := json.Marshal(fixture.Workspace)
@@ -146,6 +147,34 @@ func TestRealCoreAgentBridgeLifecycle(t *testing.T) {
 	now, err = os.ReadFile(path)
 	if err != nil || !strings.Contains(string(now), `model = "public"`) {
 		t.Fatal("explicit sync did not apply default model", err)
+	}
+	// The unified desktop update must submit the draft model and reclaim drift
+	// through one EnrollAgent call instead of applying the previously saved model.
+	st, err = state.Open(s.options.Dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	if _, err := st.PutModel(state.Model{ID: "second", Candidates: []state.Candidate{{ProviderID: "p", Model: "fixture-source"}}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	raw = []byte(strings.Replace(string(now), `model = "public"`, `model = "external-edit"`, 1))
+	if err := os.WriteFile(path, raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	update := EnrollAgent{TargetID: r.Data.Targets[0].ID, Model: "second", ModelScope: "all-mapped", ExpectedRevision: row.Revision, Approved: true}
+	r = b.EnrollAgent(update)
+	if r.Problem != nil || r.Data.Bindings[0].Model != "second" || r.Data.Bindings[0].Status != "applied" || r.Data.Bindings[0].Revision != row.Revision+1 || len(r.Data.Bindings[0].AvailableModels) != 2 {
+		t.Fatalf("unified update: %+v", r)
+	}
+	row = r.Data.Bindings[0]
+	now, err = os.ReadFile(path)
+	if err != nil || !strings.Contains(string(now), `model = "second"`) {
+		t.Fatal("unified update ignored draft", err)
+	}
+	stale := b.EnrollAgent(update)
+	if stale.Problem == nil || stale.Problem.Code != "conflict" {
+		t.Fatal("stale unified update accepted", stale)
 	}
 	r = b.ManageAgent(ManageAgent{BindingID: row.ID, ExpectedRevision: row.Revision, Action: "disable"})
 	if r.Problem != nil || r.Data.Bindings[0].Enabled {

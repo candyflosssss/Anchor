@@ -1,6 +1,6 @@
 import { bridge, call, DesktopProblem } from '../../desktop/transport';
 import type { DesktopBridge, AgentWorkspace, AgentTarget, AgentModel, EnrollAgent, ManageAgent, ManagedAgent } from '../../desktop/contract.generated';
-export type { AgentWorkspace, AgentTarget, AgentModel, ManagedAgent } from '../../desktop/contract.generated';
+export type { AgentWorkspace, AgentTarget, AgentModel, ManagedAgent, EnrollAgent } from '../../desktop/contract.generated';
 
 export function checkedAgentWorkspace(value: AgentWorkspace): AgentWorkspace {
   const bad = () => { throw new DesktopProblem('read_error'); };
