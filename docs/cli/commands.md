@@ -6,7 +6,7 @@
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.40 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.41 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -738,7 +738,7 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts 及其他 evidence 大字段，仅保留下述五项档位证据，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 
-2026-10-16 当前源码（未发布）：代理及推理测试的 `logs list` / `logs follow` 在已有 `evidence` 字典中保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`。`logs detail REQUEST_ID` 与 `logs export` 仍返回完整安全证据，还包括入站 `requested_service_tier` / `requested_service_tier_raw` 与固定映射策略。派发字段取协议转换后的实际请求体，未派发为 `not_sent`、无档位参数为 `unspecified`；上游未报告时返回档位缺省。`*_raw` 为 JSON 标量文本，保留未知短名称、空字符串、null、布尔和数字，不把任意值强行解析成档位。字符串最多 128 UTF-8 字节、序列化后最多 256 字节，抑制对象／数组、控制字符与可识别凭据，不保存请求／响应正文。
+2026-10-16 增量（已随 desktop.41 dev 宿主／核心发布；独立公开 alpha.6 CLI 不含此增量）：代理及推理测试的 `logs list` / `logs follow` 在已有 `evidence` 字典中保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`。`logs detail REQUEST_ID` 与 `logs export` 仍返回完整安全证据，还包括入站 `requested_service_tier` / `requested_service_tier_raw` 与固定映射策略。派发字段取协议转换后的实际请求体，未派发为 `not_sent`、无档位参数为 `unspecified`；上游未报告时返回档位缺省。`*_raw` 为 JSON 标量文本，保留未知短名称、空字符串、null、布尔和数字，不把任意值强行解析成档位。字符串最多 128 UTF-8 字节、序列化后最多 256 字节，抑制对象／数组、控制字符与可识别凭据，不保存请求／响应正文。
 
 规范化 `priority/fast` 代表 Fast、`ultrafast` 代表 Ultrafast、`default` 代表 Standard；其余保留已知 auto/flex/scale 或固定 `unknown`。`fast_triggered` 是字符串三态：上游明确报告 priority/fast/ultrafast 为 `true`、default/flex/scale 为 `false`，缺失／auto／未知为 `unknown`；只表示报告档位，不保证实际速度、计费或与请求完全匹配。SSE 以最后报告为准，切换候选清除旧快照；这些字段不是逐尝试历史。不改变请求或跨协议能力，不回填旧历史，无数据库迁移；命令参数与退出码不变，旧客户端可忽略新增 evidence 项。
 

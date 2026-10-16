@@ -1,14 +1,14 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-16。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.40`，北京时间 2026-10-16 01:06:46 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
-- 范围：供应商模型映射新增多选／全选与批量测试、编辑、删除；串行执行、显式确认、固定 revision、保留逐项结果与部分完成状态，不自动重试。另包含已有模型默认值补全、上下文分档计费提示、DSH Desktop 独立托管与模型能力同步，以及托管失败分类反馈。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.40` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.41`，北京时间 2026-10-16 11:39:20 发布到 GitHub Releases，为非 latest 的 prerelease；Windows／Linux 安装包与清单同版投放。
+- 范围：日志安全保留入站、实际发送与上游报告的原始 service_tier 标量，只标注可解析值；新增“发送档位”“加速状态”，Fast 用青色闪电、Ultrafast 用紫色火箭。加速确认仅依据上游报告，Ultrafast → Fast 显示“仅确认 Fast”，未知／未报告不误判；不保证实际速度或计费。默认／性能布局展示两块，既有自定义布局保持；无数据库迁移、无历史回填、不改转发策略。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 `.35` 的 `restart_handoff` 安全保留交接；desktop.34 及更早版本首次迁移仍须备份、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.41` 并重新打开、核对实际 Agent 连接。新宿主面对缺能力旧核心拒绝在线安装，不降级／强杀；仍有停机窗口，不承诺既有会话自动重连，远端核心另行升级。
 - 沿用 state.db schema8，从更早版本首次启动前请备份；旧程序不能打开已迁移数据库，无数据库降级。
-- 构建：干净隔离源码 `2da6c20910b54ece98be4f7d713045f711e15d6b`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用功能提交的定向 TypeScript／ESLint、29 项 Vitest 与 9 项 Playwright 通过结果，本轮不重复全量或浏览器测试。
-- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.39` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 上述打包发布轮次未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
+- 构建：干净隔离源码 `bf3097f8ffd2742c09416a00572d41ba0fbd9484`（SOURCE.json dirty=false），不混入工作区未提交的余额缓存／工作台改动。复用功能提交已通过的 protocol／core／desktop／cli 四包 Go 测试、TypeScript／定向 ESLint、37 项日志单测与 9 项单 worker Playwright；本轮不重复全量或浏览器测试。
+- 验证：Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.40` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。
 
-- 后续本机升级：2026-10-16 01:18，按用户明确要求将用户目录中的 CLI／核心／GUI 从 `.39` 升为 `.40`；核心、网关、Agent 托管均 ready，Codex／DSH 均 applied，配置与原始恢复基线保留。此为用户目录安装，不是系统安装器／应用内 apply 验收，详见下方本机升级记录。
+- 上一版本机升级：2026-10-16 01:18，按用户明确要求将用户目录中的 CLI／核心／GUI 从 `.39` 升为 `.40`；核心、网关、Agent 托管均 ready，Codex／DSH 均 applied，配置与原始恢复基线保留。此为用户目录安装，不是系统安装器／应用内 apply 验收，详见下方本机升级记录。
 
 ## 1. 安装与使用行为
 
@@ -31,7 +31,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.40_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.41_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -87,7 +87,26 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.40`
+### 当前在线 dev 版 `.41`
+
+`0.1.0-dev.desktop.41` 从干净隔离 worktree 的 `bf3097f8ffd2742c09416a00572d41ba0fbd9484` 构建，于北京时间 2026-10-16 11:39:20 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.41)（非 latest）。tag 指向实际构建提交，不指向后续发行文档提交；SOURCE.json dirty=false。
+
+日志安全保留入站、实际发送与上游报告的原始 service_tier 标量，只标注可解析值；新增“发送档位”“加速状态”，Fast 用青色闪电、Ultrafast 用紫色火箭。加速确认仅依据上游报告，Ultrafast → Fast 显示“仅确认 Fast”，未知／未报告不误判；不保证实际速度或计费。默认／性能布局展示两块，既有自定义布局保持；无数据库迁移、无历史回填、不改转发策略。
+
+原始值受长度、类型与凭据过滤限制，不存任意请求／响应内容。`fast_triggered` 为字符串 true／false／unknown，表示上游报告而非测速结果。列表、详情、复制与 CLI 日志证据共用解析；JSON／SSE、探测和重试候选均覆盖。旧自定义布局可在日志字段设置中添加新显示块。
+
+输出 `dist/desktop/0.1.0-dev.desktop.41/`；publication 六附件包括 Windows NSIS、Ubuntu24.04 AMD64 deb、flat 清单、含 vendor 源码、许可／构建元数据 ZIP 与 SHA256SUMS。
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.41_amd64.deb` | 6,062,508 | `6d552517f83bd3f0ec7276e786bc6199bb2fccc26323b8fd3735a108d3aafafb` |
+| windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.41-windows-amd64-setup.exe` | 8,262,139 | `8186b56e02455d3aee9ad673b76a0fd39d588426a6dbbd2dc721925948a91b98` |
+
+Go／TypeScript 契约比对、TypeScript／Vite 生产编译、双平台编译和打包通过；六附件大小／SHA256 digest、vendored 源码、元数据 ZIP CRC、tag revision 校验通过；默认源从 `.40` 发现并真实下载 Linux 安装包，大小／SHA256 校验通过，Windows 附件 digest 与本地一致。 复用功能提交已通过的 protocol／core／desktop／cli 四包 Go 测试、TypeScript／定向 ESLint、37 项日志单测与 9 项单 worker Playwright；本轮不重复全量或浏览器测试。
+
+本轮未自动安装或替换正在运行的程序；未执行系统安装器／应用内 apply、原生 GUI／Windows 安装或真实付费上游验收。安装器未签名，下载成功不等于安装成功。 未改真实 Agent 配置；独立公开 CLI 仍为 alpha.6，读取新增日志证据须兼容源码 CLI／新版核心。BUILD.json 保留构建时 public_release=false 与未原生安装验收的原始事实，发布与下载证据另存 publication。工作区未提交的余额缓存／工作台改动未包含在包中。
+
+### 历史 dev 版 `.40`
 
 `0.1.0-dev.desktop.40` 从干净隔离 worktree 的 `2da6c20910b54ece98be4f7d713045f711e15d6b` 构建，于北京时间 2026-10-16 01:06:46 发布为 [dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.40)（非 latest）。tag 指向实际构建提交，不指向后续发行文档提交。
 
