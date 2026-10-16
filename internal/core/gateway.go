@@ -252,13 +252,14 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 }
-func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string) (retry bool) {
+func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string, attemptCtx context.Context, attemptResult *forwardAttemptResult) (retry bool) {
 	// Resolve after key selection: the upstream model override wins over this key's default.
 	p.Protocol = key.EffectiveProtocol(c.Model)
 	started := time.Now()
 	status := 0
 	success := false
 	attempted := false
+	retrySame := false
 	sentTier := "not_sent"
 	after := ""
 	usage := protocol.Usage{}
@@ -282,22 +283,9 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		t.row.Code = ""
 	}
 	defer func() {
-		if !attempted { // Release a half-open reservation if local conversion was rejected.
-			s.mu.Lock()
-			if h := s.health[healthID(p, key.ID)]; h != nil {
-				h.Probing = false
-			}
-			s.mu.Unlock()
+		*attemptResult = forwardAttemptResult{attempted: attempted, success: success, retrySame: retrySame, status: status, after: after}
+		if !attempted {
 			return
-		}
-		if r.Context().Err() == nil {
-			s.finishKey(p, key.ID, status, after, success)
-		} else {
-			s.mu.Lock()
-			if h := s.health[healthID(p, key.ID)]; h != nil {
-				h.Probing = false
-			}
-			s.mu.Unlock()
 		}
 		t := trace(r)
 		outcome := "failed"
@@ -364,7 +352,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	}
 	base := s.pickURL(p)
 	target := strings.TrimRight(base, "/") + protocol.Endpoint(p.Protocol)
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.TimeoutSeconds)*time.Second)
+	ctx, cancel := context.WithCancel(attemptCtx)
 	defer cancel()
 	var connected atomic.Bool
 	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { connected.Store(true) }})
@@ -402,8 +390,9 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		if r.Context().Err() != nil {
 			return false
 		}
-		if !connected.Load() {
+		if !connected.Load() && ctx.Err() == nil {
 			code = "upstream_connect"
+			retrySame = true
 			return true
 		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -424,6 +413,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	if status != 200 {
 		switch status {
 		case 401, 403, 429, 502, 503, 504:
+			retrySame = status == 502 || status == 503 || status == 504
 			code = "upstream_unavailable"
 			if status == 429 {
 				code = "rate_limited"

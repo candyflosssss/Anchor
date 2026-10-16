@@ -334,7 +334,11 @@ anchor usage
 
 配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
-usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
+**网关默认同渠道重试（当前源码，未打包发布）**：同一渠道指供应商 + Key + 候选上游模型。HTTP 502/503/504 或尚未取得连接的失败，首次请求后默认额外重试3次（最多4次尝试），按250ms/500ms/1s退避；保留所选 Key 和原请求，仍按供应商多地址轮询取址。全部尝试与退避共享 `provider add/put --timeout`（默认120秒），不因重试延长预算；预算耗尽返回504 `upstream_timeout`，客户端取消立即停止。重试耗尽后再切换其他可用 Key／候选，全部不可用／失败返回503 `no_available_candidate`。
+
+401/403/429 不在同一 Key 重试，沿用切换与冷却；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康按实际尝试计数，在重试组结束后统一生效；失败3次的熔断不提前截断本组的第3次重试，半开探测名额覆盖整组。`anchor logs detail REQUEST_ID` 可查看每次尝试，根请求仍只算一次。此策略固定默认生效，无独立重试次数配置命令；不改变 `provider test/chat` 或管理写操作，已安装核心需升级后生效。
+
+usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含同渠道重试、换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
 
 GUI 在供应商详情的三个页签提供同等操作。数据库启动自动从 schema2 升至3并迁移旧 secret 为 default Key，再升至4将供应商旧协议复制给全部既存 Key；安装前正常停止旧核心，升级后旧二进制不能再打开该数据库，无数据库降级入口。
 

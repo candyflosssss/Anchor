@@ -25,6 +25,9 @@ const help = `Anchor — headless model gateway (development milestone)
 Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
   init [--control-address 127.0.0.1:17861] [--gateway-address 127.0.0.1:17860]
   serve                              Run the local foreground core
+      Inference: 3 same-channel retries (4 attempts) for 502/503/504 or pre-connection failures.
+      Backoff 250ms/500ms/1s shares the provider timeout; no replay after output or unknown execution.
+      401/403/429 switch keys/candidates instead; management writes are not retried.
   restart --approve [--timeout 30s]   Restart/recover local core; preserve managed configuration
   context add NAME --local           Authenticate and bind a local instance
   context add NAME --ssh TARGET [--ssh-port N] [--identity-file PATH]
