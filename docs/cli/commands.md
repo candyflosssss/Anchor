@@ -6,7 +6,7 @@
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.44 已发布到默认 GitHub 源的 dev 渠道**。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.44 已发布到默认 GitHub 源的 dev 渠道**；desktop.45 仅完成本地打包与本机 CLI／核心／GUI 升级，未在线投放。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -673,7 +673,7 @@ anchor recover [--id ID]
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
-| 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；当前未发布源码增加认证 Codex 原生线程及本机项目元数据关联，其他客户端仍需显式标签；历史不回填 |
+| 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；desktop.45 本地交付增加认证 Codex 原生线程及同机项目元数据关联，未在线投放，其他客户端仍需显式标签；历史不回填 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
@@ -760,7 +760,7 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 
 desktop.44 dev 宿主／核心已发布归属筛选和 `--group-by`。示例：`anchor logs stats --since 24h --group-by agent`、`anchor logs stats --agent codex --group-by project`、`anchor logs list --session thread-1`、`anchor logs export --project ""`。分组响应额外含 `{group_by,groups:[{value,values}],group_count}`；空 value 为“未识别”，按请求量降序／同量值升序返回前100组，不截断总体统计。命令需要支持新参数的 CLI 与核心；旧核心拒绝新字段时非零退出，不静默当作成功。四维度也参与请求 search／suggestions；系统事件不接受归属筛选。
 
-Agent 只从已验证绑定采集；绑定 ID 不是进程 ID。项目／会话优先采用调用端的 `X-Anchor-Project` / `X-Anchor-Session` 安全标签。当前未发布源码还支持已认证 Codex Binding 的原生 `x-codex-turn-metadata`（优先 thread_id，其次 session_id）及旧 `session_id` 请求头：会话保存真实线程 UUID，项目通过对应线程精确查询同机 Codex 项目集合／cwd 元数据，保存可读名称加摘要（如 `Anchor@<digest>`），不保存完整路径、标题或正文。`logs suggestions --field project --prefix Anchor`／`--field session --prefix <thread-prefix>` 返回日志范围内候选，查询／分类／导出命令无需新参数；不是全量 Codex 会话浏览器，不支持按会话标题搜索。元数据缺失／跨设备不可见时不猜项目；旧日志不能可靠回填。其他 Agent 仍需显式标签。本功能不修改真实 Agent 配置或 Codex 数据库，桌面展示增量不另造 CLI。采集字符限制／隐私和旧日志兼容见[日志设计](../design/logging.md#11-归属与分类统计2026-10-16desktop44-dev-已发布)。
+Agent 只从已验证绑定采集；绑定 ID 不是进程 ID。项目／会话优先采用调用端的 `X-Anchor-Project` / `X-Anchor-Session` 安全标签。desktop.45 本地交付（已打包并升级本机，未在线投放）还支持已认证 Codex Binding 的原生 `x-codex-turn-metadata`（优先 thread_id，其次 session_id）及旧 `session_id` 请求头：会话保存真实线程 UUID，项目通过对应线程精确查询同机 Codex 项目集合／cwd 元数据，保存可读名称加摘要（如 `Anchor@<digest>`），不保存完整路径、标题或正文。`logs suggestions --field project --prefix Anchor`／`--field session --prefix <thread-prefix>` 返回日志范围内候选，查询／分类／导出命令无需新参数；不是全量 Codex 会话浏览器，不支持按会话标题搜索。元数据缺失／跨设备不可见时不猜项目；旧日志不能可靠回填。其他 Agent 仍需显式标签。本功能不修改真实 Agent 配置或 Codex 数据库，桌面展示增量不另造 CLI。采集字符限制／隐私和旧日志兼容见[日志设计](../design/logging.md#11-归属与分类统计2026-10-16desktop44-dev-已发布)。
 
 values 的 requests 包括 pending/cancelled；completed=succeeded+failed+interrupted，errors=failed+interrupted，error_rate=errors/completed×100，pending/cancelled 不计错误率分母。用量只累加输入输出均已知请求，input_tokens/output_tokens/total_tokens 是已知小计并带 usage_samples；总量不另加缓存或思考。tps 是成功且输出已知／总耗时>0样本的 sum(output)×1000/sum(elapsed_ms)，不是桶或请求速率简单平均；cache_hit_rate 是单次尝试且输入>0、0≤cache≤input已知样本的 sum(cache)/sum(input)×100。latency_ms 和 first_output_ms 是有效观测均值，首字回退旧正文首字，各指标带样本数。没有相应观测时为 null，明确观测零保留0；空桶不补造 TPS／用量／率。summary 使用同一查询原始累加器，非桶均值。统计受日志保留和 health 丢弃／写入失败限制，不代表永久消费账本，详见[日志趋势口径](../design/logging.md#9-请求趋势统计2026-10-16当前源码未打包)。
 
