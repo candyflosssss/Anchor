@@ -240,8 +240,8 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 
 func sameRoot(a, b string) bool { return sameCatalogPath(a, filepath.Clean(b)) }
 
-// Refresh uses conditional recovery before generating a fresh snapshot. It
-// refuses third-party edits and never turns Anchor's own values into originals.
+// Refresh explicitly reclaims approved fields while preserving external values
+// for later recovery. Background SyncMappings retains strict drift checks.
 func (m *Manager) Refresh(id string, revision int64) (Result, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -262,8 +262,8 @@ func (m *Manager) Refresh(id string, revision int64) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if current, e := m.Engine.load(id); e == nil && current.Status == "applied" {
-		r, e := m.Engine.Reconcile(b, g)
+	if current, e := m.Engine.load(id); e == nil && (current.Status == "applied" || current.Status == "conflict") {
+		r, e := m.Engine.Reapply(b, g)
 		if e != nil {
 			m.last[id] = r
 		} else {

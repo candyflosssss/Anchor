@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -45,6 +46,17 @@ func catalogWritten(j journal, raw []byte) bool {
 // user configuration. Original recovery values and scoped credentials survive.
 // A durable previous/next journal makes either side of a crash recoverable.
 func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
+	return e.reconcile(b, g, false)
+}
+
+// Reapply is an explicit user request to reclaim the already-approved fields.
+// Unlike background reconciliation, it retains changed values as their next
+// recovery baseline. Unchanged fields keep their original recovery values.
+func (e *Engine) Reapply(b state.Binding, g GatewayBinding) (Result, error) {
+	return e.reconcile(b, g, true)
+}
+
+func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Result, error) {
 	out := Result{BindingID: b.ID, Status: "needs_sync"}
 	err := e.withLock(func() error {
 		j, err := e.load(b.ID)
@@ -52,7 +64,7 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 			return err
 		}
 		out.OperationID = j.OperationID
-		if j.Status != "applied" || j.Previous != nil {
+		if (j.Status != "applied" && !(reclaim && j.Status == "conflict")) || j.Previous != nil {
 			return withDiagnostic(ErrChanged, "sync_precondition", "unfinished_journal", "")
 		}
 		root := filepath.Dir(j.Path)
@@ -60,24 +72,45 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 		if err != nil {
 			return err
 		}
+		paths := make([][]string, len(j.Edits))
+		for i, edit := range j.Edits {
+			paths[i] = edit.Path
+		}
+		values, err := e.editor(j.Path).Values(raw, paths)
+		if err != nil {
+			return err
+		}
 		inverse := make([]Edit, len(j.Edits))
+		baseline := make([]Value, len(j.Edits))
 		for i, edit := range j.Edits {
 			inverse[i] = Edit{Path: edit.Path, Before: edit.After, After: edit.Before}
+			if edit.PlanningBefore != nil {
+				inverse[i].After = *edit.PlanningBefore
+			}
+			baseline[i] = edit.Before
+			if reclaim {
+				inverse[i].Before = values[i]
+				if !equal(values[i], edit.After) && !equal(values[i], edit.Before) {
+					baseline[i] = values[i]
+				}
+			}
 		}
-		// Patch verifies every owned field. Third-party changes are never absorbed
-		// as a new baseline or overwritten, even if unrelated fields may be kept.
+		// Restore only in memory for planning; never publish an intermediate
+		// user configuration or adopt our own written values as originals.
 		original, err := e.editor(j.Path).Patch(raw, inverse)
 		if err != nil {
 			return withDiagnostic(err, "sync_verify", "", "")
 		}
 		owned := ""
+		var catalogRaw []byte
+		var catalogPresent bool
 		if j.Catalog != nil {
 			owned = j.Catalog.Path
-			current, present, err := readConfig(root, owned)
+			catalogRaw, catalogPresent, err = readConfig(root, owned)
 			if err != nil {
 				return err
 			}
-			if !present || !bytes.Equal(current, j.Catalog.Written) {
+			if !reclaim && (!catalogPresent || !bytes.Equal(catalogRaw, j.Catalog.Written)) {
 				return withDiagnostic(ErrChanged, "sync_verify", "catalog_mismatch", "model_catalog_json")
 			}
 		}
@@ -96,12 +129,18 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 		}
 		// Sync never silently stops owning a field. Scope changes use their own
 		// explicitly approved recovery/apply flow instead.
-		for _, old := range j.Edits {
+		for i, old := range j.Edits {
 			found := false
-			for _, next := range p.Edits {
+			for k, next := range p.Edits {
 				if sameField(old.Path, next.Path) {
-					if !equal(old.Before, next.Before) {
+					if !equal(inverse[i].After, next.Before) {
 						return ErrUnsafe
+					}
+					p.Edits[k].Before = baseline[i]
+					if !equal(baseline[i], next.Before) {
+						planning := next.Before
+						p.Edits[k].PlanningBefore = &planning
+						p.Edits[k].After = retainExtraFields(values[i], next.After)
 					}
 					found = true
 					break
@@ -111,12 +150,36 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 				return ErrUnsafe
 			}
 		}
-		next, err := e.editor(j.Path).Patch(original, p.Edits)
+		// Journal Before values describe recovery, not this write's precondition.
+		// The actual patch and final atomic rename compare the current snapshot.
+		writeEdits := append([]Edit(nil), p.Edits...)
+		writePaths := make([][]string, len(writeEdits))
+		for i, edit := range writeEdits {
+			writePaths[i] = edit.Path
+		}
+		current, err := e.editor(j.Path).Values(raw, writePaths)
 		if err != nil {
 			return err
 		}
-		sameCatalog := (j.Catalog == nil && p.catalog == nil) || (j.Catalog != nil && p.catalog != nil && j.Catalog.Path == p.catalog.Path && bytes.Equal(j.Catalog.Written, p.catalog.Written))
-		if bytes.Equal(raw, next) && sameCatalog {
+		for i := range writeEdits {
+			writeEdits[i].Before = current[i]
+		}
+		next, err := e.editor(j.Path).Patch(raw, writeEdits)
+		if err != nil {
+			return err
+		}
+		if j.Catalog != nil && p.catalog != nil {
+			p.catalog.Original, p.catalog.Existed = j.Catalog.Original, j.Catalog.Existed
+			if reclaim && (!catalogPresent || !bytes.Equal(catalogRaw, j.Catalog.Written)) {
+				p.catalog.Original, p.catalog.Existed = catalogRaw, catalogPresent
+			}
+		}
+		sameCatalog := p.catalog == nil || (catalogPresent && bytes.Equal(catalogRaw, p.catalog.Written))
+		sameBaseline := reflect.DeepEqual(j.Edits, p.Edits)
+		if j.Catalog != nil && p.catalog != nil {
+			sameBaseline = sameBaseline && j.Catalog.Existed == p.catalog.Existed && bytes.Equal(j.Catalog.Original, p.catalog.Original)
+		}
+		if bytes.Equal(raw, next) && sameCatalog && sameBaseline && j.Status == "applied" {
 			out.Status = "applied"
 			return nil
 		}
@@ -128,10 +191,7 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 		}
 		out.Status = "recovery_pending"
 		if j.Catalog != nil && !sameCatalog {
-			expected := fingerprint(nil, false)
-			if oldCatalog != nil {
-				expected = fingerprint(oldCatalog.Written, true)
-			}
+			expected := fingerprint(catalogRaw, catalogPresent)
 			if err := atomicWrite(root, j.Catalog.Path, j.Catalog.Written, expected, true); err != nil {
 				return err
 			}
@@ -149,6 +209,25 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 		return nil
 	})
 	return out, err
+}
+
+// A generated provider may contain third-party extension keys. Reassert only
+// generated keys, retaining other nested settings instead of replacing a table.
+func retainExtraFields(current, desired Value) Value {
+	old, ok := current.Data.(map[string]any)
+	next, nextOK := desired.Data.(map[string]any)
+	if !current.Exists || !desired.Exists || !ok || !nextOK {
+		return desired
+	}
+	merged := make(map[string]any, len(old)+len(next))
+	for key, value := range old {
+		merged[key] = value
+	}
+	for key, value := range next {
+		previous, exists := old[key]
+		merged[key] = retainExtraFields(Value{Exists: exists, Data: previous}, Value{Exists: true, Data: value}).Data
+	}
+	return Value{Exists: true, Data: merged}
 }
 
 // SyncMappings is called after a committed management mutation. It only

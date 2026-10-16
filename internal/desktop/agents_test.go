@@ -140,11 +140,19 @@ func TestRealCoreAgentBridgeLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	r = b.ManageAgent(ManageAgent{BindingID: row.ID, ExpectedRevision: row.Revision, Action: "sync"})
-	if r.Problem == nil || r.Problem.Code != "agent_config_conflict" {
-		t.Fatalf("external edit was hidden behind revision conflict: %+v", r)
+	if r.Problem != nil || r.Data.Bindings[0].Status != "applied" || r.Data.Bindings[0].Revision != row.Revision {
+		t.Fatalf("explicit sync did not reclaim external edit: %+v", r)
 	}
 	now, err = os.ReadFile(path)
-	if err != nil || string(now) != string(raw) {
-		t.Fatal("external edit overwritten", err)
+	if err != nil || !strings.Contains(string(now), `model = "public"`) {
+		t.Fatal("explicit sync did not apply default model", err)
+	}
+	r = b.ManageAgent(ManageAgent{BindingID: row.ID, ExpectedRevision: row.Revision, Action: "disable"})
+	if r.Problem != nil || r.Data.Bindings[0].Enabled {
+		t.Fatalf("disable after reclaim: %+v", r)
+	}
+	now, err = os.ReadFile(path)
+	if err != nil || !strings.Contains(string(now), `model = "external-edit"`) || strings.Contains(string(now), "anchor_") {
+		t.Fatal("external recovery baseline lost", err)
 	}
 }

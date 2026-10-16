@@ -11,6 +11,7 @@
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
 - Agent discover/enroll/sync 在源码 CLI 中，桌面托管入口与核心已随 desktop.21 dev 发布；alpha.6 CLI 不含，需使用兼容客户端与核心。
+- 2026-10-17 Agent 恢复增量：`agent sync` 明确重新接管已批准字段并保存外部恢复基线，后台同步仍不覆盖第三方修改；仅当前源码，现有安装包不含，见 §8。
 - 平台兼容查询（sub2api / NewAPI / 原版 OneAPI）的核心接口已随 desktop.21 dev 发布，命令由源码 CLI 提供，alpha.6 CLI 不含，已安装桌面程序不提供通用 CLI。新增 schema5，旧程序不能打开升级后的数据库，客户端与核心需一起升级；desktop.22 的桌面平台配置／账户余额／Key 额度页已发布，desktop.25新增独立分组倍率查询；请求账单桌面页仍未接入。
 - desktop.23 已交付全部启用 Key 的模型目录合并与逐 Key 分组倍率显示，停用 Key 不查询；复用 `provider models`，命令契约见下文。desktop.25已交付来源Key范围、模型排序／调度设置与账户分组倍率查询；独立账单桌面页仍未接入。
 - 核对来源：`internal/cli/cli.go`、`cmd/anchor/main.go` 及其调用实现。
@@ -570,7 +571,11 @@ Codex 目录导出把模型设置中的推理档位投影为客户端可表示�
 
 登记为新绑定创建凭据；更新保留凭据。在线核心保存后立即应用；更新先条件恢复，冲突拒绝更新。可能出现配置应用失败但登记已保存，需要重新 discover 检查。成功返回 workspace。默认开关关闭，初次点击展开平台设置；点「开启托管」才提交批准，成功后开关打开。设置、目录和同步全部收进对应平台折叠区域。
 
-`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。正常 applied 绑定先校验并原位更新配置／目录，保留最初恢复基线与凭据，不先把用户原配置写回；其他可修复状态仍走条件恢复再应用。第三方冲突保留并报告，失败不重放。模型映射通过管理入口新增、修改、删除（含 Fast/Ultrafast 分身、模型设置／路由）以及供应商启停／候选变化后，核心会自动刷新已启用且已接管 Agent 的名单，不再要求每次手动 sync；single/all-compatible/all-mapped 仍各守原有授权范围，不扩大权限、不自动登记或复活已恢复的目标。`sync` 保留作手动重试入口。映射保存成功不因某个 Agent 同步冲突而回滚；Agent 状态会报告 needs_sync／overridden／recovery_pending，HTTP 成功响应带 `X-Anchor-Agent-Sync: applied|needs_sync`。默认模型失去可用候选时不会擅自换默认值，需先处理默认模型再同步。Codex/Claude Code 需要重启，DSH 默认模型在新会话生效。配置写入成功不证明真实请求已通过 Anchor。
+`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。**2026-10-17 当前源码起，显式 `agent sync ID --revision N` 是重新接管请求**：对已应用或条件恢复后 conflict 的绑定，重新应用既有批准范围内的连接、默认模型和目录；受影响字段若被外部改过，先把当前值保存为下次恢复基线，未变化字段仍保留原基线。不先向客户端发布临时恢复配置，不吸收 Anchor 自己上次写入值为原值；对象字段保留生成键之外的外部扩展。生成目录被修改（含内容损坏）或删除也可重建，停用时还原其外部内容／缺失状态。完整配置语法错误、不支持的 profile／传输、危险路径、权限或未完成 journal 的错误仍拒绝，不能用 sync 盲目覆盖。revision 不匹配和写入前再次发生修改仍失败，失败不重放。重新登记或 set-models 遇外部冲突时，可先在现有策略下 sync 解除冲突，再重新选择策略。旧版本 sync 遇外部修改只报冲突；本语义需升级核心，桌面同步入口会先确认影响。未新增命令或参数。
+
+**后台自动同步及启动仍不抢回外部修改**。映射、模型设置／路由和供应商候选变化后，核心自动刷新已启用且已接管 Agent 的名单；single/all-compatible/all-mapped 各守原有范围，不扩大权限、不自动登记或复活已恢复目标。单个 Agent 冲突不回滚映射保存，不影响其他绑定；状态报告 needs_sync／overridden／recovery_pending，HTTP 成功响应带 `X-Anchor-Agent-Sync: applied|needs_sync`。默认模型失去可用候选时不会擅自换默认值，需先处理默认模型再同步。`sync` 同时作为手动重试和明确重新接管入口。Codex/Claude Code 需要重启，DSH 默认模型在新会话生效；配置落盘成功不证明真实请求已通过 Anchor。
+
+Codex provider 的 Anchor 注释不是所有权凭据；journal 才是恢复依据。第三方 TOML 序列化删掉注释、重排普通／带引号／嵌套 provider table 时，按语义定位既有托管表，完整核对结果并保留其他配置，不整份重新序列化。无法无歧义定位的 inline／dotted／multiline 形式仍安全拒绝。
 
 ### `agent add`
 
@@ -613,7 +618,7 @@ anchor agent disable ID --revision N
 
 - `ID` 与 `--revision` 必填；revision >= 1，从 list/inspect 获取。`apply` 另须已审核的 plan fingerprint，文件、目录计划、模型元数据或 revision 变化会拒绝，不自动重试。
 - `apply` 只对 enabled Binding 且网关就绪时执行；先持久恢复日志，再原子写目录（有目录时）、原子替换配置指针并配置层校验。返回 `{binding_id, operation_id, status}`。再次应用已接管目标不重置原值或重放文件写入。托管字段为根级 model/model_provider/web_search、可选 model_catalog_json 和独立带标记 provider（含命令认证）；不嵌入 token。
-- `restore` 仅恢复当前值仍等于 Anchor 写入值的字段；第三方值保留并报告 `conflict`。原值已恢复视为完成；被用户删除的配置不盲目重建；被基础配置或独立 `*.config.toml` profile 引用的 provider/目录不删除；目录只有仍等于 Anchor 写入内容且无引用时才删除，用户改过的目录保留并报告冲突。返回状态和冲突字段路径，冲突时 CLI 输出 JSON 后以 1 退出。
+- `restore` 仅恢复当前值仍等于 Anchor 写入值的字段；第三方值保留并报告 `conflict`。原值已恢复视为完成；被用户删除的配置不盲目重建；被基础配置或独立 `*.config.toml` profile 引用的 provider/目录不删除；目录只有仍等于 Anchor 写入内容且无引用时才删除；显式 sync 已保存外部目录基线时，条件恢复该基线而非删除。尚未接管的外部目录修改保留并报告冲突。返回状态和冲突字段路径，冲突时 CLI 输出 JSON 后以 1 退出。
 - `restore` 不修改 enabled 或 Binding revision，因此下次启动仍会接管。配置本来不存在时恢复可留下空文件，不删除可能已被其他工具引用的配置文件。
 - `enable` / `disable` 返回 `{binding, management}` 并递增 revision；enable 只批准后续接管，不立即改配置。当前源码在 enable 事务内检查默认模型存在；模型已删除时返回 `agent_model_unavailable`（HTTP 409），保留禁用状态、revision 和凭据，不自动改选模型。disable 先条件恢复再禁用凭据，即使出现已报告的第三方冲突也禁用授权，CLI 非零退出；真正的文件/日志 I/O 失败会中止禁用。已接受请求不承诺即时取消。
 - `model put` 不会自动刷新已写入的 Codex 目录；网关 all-compatible 授权按每次请求的当前模型/供应商配置判断，而 Codex 目录是接管时快照。新增模型/改元数据后可用 `agent sync ID --revision N`，或 `restore` → `plan` → `apply`（或正常停服再启动），再重启远端 Codex app-server。更新目录不等于让已有会话立即切换。

@@ -162,3 +162,7 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 ## Skill 中心库桥接（2026-10-17 源码，未发布）
 
 新增 `Bridge.SkillWorkspace()`、`Bridge.SkillDetail(SkillQuery)`、`Bridge.ManageSkill(SkillAction)`，规范 DTO 从 `internal/skills` 以别名纳入生成器，共享 `desktop/contract/skills.json`。薄桥接经认证客户端调用 `/control/v1/skills`、`/detail`、`/action`，所有写入仍在核心校验 approval / revision / hash。只读详情 POST 的传输失败不标记未知写入，实际动作不自动重试。新增错误 skill_unsafe / skill_changed / skill_limit / skill_link_unavailable。Skill 响应有独立16 MiB客户端上限，不改变其他接口1 MiB上限。发现、版本、冲突与恢复行为见 [设计](skills.md)，CLI 见 [大全 §14](../cli/commands.md#14-skill-中心库当前源码未发布)。不代表原生窗口或真实 Agent 加载已验收。
+
+## Agent 显式重新接管语义（2026-10-17，当前源码未发布）
+
+既有 ManageAgent(action=sync) 与 CLI agent sync 均明确请求重新应用当前已批准策略：外部变化的托管字段／生成目录先保存为恢复基线，再原位生成；未变化字段不吸收上次 Anchor 写入值。DTO 与错误白名单不变，仍校验 revision、实例身份、权限、路径和最终写入快照。GUI 始终确认影响后再提交；取消不请求核心。后台同步／启动继续拒绝外部漂移，prepared previous journal 仍需先恢复；实际失败与 unknown 不盲重试。详见[托管层增量](agent-management-layer.md)，未打包或验证 Windows/Linux 原生窗口。

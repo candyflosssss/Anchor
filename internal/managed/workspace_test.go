@@ -225,11 +225,18 @@ func TestStartupRefreshPreservesThirdPartyEdits(t *testing.T) {
 	if !bytes.Equal(now, edited) {
 		t.Fatal("restart changed external edits")
 	}
-	if _, err = restarted.Refresh(b.ID, b.Revision); err == nil {
-		t.Fatal("sync accepted external owned-field edit")
+	if r, err := restarted.Refresh(b.ID, b.Revision); err != nil || r.Status != "applied" {
+		t.Fatal("explicit sync could not reclaim owned-field edit", r, err)
 	}
 	now, _ = os.ReadFile(path)
-	if !bytes.Contains(now, []byte(`model = "external"`)) {
+	if !bytes.Contains(now, []byte(`model = "public"`)) {
+		t.Fatal(string(now))
+	}
+	if r, err := restarted.Restore(b.ID, b.Revision); err != nil || r.Status != "restored" {
+		t.Fatal(r, err)
+	}
+	now, _ = os.ReadFile(path)
+	if !bytes.Contains(now, []byte(`model = "external"`)) || bytes.Contains(now, []byte("anchor_")) {
 		t.Fatal(string(now))
 	}
 }

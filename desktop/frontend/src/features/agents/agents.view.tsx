@@ -59,11 +59,14 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
               </fieldset>
               <div className="agent-settings-actions"><Button type="submit" disabled={c.busy || !c.availableModels.some(m => m.id === c.model)}>{binding ? '保存并应用' : '开启托管'}</Button></div>
             </form>}
-            {binding && <div className="agent-settings-actions"><Button size="sm" variant="outline" disabled={c.busy || !binding.enabled} onClick={() => void c.manage(binding, 'sync')}>同步模型映射</Button></div>}
+            {binding && <div className="agent-settings-actions"><Button size="sm" variant="outline" disabled={c.busy || !binding.enabled} onClick={() => c.setSyncTarget(binding)}>重新接管并同步</Button></div>}
           </div>}
         </article>;
       })}</section>}
     </>}
+    <ConfirmAction open={!!c.syncTarget} title="重新接管并同步此 Agent？" busy={c.busy} onCancel={() => c.setSyncTarget(null)} onConfirm={() => { if (c.syncTarget) void c.manage(c.syncTarget, 'sync'); }}>
+      <p className="break-all">{c.syncTarget?.config_root}</p><p>将按当前托管策略重新应用连接、默认模型和模型目录。已批准字段的外部修改会先保存为恢复基线，停用时恢复；未变化字段仍保留原始恢复值，其他设置保持不变。后台同步不会自动抢回外部修改。</p>
+    </ConfirmAction>
     <ConfirmAction open={!!c.disableTarget} title="停用此 Agent 的托管？" busy={c.busy} onCancel={() => c.setDisableTarget(null)} onConfirm={() => { if (c.disableTarget) void c.manage(c.disableTarget, 'disable'); }}>
       <p className="break-all">{c.disableTarget?.config_root}</p><p>按字段恢复 Anchor 写入的配置并停用网关凭据。第三方修改会保留并报告冲突。完成后请重启对应 Agent（DSH Desktop 关闭窗口可能只是隐藏，请完全退出）；DSH 请新建会话。</p>
     </ConfirmAction>

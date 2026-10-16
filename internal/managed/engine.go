@@ -1,6 +1,7 @@
 package managed
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -46,8 +47,10 @@ type Result struct {
 	Conflicts   [][]string `json:"conflicts,omitempty"`
 }
 type catalogArtifact struct {
-	Path    string `json:"path"`
-	Written []byte `json:"written"`
+	Path     string `json:"path"`
+	Written  []byte `json:"written"`
+	Original []byte `json:"original,omitempty"`
+	Existed  bool   `json:"existed,omitempty"`
 }
 type journal struct {
 	Previous       *previousWrite   `json:"previous,omitempty"`
@@ -123,14 +126,14 @@ func (e *Engine) load(id string) (journal, error) {
 	if j.Schema != 1 || j.BindingID != id || j.AdapterVersion != "1" || !supportedConfig(j.Path) || !filepath.IsAbs(j.Path) {
 		return j, ErrUnsafe
 	}
-	if j.Catalog != nil && (filepath.Dir(j.Catalog.Path) != filepath.Dir(j.Path) || filepath.Base(j.Catalog.Path) != catalogName(id) || len(j.Catalog.Written) > maxConfig || !json.Valid(j.Catalog.Written)) {
+	if j.Catalog != nil && (filepath.Dir(j.Catalog.Path) != filepath.Dir(j.Path) || filepath.Base(j.Catalog.Path) != catalogName(id) || len(j.Catalog.Written) > maxConfig || len(j.Catalog.Original) > maxConfig || !json.Valid(j.Catalog.Written)) {
 		return j, ErrUnsafe
 	}
 	if j.Previous != nil {
 		if j.Status != "prepared" && j.Status != "conflict" {
 			return j, ErrUnsafe
 		}
-		if a := j.Previous.Catalog; a != nil && (j.Catalog == nil || a.Path != j.Catalog.Path || len(a.Written) > maxConfig || !json.Valid(a.Written)) {
+		if a := j.Previous.Catalog; a != nil && (j.Catalog == nil || a.Path != j.Catalog.Path || len(a.Written) > maxConfig || len(a.Original) > maxConfig || !json.Valid(a.Written)) {
 			return j, ErrUnsafe
 		}
 	}
@@ -456,10 +459,16 @@ func (e *Engine) recoverCatalog(j journal, out *Result) error {
 	if !exists {
 		return nil
 	}
+	if a.Existed && bytes.Equal(raw, a.Original) {
+		return nil
+	}
 	conflict := func() { out.Conflicts = append(out.Conflicts, []string{"catalog", filepath.Base(a.Path)}) }
 	if !catalogWritten(j, raw) {
 		conflict()
 		return nil
+	}
+	if a.Existed {
+		return atomicWrite(root, a.Path, a.Original, fingerprint(raw, true), true)
 	}
 	referenced, err := fileReferences(root, j.Path, func(v any) bool { return referencesCatalog(v, a.Path) })
 	if err != nil {

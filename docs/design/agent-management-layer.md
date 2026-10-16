@@ -349,7 +349,7 @@ Codex all-mapped 也导出 `anchor_<binding>.models.json` 并管理 `model_catal
 
 Codex 目录与上游 portable settings 使用不同的推理档位表示。导出器只投影 Codex 能表示的 `none/minimal/low/medium/high/xhigh`；`max/default/null` 等上游原生选项保留在存储及上游配置，仅不出现在生成的 Codex effort 列表，不阻断整份目录、不删除模型、不暗中映射成另一强度。不可表示的默认 effort 导出为 null。明确声明的上下文／能力和原指令模板继续沿用，结构校验、权限、外部修改冲突仍拒绝。此兼容规则用于各目录范围、登记、启动迁移及手动／自动同步。
 
-自动同步仅处理已启用且存在未恢复 journal 的目标，保持原 scope/default/token。逐绑定失败隔离：映射仍保存成功，其他目标继续同步，状态报告 needs_sync、overridden 或 recovery_pending；不得覆盖外部修改。默认模型不再有可用候选时暂停该目标同步，不擅自选新默认值。更新先在内存中核对／还原旧托管字段，生成下一份配置，再用包含 previous/next 写入值的 prepared journal 和条件原子替换发布；中断后恢复接受前一份或下一份 Anchor 写入值，但拒绝第三方值。不会先发布未接管配置，恢复基线始终是首次接管时的用户值。Codex／Claude 仍需重启，DSH 默认值需新会话生效；自动落盘不代表客户端实时刷新或上游认可 Fast/Ultrafast。
+自动同步仅处理已启用且存在未恢复 journal 的目标，保持原 scope/default/token。逐绑定失败隔离：映射仍保存成功，其他目标继续同步，状态报告 needs_sync、overridden 或 recovery_pending；不得覆盖外部修改。默认模型不再有可用候选时暂停该目标同步，不擅自选新默认值。更新先在内存中核对／还原旧托管字段，生成下一份配置，再用包含 previous/next 写入值的 prepared journal 和条件原子替换发布；中断后恢复接受前一份或下一份 Anchor 写入值，但拒绝第三方值。不会先发布未接管配置；后台同步保留已有恢复基线，显式重新接管的基线规则见下文。Codex／Claude 仍需重启，DSH 默认值需新会话生效；自动落盘不代表客户端实时刷新或上游认可 Fast/Ultrafast。
 
 Claude 仅写用户 settings.json 的 model/availableModels、Anthropic 基址、Binding auth 与模型默认环境变量，暂时禁用原 API key/helper 和云平台选项；停用按原字段恢复。基址使用网关 origin，避免 SDK 重复 /v1；自定义默认别名提供 custom model option，网关发现不能保证任意别名进入原生选择器。项目、策略、CLI 覆盖与实际程序连接不作探测。
 
@@ -390,3 +390,13 @@ reasoningEfforts 按原值映射 off/minimal/low/medium/high/xhigh/max，保留 
 maxTokens 在 DSH 同时设定模型输出能力和单次请求默认上限，因此只写显式 default_output_tokens；不能无损单独表达 limits.output，故不导出该容量。默认温度、其他输入模态和工具开关不在本轮转换，原设置不变。映射保存／路由变动自动同步、手动同步、启动接管复用相同计划／验证／恢复流程，逐绑定失败隔离；无原生客户端或真实上游验证承诺。
 
 字段语义依据固定上游 [catalog.ts](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/llm/llm-pi-ai/src/catalog.ts)、[config.ts](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/llm/llm-pi-ai/src/config.ts) 与 [agent-default-model](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/packages/core/agent-default-model/src/index.ts)。部署的 DSH 版本仍需独立核对。
+
+### 2026-10-17 外部配置漂移后的显式重新接管（当前源码，未打包发布）
+
+- 后台 `Reconcile`、启动和映射自动同步继续校验上次写入，不抢改第三方值；单绑定失败隔离，不阻断核心或其他绑定。
+- 显式 `Refresh` / `agent sync` / `ManageAgent(action=sync)` 使用 `Reapply`：相同批准范围内，对 applied 或无未完成 previous journal 的 conflict 重新生成并原位写入。未变化字段沿用原恢复值，被外部改变的字段采用当前值作为恢复值；不改变 scope、默认模型策略、revision 或凭据。已有 conflict 可走该入口，不再只能手改文件解除死结；登记／set-models 的 scope 变更仍先按原规则恢复，可先重新接管再变更策略。
+- journal 的可选 `planning_before` 保留初次规划的结构基线，与后来采用的外部恢复值分开，避免新增 DSH 整行／Anchor provider 在重复同步时被当成未经授权的既有对象。对象字段重新应用生成键，保留其他外部扩展。原 `Original`、operation ID 和未变字段基线不重置；兼容读取无这些可选字段的旧 schema1 journal。
+- 已跟踪的生成目录被修改／删除可重建；可选 original/existed 保存重新接管时的外部字节／缺失状态，恢复只在当前仍是已知写入值时还原。外部坏 JSON 可以备份恢复，不作为新的模型元数据读取。
+- TOML journal 是所有权依据，不依赖 `anchor:begin/end` 注释永久存在。标记被序列化器丢弃后，对普通、quoted 和嵌套 provider section 定位并逐段修改，避免重复声明显式 `[model_providers]`。完整语义比对和最终字节级条件写入不放宽；无法定位、语法／路径／权限不安全仍拒绝。
+- 写入前先保存 previous/next prepared journal，最终配置与目录分别按读取快照校验，不覆盖此后并发编辑。未完成 previous journal 不直接重新接管，须先核对恢复结果。
+- 桌面将同步入口显示为「重新接管并同步」，始终先确认将重设哪些已批准设置及恢复规则；Controller 仅通过既有受控 ManageAgent 接口提交，失败重读且不自动重放。无新增 DTO 字段／接口。CLI 具体兼容变化见[最新指令大全](../cli/commands.md)。

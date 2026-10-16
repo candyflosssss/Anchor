@@ -73,7 +73,7 @@ func TestAgentTokenAndIndependentRecovery(t *testing.T) {
 	}
 }
 func TestAgentHelpMatchesLifecycle(t *testing.T) {
-	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh|dsh-desktop", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version", "DSH Web/Desktop sync mapped display names, vision/input, context", "off/minimal/low/medium/high/xhigh/max", "native none/default/null and toggle/budget reasoning are not relabelled", "DSH maxTokens exports explicit default output tokens only"} {
+	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh|dsh-desktop", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version", "DSH Web/Desktop sync mapped display names, vision/input, context", "off/minimal/low/medium/high/xhigh/max", "native none/default/null and toggle/budget reasoning are not relabelled", "DSH maxTokens exports explicit default output tokens only", "without overwriting external changes", "agent sync explicitly reclaims approved fields and catalogs"} {
 		if !strings.Contains(help, s) {
 			t.Fatal("missing help", s)
 		}
@@ -227,6 +227,25 @@ func TestCLIDiscoverEnrollSync(t *testing.T) {
 	}
 	srv.Agents.Start()
 	run(false, "agent", "sync", id, "--revision", "0")
+	run(true, "agent", "sync", id, "--revision", "1")
+	configPath := filepath.Join(root, "config.toml")
+	config, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changed := bytes.Replace(config, []byte(`model = "public"`), []byte(`model = "external"`), 1)
+	if bytes.Equal(changed, config) {
+		t.Fatal("fixture edit failed")
+	}
+	if err := os.WriteFile(configPath, changed, 0600); err != nil {
+		t.Fatal(err)
+	}
+	run(false, "agent", "sync", id, "--revision", "2")
+	run(true, "agent", "sync", id, "--revision", "1")
+	run(true, "agent", "restore", id, "--revision", "1")
+	if raw, err := os.ReadFile(configPath); err != nil || !bytes.Contains(raw, []byte(`model = "external"`)) {
+		t.Fatal("explicit CLI sync lost external recovery baseline", err)
+	}
 	run(true, "agent", "sync", id, "--revision", "1")
 	run(false, "agent", "enroll", "--target", id, "--model", "public", "--approve")
 	run(true, "agent", "disable", id, "--revision", "1")

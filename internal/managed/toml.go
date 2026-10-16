@@ -26,6 +26,9 @@ type Edit struct {
 	Path   []string `json:"path"`
 	Before Value    `json:"before"`
 	After  Value    `json:"after"`
+	// PlanningBefore keeps the pre-enrollment shape when explicit takeover
+	// changes Before to an external recovery value (e.g. a created DSH row).
+	PlanningBefore *Value `json:"planning_before,omitempty"`
 }
 
 // Editor is deliberately narrow. Future JSON/YAML adapters can implement the
@@ -219,16 +222,22 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 				return nil, ErrUnsafe
 			}
 			if edit.Before.Exists {
-				if start < 0 || finish < start || strings.Count(out, begin) != 1 || strings.Count(out, end) != 1 {
-					return nil, ErrUnsafe
+				if start >= 0 && finish > start && strings.Count(out, begin) == 1 && strings.Count(out, end) == 1 {
+					finish += len(end)
+					if strings.HasPrefix(out[finish:], "\r\n") {
+						finish += 2
+					} else if strings.HasPrefix(out[finish:], "\n") {
+						finish++
+					}
+					out = out[:start] + out[finish:]
+				} else {
+					// Third-party TOML encoders routinely discard comments. Markers
+					// are an optimization, not proof of ownership (the journal is).
+					out, e = removeProviderSections(out, key)
+					if e != nil {
+						return nil, e
+					}
 				}
-				finish += len(end)
-				if strings.HasPrefix(out[finish:], "\r\n") {
-					finish += 2
-				} else if strings.HasPrefix(out[finish:], "\n") {
-					finish++
-				}
-				out = out[:start] + out[finish:]
 			} else if start >= 0 || finish >= 0 {
 				return nil, ErrUnsafe
 			}
@@ -244,7 +253,10 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 				if out != "" && !strings.HasSuffix(out, "\n") {
 					out += nl
 				}
-				out += begin + nl + strings.ReplaceAll(enc.String(), "\n", nl) + end + nl
+				// Do not redeclare the parent table: third-party serializers often
+				// emit an explicit [model_providers] even when it is empty.
+				section := strings.TrimPrefix(enc.String(), "[model_providers]\n")
+				out += begin + nl + strings.ReplaceAll(section, "\n", nl) + end + nl
 			}
 		} else {
 			return nil, ErrUnsafe
@@ -266,4 +278,49 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 		return nil, ErrUnsafe
 	}
 	return []byte(out), nil
+}
+
+// removeProviderSections handles ordinary, quoted and nested provider tables
+// after a serializer has removed Anchor's markers. It never reserializes the
+// document. The caller still verifies the entire resulting semantic document,
+// so ambiguous inline/dotted/multiline forms fail closed without a file write.
+func removeProviderSections(raw, provider string) (string, error) {
+	const probe = "__anchor_section_probe__"
+	var probePath func(map[string]any) []string
+	probePath = func(m map[string]any) []string {
+		if m[probe] == true {
+			return []string{}
+		}
+		for key, value := range m {
+			if child, ok := value.(map[string]any); ok {
+				if path := probePath(child); path != nil {
+					return append([]string{key}, path...)
+				}
+			}
+		}
+		return nil
+	}
+	lines := strings.SplitAfter(raw, "\n")
+	var out strings.Builder
+	removing, found := false, false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") {
+			if doc, err := document([]byte(trimmed + "\n" + probe + " = true\n")); err == nil {
+				path := probePath(doc)
+				removing = len(path) >= 2 && path[0] == "model_providers" && path[1] == provider
+				found = found || removing
+			}
+		}
+		if trimmed == "# anchor:begin "+provider || trimmed == "# anchor:end "+provider {
+			continue
+		}
+		if !removing || trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			out.WriteString(line)
+		}
+	}
+	if !found {
+		return "", ErrUnsafe
+	}
+	return out.String(), nil
 }

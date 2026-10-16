@@ -28,6 +28,7 @@ test.beforeEach(async ({ page }) => {
         }
         if (input.action === 'disable') { row.enabled = false; row.status = 'restored'; row.revision++; }
         if (input.action === 'enable') { row.enabled = true; row.status = 'applied'; row.revision++; }
+        if (input.action === 'sync') row.status = 'applied';
         return result(data);
       },
     } as unknown as DesktopBridge;
@@ -60,7 +61,13 @@ test('compact platform list, inline enrollment, sync and conditional disable', a
   expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll]);
   await openSettings(page);
   await expect(page.getByText('配置已应用', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '同步模型映射' }).click();
+  await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('外部修改会先保存为恢复基线');
+  expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+  await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.agentTest.actions)).toEqual([fixture.sync]);
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   const dialog = page.getByRole('alertdialog'); await expect(dialog).toBeVisible();
@@ -75,6 +82,25 @@ test('compact platform list, inline enrollment, sync and conditional disable', a
   expect(await page.evaluate(() => window.agentTest.actions[2])).toEqual({ ...fixture.sync, expected_revision: 2, action: 'enable' });
   expect(errors).toEqual([]);
 });
+
+for (const status of ['overridden', 'conflict']) {
+  test(`explicit sync recovers ${status} through a confirmed action`, async ({ page }) => {
+    await openSettings(page);
+    await page.getByRole('button', { name: '开启托管', exact: true }).click();
+    await page.evaluate(status => { window.agentTest.data.bindings[0].status = status; }, status);
+    await page.getByRole('button', { name: '重新识别', exact: true }).click();
+    await openSettings(page);
+    await expect(page.getByRole('region', { name: 'Codex 托管设置' })).toContainText('可重新接管');
+    await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('后台同步不会自动抢回外部修改');
+    expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+    await page.getByRole('button', { name: '确认变更', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.agentTest.actions)).toEqual([fixture.sync]);
+    expect(await page.evaluate(() => window.agentTest.enrolls.length)).toBe(1);
+    await openSettings(page);
+    await expect(page.getByText('配置已应用', { exact: true })).toBeVisible();
+  });
+}
 
 test('Agent write conflict rereads state and does not replay the write', async ({ page }) => {
   const reads = await page.evaluate(() => { window.agentTest.failWrite = true; return window.agentTest.reads; });
@@ -204,7 +230,8 @@ test('DSH Web and Desktop at the same home keep independent switches and actions
   await expect(web).not.toBeChecked();
   await expect(desktop).toBeChecked();
   await page.getByRole('button', { name: 'DSH Desktop 托管设置', exact: true }).click();
-  await page.getByRole('button', { name: '同步模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '重新接管并同步', exact: true }).click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
   expect(await page.evaluate(() => window.agentTest.actions)).toMatchObject([
     { binding_id: 'dsh', action: 'disable' }, { binding_id: 'dsh-desktop', action: 'sync' },
   ]);
@@ -212,7 +239,7 @@ test('DSH Web and Desktop at the same home keep independent switches and actions
 
 for (const [code, message] of [
   ['agent_catalog_invalid', '无法生成托管模型目录'],
-  ['agent_config_conflict', '托管配置或模型目录已被外部修改'],
+  ['agent_config_conflict', '托管配置或模型目录已变化'],
   ['agent_model_unavailable', '默认模型在当前托管范围内不可用'],
   ['agent_operation_failed', '不能据此判定为配置冲突'],
 ] as const) {

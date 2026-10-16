@@ -10,6 +10,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
   const [targetId, setTargetId] = useState('');
   const [model, setModel] = useState('');
   const [disableTarget, setDisableTarget] = useState<ManagedAgent | null>(null);
+  const [syncTarget, setSyncTarget] = useState<ManagedAgent | null>(null);
   const alive = useRef(false);
   const epoch = useRef(0);
   const latch = useRef(false);
@@ -67,13 +68,13 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
           }
         }
       }
-    } finally { latch.current = false; if (alive.current && epoch.current === generation) { setWriting(false); setDisableTarget(null); } }
+    } finally { latch.current = false; if (alive.current && epoch.current === generation) { setWriting(false); setDisableTarget(null); setSyncTarget(null); } }
   }
   const expanded = rows.find(row => row.id === targetId);
   const selected = expanded?.target;
   const binding = expanded?.binding;
   const availableModels = selected && data ? availableAgentModels(data, selected) : [];
-  return { data, rows, expanded, availableModels, loading, busy, error, notice, selected, binding, model, setModel, disableTarget, setDisableTarget,
+  return { data, rows, expanded, availableModels, loading, busy, error, notice, selected, binding, model, setModel, disableTarget, setDisableTarget, syncTarget, setSyncTarget,
     read, select, cancel: () => { if (!busy) setTargetId(''); },
     enroll: () => selected?.supported && selected.status === 'ready' && availableModels.some(m => m.id === model) && write(() => agentService.enroll({ target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
       model_scope: 'all-mapped', model_templates: {}, approved: true })),
