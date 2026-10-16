@@ -57,3 +57,9 @@ func (c *Client) ExportLogs(ctx context.Context, q logbook.Query, out io.Writer)
 	_, err = io.Copy(out, resp.Body)
 	return err
 }
+
+func (c *Client) LogStats(ctx context.Context, q logbook.StatsQuery) (logbook.Stats, error) {
+	var v logbook.Stats
+	err := c.call(ctx, "POST", "/control/v1/logs/stats", q, &v)
+	return v, err
+}

@@ -138,3 +138,7 @@ Linux GUI 宿主在 Wails／GTK 初始化前检测 GNOME Wayland 会话。仅当
 ### DSH Desktop 独立托管增量（2026-10-15，当前源码未发布）
 
 AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字符串新增 `dsh-desktop`；旧 `dsh` 始终为 Web。核心返回相同 DSH home 下两个不同 target ID，前端按 adapter_id + 规范化配置根匹配绑定，不把两端合并。桌面固定展示 DSH Web、DSH Desktop 独立行；未发现也保留已登记端的恢复入口。生命周期、鉴权和写入继续复用核心，不新增任意路径/命令桥接。细节见 [Agent 管理层增量](agent-management-layer.md#2026-10-15-dsh-desktop-独立-agent当前源码未发布) 与 [CLI §8](../cli/commands.md#8-agent-托管与独立恢复)。模拟绑定验证不代表原生 DSH Desktop 已加载配置。
+
+## 请求趋势只读桥接（2026-10-16，当前源码未打包）
+
+新增 `LogStats(LogStatsQuery) LogStatsResult`，复用当前已授权连接与标准 Result；DTO 别名由 logbook 规范源经 desktop/contract.go 纳入生成，TS 不手改，共享样例 `desktop/contract/log-stats.json`。方法只读、最多5秒，查询全部匹配保留请求，不采用列表游标或快照。核心 stats 查询最多3秒／90天／600桶；错误与旧核心无接口均返回 problem，不回退模拟数据、不新增上游请求或持久累计表。页面 Controller 负责15秒轮询、暂停、刷新、条件变化和卸载后的旧结果丢弃；切换实例沿用页面卸载和连接隔离。详细字段、指标分母和空值语义见[日志趋势设计](logging.md#9-请求趋势统计2026-10-16当前源码未打包)。本轮隔离 Go 调用链与模拟浏览器验收不等于 Linux／Windows 原生窗口验收，未更新已运行的安装程序或核心。

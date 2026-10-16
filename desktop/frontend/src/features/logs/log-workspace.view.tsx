@@ -9,12 +9,13 @@ import { useLogController, type LogController } from './use-log-controller';
 import { RequestTable } from './log-request-table.view';
 import { LogColumnSettings } from './log-columns.view';
 import { useLogColumnsController } from './use-log-columns-controller';
+import { LogStatsView } from './log-stats.view';
 import './logs.css';
 function Filters({ c }: { c: LogController }) {
   return <div className="log-filters">
     <Input aria-label="搜索日志" placeholder="搜索" value={c.filters.query} onChange={e => c.filter('query', e.target.value)} />
     <select aria-label="日志时间范围" className="select-field" value={c.filters.window} onChange={e => c.filter('window', e.target.value)}>
-      <option value="15">最近 15 分钟</option><option value="60">最近 1 小时</option><option value="1440">最近 24 小时</option><option value="10080">最近 7 天</option><option value="129600">最近 90 天</option>
+      <option value="15">最近 15 分钟</option><option value="60">最近 1 小时</option><option value="1440">最近 24 小时</option><option value="10080">最近 7 天</option><option value="43200">最近 30 天</option><option value="129600">最近 90 天</option>
     </select>
     {c.tab === 'requests' ? <>
       <select aria-label="请求结果" className="select-field" value={c.filters.status} onChange={e => c.filter('status', e.target.value)}><option value="all">全部结果</option>{Object.entries(statusLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select>
@@ -44,6 +45,7 @@ export function LogsPreview() {
       <button aria-pressed={c.tab === 'system'} className={c.tab === 'system' ? 'is-active' : ''} onClick={() => { c.setTab('system'); c.resetFilters(); }}><Terminal size={15} />系统日志</button>
     </div>{c.tab === 'requests' && <Button variant="outline" size="sm" onClick={() => layout.setOpen(true)}><Columns3 size={14} />显示内容<span>{layout.ids.length}</span></Button>}</div>
     <Filters c={c} />
+    {c.tab === 'requests' && <LogStatsView filters={c.filters} paused={c.paused} revision={c.revision} />}
     {c.health && (c.health.dropped > 0 || c.health.write_failures > 0 || c.health.error) && <div role="status" className="log-degraded">丢弃 {c.health.dropped} · 写入失败 {c.health.write_failures} · {c.health.error || '—'}</div>}
     {(c.notice || c.error) && <p role="status" className="my-3 text-sm text-destructive">{c.error || c.notice}</p>}
     <section className="log-surface" aria-label={c.tab === 'requests' ? '请求日志列表' : '系统日志列表'} aria-busy={c.loading}>

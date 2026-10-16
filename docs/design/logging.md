@@ -96,3 +96,32 @@ DTO 规范源为 `internal/desktop/contract.go` 的 logbook 类型别名；`cmd/
 - new-api `42e694eb60fe3191795c00d416571ced716eb9c4`：[日志模型](https://github.com/QuantumNous/new-api/blob/42e694eb60fe3191795c00d416571ced716eb9c4/model/log.go)、[失败详情](https://github.com/QuantumNous/new-api/blob/42e694eb60fe3191795c00d416571ced716eb9c4/web/src/features/usage-logs/components/dialogs/fail-reason-dialog.tsx)。
 - CPA `f1d4a94ef4398349716f2db5bbc3a27624c174a7`：[配置](https://github.com/router-for-me/CLIProxyAPI/blob/f1d4a94ef4398349716f2db5bbc3a27624c174a7/config.example.yaml)、[请求日志格式](https://github.com/router-for-me/CLIProxyAPI/blob/f1d4a94ef4398349716f2db5bbc3a27624c174a7/internal/logging/request_logger_format.go)。
 - CCS `f45fa923f231ecb95b782d3a9edde3cad3476d48`：[Logging Contract](https://github.com/kaitranntt/ccs/blob/f45fa923f231ecb95b782d3a9edde3cad3476d48/docs/logging-contract.md)、[日志类型](https://github.com/kaitranntt/ccs/blob/f45fa923f231ecb95b782d3a9edde3cad3476d48/src/services/logging/log-types.ts)、[轮转存储](https://github.com/kaitranntt/ccs/blob/f45fa923f231ecb95b782d3a9edde3cad3476d48/src/services/logging/log-storage.ts)。
+
+## 9. 请求趋势统计（2026-10-16，当前源码未打包）
+
+请求日志页在筛选区与列表之间增加运行趋势。可切换请求量、已知 Token 用量（输入／输出／合计）、总 TPS、错误率、缓存命中率、平均耗时及首字延迟；不同单位不混在同一坐标轴。使用现有日志语义色，支持浅／深主题、窄窗口、鼠标时间点和键盘左右／Home／End 读数，不增加图表依赖。
+
+时间范围为最近 15 分钟、1 小时、24 小时、7 天、30 天、90 天；统计粒度为自动、10 秒、30 秒、1 分钟、5 分钟、15 分钟、1 小时、6 小时、1 天。自动选择不超过120个桶的最细可用粒度；手选最多600个桶，超限选项禁用，扩大范围导致粒度不适用时回到自动。统计按请求开始时间归桶，范围为 `[since_ms,before_ms)`，首桶从 since_ms 开始，末桶可以不足完整间隔；不是请求完成时刻或 UTC 整点对齐。
+
+### 接口与生命周期
+
+- 核心：`POST /control/v1/logs/stats`，管理鉴权、实例身份和 Origin 防护沿用核心管理边界。输入 `StatsQuery {filter: Query, interval_ms}`，只允许请求日志；时间跨度最多90天，interval_ms=0 表示自动，其余只能是上述粒度。无写入、不访问上游。
+- `filter` 复用列表的结果、来源、供应商、模型、Key、HTTP、错误码、阶段和标识前缀规则；忽略 limit/cursor/until，level 不适用。不从当前分页、前端累计缓存或 JSONL 导出计算。后端在日志只读连接中扫描所选保留数据，仅提取数值字段，内存随桶数而非历史条数增长，核心超时3秒。
+- 输出 `Stats {since_ms,before_ms,interval_ms,buckets,summary,health}`；bucket 为 `{at_ms,values}`。Go `internal/logbook/stats.go` 是规范源，经 `internal/desktop/contract.go` 引入并生成 TS；共享合成样例为 `desktop/contract/log-stats.json`。
+- 桌面 `LogStats` 使用标准 Result，超时5秒，复用 client→管理接口。Controller 独立每15秒刷新，避免每3秒列表轮询都重扫历史；全局暂停停止后续自动刷新，手动刷新、条件／粒度变化仍读取。翻页不改变趋势范围。切换条件清空旧统计并丢弃过期响应，离开页签／切换实例卸载后不再消费旧结果。宿主缺绑定、旧核心或读取失败明确显示不可用，不回退 Mock。
+- CLI 为 `anchor logs stats`，参数与 JSON 结构见[最新指令大全](../cli/commands.md)。统计属于保留日志，不是永久账本；时间窗超过保留天数、容量淘汰或 health 丢弃记录会使历史不完整，90天选项不代表有90天数据。
+
+### 聚合口径
+
+| 指标 | 口径 |
+| --- | --- |
+| requests | 全部匹配根请求（含 pending/cancelled），重试不另算请求 |
+| input/output/total_tokens | 仅累加输入和输出都已确认且非负的请求；total=input+output，输出已含思考，不再加缓存或思考。usage_samples 为贡献请求数；没有样本为 null，部分已知小计明确标「已知用量」，不声称是完整消费 |
+| tps | 仅成功且输出非负、总耗时为正的请求，`sum(output)*1000/sum(elapsed_ms)`，按总耗时加权，非逐请求 TPS 的简单平均；含思考、等待、重试和传输，与列表总 TPS 同源。tps_samples 给出样本数 |
+| error_rate | `errors/completed*100`；errors=failed+interrupted，completed=succeeded+failed+interrupted；不将 HTTP200 直接判成功，pending 和客户端 cancelled 均不计分母；分母为0时 null |
+| cache_hit_rate | 仅单次尝试、输入>0、缓存读数已确认且 `0≤cache≤input` 的请求，`sum(cache_read_tokens)/sum(input)*100`；按 Token 加权，不是「有缓存请求占比」，不将缺失读数当0；cache_samples 给出样本数 |
+| latency_ms / first_output_ms | 对相应已知非负观测求均值；总耗时排除 pending，首字优先有效输出首字，旧日志回退正文首字；各带样本数 |
+
+空桶请求数为0；无用量、速度或率的样本仍为 null，曲线断开，不连接未知段，也不补0。整个范围没有请求和读取失败分别展示，后者不伪装成空历史。总览直接使用相同查询的累加器，不平均各桶比率。
+
+本轮验证与平台边界记于当前任务记录：Go 隔离管理链路与浏览器模拟 Wails 绑定分别验收，不代表 Linux WebKitGTK／Windows 原生窗口已验收。未生成安装包、替换运行核心或发布在线更新；使用此功能需同步更新桌面宿主与核心。

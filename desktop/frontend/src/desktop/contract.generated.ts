@@ -608,6 +608,45 @@ export interface WorkspaceResult {
   data: Workspace | null;
   problem: Problem | null;
 }
+export interface StatsQuery {
+  filter: Query;
+  interval_ms: number;
+}
+export interface StatsValues {
+  requests: number;
+  completed: number;
+  errors: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  usage_samples: number;
+  tps: number | null;
+  tps_samples: number;
+  error_rate: number | null;
+  cache_hit_rate: number | null;
+  cache_samples: number;
+  latency_ms: number | null;
+  latency_samples: number;
+  first_output_ms: number | null;
+  first_output_samples: number;
+}
+export interface StatsBucket {
+  at_ms: number;
+  values: StatsValues;
+}
+export interface Stats {
+  since_ms: number;
+  before_ms: number;
+  interval_ms: number;
+  buckets: StatsBucket[];
+  summary: StatsValues;
+  health: Health;
+}
+export interface LogStatsResult {
+  contract: string;
+  data: Stats | null;
+  problem: Problem | null;
+}
 export interface Metrics {
   output_generation_ms: number | null;
   non_reasoning_output_tokens: number | null;
@@ -745,6 +784,7 @@ export interface DesktopBridge {
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
   LogDetail(input1: string): Promise<LogDetailResult>;
   LogSettings(): Promise<LogSettingsResult>;
+  LogStats(input1: StatsQuery): Promise<LogStatsResult>;
   Logs(input1: Query): Promise<LogsResult>;
   ManageAgent(input1: ManageAgent): Promise<AgentWorkspaceResult>;
   ModelCatalog(input1: ModelCatalogQuery): Promise<ModelCatalogResult>;

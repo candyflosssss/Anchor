@@ -1,12 +1,13 @@
+import statsFixture from '../../contract/log-stats.json' with { type: 'json' };
 import { expect, test, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
 import fixture from '../../contract/logs.json' with { type: 'json' };
 import type { DesktopBridge, Query } from '../src/desktop/contract.generated';
 const capture = process.env.ANCHOR_LOG_SCREENSHOTS;
-declare global { interface Window { logTest: { queries: Query[]; exports: number; settings: typeof fixture.settings; unavailable: boolean; paged: boolean } } }
+declare global { interface Window { logTest: { queries: Query[]; statsQueries: import('../src/desktop/contract.generated').StatsQuery[]; statsUnavailable: boolean; statsEmpty: boolean; exports: number; settings: typeof fixture.settings; unavailable: boolean; paged: boolean } } }
 async function openLogs(page: Page, data = fixture) {
-  await page.addInitScript(f => {
-    window.logTest = { queries: [], exports: 0, settings: f.settings, unavailable: false, paged: false };
+  await page.addInitScript(({ f, sf }) => {
+    window.logTest = { queries: [], statsQueries: [], statsUnavailable: false, statsEmpty: false, exports: 0, settings: f.settings, unavailable: false, paged: false };
     const result = <T,>(data: T) => ({ contract: f.contract, data, problem: null });
     const session = { instance_id: 'logs-isolated', phase: 'ready', source: 'started', can_stop: true };
     const rows = f.page.requests.map(r => ({ ...r, started_at_ms: Date.now() }));
@@ -19,13 +20,24 @@ async function openLogs(page: Page, data = fixture) {
         const selected = rows.filter(r => (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
         return result({ ...f.page, requests: selected.map(r => ({ ...r, attempts: [], evidence: Object.fromEntries(Object.entries(r.evidence).filter(([key]) => ['sent_service_tier', 'sent_service_tier_raw', 'upstream_service_tier', 'upstream_service_tier_raw', 'fast_triggered'].includes(key))) })), latest: q.cursor ? 3 : 2, has_more: window.logTest.paged && !q.cursor, next_cursor: 1 });
       },
+      LogStats: async (q: import('../src/desktop/contract.generated').StatsQuery) => {
+        window.logTest.statsQueries.push(q);
+        if (window.logTest.statsUnavailable || window.logTest.unavailable) return { contract: f.contract, data: null, problem: { code: 'offline' } };
+        if (q.filter.provider === 'slow-provider') await new Promise(resolve => setTimeout(resolve, 500));
+        const span = q.filter.before_ms - q.filter.since_ms;
+        const interval = q.interval_ms || [10000, 30000, 60000, 300000, 900000, 3600000, 21600000, 86400000].find(ms => Math.ceil(span / ms) <= 120)!;
+        const empty = sf.stats.buckets[1].values;
+        const buckets = Array.from({ length: Math.ceil(span / interval) }, (_, i) => ({ at_ms: q.filter.since_ms + i * interval, values: window.logTest.statsEmpty ? empty : sf.stats.buckets[i % 3].values }));
+        const summary = window.logTest.statsEmpty ? empty : { ...sf.stats.summary, requests: q.filter.provider === 'slow-provider' ? 999 : 3 };
+        return result({ ...sf.stats, since_ms: q.filter.since_ms, before_ms: q.filter.before_ms, interval_ms: interval, buckets, summary });
+      },
       LogDetail: async (id: string) => result(rows.find(r => r.id === id)),
       LogSettings: async () => result(window.logTest.settings),
       ConfigureLogs: async (s: typeof f.settings) => { window.logTest.settings = s; return result(s); },
       ExportLogs: async () => { window.logTest.exports++; return result({ accepted: true }); },
     } as unknown as DesktopBridge;
     window.go = { desktop: { Bridge: api } };
-  }, data);
+  }, { f: data, sf: statsFixture });
   await page.goto('/');
   await page.getByRole('button', { name: '日志', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看请求 fixture_failed' })).toBeVisible();
@@ -255,4 +267,62 @@ test('unknown raw tiers and lower returned tiers are never labelled as requested
   await expect(list).toContainText('"turbo-v2"');
   await expect(list).toContainText('无法确认加速');
   await expect(list.getByText('已确认加速', { exact: true })).toHaveCount(0);
+});
+
+
+test('trend metrics, range, granularity, filter parity and keyboard inspection', async ({ page }) => {
+  await openLogs(page);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  await expect(trends.getByRole('button', { name: /已知用量/ })).toContainText('600');
+  await expect(trends.locator('.log-chart-line')).not.toHaveCount(0);
+  for (const label of ['请求量', '总 TPS', '错误率', '缓存命中率', '平均耗时', '首字延迟']) {
+    await trends.getByRole('button', { name: new RegExp(label) }).click();
+    await expect(trends.getByRole('slider')).toHaveAttribute('aria-label', new RegExp(label));
+  }
+  const chart = trends.getByRole('slider');
+  await chart.focus(); await page.keyboard.press('Home');
+  await expect(chart).toHaveAttribute('aria-valuenow', '0');
+  await page.keyboard.press('ArrowRight'); await expect(chart).toHaveAttribute('aria-valuenow', '1');
+  await page.getByLabel('趋势统计粒度').selectOption('60000');
+  await page.getByLabel('请求结果', { exact: true }).selectOption('failed');
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.filter.status)).toBe('failed');
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.interval_ms)).toBe(60000);
+  await page.getByLabel('日志时间范围').selectOption('129600');
+  await expect(page.getByLabel('趋势统计粒度')).toHaveValue('0');
+  await expect(page.getByLabel('趋势统计粒度').locator('option[value="10000"]')).toHaveJSProperty('disabled', true);
+  await page.getByLabel('趋势统计粒度').selectOption('86400000');
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.interval_ms)).toBe(86400000);
+  await expect(chart).toBeVisible();
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(chart).toBeVisible();
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      if (capture) await trends.screenshot({ path: resolve(capture, `logs-trends-${width}-${theme}.png`) });
+    }
+  }
+  await page.getByRole('button', { name: '系统日志', exact: true }).click();
+  await expect(trends).toHaveCount(0);
+});
+
+test('trend errors and empty history are explicit and stale filter responses are discarded', async ({ page }) => {
+  await openLogs(page);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  await page.getByLabel('供应商筛选').fill('slow-provider');
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.filter.provider)).toBe('slow-provider');
+  await page.getByLabel('供应商筛选').fill('local');
+  await expect(trends.getByRole('button', { name: /请求量/ })).toContainText('3');
+  await page.waitForTimeout(650);
+  await expect(trends.getByRole('button', { name: /请求量/ })).not.toContainText('999');
+  await page.evaluate(() => { window.logTest.statsUnavailable = true; });
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(trends).toContainText('趋势读取失败');
+  await expect(trends.locator('.log-chart-line')).toHaveCount(0);
+  await page.evaluate(() => { window.logTest.statsUnavailable = false; window.logTest.statsEmpty = true; });
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(trends).toContainText('所选范围内暂无请求');
+  await expect(trends.getByRole('button', { name: /已知用量/ })).toContainText('—');
 });

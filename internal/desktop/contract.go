@@ -131,6 +131,15 @@ type LogQuery = logbook.Query
 type LogPage = logbook.Page
 type LogHealth = logbook.Health
 type LogSettings = logbook.Settings
+type LogStatsQuery = logbook.StatsQuery
+type LogStatsValues = logbook.StatsValues
+type LogStatsBucket = logbook.StatsBucket
+type LogStats = logbook.Stats
+type LogStatsResult struct {
+	Contract string    `json:"contract"`
+	Data     *LogStats `json:"data"`
+	Problem  *Problem  `json:"problem"`
+}
 type LogsResult struct {
 	Contract string   `json:"contract"`
 	Data     *LogPage `json:"data"`

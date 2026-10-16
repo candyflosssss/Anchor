@@ -1,3 +1,4 @@
+import { checkedStats } from './log-stats.model';
 import { bridge, call, DesktopProblem } from '../../desktop/transport';
 import type { Query, Page, Request, Event, Settings } from '../../desktop/contract.generated';
 import { statusLabels, type RequestLog, type SystemLog, type LogStatus, type LogSource } from './log.model';
@@ -29,6 +30,7 @@ export function systemLog(row: Event): SystemLog {
     source: row.source as SystemLog['source'], event: row.event, message: Object.entries(row.fields ?? {}).map(([k,v]) => `${k}=${v}`).join(' · '), requestId: row.request_id || undefined };
 }
 export const logService = {
+  stats: async (query: import('../../desktop/contract.generated').StatsQuery) => checkedStats(await call(() => bridge().LogStats(query))),
   async list(query: Query): Promise<Page> { const p = await call(() => bridge().Logs(query)); if (!Array.isArray(p.requests) || !Array.isArray(p.events) || !p.health) throw new DesktopProblem('read_error'); p.requests.forEach(requestLog); p.events.forEach(systemLog); return p; },
   detail: async (id: string) => requestLog(await call(() => bridge().LogDetail(id))),
   settings: () => call(() => bridge().LogSettings()),

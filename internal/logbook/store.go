@@ -399,6 +399,51 @@ func (s *Store) List(ctx context.Context, q Query) (Page, error) {
 	if err := s.read.QueryRowContext(ctx, `SELECT COALESCE(MAX(seq),0) FROM `+table).Scan(&out.Latest); err != nil {
 		return out, ErrUnavailable
 	}
+	where, args := logWhere(q, table)
+	args = append(args, q.Limit+1)
+	rows, err := s.read.QueryContext(ctx, fmt.Sprintf("SELECT seq,document FROM %s WHERE %s ORDER BY seq DESC LIMIT ?", table, strings.Join(where, " AND ")), args...)
+	if err != nil {
+		return out, ErrUnavailable
+	}
+	defer rows.Close()
+	count := 0
+	for rows.Next() {
+		var seq int64
+		var raw string
+		if rows.Scan(&seq, &raw) != nil {
+			return out, ErrUnavailable
+		}
+		count++
+		if count > q.Limit {
+			out.HasMore = true
+			break
+		}
+		out.NextCursor = seq
+		if table == "requests" {
+			var r Request
+			if json.Unmarshal([]byte(raw), &r) != nil {
+				return out, ErrUnavailable
+			}
+			out.Requests = append(out.Requests, r)
+		} else {
+			var e Event
+			if json.Unmarshal([]byte(raw), &e) != nil {
+				return out, ErrUnavailable
+			}
+			out.Events = append(out.Events, e)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return out, ErrUnavailable
+	}
+	if !out.HasMore {
+		out.NextCursor = 0
+	}
+	return out, nil
+}
+
+// logWhere keeps list and full-range statistics on identical filter semantics.
+func logWhere(q Query, table string) ([]string, []any) {
 	where := []string{"created_at>=?"}
 	args := []any{q.SinceMS}
 	add := func(clause string, v any) { where = append(where, clause); args = append(args, v) }
@@ -443,44 +488,5 @@ func (s *Store) List(ctx context.Context, q Query) (Page, error) {
 			add("event<?", q.Search+"\U0010ffff")
 		}
 	}
-	args = append(args, q.Limit+1)
-	rows, err := s.read.QueryContext(ctx, fmt.Sprintf("SELECT seq,document FROM %s WHERE %s ORDER BY seq DESC LIMIT ?", table, strings.Join(where, " AND ")), args...)
-	if err != nil {
-		return out, ErrUnavailable
-	}
-	defer rows.Close()
-	count := 0
-	for rows.Next() {
-		var seq int64
-		var raw string
-		if rows.Scan(&seq, &raw) != nil {
-			return out, ErrUnavailable
-		}
-		count++
-		if count > q.Limit {
-			out.HasMore = true
-			break
-		}
-		out.NextCursor = seq
-		if table == "requests" {
-			var r Request
-			if json.Unmarshal([]byte(raw), &r) != nil {
-				return out, ErrUnavailable
-			}
-			out.Requests = append(out.Requests, r)
-		} else {
-			var e Event
-			if json.Unmarshal([]byte(raw), &e) != nil {
-				return out, ErrUnavailable
-			}
-			out.Events = append(out.Events, e)
-		}
-	}
-	if err = rows.Err(); err != nil {
-		return out, ErrUnavailable
-	}
-	if !out.HasMore {
-		out.NextCursor = 0
-	}
-	return out, nil
+	return where, args
 }

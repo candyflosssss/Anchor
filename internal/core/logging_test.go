@@ -53,6 +53,13 @@ func TestRealLogsQueryDetailExportRetentionAndIdentity(t *testing.T) {
 	if err != nil || len(p.Requests) != 1 {
 		t.Fatalf("%+v %v", p, err)
 	}
+	stats, err := c.LogStats(t.Context(), logbook.StatsQuery{Filter: logbook.Query{Model: "public", Provider: "p"}})
+	if err != nil || stats.Summary.Requests != 1 || stats.Summary.TotalTokens == nil || *stats.Summary.TotalTokens != 19 {
+		t.Fatalf("statistics: %+v %v", stats, err)
+	}
+	if _, err = c.LogStats(t.Context(), logbook.StatsQuery{IntervalMS: 123}); err == nil {
+		t.Fatal("invalid statistics interval accepted")
+	}
 	r, err := c.LogDetail(t.Context(), id)
 	if err != nil || r.Status != "succeeded" || r.HTTP == nil || *r.HTTP != 200 || r.AttemptCount != 1 || r.Input == nil || *r.Input != 12 || r.ReasoningEffort == nil || *r.ReasoningEffort != "high" || r.Metrics.TimeToFirstTextMS != nil {
 		t.Fatalf("%+v %v", r, err)
@@ -75,6 +82,35 @@ func TestRealLogsQueryDetailExportRetentionAndIdentity(t *testing.T) {
 	cfg, err = c.ConfigureLogs(t.Context(), cfg)
 	if err != nil || cfg.Days != 14 {
 		t.Fatal(cfg, err)
+	}
+	// The new read-only POST requires management credentials, identity and no Origin.
+	settings, _ := f.store.Settings()
+	for _, tc := range []struct {
+		name, token, identity, origin string
+		status                        int
+	}{
+		{"no credential", "", settings.InstanceID, "", http.StatusUnauthorized},
+		{"gateway credential", f.token, settings.InstanceID, "", http.StatusUnauthorized},
+		{"missing identity", f.owner, "", "", http.StatusConflict},
+		{"wrong identity", f.owner, "other-instance", "", http.StatusConflict},
+		{"foreign origin", f.owner, settings.InstanceID, "https://untrusted.example", http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req, _ := http.NewRequest("POST", f.control.URL+"/control/v1/logs/stats", strings.NewReader(`{"filter":{},"interval_ms":0}`))
+			if tc.token != "" {
+				req.Header.Set("Authorization", "Bearer "+tc.token)
+			}
+			req.Header.Set("X-Anchor-Instance", tc.identity)
+			req.Header.Set("Origin", tc.origin)
+			response, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response.Body.Close()
+			if response.StatusCode != tc.status {
+				t.Fatalf("stats protection: got %d, want %d", response.StatusCode, tc.status)
+			}
+		})
 	}
 	// Origin/instance protections remain active for logging writes/read POSTs.
 	req, _ := http.NewRequest("PUT", f.control.URL+"/control/v1/logs/settings", strings.NewReader(`{}`))

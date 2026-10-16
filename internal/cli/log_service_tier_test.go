@@ -66,6 +66,15 @@ func TestLogServiceTierCLI(t *testing.T) {
 	if row.ID == "" || row.Evidence["upstream_service_tier_raw"] != `"provider-turbo"` || row.Evidence["fast_triggered"] != "unknown" || len(row.Evidence) > 5 || len(row.Attempts) != 0 {
 		t.Fatalf("invalid list evidence: %+v", row)
 	}
+	var stats logbook.Stats
+	if err := json.Unmarshal([]byte(run("", "logs", "stats", "--source", "probe", "--since", "1h", "--interval", "1m")), &stats); err != nil || stats.Summary.Requests != 1 || len(stats.Buckets) != 60 {
+		t.Fatal(stats, err)
+	}
+	for _, interval := range []string{"-1s", "13s", "1ns"} {
+		if err := (App{Out: io.Discard, Err: io.Discard}).Run(context.Background(), []string{"--data-dir", dir, "logs", "stats", "--interval", interval}); err == nil {
+			t.Fatal("invalid interval accepted", interval)
+		}
+	}
 	var detail logbook.Request
 	if err := json.Unmarshal([]byte(run("", "logs", "detail", row.ID)), &detail); err != nil || detail.Evidence["upstream_service_tier_raw"] != `"provider-turbo"` || len(detail.Attempts) != 1 {
 		t.Fatal(detail, err)

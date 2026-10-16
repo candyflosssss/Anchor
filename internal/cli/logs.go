@@ -10,7 +10,7 @@ import (
 
 func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("logs requires list, detail, follow, export, settings or configure")
+		return errors.New("logs requires list, stats, detail, follow, export, settings or configure")
 	}
 	switch args[0] {
 	case "detail":
@@ -52,9 +52,13 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 			return err
 		}
 		return a.output(v)
-	case "list", "follow", "export":
+	case "list", "follow", "export", "stats":
 		f := a.flags("logs " + args[0])
 		q := logbook.Query{}
+		var interval *time.Duration
+		if args[0] == "stats" {
+			interval = f.Duration("interval", 0, "bucket interval: 10s|30s|1m|5m|15m|1h|6h|24h (default auto, max 600 buckets)")
+		}
 		f.StringVar(&q.Kind, "kind", "requests", "requests|system")
 		f.IntVar(&q.Limit, "limit", 50, "page size (1..200)")
 		f.Int64Var(&q.Cursor, "cursor", 0, "older-page cursor")
@@ -76,12 +80,30 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		if *since <= 0 || *since > 90*24*time.Hour {
 			return errors.New("since must be in (0,90d]")
 		}
-		q.SinceMS = time.Now().Add(-*since).UnixMilli()
+		now := time.Now()
+		q.SinceMS = now.Add(-*since).UnixMilli()
+		if args[0] == "stats" {
+			q.BeforeMS = now.UnixMilli()
+		}
 		if *httpStatus != 0 {
 			q.HTTP = httpStatus
 		}
 		if q.Validate() != nil {
 			return logbook.ErrInvalid
+		}
+		if args[0] == "stats" {
+			if *interval < 0 || *interval%time.Millisecond != 0 {
+				return logbook.ErrInvalid
+			}
+			query := logbook.StatsQuery{Filter: q, IntervalMS: interval.Milliseconds()}
+			if query.Validate() != nil {
+				return logbook.ErrInvalid
+			}
+			v, err := c.LogStats(ctx, query)
+			if err != nil {
+				return err
+			}
+			return a.output(v)
 		}
 		if args[0] == "export" {
 			return c.ExportLogs(ctx, q, a.Out)

@@ -512,3 +512,12 @@
 - 旧 → 新：列表原先省略整个 evidence，现在保留 sent_service_tier / sent_service_tier_raw / upstream_service_tier / upstream_service_tier_raw / fast_triggered 五项紧凑证据，其他诊断仍只在详情／导出。新增协议转换后的派发观测与原始 JSON 标量文本，详情／导出还保留入站原值；未知短名称不再一律丢弃。代理与推理测试共用安全限制。fast_triggered 仅基于上游已报告档位为字符串 true/false/unknown，不是实测速度或与请求完全匹配的保证。
 - 兼容与迁移：复用 evidence 字典，不迁移数据库、不补写旧历史；新旧客户端可忽略未知项。未派发 not_sent、未指定 unspecified、上游缺失／auto／未知分开处理；SSE 最后报告覆盖前值，候选切换清空旧快照，不新增逐尝试档位字段。原值仅保存有界安全标量（字符串最多128 UTF-8字节、序列化最多256字节），抑制对象／数组、控制字符与可识别凭据；不改写请求或扩展跨协议能力。
 - 验证：完整 protocol/core/desktop/cli 四包测试通过，覆盖 JSON/SSE、未知与非字符串、数值精度、凭据抑制、映射注入、候选清理、列表／详情／导出、真实隔离 CLI 和桌面桥接、契约漂移及帮助。前端类型检查、日志37项单测、定向 ESLint 及单 worker 的9项日志浏览器测试通过。浏览器使用缓存 headless shell（系统 Chrome 启动 SIGTRAP）；未调用真实付费上游、未操作真实 Agent 配置、未验收原生双平台、未打包发布。
+
+
+## 2026-10-16 — 请求日志趋势聚合（当前源码，未发布）
+
+- 类型：新增命令；已有 list/detail/follow/export 输出和参数保持不变。
+- 指令与参数：新增 `anchor logs stats [--since 1h] [--interval 0s|10s|30s|1m|5m|15m|1h|6h|24h]`，复用 status/source/provider/model/key/http/code/stage/search；默认自动粒度，全范围统计忽略分页与快照，最多90天／600桶。
+- 旧 → 新：此前只能分页读取请求；现在可直接查询请求量、已知 Token 小计、总 TPS、错误率、缓存命中率、平均耗时和首字延迟的 buckets/summary/health JSON，不需要客户端抓全历史。无观测保持 null、空请求桶为0，带各项样本数；错误率排除 pending/cancelled，总 TPS 和缓存率按分母加权。
+- 兼容与迁移：纯新增只读接口，需同步更新源码 CLI、核心与桌面宿主；公开 alpha.6 和已安装旧 dev 不自动获得此能力，无数据库迁移，不重采历史、不触发付费上游。该任务未打包或发布。
+- 验证：隔离 Go CLI→client→管理接口测试通过，覆盖 stats JSON、1小时60个分钟桶和非法粒度拒绝；日志聚合与共享桌面契约测试通过。完整执行结果见同轮任务记录。

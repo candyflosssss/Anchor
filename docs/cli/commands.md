@@ -79,6 +79,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `provider test` | 显式最小推理测试 | 核心在线；已存供应商/模型 ID；须 approve |
 | `provider model-put` / `model-delete` | 工作台模型映射写入/删除 | 核心在线；供应商与模型 revision；删除须 approve |
 | `provider price-put` / `price-import` | 保存单价 / models.dev 预览 | 核心在线；当前 revision；导入不自动保存 |
+| `logs stats` | 请求趋势全范围聚合（用量／TPS／错误率／缓存／耗时） | 所选 Context 核心在线且支持 stats 接口；当前源码未发布 |
 | `logs list` | 结构化日志分页/筛选 | 所选 Context 核心在线，支持日志接口 |
 | `logs detail REQUEST_ID` | 完整安全请求详情 | 对应记录仍在保留期 |
 | `logs follow` | 每 2 秒输出日志页快照 | 核心在线；可重复更新记录 |
@@ -668,7 +669,7 @@ anchor recover [--id ID]
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
-| 真实日志查询、详情、导出、保留管理 | logs list/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
+| 真实日志查询、详情、导出、保留管理 | logs list/stats/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
@@ -717,6 +718,9 @@ anchor logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50
   [--cursor N] [--until N] [--status VALUE] [--source VALUE]
   [--provider ID] [--model NAME] [--key ID] [--http N]
   [--code VALUE] [--stage VALUE] [--level VALUE] [--search PREFIX]
+anchor logs stats [--since 1h] [--interval 0s|10s|30s|1m|5m|15m|1h|6h|24h]
+  [--status VALUE] [--source proxy|probe] [--provider ID] [--model NAME]
+  [--key ID] [--http N] [--code VALUE] [--stage VALUE] [--search PREFIX]
 anchor logs detail REQUEST_ID
 anchor logs settings
 anchor logs configure [--days N] [--system-days N] [--max-requests N]
@@ -728,6 +732,7 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | kind | requests；system 查询系统事件 |
 | since | 1h，Go duration，>0 且 ≤2160h（90 天）；24h、168h 可用，不支持 `7d` |
 | limit | 50，1–200；导出内部固定每页 100 条 |
+| interval（仅 stats） | 0s（自动）；手选 10s、30s、1m、5m、15m、1h、6h、24h，最多600个桶；自动取不超过120个桶的最细粒度；不支持1ns、任意间隔或负值 |
 | cursor / until | 0；列表 next_cursor 读取更旧记录，latest 固定序号上界 |
 | status / source / provider / model / key / code / stage / level | 空表示不筛选；非空按原值精确匹配；requests 与 system 适用字段不同 |
 | http | 0 表示不筛选；显式值 100–599，代表实际收到的上游状态 |
@@ -735,6 +740,10 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | days / system-days | 查询当前值再修改；初始均 7，范围 1–90 |
 | max-requests | 初始 50,000，100–200,000 |
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
+
+`stats`（2026-10-16 当前源码，未打包发布）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
+
+values 的 requests 包括 pending/cancelled；completed=succeeded+failed+interrupted，errors=failed+interrupted，error_rate=errors/completed×100，pending/cancelled 不计错误率分母。用量只累加输入输出均已知请求，input_tokens/output_tokens/total_tokens 是已知小计并带 usage_samples；总量不另加缓存或思考。tps 是成功且输出已知／总耗时>0样本的 sum(output)×1000/sum(elapsed_ms)，不是桶或请求速率简单平均；cache_hit_rate 是单次尝试且输入>0、0≤cache≤input已知样本的 sum(cache)/sum(input)×100。latency_ms 和 first_output_ms 是有效观测均值，首字回退旧正文首字，各指标带样本数。没有相应观测时为 null，明确观测零保留0；空桶不补造 TPS／用量／率。summary 使用同一查询原始累加器，非桶均值。统计受日志保留和 health 丢弃／写入失败限制，不代表永久消费账本，详见[日志趋势口径](../design/logging.md#9-请求趋势统计2026-10-16当前源码未打包)。
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts 及其他 evidence 大字段，仅保留下述五项档位证据，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 

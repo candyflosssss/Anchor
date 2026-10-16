@@ -1,0 +1,122 @@
+{
+  "contract": "anchor-desktop-v1",
+  "query": {
+    "filter": {
+      "kind": "requests",
+      "limit": 50,
+      "cursor": 0,
+      "until": 0,
+      "since_ms": 1792123200000,
+      "before_ms": 1792123380000,
+      "status": "",
+      "source": "",
+      "provider": "",
+      "model": "",
+      "key": "",
+      "http": null,
+      "code": "",
+      "stage": "",
+      "level": "",
+      "search": ""
+    },
+    "interval_ms": 60000
+  },
+  "stats": {
+    "since_ms": 1792123200000,
+    "before_ms": 1792123380000,
+    "interval_ms": 60000,
+    "buckets": [
+      {
+        "at_ms": 1792123200000,
+        "values": {
+          "requests": 2,
+          "completed": 2,
+          "errors": 1,
+          "input_tokens": 100,
+          "output_tokens": 50,
+          "total_tokens": 150,
+          "usage_samples": 1,
+          "tps": 50,
+          "tps_samples": 1,
+          "error_rate": 50,
+          "cache_hit_rate": 80,
+          "cache_samples": 1,
+          "latency_ms": 1500,
+          "latency_samples": 2,
+          "first_output_ms": 100,
+          "first_output_samples": 1
+        }
+      },
+      {
+        "at_ms": 1792123260000,
+        "values": {
+          "requests": 0,
+          "completed": 0,
+          "errors": 0,
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null,
+          "usage_samples": 0,
+          "tps": null,
+          "tps_samples": 0,
+          "error_rate": null,
+          "cache_hit_rate": null,
+          "cache_samples": 0,
+          "latency_ms": null,
+          "latency_samples": 0,
+          "first_output_ms": null,
+          "first_output_samples": 0
+        }
+      },
+      {
+        "at_ms": 1792123320000,
+        "values": {
+          "requests": 1,
+          "completed": 1,
+          "errors": 0,
+          "input_tokens": 300,
+          "output_tokens": 150,
+          "total_tokens": 450,
+          "usage_samples": 1,
+          "tps": 50,
+          "tps_samples": 1,
+          "error_rate": 0,
+          "cache_hit_rate": 0,
+          "cache_samples": 1,
+          "latency_ms": 3000,
+          "latency_samples": 1,
+          "first_output_ms": 200,
+          "first_output_samples": 1
+        }
+      }
+    ],
+    "summary": {
+      "requests": 3,
+      "completed": 3,
+      "errors": 1,
+      "input_tokens": 400,
+      "output_tokens": 200,
+      "total_tokens": 600,
+      "usage_samples": 2,
+      "tps": 50,
+      "tps_samples": 2,
+      "error_rate": 33.33333333333333,
+      "cache_hit_rate": 20,
+      "cache_samples": 2,
+      "latency_ms": 2000,
+      "latency_samples": 3,
+      "first_output_ms": 150,
+      "first_output_samples": 2
+    },
+    "health": {
+      "dropped": 0,
+      "write_failures": 0,
+      "queue_depth": 0,
+      "request_count": 2,
+      "request_bytes": 4096,
+      "event_count": 1,
+      "event_bytes": 1024,
+      "error": ""
+    }
+  }
+}
