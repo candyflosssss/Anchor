@@ -226,6 +226,9 @@
 .log-chart-tooltip strong { color: hsl(var(--foreground)); font-size: 11px; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
 .log-chart-grid { stroke: hsl(var(--border)); stroke-dasharray: 3 5; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .log-chart-line { fill: none; stroke: var(--trend-color); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.log-chart-bridge { stroke-dasharray: 5 5; opacity: .5; }
+.log-chart-note { margin: 8px 0 0 56px; font-size: 11px; line-height: 1.5; color: hsl(var(--muted-foreground)); }
+.log-chart-observation { margin-bottom: 6px; }
 .log-chart-dot { fill: var(--trend-color); }
 .log-chart-cursor { stroke: hsl(var(--muted-foreground)); stroke-dasharray: 4; vector-effect: non-scaling-stroke; }
 .log-chart-x { display: flex; justify-content: space-between; gap: 8px; padding: 10px 0 0 56px; color: hsl(var(--muted-foreground)); font-size: 10px; }

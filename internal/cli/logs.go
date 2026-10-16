@@ -89,8 +89,8 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		var agent, binding, project, session string
 		f.StringVar(&agent, "agent", "", "exact authenticated Agent type; empty selects unattributed")
 		f.StringVar(&binding, "binding", "", "exact enrolled binding ID; empty selects unattributed")
-		f.StringVar(&project, "project", "", "exact client-declared project ID; empty selects unattributed")
-		f.StringVar(&session, "session", "", "exact client-declared session ID; empty selects unattributed")
+		f.StringVar(&project, "project", "", "exact project label (explicit or Codex metadata); empty selects unattributed")
+		f.StringVar(&session, "session", "", "exact session ID (explicit or Codex thread); empty selects unattributed")
 		f.StringVar(&q.Kind, "kind", "requests", "requests|system")
 		f.IntVar(&q.Limit, "limit", 50, "page size (1..200)")
 		f.Int64Var(&q.Cursor, "cursor", 0, "older-page cursor")

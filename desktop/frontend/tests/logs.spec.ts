@@ -560,3 +560,26 @@ test('classification drills into shared list, chart and export filters including
   await page.getByRole('button', { name: '查看请求 fixture_success', exact: true }).click();
   await expect(page.getByRole('region', { name: '请求归属', exact: true })).toContainText('thread-1');
 });
+
+
+test('idle chart gaps are connected visually while tooltips keep raw empty and zero observations', async ({ page }) => {
+  await openLogs(page);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  const chart = trends.getByRole('slider');
+  await expect(trends.locator('.log-chart-bridge')).not.toHaveCount(0);
+  await expect(trends.getByText('虚线连接无请求的空档，仅辅助观察趋势，不代表该时段有用量或采样。')).toBeVisible();
+  await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight');
+  const tooltip = trends.getByRole('tooltip');
+  await expect(tooltip).toContainText('此时段无请求');
+  await expect(tooltip.locator('strong')).toHaveText(['— Token', '— Token', '— Token']);
+  await expect(tooltip.locator('time')).toHaveCount(2);
+  await page.keyboard.press('ArrowRight');
+  await expect(tooltip).toContainText('1 次请求');
+  await expect(tooltip.locator('strong').first()).toHaveText('450 Token');
+  await trends.getByRole('button', { name: /缓存命中率/ }).click();
+  await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
+  await expect(tooltip.locator('strong')).toHaveText('0 %');
+  await trends.getByRole('button', { name: /请求量/ }).click();
+  await expect(trends.locator('.log-chart-bridge')).toHaveCount(0);
+  await expect(trends.locator('.log-chart-note')).toHaveCount(0);
+});

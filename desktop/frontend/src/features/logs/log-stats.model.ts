@@ -67,3 +67,22 @@ export function chartPaths(values: (number | null)[], max: number, width = 1000,
   if (path) paths.push(path);
   return paths;
 }
+
+// Bridge only idle buckets between observations. A request with an unknown
+// measurement is a hard break; these paths never create interpolated values.
+export function idleBridges(values: (number | null)[], requests: number[], max: number, width = 1000, height = 180, positions?: number[]): string[] {
+  const bridges: string[] = [];
+  let previous: number | null = null;
+  values.forEach((value, index) => {
+    if (value === null) {
+      if (requests[index] !== 0) previous = null;
+      return;
+    }
+    if (previous !== null && index > previous + 1) {
+      const x = (i: number) => positions?.[i] ?? (values.length === 1 ? width / 2 : i * width / (values.length - 1));
+      bridges.push(`M${x(previous).toFixed(2)},${(height - values[previous]! / max * height).toFixed(2)} L${x(index).toFixed(2)},${(height - value / max * height).toFixed(2)}`);
+    }
+    previous = index;
+  });
+  return bridges;
+}

@@ -42,7 +42,8 @@ type Request struct {
 	// Agent and Binding come from authenticated enrollment, never caller labels.
 	Agent   string `json:"agent,omitempty"`
 	Binding string `json:"binding,omitempty"`
-	// Project and Session are optional, client-declared opaque identifiers.
+	// Project and Session are optional log labels: explicit client tags, or Codex
+	// native thread IDs and project metadata resolved through an authenticated binding.
 	Project           string            `json:"project,omitempty"`
 	Session           string            `json:"session,omitempty"`
 	ID                string            `json:"id"`

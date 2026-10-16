@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/logbook"
@@ -50,11 +49,7 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 		}
 		now := time.Now()
 		t := &requestTrace{start: now, row: logbook.Request{ID: id[:16], StartedAtMS: now.UnixMilli(), Status: "pending", Source: "proxy", Stage: "request_parse", Delivery: "none", Attempts: []logbook.Attempt{}, Evidence: map[string]string{"sent_service_tier": "not_sent", "fast_triggered": "unknown"}}}
-		if b, ok := r.Context().Value(bindingKey{}).(state.Binding); ok {
-			t.row.Agent, t.row.Binding = b.AdapterID, b.ID
-		}
-		t.row.Project = logIdentity(r.Header.Values("X-Anchor-Project"), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key"))
-		t.row.Session = logIdentity(r.Header.Values("X-Anchor-Session"), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key"))
+		logAttribution(r, t)
 		switch r.URL.Path {
 		case "/v1/messages":
 			t.row.Protocol = "anthropic"
