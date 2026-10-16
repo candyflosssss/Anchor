@@ -220,7 +220,7 @@ func (e StructuredEditor) Patch(raw []byte, edits []Edit) ([]byte, error) {
 				return nil, err
 			}
 			if !equal(before, edit.Before) {
-				return nil, ErrChanged
+				return nil, withDiagnostic(ErrChanged, "patch_configuration", "managed_field_mismatch", diagnosticField(edit.Path))
 			}
 			if edit.After.Exists {
 				var n yaml.Node
@@ -253,7 +253,7 @@ func (e StructuredEditor) Patch(raw []byte, edits []Edit) ([]byte, error) {
 			return nil, err
 		}
 		if !equal(before, edit.Before) {
-			return nil, ErrChanged
+			return nil, withDiagnostic(ErrChanged, "patch_configuration", "managed_field_mismatch", diagnosticField(edit.Path))
 		}
 		if !edit.After.Exists {
 			if parent != nil {

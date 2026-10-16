@@ -219,7 +219,7 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 			return b, e
 		}
 		if restored.Status == "conflict" {
-			return b, ErrChanged
+			return b, withDiagnostic(ErrChanged, "recovery", "recovery_conflict", "")
 		}
 		b, err = m.Store.UpdateBindingCatalog(b, in.ExpectedRevision)
 	}
@@ -285,7 +285,7 @@ func (m *Manager) Refresh(id string, revision int64) (Result, error) {
 		return r, err
 	}
 	if r.Status == "conflict" {
-		return r, ErrChanged
+		return r, withDiagnostic(ErrChanged, "recovery", "recovery_conflict", "")
 	}
 	r, err = m.apply(id, revision, "")
 	if err != nil {

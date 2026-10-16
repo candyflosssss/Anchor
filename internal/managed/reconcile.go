@@ -53,7 +53,7 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 		}
 		out.OperationID = j.OperationID
 		if j.Status != "applied" || j.Previous != nil {
-			return ErrChanged
+			return withDiagnostic(ErrChanged, "sync_precondition", "unfinished_journal", "")
 		}
 		root := filepath.Dir(j.Path)
 		raw, exists, err := readConfig(root, j.Path)
@@ -68,7 +68,7 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 		// as a new baseline or overwritten, even if unrelated fields may be kept.
 		original, err := e.editor(j.Path).Patch(raw, inverse)
 		if err != nil {
-			return err
+			return withDiagnostic(err, "sync_verify", "", "")
 		}
 		owned := ""
 		if j.Catalog != nil {
@@ -78,7 +78,7 @@ func (e *Engine) Reconcile(b state.Binding, g GatewayBinding) (Result, error) {
 				return err
 			}
 			if !present || !bytes.Equal(current, j.Catalog.Written) {
-				return ErrChanged
+				return withDiagnostic(ErrChanged, "sync_verify", "catalog_mismatch", "model_catalog_json")
 			}
 		}
 		planner, ok := AdapterFor(b.AdapterID).(interface {

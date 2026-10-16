@@ -140,7 +140,7 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 	}
 	for _, edit := range edits {
 		if len(edit.Path) == 0 || !equal(at(original, edit.Path), edit.Before) {
-			return nil, ErrChanged
+			return nil, withDiagnostic(ErrChanged, "patch_configuration", "managed_field_mismatch", diagnosticField(edit.Path))
 		}
 		for i, p := range edit.Path {
 			unicodeProvider := len(edit.Path) == 2 && edit.Path[0] == "model_providers" && i == 1 && naming.ValidID(p)

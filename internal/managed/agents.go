@@ -224,7 +224,7 @@ func (a StructuredAgent) Verify(b state.Binding, g GatewayBinding) (Inspection, 
 	}
 	for i, value := range values {
 		if !equal(value, Value{Exists: after[i] != nil, Data: normalize(after[i])}) {
-			return inspection, ErrChanged
+			return inspection, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", diagnosticField(paths[i]))
 		}
 	}
 	return inspection, nil

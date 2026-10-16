@@ -180,7 +180,7 @@ func atomicWrite(root, path string, b []byte, expected string, check bool) error
 			return err
 		}
 		if fingerprint(current, exists) != expected {
-			return ErrChanged
+			return withDiagnostic(ErrChanged, "write_configuration", "configuration_changed_before_write", "")
 		}
 	}
 	if err = platform.CheckManagedPath(root, path); err != nil {
@@ -211,7 +211,11 @@ func (e *Engine) Apply(p Plan) (Result, error) {
 		if old, err := e.load(p.BindingID); err == nil && old.Status != "restored" {
 			out.OperationID = old.OperationID
 			out.Status = "recovery_pending"
-			return ErrChanged
+			reason := "unfinished_journal"
+			if old.Status == "applied" {
+				reason = "active_journal"
+			}
+			return withDiagnostic(ErrChanged, "apply_precondition", reason, "")
 		} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
@@ -225,7 +229,7 @@ func (e *Engine) Apply(p Plan) (Result, error) {
 			expected = p.Fingerprint
 		}
 		if fingerprint(b, exists) != expected {
-			return ErrChanged
+			return withDiagnostic(ErrChanged, "read_configuration", "configuration_changed_since_plan", "")
 		}
 		if p.catalog != nil {
 			if filepath.Dir(p.catalog.Path) != root || filepath.Base(p.catalog.Path) != catalogName(p.BindingID) || len(p.catalog.Written) > maxConfig || !json.Valid(p.catalog.Written) {
@@ -236,7 +240,7 @@ func (e *Engine) Apply(p Plan) (Result, error) {
 				return err
 			}
 			if catalogExists {
-				return ErrChanged
+				return withDiagnostic(ErrChanged, "apply_precondition", "catalog_exists", "model_catalog_json")
 			}
 		}
 		next, err := e.editor(p.Path).Patch(b, p.Edits)

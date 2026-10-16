@@ -148,21 +148,31 @@ func (m *Manager) apply(id string, revision int64, fp string) (Result, error) {
 	}
 	if current.Status == "applied" {
 		_, e = AdapterFor(b.AdapterID).Verify(b, g)
-		return current, e
+		return current, withDiagnostic(e, "verify_existing", "", "")
 	}
 	if current.Status != "unmanaged" && current.Status != "restored" {
-		return current, ErrChanged
+		reason, field := "unfinished_journal", ""
+		if len(current.Conflicts) > 0 {
+			reason, field = "managed_field_mismatch", diagnosticField(current.Conflicts[0])
+			if len(current.Conflicts[0]) > 0 && current.Conflicts[0][0] == "catalog" {
+				reason = "catalog_mismatch"
+			}
+		} else if current.Status == "conflict" {
+			reason = "recovery_conflict"
+		}
+		return current, withDiagnostic(ErrChanged, "apply_precondition", reason, field)
 	}
 	p, e := AdapterFor(b.AdapterID).Plan(b, g)
 	if e != nil {
-		return Result{}, e
+		return Result{}, withDiagnostic(e, "plan", "", "")
 	}
 	if fp != "" && fp != p.Fingerprint {
-		return Result{}, ErrChanged
+		return Result{}, withDiagnostic(ErrChanged, "plan_check", "plan_changed", "")
 	}
 	result, e := m.Engine.Apply(p)
 	if e == nil {
 		_, e = AdapterFor(b.AdapterID).Verify(b, g)
+		e = withDiagnostic(e, "verify_written", "", "")
 	}
 	return result, e
 }

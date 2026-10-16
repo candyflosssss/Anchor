@@ -182,12 +182,12 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 	v := at(m, []string{"model_providers", provider})
 	table, ok := v.Data.(map[string]any)
 	if m["model"] != g.Model || m["model_provider"] != provider || !ok || table["base_url"] != g.BaseURL {
-		return out, ErrChanged
+		return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "codex.routing")
 	}
 	if len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
 		path := filepath.Join(b.ConfigRoot, catalogName(b.ID))
 		if m["model_catalog_json"] != path {
-			return out, ErrChanged
+			return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "model_catalog_json")
 		}
 		raw, exists, err := readConfig(b.ConfigRoot, path)
 		if err != nil {
@@ -198,7 +198,7 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 			return out, err
 		}
 		if !exists || !bytes.Equal(raw, expected) {
-			return out, ErrChanged
+			return out, withDiagnostic(ErrChanged, "verify_catalog", "catalog_mismatch", "model_catalog_json")
 		}
 	}
 	return out, nil

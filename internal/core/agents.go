@@ -28,6 +28,30 @@ func agentError(w http.ResponseWriter, e error) {
 	fail(w, http.StatusConflict, code, message)
 }
 
+// logAgentFailure records safe diagnostic labels, never the underlying error.
+// Binding metadata is loaded from validated state, not copied from request input.
+func (s *Server) logAgentFailure(action, bindingID string, err error) {
+	if s.Log == nil {
+		return
+	}
+	d := managed.Diagnose(err)
+	attrs := []any{"action", action, "stage", d.Stage, "reason", d.Reason}
+	if d.Field != "" {
+		attrs = append(attrs, "field", d.Field)
+	}
+	if s.Store != nil && bindingID != "" {
+		if b, e := s.Store.Binding(bindingID); e == nil {
+			attrs = append(attrs, "binding_id", b.ID, "adapter_id", b.AdapterID)
+		}
+	}
+	s.Log.Warn("agent operation failed", attrs...)
+}
+
+func (s *Server) agentError(w http.ResponseWriter, action, bindingID string, err error) {
+	s.logAgentFailure(action, bindingID, err)
+	agentError(w, err)
+}
+
 // Local catalog snapshots can be larger than the client response budget.
 // Public binding responses retain policy choices, never full instruction entries.
 func publicBinding(b state.Binding) state.Binding {
@@ -39,12 +63,12 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /control/v1/agents/workspace", func(w http.ResponseWriter, r *http.Request) {
 		env, e := s.localAgentEnvironment()
 		if e != nil {
-			agentError(w, e)
+			s.agentError(w, "workspace", "", e)
 			return
 		}
 		v, e := s.Agents.Workspace(env)
 		if e != nil {
-			agentError(w, e)
+			s.agentError(w, "workspace", "", e)
 			return
 		}
 		writeJSON(w, 200, v)
@@ -59,16 +83,16 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 		}
 		env, e := s.localAgentEnvironment()
 		if e != nil {
-			agentError(w, e)
+			s.agentError(w, "workspace", "", e)
 			return
 		}
-		if _, e = s.Agents.Enroll(env, in); e != nil {
-			agentError(w, e)
+		if b, err := s.Agents.Enroll(env, in); err != nil {
+			s.agentError(w, "enroll", b.ID, err)
 			return
 		}
 		v, e := s.Agents.Workspace(env)
 		if e != nil {
-			agentError(w, e)
+			s.agentError(w, "workspace", "", e)
 			return
 		}
 		writeJSON(w, 200, v)
@@ -102,7 +126,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 		}
 		b, e := s.Agents.Add(in.Binding)
 		if e != nil {
-			agentError(w, e)
+			s.agentError(w, "add", b.ID, e)
 			return
 		}
 		writeJSON(w, 200, publicBinding(b))
@@ -115,11 +139,12 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 		}
 		v, e := managed.AdapterFor(b.AdapterID).Inspect(b)
 		if e != nil {
-			agentError(w, e)
+			s.agentError(w, "inspect", b.ID, e)
 			return
 		}
 		status, e := s.Agents.Engine.Status(b.ID)
 		if e != nil {
+			s.logAgentFailure("inspect-status", b.ID, e)
 			status = managed.Result{BindingID: b.ID, Status: "recovery_pending"}
 		}
 		writeJSON(w, 200, map[string]any{"binding": publicBinding(b), "inspection": v, "management": status})
@@ -127,7 +152,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /control/v1/agents/{id}/plan", func(w http.ResponseWriter, r *http.Request) {
 		p, e := s.Agents.Plan(r.PathValue("id"))
 		if e != nil {
-			agentError(w, e)
+			s.agentError(w, "plan", r.PathValue("id"), e)
 			return
 		}
 		writeJSON(w, 200, p)
@@ -151,7 +176,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 		case "sync":
 			v, e := s.Agents.Refresh(id, in.ExpectedRevision)
 			if e != nil {
-				agentError(w, e)
+				s.agentError(w, action, id, e)
 				return
 			}
 			writeJSON(w, 200, v)
@@ -162,7 +187,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			}
 			b, v, e := s.Agents.SetModels(id, in.ExpectedRevision, in.Model, in.ModelScope)
 			if e != nil {
-				agentError(w, e)
+				s.agentError(w, action, id, e)
 				return
 			}
 			writeJSON(w, 200, map[string]any{"binding": publicBinding(b), "management": v, "apply_required": true})
@@ -173,21 +198,21 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			}
 			v, e := s.Agents.Apply(id, in.ExpectedRevision, in.Fingerprint)
 			if e != nil {
-				agentError(w, e)
+				s.agentError(w, action, id, e)
 				return
 			}
 			writeJSON(w, 200, v)
 		case "restore":
 			v, e := s.Agents.Restore(id, in.ExpectedRevision)
 			if e != nil {
-				agentError(w, e)
+				s.agentError(w, action, id, e)
 				return
 			}
 			writeJSON(w, 200, v)
 		case "enable", "disable":
 			b, v, e := s.Agents.SetEnabled(id, in.ExpectedRevision, action == "enable")
 			if e != nil {
-				agentError(w, e)
+				s.agentError(w, action, id, e)
 				return
 			}
 			writeJSON(w, 200, map[string]any{"binding": publicBinding(b), "management": v})

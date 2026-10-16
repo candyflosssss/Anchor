@@ -145,6 +145,8 @@ func TestDSHReasoningExternalEditIsNotOverwritten(t *testing.T) {
 			}
 			if _, err := engine.Reconcile(b, g); !errors.Is(err, ErrChanged) {
 				t.Fatal(err)
+			} else if d := Diagnose(err); d.Stage != "sync_verify" || d.Reason != "managed_field_mismatch" || d.Field != "dsh.default_reasoning" {
+				t.Fatalf("unsafe or unspecific diagnostic: %+v", d)
 			}
 			if !bytes.Equal(changed, readSyncFile(t, a.path(b))) {
 				t.Fatal("external effort overwritten")

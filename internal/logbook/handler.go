@@ -26,6 +26,7 @@ func NewHandler(next slog.Handler, s *Store) slog.Handler { return &Handler{next
 
 var systemMessages = map[string]string{
 	"core ready": "core.started", "core stopped": "core.stopped", "bindings preserved for restart": "core.restart_handoff", "binding startup": "binding.startup", "binding shutdown": "binding.shutdown",
+	"agent operation failed":                   "agent.operation_failed",
 	"agent startup reconciliation unavailable": "binding.startup_failed", "agent recovery incomplete; run anchor recover": "binding.recovery_failed",
 	"drain deadline exceeded; remaining requests canceled": "core.drain_timeout", "usage persistence failed": "usage.write_failed", "test usage persistence failed": "usage.write_failed",
 }
@@ -37,8 +38,14 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	if event, ok := systemMessages[r.Message]; ok {
 		fields := map[string]string{}
 		add := func(a slog.Attr) bool {
+			allowed := false
 			switch a.Key {
 			case "instance_id", "binding_id", "status":
+				allowed = true
+			case "action", "adapter_id", "stage", "reason", "field":
+				allowed = event == "agent.operation_failed"
+			}
+			if allowed {
 				v := a.Value.Resolve().String()
 				if len(v) <= 128 {
 					fields[a.Key] = v

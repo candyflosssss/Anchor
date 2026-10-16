@@ -49,6 +49,27 @@
 桌面增加“发送档位”“加速状态”显示块：原始 JSON 值为主，青色闪电标 Fast、紫色火箭标 Ultrafast，辅以文字和确认／不匹配状态。`auto`、`flex`、`scale` 单独显示，不算已确认 Fast。核心运行日志 `model request` 只输出安全规范化的请求／派发／返回档位与 fast_triggered，不输出任意原值。本改动仅观测，不改写请求、不启用服务档位、不改变跨协议转换支持范围。
 
 
+### Agent 托管失败诊断（2026-10-16，当前源码未发布）
+
+Agent 管理接口在处理 workspace、enroll、add、inspect、plan、sync、set-models、apply、restore、enable/disable 时返回的操作错误，现在通过系统事件 `agent.operation_failed` 记录，级别 `warn`、来源 `core`。inspect 读取托管状态失败但仍返回降级状态时也记录，动作标为 `inspect-status`。正常成功操作不新增失败事件；请求格式、鉴权、实例身份等前置拒绝不在本次诊断范围内。启动和自动同步仍沿用现有状态/汇总事件，本次不声称完整覆盖后台生命周期。
+
+事件 `fields` 包含 `action`、`stage`、`reason`；能从已保存绑定解析时，附带 `binding_id`、`adapter_id`；已知冲突可附带固定 `field` 标签。主要诊断示例：
+
+| stage / reason | 事实含义 |
+| --- | --- |
+| `apply_precondition / unfinished_journal` | 托管记录尚未完成，阻止开始新的覆盖写入；不代表配置一定已被写入 |
+| `apply_precondition / active_journal` | 引擎已有生效中的托管记录，拒绝重复创建 |
+| `read_configuration / configuration_changed_since_plan` | 写入前读取的配置与计划时的文件指纹不符 |
+| `write_configuration / configuration_changed_before_write` | 原子替换前的最后一次比较发现文件变化 |
+| `plan_check / plan_changed` | 用户确认的计划指纹与重新计算的计划不符 |
+| `verify_written / managed_field_mismatch` | 本次写入后立即校验未通过；不能据此认定用户/其他程序改过配置 |
+| `verify_existing`、`apply_precondition`、`sync_verify` 下的 `managed_field_mismatch` | 已有托管字段或同步前校验与预期不符 |
+| `recovery / recovery_conflict`、`catalog_mismatch`、`catalog_exists` | 恢复冲突、目录内容不符或目录文件已存在 |
+
+不带专门阶段的错误使用 `operation` 和安全类别，例如 `revision_conflict`、`model_unavailable`、`catalog_invalid`、`unsafe_configuration`、`permission_denied`；未知原因固定为 `operation_failed`。`field` 只从代码白名单映射，例如 `dsh.default_reasoning`、`dsh.provider`，不序列化原始字段路径或动态 provider ID。事件不包含底层 `error.Error()`、文件绝对路径、配置内容、比较前后值、指纹、Token 或认证头；终端日志和持久系统日志遵循同一数据边界，事件属性白名单不扩展到其他系统事件。
+
+在日志页的**系统**页签查看，或使用既有 `anchor logs list --kind system --since 1h`、`anchor logs export --kind system --since 1h`。沿用当前上下文的 owner 管理权限、保留配置和 JSONL 导出，不增加命令或改变 API 错误码。只对升级后新发生的失败采集，历史错误不会补录；日志丢弃/写入失败仍受既有日志健康状态约束。本改动不放宽任何配置保护检查，也不自动重试覆盖写入。
+
 ## 4. 存储、性能与保留
 
 独立 `logs.db` 与 state.db 位于同一受保护 data-dir。SQLite WAL、单写连接、两个只读连接、2048 项非阻塞队列、128 项批量、100 ms 刷新。提交时形成不可变的有界 JSON 快照；单请求上限 32 KiB、系统事件 4 KiB，队列满/超限立即丢弃并计数，转发不等待日志数据库。生产者仍承担字段整理及有界 JSON 编码成本。
