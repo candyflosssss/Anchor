@@ -146,7 +146,7 @@ func run() int {
 			contextMu.Lock()
 			hostContext = ctx
 			contextMu.Unlock()
-			tray.Start(func() { window.Show() }, func() { bridge.ExitDesktop() })
+			tray.Start(func() { window.Show() }, func() { bridge.ExitDesktop() }, func() { exitWithLocalCore(ctx, &window, session) })
 		},
 		OnDomReady: func(ctx context.Context) {
 			window.Ready(func() {

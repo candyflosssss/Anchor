@@ -22,7 +22,7 @@ type Tray struct {
 	stopped bool
 }
 
-func (t *Tray) Start(show, exit func()) {
+func (t *Tray) Start(show, exit, exitWithCore func()) {
 	t.mu.Lock()
 	if t.stop != nil || t.stopped || !platformSupported() {
 		t.mu.Unlock()
@@ -41,11 +41,12 @@ func (t *Tray) Start(show, exit func()) {
 		defer t.ready.Store(false)
 		systray.Run(func() {
 			systray.SetIcon(icon())
-			systray.SetTooltip("Anchor · 点击打开，右键退出界面")
+			systray.SetTooltip("Anchor · 点击打开，右键选择退出方式")
 			systray.SetOnTapped(show)
 			openItem := systray.AddMenuItem("打开 Anchor", "恢复主窗口")
 			systray.AddSeparator()
-			exitItem := systray.AddMenuItem("退出界面（核心继续运行）", "退出窗口和托盘；停止核心请在主窗口中确认")
+			exitItem := systray.AddMenuItem("退出界面（核心继续运行）", "仅退出窗口和托盘，不停止核心")
+			exitWithCoreItem := systray.AddMenuItem("退出 Anchor（同时停止本机核心）", "确认后正常停止本机核心，再退出窗口和托盘；不停止远程核心")
 			t.ready.Store(true)
 			go func() {
 				for {
@@ -54,6 +55,8 @@ func (t *Tray) Start(show, exit func()) {
 						show()
 					case <-exitItem.ClickedCh:
 						exit()
+					case <-exitWithCoreItem.ClickedCh:
+						exitWithCore()
 					case <-stop:
 						systray.Quit()
 						return
