@@ -191,6 +191,7 @@
 /* Trend metrics use separate axes rather than mixing rates, tokens and latency. */
 .log-stats { margin: 16px 0; padding: 18px 20px 16px; min-width: 0; }
 .log-stats-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.log-stats[data-collapsed=true] .log-stats-header { margin-bottom: 0; }
 .log-stats-header h2 { font-size: 14px; font-weight: 600; }
 .log-stats-header label { display: flex; align-items: center; gap: 10px; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .log-stats-header select { width: 136px; }

@@ -1,4 +1,6 @@
 import { useId, useState, type PointerEvent } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Button } from '../../components/ui/button';
 import type { Stats } from '../../desktop/contract.generated';
 import { dimensionLabels, type LogDimension, type LogFilters } from './log.model';
 import { LogGroups } from './log-groups.view';
@@ -72,17 +74,25 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
 }
 export function LogStatsView({ filters, paused, revision, onGroupSelect }: { filters: LogFilters; paused: boolean; revision: number; onGroupSelect: (dimension: LogDimension, value: string) => void }) {
   const c = useLogStatsController(filters, paused, revision);
-  return <section className="log-stats log-surface" aria-label="请求运行趋势" aria-busy={c.loading}>
-    <header className="log-stats-header"><h2>运行趋势</h2><label>分类统计<select aria-label="日志分类统计" className="select-field" value={c.groupBy} onChange={e => c.setGroupBy(e.target.value as LogDimension | '')}>
+  const [collapsed, setCollapsed] = useState(false);
+  const contentId = useId();
+  return <section className="log-stats log-surface" aria-label="请求运行趋势" aria-busy={c.loading} data-collapsed={collapsed}>
+    <header className="log-stats-header"><h2>运行趋势</h2>{!collapsed && <><label>分类统计<select aria-label="日志分类统计" className="select-field" value={c.groupBy} onChange={e => c.setGroupBy(e.target.value as LogDimension | '')}>
       <option value="">不分类</option>{(Object.keys(dimensionLabels) as LogDimension[]).map(key => <option key={key} value={key}>按{dimensionLabels[key]}</option>)}
     </select></label><label>统计粒度<select aria-label="趋势统计粒度" className="select-field" value={c.interval} onChange={e => c.setInterval(Number(e.target.value))}>
       <option value={0}>自动{c.data && c.interval === 0 ? ` · ${intervals.find(i => i.ms === c.data!.interval_ms)?.label ?? ''}` : ''}</option>
       {intervals.map(i => <option key={i.ms} value={i.ms} disabled={!validInterval(filters.window, i.ms)}>{i.label}</option>)}
-    </select></label></header>
-    <div className="log-stats-metrics" role="group" aria-label="趋势指标">{metrics.map(m => <button key={m.id} aria-pressed={c.metric === m.id} data-tone={m.id} onClick={() => c.setMetric(m.id)}>
-      <span>{m.label}</span><strong>{formatStat(c.data?.summary[m.field] ?? null, true)}<small>{m.unit}</small></strong>
-    </button>)}</div>
-    {c.error || c.loading || !c.data || c.data.summary.requests === 0 ? <div className="log-stats-placeholder" role="status">{c.error || (c.loading ? '趋势加载中' : '所选范围内暂无请求')}</div> : <TrendChart data={c.data} metric={c.metric} />}
-    {c.groupBy && !c.loading && !c.error && c.data && <LogGroups data={c.data} dimension={c.groupBy} onSelect={value => onGroupSelect(c.groupBy as LogDimension, value)} />}
+    </select></label></>}
+      <Button variant="ghost" size="sm" type="button" aria-label={collapsed ? '展开运行趋势' : '折叠运行趋势'} aria-expanded={!collapsed} aria-controls={contentId} onClick={() => setCollapsed(value => !value)}>
+        {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}{collapsed ? '展开' : '折叠'}
+      </Button>
+    </header>
+    <div id={contentId} hidden={collapsed}>
+      <div className="log-stats-metrics" role="group" aria-label="趋势指标">{metrics.map(m => <button key={m.id} aria-pressed={c.metric === m.id} data-tone={m.id} onClick={() => c.setMetric(m.id)}>
+        <span>{m.label}</span><strong>{formatStat(c.data?.summary[m.field] ?? null, true)}<small>{m.unit}</small></strong>
+      </button>)}</div>
+      {c.error || c.loading || !c.data || c.data.summary.requests === 0 ? <div className="log-stats-placeholder" role="status">{c.error || (c.loading ? '趋势加载中' : '所选范围内暂无请求')}</div> : <TrendChart data={c.data} metric={c.metric} />}
+      {c.groupBy && !c.loading && !c.error && c.data && <LogGroups data={c.data} dimension={c.groupBy} onSelect={value => onGroupSelect(c.groupBy as LogDimension, value)} />}
+    </div>
   </section>;
 }

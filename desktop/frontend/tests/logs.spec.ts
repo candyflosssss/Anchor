@@ -583,3 +583,77 @@ test('idle chart gaps are connected visually while tooltips keep raw empty and z
   await expect(trends.locator('.log-chart-bridge')).toHaveCount(0);
   await expect(trends.locator('.log-chart-note')).toHaveCount(0);
 });
+
+
+test('trend panel collapses with keyboard access and preserves choices in both themes and narrow windows', async ({ page }) => {
+  await openLogs(page, fixture, true);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  const toggle = trends.getByRole('button', { name: /(?:折叠|展开)运行趋势/ });
+  const chart = trends.getByRole('slider');
+  const metrics = trends.getByRole('group', { name: '趋势指标' });
+  const groups = trends.getByRole('region', { name: '项目分类汇总', exact: true });
+  const list = page.getByRole('region', { name: '请求日志列表' });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(chart).toBeVisible();
+  const contentId = await toggle.getAttribute('aria-controls');
+  expect(contentId).toBeTruthy();
+  await trends.getByRole('button', { name: /请求量/ }).click();
+  await trends.getByLabel('趋势统计粒度').selectOption('60000');
+  await trends.getByLabel('日志分类统计').selectOption('project');
+  await expect(groups).toBeVisible();
+  for (const { width, dark } of [{ width: 1440, dark: false }, { width: 390, dark: true }]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), dark);
+    const expandedHeight = (await trends.boundingBox())!.height;
+    await toggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(toggle).toHaveAccessibleName('展开运行趋势');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(toggle).toHaveAttribute('aria-controls', contentId!);
+    expect(await page.evaluate(id => document.getElementById(id!)?.hidden, contentId)).toBe(true);
+    await expect(chart).toBeHidden();
+    await expect(metrics).toBeHidden();
+    await expect(groups).toBeHidden();
+    await expect(trends.getByLabel('日志分类统计')).toBeHidden();
+    await expect(trends.getByLabel('趋势统计粒度')).toBeHidden();
+    await expect(list).toBeVisible();
+    const collapsedBox = (await trends.boundingBox())!;
+    expect(collapsedBox.height).toBeLessThan(expandedHeight);
+    const toggleBox = (await toggle.boundingBox())!;
+    expect(toggleBox.x).toBeGreaterThanOrEqual(0);
+    expect(toggleBox.x + toggleBox.width).toBeLessThanOrEqual(width);
+    if (capture) await page.screenshot({ path: resolve(capture, `log-trends-collapsed-${dark ? 'dark-narrow' : 'light'}.png`), fullPage: true });
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await toggle.focus();
+    await page.keyboard.press('Space');
+    await expect(toggle).toBeFocused();
+    await expect(toggle).toHaveAccessibleName('折叠运行趋势');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(chart).toBeVisible();
+    await expect(groups).toBeVisible();
+    await expect(trends.getByRole('button', { name: /请求量/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(trends.getByLabel('日志分类统计')).toHaveValue('project');
+    await expect(trends.getByLabel('趋势统计粒度')).toHaveValue('60000');
+  }
+});
+
+test('collapsed trends keep errors and empty states out of the log list until expanded', async ({ page }) => {
+  await openLogs(page);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  const toggle = trends.getByRole('button', { name: /(?:折叠|展开)运行趋势/ });
+  await expect(trends.getByRole('slider')).toBeVisible();
+  for (const error of [true, false]) {
+    await toggle.click();
+    await page.evaluate(error => { window.logTest.statsUnavailable = error; window.logTest.statsEmpty = !error; }, error);
+    const queries = await page.evaluate(() => window.logTest.statsQueries.length);
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.length)).toBeGreaterThan(queries);
+    await expect(trends).toHaveAttribute('aria-busy', 'false');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(trends.getByRole('status')).toBeHidden();
+    await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toBeVisible();
+    await toggle.click();
+    await expect(trends.getByRole('status')).toHaveText(error ? '趋势读取失败' : '所选范围内暂无请求');
+  }
+});
