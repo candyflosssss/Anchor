@@ -308,6 +308,95 @@ test('trend metrics, range, granularity, filter parity and keyboard inspection',
   await expect(trends).toHaveCount(0);
 });
 
+for (const width of [1440, 390]) {
+  test(`trend hover exposes bucket time and values without moving the plot at ${width}px`, async ({ page }) => {
+    await openLogs(page);
+    await page.getByRole('button', { name: '暂停', exact: true }).click();
+    await page.setViewportSize({ width, height: 1000 });
+    const trends = page.getByRole('region', { name: '请求运行趋势' });
+    const chart = trends.getByRole('slider');
+    await expect(chart).toBeVisible();
+    await chart.scrollIntoViewIfNeeded();
+    const before = (await chart.boundingBox())!;
+    const plotOffset = await chart.evaluate(el => (el as HTMLElement).offsetTop);
+    // Enter at the upper edge: hover content must not reflow the plot away from the pointer.
+    await page.mouse.move(before.x + before.width / 240, before.y + 1);
+    await expect(chart).toHaveAttribute('aria-valuenow', '0');
+    const tooltip = trends.getByRole('tooltip');
+    await expect(tooltip).toBeVisible();
+    const query = await page.evaluate(() => window.logTest.statsQueries.at(-1)!);
+    const interval = query.interval_ms || 30000;
+    const range = (index: number) => [query.filter.since_ms + index * interval, Math.min(query.filter.since_ms + (index + 1) * interval, query.filter.before_ms)].map(at => new Date(at).toISOString());
+    await expect(tooltip.locator('time').first()).toHaveAttribute('datetime', range(0)[0]);
+    await expect(tooltip.locator('time').nth(1)).toHaveAttribute('datetime', range(0)[1]);
+    for (const text of ['合计150 Token', '输入100 Token', '输出50 Token']) await expect(tooltip).toContainText(text);
+    expect((await chart.boundingBox())!.y).toBe(before.y);
+    await page.mouse.move(before.x + before.width / 240, before.y + 2);
+    await expect(tooltip).toBeVisible();
+    // Hover the tooltip itself; it must not intercept the pointer or dismiss itself.
+    const tip = (await tooltip.boundingBox())!;
+    await page.mouse.move(tip.x + 3, tip.y + 3);
+    await expect(tooltip).toBeVisible();
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
+      // Element screenshots can scroll the page; compare layout offsets, not stale viewport coordinates.
+      const plot = (await chart.boundingBox())!;
+      for (const fraction of [0, 0.5, 0.999]) {
+        await page.mouse.move(plot.x + plot.width * fraction + (fraction === 0 ? 1 : 0), plot.y + 1);
+        await expect(chart).toHaveAttribute('aria-valuenow', String(fraction === 0 ? 0 : fraction === 0.5 ? 60 : 119));
+        await expect(tooltip).toBeVisible();
+        const bounds = (await tooltip.boundingBox())!;
+        expect(bounds.x).toBeGreaterThanOrEqual(plot.x - 1);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(plot.x + plot.width + 1);
+        expect(await chart.evaluate(el => (el as HTMLElement).offsetTop)).toBe(plotOffset);
+      }
+      await expect(chart).toHaveAttribute('aria-valuenow', '119');
+      await expect(tooltip.locator('time').first()).toHaveAttribute('datetime', range(119)[0]);
+      await expect(tooltip.locator('time').last()).toHaveAttribute('datetime', range(119)[1]);
+      if (capture) await trends.screenshot({ path: resolve(capture, `logs-trend-hover-${width}-${theme}.png`) });
+    }
+    await page.mouse.move(0, 0);
+    await expect(tooltip).toHaveCount(0);
+    await chart.focus(); await page.keyboard.press('Home');
+    await expect(tooltip).toBeVisible();
+    await expect(tooltip.locator('time').first()).toHaveAttribute('datetime', range(0)[0]);
+    await page.keyboard.press('ArrowRight');
+    await expect(tooltip).toContainText('合计— Token');
+    await trends.getByRole('button', { name: /请求量/ }).click();
+    await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight');
+    await expect(tooltip).toContainText('请求量0 次');
+    await page.keyboard.press('End'); await expect(chart).toHaveAttribute('aria-valuenow', '119');
+    await page.keyboard.press('Escape'); await expect(tooltip).toHaveCount(0);
+    await page.keyboard.press('Home'); await expect(tooltip).toBeVisible();
+    await page.keyboard.press('Tab'); await expect(tooltip).toHaveCount(0);
+  });
+}
+
+test('trend tooltip shows local timestamps and clips a partial bucket to the query end', async ({ page }) => {
+  await openLogs(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  const chart = page.getByRole('region', { name: '请求运行趋势' }).getByRole('slider');
+  const tooltip = page.getByRole('tooltip');
+  for (const [rangeMinutes, interval] of [['15', '10000'], ['15', '3600000'], ['10080', '86400000']]) {
+    await page.getByLabel('日志时间范围').selectOption(rangeMinutes);
+    await page.getByLabel('趋势统计粒度').selectOption(interval);
+    await expect(chart).toBeVisible();
+    await chart.focus(); await page.keyboard.press('End');
+    const query = await page.evaluate(() => window.logTest.statsQueries.at(-1)!);
+    const count = Math.ceil((query.filter.before_ms - query.filter.since_ms) / Number(interval));
+    const start = query.filter.since_ms + (count - 1) * Number(interval);
+    const end = query.filter.before_ms;
+    await expect(chart).toHaveAttribute('aria-valuenow', String(count - 1));
+    for (const [i, at] of [start, end].entries()) {
+      const time = tooltip.locator('time').nth(i);
+      await expect(time).toBeVisible();
+      await expect(time).toHaveAttribute('datetime', new Date(at).toISOString());
+      const text = await page.evaluate(({ at, seconds }) => new Date(at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', ...(seconds ? { second: '2-digit' } : {}), hour12: false }), { at, seconds: Number(interval) < 60000 });
+      await expect(time).toHaveText(text);
+    }
+  }
+});
+
 test('trend errors and empty history are explicit and stale filter responses are discarded', async ({ page }) => {
   await openLogs(page);
   const trends = page.getByRole('region', { name: '请求运行趋势' });
