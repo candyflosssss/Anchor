@@ -78,7 +78,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		fail(w, 413, "request_too_large", "request exceeds limit or cannot be read")
+		fail(w, 413, "request_too_large", "request exceeds the "+strconv.Itoa(MaxRequestBytes>>20)+" MiB gateway limit or cannot be read")
 		return
 	}
 	var request map[string]json.RawMessage
@@ -225,7 +225,7 @@ func (s *Server) protocolHandler(from string) http.HandlerFunc {
 		r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBytes)
 		raw, err := io.ReadAll(r.Body)
 		if err != nil {
-			fail(w, 413, "request_too_large", "request exceeds limit")
+			fail(w, 413, "request_too_large", "request exceeds the "+strconv.Itoa(MaxRequestBytes>>20)+" MiB gateway limit or cannot be read")
 			return
 		}
 		var fields map[string]json.RawMessage

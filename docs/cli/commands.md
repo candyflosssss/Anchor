@@ -156,6 +156,8 @@ anchor serve
 
 两面绑定后才对已批准且 enabled 的 Binding 自动接管；某个目标失败不阻断其他目标，`status.bindings` 分别报告 pending/applied/overridden/conflict 等状态。正常停止先冻结托管写入并条件恢复，然后最多 10 秒排空请求。崩溃不会自动执行恢复；重新启动会核对原日志，或核心离线后用 `recover`。已运行的 Codex 会话可能缓存旧地址，恢复后应重启 Codex。
 
+2026-10-16 网关修订：`serve` 的 Responses / Chat Completions / Anthropic 请求体上限由 8 MiB 提高到 **32 MiB**，超限仍返回 HTTP 413 `request_too_large`，错误信息包含上限。该限制包括内嵌图片与完整历史，不是 token 限制；跨协议转换后的请求也受保护。全局并发 16、供应商并发和管理写入 128 KiB 上限不变；无新增 CLI 参数。需更新并重启核心才能生效，未发布新的官方桌面安装包，既有安装包不会自动改变。
+
 ### `stop`（当前开发版）
 
 ```text

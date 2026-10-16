@@ -29,7 +29,8 @@ import (
 // Version defaults to the source milestone; release builds inject their version with -ldflags -X.
 var Version = "0.1.0-dev"
 
-const MaxRequestBytes = 8 << 20
+// MaxRequestBytes bounds gateway bodies, including inline image history.
+const MaxRequestBytes = 32 << 20
 
 type Server struct {
 	AgentEnvironment func() (managed.Environment, error)
