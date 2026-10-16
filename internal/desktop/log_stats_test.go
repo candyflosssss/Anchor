@@ -29,3 +29,27 @@ func TestSharedLogStatsContract(t *testing.T) {
 		t.Fatal(v)
 	}
 }
+
+func TestSharedLogDimensionsContract(t *testing.T) {
+	raw, err := os.ReadFile("../../desktop/contract/log-dimensions.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var f struct {
+		Contract string        `json:"contract"`
+		Query    LogStatsQuery `json:"query"`
+		Stats    LogStats      `json:"stats"`
+	}
+	if err = json.Unmarshal(raw, &f); err != nil || f.Contract != Contract || f.Query.Validate() != nil || f.Stats.GroupBy != "project" || f.Stats.GroupCount != 2 || len(f.Stats.Groups) != 2 || f.Stats.Groups[1].Value != "" {
+		t.Fatal("dimensions contract drift", err)
+	}
+	empty := ""
+	raw, err = json.Marshal(LogQuery{Project: &empty})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err = json.Unmarshal(raw, &fields); err != nil || string(fields["project"]) != `""` || fields["agent"] != nil {
+		t.Fatal("all and unknown filters collapsed", string(raw), err)
+	}
+}

@@ -1,6 +1,7 @@
 import { useId, useState, type PointerEvent } from 'react';
 import type { Stats } from '../../desktop/contract.generated';
-import type { LogFilters } from './log.model';
+import { dimensionLabels, type LogDimension, type LogFilters } from './log.model';
+import { LogGroups } from './log-groups.view';
 import { chartPaths, formatStat, intervals, metrics, validInterval, type MetricID } from './log-stats.model';
 import { useLogStatsController } from './use-log-stats-controller';
 const width = 1000, height = 180, insetX = 4;
@@ -63,10 +64,12 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
     <div className="log-chart-x mono"><span>{time(data.since_ms)}</span><span>{time(data.since_ms + (data.before_ms - data.since_ms) / 2)}</span><span>{time(data.before_ms)}</span></div>
   </>;
 }
-export function LogStatsView({ filters, paused, revision }: { filters: LogFilters; paused: boolean; revision: number }) {
+export function LogStatsView({ filters, paused, revision, onGroupSelect }: { filters: LogFilters; paused: boolean; revision: number; onGroupSelect: (dimension: LogDimension, value: string) => void }) {
   const c = useLogStatsController(filters, paused, revision);
   return <section className="log-stats log-surface" aria-label="请求运行趋势" aria-busy={c.loading}>
-    <header className="log-stats-header"><h2>运行趋势</h2><label>统计粒度<select aria-label="趋势统计粒度" className="select-field" value={c.interval} onChange={e => c.setInterval(Number(e.target.value))}>
+    <header className="log-stats-header"><h2>运行趋势</h2><label>分类统计<select aria-label="日志分类统计" className="select-field" value={c.groupBy} onChange={e => c.setGroupBy(e.target.value as LogDimension | '')}>
+      <option value="">不分类</option>{(Object.keys(dimensionLabels) as LogDimension[]).map(key => <option key={key} value={key}>按{dimensionLabels[key]}</option>)}
+    </select></label><label>统计粒度<select aria-label="趋势统计粒度" className="select-field" value={c.interval} onChange={e => c.setInterval(Number(e.target.value))}>
       <option value={0}>自动{c.data && c.interval === 0 ? ` · ${intervals.find(i => i.ms === c.data!.interval_ms)?.label ?? ''}` : ''}</option>
       {intervals.map(i => <option key={i.ms} value={i.ms} disabled={!validInterval(filters.window, i.ms)}>{i.label}</option>)}
     </select></label></header>
@@ -74,5 +77,6 @@ export function LogStatsView({ filters, paused, revision }: { filters: LogFilter
       <span>{m.label}</span><strong>{formatStat(c.data?.summary[m.field] ?? null, true)}<small>{m.unit}</small></strong>
     </button>)}</div>
     {c.error || c.loading || !c.data || c.data.summary.requests === 0 ? <div className="log-stats-placeholder" role="status">{c.error || (c.loading ? '趋势加载中' : '所选范围内暂无请求')}</div> : <TrendChart data={c.data} metric={c.metric} />}
+    {c.groupBy && !c.loading && !c.error && c.data && <LogGroups data={c.data} dimension={c.groupBy} onSelect={value => onGroupSelect(c.groupBy as LogDimension, value)} />}
   </section>;
 }

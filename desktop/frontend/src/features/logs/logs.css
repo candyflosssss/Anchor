@@ -252,3 +252,16 @@
 .log-filter-value { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
 .log-filter-count { color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; font-size: 11px; }
 .log-filter-state { padding: 8px; color: hsl(var(--muted-foreground)); font-size: 11px; }
+
+.log-stats-header { flex-wrap: wrap; }
+.log-stats-header h2 { margin-right: auto; }
+.log-groups { border-top: 1px solid hsl(var(--border)); margin-top: 12px; padding-top: 12px; }
+.log-groups header { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.log-groups header h3 { color: hsl(var(--foreground)); font-weight: 500; }
+.log-groups-scroll { max-height: 280px; overflow: auto; margin-top: 8px; }
+.log-groups table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
+.log-groups th, .log-groups td { padding: 7px 12px; text-align: right; border-bottom: 1px solid hsl(var(--border)); font-variant-numeric: tabular-nums; }
+.log-groups th:first-child { text-align: left; font-weight: 500; max-width: 280px; }
+.log-groups th button { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: left; color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 3px; }
+.log-groups th button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+.log-group-status { font-size: 12px; color: hsl(var(--muted-foreground)); padding-top: 12px; }

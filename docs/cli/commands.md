@@ -673,6 +673,7 @@ anchor recover [--id ID]
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
+| 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 当前源码未发布；项目／会话需调用端显式上报安全标签，自动接入未实现，历史不回填 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
@@ -722,9 +723,12 @@ anchor logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50
   [--provider ID] [--model NAME] [--key ID] [--http N]
   [--code VALUE] [--stage VALUE] [--level VALUE] [--search PREFIX]
 anchor logs stats [--since 1h] [--interval 0s|10s|30s|1m|5m|15m|1h|6h|24h]
+  [--group-by agent|binding|project|session]
   [--status VALUE] [--source proxy|probe] [--provider ID] [--model NAME]
   [--key ID] [--http N] [--code VALUE] [--stage VALUE] [--search PREFIX]
-anchor logs suggestions [--kind requests|system] [--field search|provider|model|key|http|code|stage]
+  # 请求 list/follow/export/stats 均可额外使用：
+  [--agent TYPE] [--binding ID] [--project ID] [--session ID]
+anchor logs suggestions [--kind requests|system] [--field search|provider|model|key|http|code|stage|agent|binding|project|session]
   [--prefix VALUE] [--since 1h] [--limit 20]
 anchor logs detail REQUEST_ID
 anchor logs settings
@@ -738,6 +742,8 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | since | 1h，Go duration，>0 且 ≤2160h（90 天）；24h、168h 可用，不支持 `7d` |
 | limit | 50，1–200；导出内部固定每页 100 条 |
 | interval（仅 stats） | 0s（自动）；手选 10s、30s、1m、5m、15m、1h、6h、24h，最多600个桶；自动取不超过120个桶的最细粒度；不支持1ns、任意间隔或负值 |
+| group-by（仅 stats，当前源码未发布） | 默认不分类；agent/binding/project/session，按请求数排序，最多100组；summary/buckets仍为全范围，总组数由group_count提供 |
+| agent / binding / project / session（当前源码未发布） | 缺省不筛选；显式 `--project ""` 等仅选未识别；非空值精确匹配，最长512字节，仅 requests 可用 |
 | cursor / until | 0；列表 next_cursor 读取更旧记录，latest 固定序号上界 |
 | status / source / provider / model / key / code / stage / level | 空表示不筛选；非空按原值精确匹配；requests 与 system 适用字段不同 |
 | http | 0 表示不筛选；显式值 100–599，代表实际收到的上游状态 |
@@ -746,11 +752,15 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | max-requests | 初始 50,000，100–200,000 |
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
 
-`suggestions`（2026-10-16 已随 desktop.43 dev 宿主／核心发布；命令由兼容源码 CLI 提供，公开独立 alpha.6 CLI 不含）只读查询所选 Context 的保留日志候选，需要 owner 管理授权、正确实例身份及兼容核心；不会调用上游或写配置。参数：`--kind` 默认 requests（system 只支持 search）；`--field` 默认 search，可选 provider/model/key/http/code/stage；`--prefix` 默认空、区分大小写、最长512字节，不支持通配符；`--since` 默认1h、范围(0,2160h]；`--limit` 默认20、范围1..100。此命令不接收列表的其他过滤或分页参数。
+`suggestions`（2026-10-16 已随 desktop.43 dev 宿主／核心发布；命令由兼容源码 CLI 提供，公开独立 alpha.6 CLI 不含）只读查询所选 Context 的保留日志候选，需要 owner 管理授权、正确实例身份及兼容核心；不会调用上游或写配置。参数：`--kind` 默认 requests（system 只支持 search）；`--field` 默认 search，可选 provider/model/key/http/code/stage；当前源码（未发布）新增 agent/binding/project/session；`--prefix` 默认空、区分大小写、最长512字节，不支持通配符；`--since` 默认1h、范围(0,2160h]；`--limit` 默认20、范围1..100。此命令不接收列表的其他过滤或分页参数。
 
 输出 `{items:[{value,count}],has_more}`：基于整个时间范围而非当前页，空值不列出，按次数降序、相同次数按值升序。search 对应请求 ID／模型／供应商／Key／错误码，system 为事件名；单条请求同一值只计一次。HTTP 候选是字符串，Key 只包含日志安全 ID。超上限 has_more=true，使用更长前缀缩小；无匹配成功输出空数组。旧核心不支持、鉴权／身份错误、非法字段／范围和存储故障均非零退出，不伪装成空历史。例：`anchor logs suggestions --field model --prefix gpt --since 24h`。桌面搜索与各文本过滤复用此接口；已有精确过滤／前缀搜索语义不变。
 
 `stats`（2026-10-16 已随 desktop.42 dev 宿主／核心发布；命令由兼容源码 CLI 提供，独立公开 alpha.6 CLI 不含，桌面程序不提供通用 CLI）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
+
+当前源码（2026-10-16，未发布）新增归属筛选和 `--group-by`。示例：`anchor logs stats --since 24h --group-by agent`、`anchor logs stats --agent codex --group-by project`、`anchor logs list --session thread-1`、`anchor logs export --project ""`。分组响应额外含 `{group_by,groups:[{value,values}],group_count}`；空 value 为“未识别”，按请求量降序／同量值升序返回前100组，不截断总体统计。命令需要支持新参数的 CLI 与核心；旧核心拒绝新字段时非零退出，不静默当作成功。四维度也参与请求 search／suggestions；系统事件不接受归属筛选。
+
+Agent 只从已验证绑定采集；绑定 ID 不是进程 ID。项目／会话仅来源于调用端的 `X-Anchor-Project` / `X-Anchor-Session`（安全显式标签，非自动探测），不能从历史凭空恢复；未上报均属未识别。当前没有增加“修改客户端上报配置”的 CLI 或 GUI，调用端是否支持自定义头需另行确认；本功能不会自动修改真实 Agent 配置。采集字符限制／隐私和旧日志兼容见[日志设计](../design/logging.md#11-归属与分类统计2026-10-16当前源码未发布)。
 
 values 的 requests 包括 pending/cancelled；completed=succeeded+failed+interrupted，errors=failed+interrupted，error_rate=errors/completed×100，pending/cancelled 不计错误率分母。用量只累加输入输出均已知请求，input_tokens/output_tokens/total_tokens 是已知小计并带 usage_samples；总量不另加缓存或思考。tps 是成功且输出已知／总耗时>0样本的 sum(output)×1000/sum(elapsed_ms)，不是桶或请求速率简单平均；cache_hit_rate 是单次尝试且输入>0、0≤cache≤input已知样本的 sum(cache)/sum(input)×100。latency_ms 和 first_output_ms 是有效观测均值，首字回退旧正文首字，各指标带样本数。没有相应观测时为 null，明确观测零保留0；空桶不补造 TPS／用量／率。summary 使用同一查询原始累加器，非桶均值。统计受日志保留和 health 丢弃／写入失败限制，不代表永久消费账本，详见[日志趋势口径](../design/logging.md#9-请求趋势统计2026-10-16当前源码未打包)。
 

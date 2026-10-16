@@ -630,6 +630,7 @@ export interface LogSuggestionsResult {
   problem: Problem | null;
 }
 export interface StatsQuery {
+  group_by?: string;
   filter: Query;
   interval_ms: number;
 }
@@ -651,11 +652,18 @@ export interface StatsValues {
   first_output_ms: number | null;
   first_output_samples: number;
 }
+export interface StatsGroup {
+  value: string;
+  values: StatsValues;
+}
 export interface StatsBucket {
   at_ms: number;
   values: StatsValues;
 }
 export interface Stats {
+  group_by?: string;
+  groups?: StatsGroup[];
+  group_count?: number;
   since_ms: number;
   before_ms: number;
   interval_ms: number;
@@ -695,6 +703,10 @@ export interface Attempt {
   output: number | null;
 }
 export interface Request {
+  agent?: string;
+  binding?: string;
+  project?: string;
+  session?: string;
   id: string;
   started_at_ms: number;
   status: string;
@@ -732,6 +744,10 @@ export interface Event {
   fields: Record<string, string>;
 }
 export interface Query {
+  agent?: string | null;
+  binding?: string | null;
+  project?: string | null;
+  session?: string | null;
   kind: string;
   limit: number;
   cursor: number;

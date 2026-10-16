@@ -37,7 +37,7 @@ func (q *SuggestionsQuery) Validate() error {
 		return ErrInvalid
 	}
 	switch q.Field {
-	case "search", "provider", "model", "key", "http", "code", "stage":
+	case "search", "provider", "model", "key", "http", "code", "stage", "agent", "binding", "project", "session":
 	default:
 		return ErrInvalid
 	}
@@ -62,11 +62,14 @@ func (s *Store) Suggest(ctx context.Context, q SuggestionsQuery) (Suggestions, e
 		return out, ErrInvalid
 	}
 	columns := map[string]string{"provider": "provider", "model": "model", "key": "key_id", "http": "http", "code": "error_code", "stage": "stage"}
+	for _, name := range []string{"agent", "binding", "project", "session"} {
+		columns[name] = dimensionColumn(name)
+	}
 	table, cols := "requests", []string{columns[q.Field]}
 	if q.Kind == "system" {
 		table, cols = "events", []string{"event"}
 	} else if q.Field == "search" {
-		cols = []string{"id", "model", "provider", "key_id", "error_code"}
+		cols = []string{"id", "model", "provider", "key_id", "error_code", dimensionColumn("agent"), dimensionColumn("binding"), dimensionColumn("project"), dimensionColumn("session")}
 	}
 	var selects []string
 	var args []any

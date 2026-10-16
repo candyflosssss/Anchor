@@ -3,6 +3,7 @@ package logbook
 import (
 	"context"
 	"database/sql"
+	"sort"
 	"strings"
 	"time"
 )
@@ -10,8 +11,9 @@ import (
 // StatsQuery ignores pagination: statistics cover all retained matching requests.
 // The half-open time range is bounded to 90 days and at most 600 buckets.
 type StatsQuery struct {
-	Filter     Query `json:"filter"`
-	IntervalMS int64 `json:"interval_ms"`
+	GroupBy    string `json:"group_by,omitempty"`
+	Filter     Query  `json:"filter"`
+	IntervalMS int64  `json:"interval_ms"`
 }
 type StatsValues struct {
 	Requests           int64    `json:"requests"`
@@ -35,7 +37,14 @@ type StatsBucket struct {
 	AtMS   int64       `json:"at_ms"`
 	Values StatsValues `json:"values"`
 }
+type StatsGroup struct {
+	Value  string      `json:"value"`
+	Values StatsValues `json:"values"`
+}
 type Stats struct {
+	GroupBy    string        `json:"group_by,omitempty"`
+	Groups     []StatsGroup  `json:"groups,omitempty"`
+	GroupCount int           `json:"group_count,omitempty"`
 	SinceMS    int64         `json:"since_ms"`
 	BeforeMS   int64         `json:"before_ms"`
 	IntervalMS int64         `json:"interval_ms"`
@@ -44,7 +53,19 @@ type Stats struct {
 	Health     Health        `json:"health"`
 }
 
+// dimensionColumn is a whitelist, not an SQL expression supplied by the client.
+func dimensionColumn(name string) string {
+	switch name {
+	case "agent", "binding", "project", "session":
+		return "COALESCE(json_extract(document,'$." + name + "'),'')"
+	default:
+		return ""
+	}
+}
 func (q *StatsQuery) Validate() error {
+	if q.GroupBy != "" && dimensionColumn(q.GroupBy) == "" {
+		return ErrInvalid
+	}
 	if q.Filter.Kind != "" && q.Filter.Kind != "requests" {
 		return ErrInvalid
 	}
@@ -149,6 +170,12 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 	count := int((out.BeforeMS - out.SinceMS + out.IntervalMS - 1) / out.IntervalMS)
 	buckets := make([]statsAccumulator, count)
 	var total statsAccumulator
+	groups := map[string]*statsAccumulator{}
+	groupColumn := "''"
+	if q.GroupBy != "" {
+		groupColumn = dimensionColumn(q.GroupBy)
+	}
+	out.GroupBy = q.GroupBy
 	where, args := logWhere(q.Filter, "requests")
 	// Stats uses [since,before), whereas the historical list includes before.
 	where = append(where, "created_at<?")
@@ -158,7 +185,7 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
  json_extract(document,'$.input'),json_extract(document,'$.output'),json_extract(document,'$.elapsed_ms'),
  json_extract(document,'$.metrics.cache_read_tokens'),
  COALESCE(json_extract(document,'$.metrics.time_to_first_output_ms'),json_extract(document,'$.metrics.time_to_first_text_ms')),
- COALESCE(json_extract(document,'$.attempt_count'),json_array_length(document,'$.attempts'),0)
+ COALESCE(json_extract(document,'$.attempt_count'),json_array_length(document,'$.attempts'),0), `+groupColumn+`
  FROM requests WHERE `+strings.Join(where, " AND "), args...)
 	if err != nil {
 		return out, ErrUnavailable
@@ -166,20 +193,40 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var at, attempts int64
-		var status string
+		var status, group string
 		var input, output, elapsed, cache, first sql.NullInt64
-		if rows.Scan(&at, &status, &input, &output, &elapsed, &cache, &first, &attempts) != nil {
+		if rows.Scan(&at, &status, &input, &output, &elapsed, &cache, &first, &attempts, &group) != nil {
 			return out, ErrUnavailable
 		}
 		i := (at - out.SinceMS) / out.IntervalMS
 		buckets[i].add(status, input, output, elapsed, cache, first, attempts)
 		total.add(status, input, output, elapsed, cache, first, attempts)
+		if q.GroupBy != "" {
+			if groups[group] == nil {
+				groups[group] = &statsAccumulator{}
+			}
+			groups[group].add(status, input, output, elapsed, cache, first, attempts)
+		}
 	}
 	if rows.Err() != nil {
 		return out, ErrUnavailable
 	}
 	for i := range buckets {
 		out.Buckets = append(out.Buckets, StatsBucket{AtMS: out.SinceMS + int64(i)*out.IntervalMS, Values: buckets[i].values()})
+	}
+	// Bound the response and DOM, not the statistics: total includes every match.
+	for value, accumulator := range groups {
+		out.Groups = append(out.Groups, StatsGroup{Value: value, Values: accumulator.values()})
+	}
+	out.GroupCount = len(out.Groups)
+	sort.Slice(out.Groups, func(i, j int) bool {
+		if out.Groups[i].Values.Requests != out.Groups[j].Values.Requests {
+			return out.Groups[i].Values.Requests > out.Groups[j].Values.Requests
+		}
+		return out.Groups[i].Value < out.Groups[j].Value
+	})
+	if len(out.Groups) > 100 {
+		out.Groups = out.Groups[:100]
 	}
 	out.Summary = total.values()
 	return out, nil

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/logbook"
@@ -49,6 +50,11 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 		}
 		now := time.Now()
 		t := &requestTrace{start: now, row: logbook.Request{ID: id[:16], StartedAtMS: now.UnixMilli(), Status: "pending", Source: "proxy", Stage: "request_parse", Delivery: "none", Attempts: []logbook.Attempt{}, Evidence: map[string]string{"sent_service_tier": "not_sent", "fast_triggered": "unknown"}}}
+		if b, ok := r.Context().Value(bindingKey{}).(state.Binding); ok {
+			t.row.Agent, t.row.Binding = b.AdapterID, b.ID
+		}
+		t.row.Project = logIdentity(r.Header.Values("X-Anchor-Project"), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key"))
+		t.row.Session = logIdentity(r.Header.Values("X-Anchor-Session"), strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key"))
 		switch r.URL.Path {
 		case "/v1/messages":
 			t.row.Protocol = "anthropic"
@@ -255,4 +261,31 @@ func knownReasoningEffort(s string) bool {
 		return true
 	}
 	return false
+}
+
+// logIdentity accepts one bounded opaque label, excluding paths and known credentials.
+// Invalid/ambiguous labels are ignored without rejecting an inference request.
+func logIdentity(values []string, credentials ...string) string {
+	if len(values) != 1 {
+		return ""
+	}
+	value := values[0]
+	if len(value) == 0 || len(value) > 128 {
+		return ""
+	}
+	for i, c := range []byte(value) {
+		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' {
+			continue
+		}
+		if i > 0 && (c == '-' || c == '_' || c == '.' || c == ':' || c == '@') {
+			continue
+		}
+		return ""
+	}
+	for _, credential := range credentials {
+		if value == credential {
+			return ""
+		}
+	}
+	return value
 }

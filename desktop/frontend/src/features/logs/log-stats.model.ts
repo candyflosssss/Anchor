@@ -1,6 +1,6 @@
 import type { Stats, StatsQuery, StatsValues } from '../../desktop/contract.generated';
 import { DesktopProblem } from '../../desktop/transport';
-import type { LogFilters } from './log.model';
+import { identityQuery, type LogDimension, type LogFilters } from './log.model';
 export type MetricID = 'requests' | 'tokens' | 'tps' | 'errors' | 'cache' | 'latency' | 'first';
 export const intervals = [
   { ms: 10000, label: '10 秒' }, { ms: 30000, label: '30 秒' }, { ms: 60000, label: '1 分钟' },
@@ -16,8 +16,8 @@ export const metrics: { id: MetricID; label: string; unit: string; field: keyof 
   { id: 'latency', label: '平均耗时', unit: 'ms', field: 'latency_ms' },
   { id: 'first', label: '首字延迟', unit: 'ms', field: 'first_output_ms' },
 ];
-export function statsQuery(filters: LogFilters, interval: number, now = Date.now()): StatsQuery {
-  return { interval_ms: interval, filter: {
+export function statsQuery(filters: LogFilters, interval: number, now = Date.now(), groupBy: LogDimension | '' = ''): StatsQuery {
+  return { ...(groupBy ? { group_by: groupBy } : {}), interval_ms: interval, filter: { ...identityQuery(filters),
     kind: 'requests', limit: 50, cursor: 0, until: 0, since_ms: now - Number(filters.window) * 60000, before_ms: now,
     status: filters.status === 'all' ? '' : filters.status, source: filters.source === 'all' ? '' : filters.source,
     provider: filters.provider === 'all' ? '' : filters.provider, model: filters.model, key: filters.key,
@@ -39,6 +39,16 @@ export function checkedStats(value: Stats): Stats {
     }
     if ((v.error_rate ?? 0) > 100 || (v.cache_hit_rate ?? 0) > 100) throw new DesktopProblem('read_error');
   };
+  if (value.group_by != null && !['agent', 'binding', 'project', 'session'].includes(value.group_by)) throw new DesktopProblem('read_error');
+  if (value.group_by) {
+    const groups = value.groups ?? [];
+    if (!Array.isArray(groups) || groups.length > 100 || !Number.isSafeInteger(value.group_count ?? 0) || (value.group_count ?? 0) < groups.length) throw new DesktopProblem('read_error');
+    const seen = new Set<string>();
+    for (const group of groups) {
+      if (!group || typeof group.value !== 'string' || seen.has(group.value)) throw new DesktopProblem('read_error');
+      seen.add(group.value); check(group.values);
+    }
+  }
   check(value.summary);
   value.buckets.forEach((b, i) => { if (b.at_ms !== value.since_ms + i * value.interval_ms) throw new DesktopProblem('read_error'); check(b.values); });
   return value;

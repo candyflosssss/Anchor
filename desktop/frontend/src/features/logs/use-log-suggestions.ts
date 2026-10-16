@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Suggestion } from '../../desktop/contract.generated';
 import { logService } from './log.service';
 
-export type SuggestionField = 'search' | 'provider' | 'model' | 'key' | 'http' | 'code' | 'stage';
+export type SuggestionField = 'search' | 'provider' | 'model' | 'key' | 'http' | 'code' | 'stage' | 'agent' | 'binding' | 'project' | 'session';
 type Result = { key: string; items: Suggestion[]; hasMore: boolean; failed: boolean };
 
 // Only the focused control loads candidates. No page cursor or active filters

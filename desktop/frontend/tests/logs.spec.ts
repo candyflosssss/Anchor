@@ -1,3 +1,4 @@
+import dimensionsFixture from '../../contract/log-dimensions.json' with { type: 'json' };
 import suggestionsFixture from '../../contract/log-suggestions.json' with { type: 'json' };
 import statsFixture from '../../contract/log-stats.json' with { type: 'json' };
 import { expect, test, type Page } from '@playwright/test';
@@ -5,20 +6,21 @@ import { resolve } from 'node:path';
 import fixture from '../../contract/logs.json' with { type: 'json' };
 import type { DesktopBridge, Query } from '../src/desktop/contract.generated';
 const capture = process.env.ANCHOR_LOG_SCREENSHOTS;
-declare global { interface Window { logTest: { queries: Query[]; statsQueries: import('../src/desktop/contract.generated').StatsQuery[]; statsUnavailable: boolean; statsEmpty: boolean; exports: number; settings: typeof fixture.settings; unavailable: boolean; paged: boolean; suggestionQueries: import('../src/desktop/contract.generated').SuggestionsQuery[]; suggestionsUnavailable: boolean; suggestionDelays: Record<string, number> } } }
-async function openLogs(page: Page, data = fixture) {
-  await page.addInitScript(({ f, sf, suggestions }) => {
-    window.logTest = { queries: [], statsQueries: [], statsUnavailable: false, statsEmpty: false, exports: 0, settings: f.settings, unavailable: false, paged: false, suggestionQueries: [], suggestionsUnavailable: false, suggestionDelays: {} };
+declare global { interface Window { logTest: { queries: Query[]; statsQueries: import('../src/desktop/contract.generated').StatsQuery[]; statsUnavailable: boolean; statsEmpty: boolean; exports: number; exportQueries: Query[]; settings: typeof fixture.settings; unavailable: boolean; paged: boolean; suggestionQueries: import('../src/desktop/contract.generated').SuggestionsQuery[]; suggestionsUnavailable: boolean; suggestionDelays: Record<string, number> } } }
+async function openLogs(page: Page, data = fixture, dimensions = false) {
+  await page.addInitScript(({ f, sf, suggestions, df, dimensions }) => {
+    window.logTest = { queries: [], statsQueries: [], statsUnavailable: false, statsEmpty: false, exports: 0, exportQueries: [], settings: f.settings, unavailable: false, paged: false, suggestionQueries: [], suggestionsUnavailable: false, suggestionDelays: {} };
     const result = <T,>(data: T) => ({ contract: f.contract, data, problem: null });
     const session = { instance_id: 'logs-isolated', phase: 'ready', source: 'started', can_stop: true };
-    const rows = f.page.requests.map(r => ({ ...r, started_at_ms: Date.now() }));
+    const rows: import('../src/desktop/contract.generated').Request[] = f.page.requests.map(r => ({ ...r, evidence: Object.fromEntries(Object.entries(r.evidence)) as Record<string, string>, ...(dimensions ? { agent: 'codex', binding: 'desktop', project: 'anchor', session: 'thread-1' } : {}), started_at_ms: Date.now() }));
+    if (dimensions) rows.push({ ...rows[0], id: 'fixture_unattributed', agent: '', binding: '', project: '', session: '' });
     const api = {
       Start: async () => result(session), Status: async () => result(session), Providers: async () => result([]),
       Logs: async (q: Query) => {
         window.logTest.queries.push(q);
         if (window.logTest.unavailable) return { contract: f.contract, data: null, problem: { code: 'offline' } };
         if (q.kind === 'system') return result(f.system);
-        const selected = rows.filter(r => (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
+        const selected = rows.filter(r => (['agent', 'binding', 'project', 'session'] as const).every(key => q[key] == null || (r[key] ?? '') === q[key]) && (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
         return result({ ...f.page, requests: selected.map(r => ({ ...r, attempts: [], evidence: Object.fromEntries(Object.entries(r.evidence).filter(([key]) => ['sent_service_tier', 'sent_service_tier_raw', 'upstream_service_tier', 'upstream_service_tier_raw', 'fast_triggered'].includes(key))) })), latest: q.cursor ? 3 : 2, has_more: window.logTest.paged && !q.cursor, next_cursor: 1 });
       },
       LogSuggestions: async (q: import('../src/desktop/contract.generated').SuggestionsQuery) => {
@@ -43,16 +45,26 @@ async function openLogs(page: Page, data = fixture) {
         const interval = q.interval_ms || [10000, 30000, 60000, 300000, 900000, 3600000, 21600000, 86400000].find(ms => Math.ceil(span / ms) <= 120)!;
         const empty = sf.stats.buckets[1].values;
         const buckets = Array.from({ length: Math.ceil(span / interval) }, (_, i) => ({ at_ms: q.filter.since_ms + i * interval, values: window.logTest.statsEmpty ? empty : sf.stats.buckets[i % 3].values }));
-        const summary = window.logTest.statsEmpty ? empty : { ...sf.stats.summary, requests: q.filter.provider === 'slow-provider' ? 999 : 3 };
-        return result({ ...sf.stats, since_ms: q.filter.since_ms, before_ms: q.filter.before_ms, interval_ms: interval, buckets, summary });
+        let summary = window.logTest.statsEmpty ? empty : { ...sf.stats.summary, requests: q.filter.provider === 'slow-provider' ? 999 : 3 };
+        let grouped = {};
+        if (dimensions && q.group_by) {
+          const ids: Record<string, string> = { agent: 'codex', binding: 'desktop', project: 'anchor', session: 'thread-1' };
+          const selected = df.stats.groups.filter(g => Object.entries(ids).every(([key, value]) => {
+            const filter = q.filter[key as keyof Query]; return filter == null || filter === (g.value ? value : '');
+          }));
+          const groups = selected.map(g => ({ ...g, value: g.value ? ids[q.group_by!] : '' }));
+          grouped = { group_by: q.group_by, groups, group_count: groups.length };
+          summary = selected.length === 2 ? df.stats.summary : selected[0]?.values ?? empty;
+        }
+        return result({ ...sf.stats, ...grouped, since_ms: q.filter.since_ms, before_ms: q.filter.before_ms, interval_ms: interval, buckets, summary });
       },
       LogDetail: async (id: string) => result(rows.find(r => r.id === id)),
       LogSettings: async () => result(window.logTest.settings),
       ConfigureLogs: async (s: typeof f.settings) => { window.logTest.settings = s; return result(s); },
-      ExportLogs: async () => { window.logTest.exports++; return result({ accepted: true }); },
+      ExportLogs: async (q: Query) => { window.logTest.exportQueries.push(q); window.logTest.exports++; return result({ accepted: true }); },
     } as unknown as DesktopBridge;
     window.go = { desktop: { Bridge: api } };
-  }, { f: data, sf: statsFixture, suggestions: suggestionsFixture });
+  }, { f: data, sf: statsFixture, suggestions: suggestionsFixture, df: dimensionsFixture, dimensions });
   await page.goto('/');
   await page.getByRole('button', { name: '日志', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看请求 fixture_failed' })).toBeVisible();
@@ -521,4 +533,30 @@ test('suggestion popovers stay inside narrow viewports in both themes', async ({
     if (capture) await page.screenshot({ path: resolve(capture, `log-suggestions-${theme}.png`), fullPage: true });
     await page.keyboard.press('Escape');
   }
+});
+
+
+test('classification drills into shared list, chart and export filters including unknown history', async ({ page }) => {
+  await openLogs(page, fixture, true);
+  const groups = page.getByLabel('日志分类统计');
+  await groups.selectOption('agent');
+  await expect(page.getByRole('region', { name: 'Agent分类汇总', exact: true })).toBeVisible();
+  await groups.selectOption('project');
+  await page.getByRole('button', { name: '筛选项目：anchor', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.logTest.queries.at(-1)?.project)).toBe('anchor');
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.filter.project)).toBe('anchor');
+  await expect(page.getByRole('button', { name: '查看请求 fixture_unattributed', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '导出', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.logTest.exportQueries.at(-1)?.project)).toBe('anchor');
+  await page.getByRole('button', { name: '清除项目筛选', exact: true }).click();
+  await groups.selectOption('session');
+  await page.getByRole('button', { name: '筛选会话：未识别', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.logTest.queries.at(-1)?.session)).toBe('');
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.filter.session)).toBe('');
+  await expect(page.getByRole('button', { name: '查看请求 fixture_unattributed', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '重置', exact: true }).click();
+  await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '查看请求 fixture_success', exact: true }).click();
+  await expect(page.getByRole('region', { name: '请求归属', exact: true })).toContainText('thread-1');
 });

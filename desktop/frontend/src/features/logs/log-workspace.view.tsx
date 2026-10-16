@@ -4,7 +4,7 @@ import { Input } from '../../components/ui/input';
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { RequestDetail } from './log-detail.view';
-import { statusLabels } from './log.model';
+import { dimensionLabels, type LogDimension, statusLabels } from './log.model';
 import { useLogController, type LogController } from './use-log-controller';
 import { RequestTable } from './log-request-table.view';
 import { LogColumnSettings } from './log-columns.view';
@@ -19,11 +19,13 @@ function Filters({ c }: { c: LogController }) {
       <option value="15">最近 15 分钟</option><option value="60">最近 1 小时</option><option value="1440">最近 24 小时</option><option value="10080">最近 7 天</option><option value="43200">最近 30 天</option><option value="129600">最近 90 天</option>
     </select>
     {c.tab === 'requests' ? <>
+      {(Object.keys(dimensionLabels) as LogDimension[]).map(key => <LogFilterInput key={key} label={`${dimensionLabels[key]}筛选`} placeholder={c.filters[key] === '' ? `${dimensionLabels[key]}：未识别` : dimensionLabels[key]} field={key} kind={c.tab} window={c.filters.window} revision={c.revision} value={c.filters[key] ?? ''} onChange={value => c.filter(key, value || null)} />)}
       <select aria-label="请求结果" className="select-field" value={c.filters.status} onChange={e => c.filter('status', e.target.value)}><option value="all">全部结果</option>{Object.entries(statusLabels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select>
       <select aria-label="日志来源" className="select-field" value={c.filters.source} onChange={e => c.filter('source', e.target.value)}><option value="all">全部来源</option><option value="proxy">代理请求</option><option value="probe">推理测试</option></select>
       <LogFilterInput label="供应商筛选" placeholder="供应商" field="provider" kind={c.tab} window={c.filters.window} revision={c.revision} value={c.filters.provider === 'all' ? '' : c.filters.provider} onChange={value => c.filter('provider', value || 'all')} />
       {(['model','key','http','code','stage'] as const).map(k => <LogFilterInput key={k} label={`${k}筛选`} placeholder={{ model:'模型', key:'Key', http:'HTTP', code:'错误码', stage:'阶段' }[k]} field={k} kind={c.tab} window={c.filters.window} revision={c.revision} value={c.filters[k]} onChange={value => c.filter(k,value)} />)}
     </> : <select aria-label="日志级别" className="select-field" value={c.level} onChange={e => { c.setLevel(e.target.value); c.refresh(); }}><option value="all">全部级别</option><option value="info">INFO</option><option value="warn">WARN</option><option value="error">ERROR</option></select>}
+    {c.tab === 'requests' && (Object.keys(dimensionLabels) as LogDimension[]).filter(key => c.filters[key] != null).map(key => <Button key={key} variant="outline" size="sm" aria-label={`清除${dimensionLabels[key]}筛选`} onClick={() => c.filter(key, null)}>{dimensionLabels[key]}：{c.filters[key] || '未识别'} ×</Button>)}
     <Button variant="ghost" size="sm" onClick={c.resetFilters}>重置</Button>
   </div>;
 }
@@ -46,7 +48,7 @@ export function LogsPreview() {
       <button aria-pressed={c.tab === 'system'} className={c.tab === 'system' ? 'is-active' : ''} onClick={() => { c.setTab('system'); c.resetFilters(); }}><Terminal size={15} />系统日志</button>
     </div>{c.tab === 'requests' && <Button variant="outline" size="sm" onClick={() => layout.setOpen(true)}><Columns3 size={14} />显示内容<span>{layout.ids.length}</span></Button>}</div>
     <Filters c={c} />
-    {c.tab === 'requests' && <LogStatsView filters={c.filters} paused={c.paused} revision={c.revision} />}
+    {c.tab === 'requests' && <LogStatsView filters={c.filters} paused={c.paused} revision={c.revision} onGroupSelect={(dimension, value) => c.filter(dimension, value)} />}
     {c.health && (c.health.dropped > 0 || c.health.write_failures > 0 || c.health.error) && <div role="status" className="log-degraded">丢弃 {c.health.dropped} · 写入失败 {c.health.write_failures} · {c.health.error || '—'}</div>}
     {(c.notice || c.error) && <p role="status" className="my-3 text-sm text-destructive">{c.error || c.notice}</p>}
     <section className="log-surface" aria-label={c.tab === 'requests' ? '请求日志列表' : '系统日志列表'} aria-busy={c.loading}>

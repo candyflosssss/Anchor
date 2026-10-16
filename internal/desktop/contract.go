@@ -141,6 +141,7 @@ type LogHealth = logbook.Health
 type LogSettings = logbook.Settings
 type LogStatsQuery = logbook.StatsQuery
 type LogStatsValues = logbook.StatsValues
+type LogStatsGroup = logbook.StatsGroup
 type LogStatsBucket = logbook.StatsBucket
 type LogStats = logbook.Stats
 type LogStatsResult struct {

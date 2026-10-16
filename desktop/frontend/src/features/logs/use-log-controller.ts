@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { initialFilters, safeSummary, type LogFilters, type RequestLog } from './log.model';
+import { identityQuery, initialFilters, safeSummary, type LogFilters, type RequestLog } from './log.model';
 import { logService, requestLog, systemLog, type LogQuery, type LogSettings } from './log.service';
 import type { Page } from '../../desktop/contract.generated';
 export function useLogController() {
@@ -12,7 +12,7 @@ export function useLogController() {
   const [settings, showSettings] = useState(false), [config, setConfig] = useState<LogSettings | null>(null);
   const [revision, refresh] = useState(0), [exporting, setExporting] = useState(false), [saving, setSaving] = useState(false);
   const lifecycle = useRef({ request: 0, detail: 0, alive: true }).current;
-  const query = useMemo<LogQuery>(() => ({ kind: tab, limit: 50, cursor: cursors.at(-1) ?? 0, until: snapshot,
+  const query = useMemo<LogQuery>(() => ({ ...(tab === 'requests' ? identityQuery(filters) : {}), kind: tab, limit: 50, cursor: cursors.at(-1) ?? 0, until: snapshot,
     since_ms: Date.now() - Number(filters.window) * 60000, before_ms: 0, status: tab === 'requests' && filters.status !== 'all' ? filters.status : '',
     source: filters.source !== 'all' ? filters.source : '', provider: tab === 'requests' && filters.provider !== 'all' ? filters.provider : '',
     model: filters.model, key: filters.key, http: filters.http ? Number(filters.http) : null, code: filters.code, stage: filters.stage,

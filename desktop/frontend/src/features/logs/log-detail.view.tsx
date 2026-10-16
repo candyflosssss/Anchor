@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Copy } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../../components/ui/sheet';
-import { statusLabels, sourceLabels, serviceTierLabel, type RequestLog } from './log.model';
+import { dimensionLabels, type LogDimension, statusLabels, sourceLabels, serviceTierLabel, type RequestLog } from './log.model';
 import { tierSnapshot } from './log-service-tier.model';
 import { TierValue } from './log-service-tier.view';
 import { logColumns } from './log-columns.model';
@@ -15,6 +15,9 @@ export function RequestDetail({ row, onClose, onCopy, notice }: { row: RequestLo
     {row && <><SheetHeader><SheetTitle>请求详情</SheetTitle><div className="flex justify-between gap-2 text-sm"><span>{statusLabels[row.status]} · {sourceLabels[row.source]}</span><Button variant="outline" size="sm" onClick={() => onCopy(row)}><Copy size={13} />复制</Button></div></SheetHeader>
       <div className="log-detail-body">{notice && <p role="status">{notice}</p>}
         <section><h3 className="log-section-title">请求</h3><dl className="log-properties">{logColumns.map(col => <div key={col.id}><dt>{col.label}</dt><dd><ColumnValue id={col.id} row={row} /></dd></div>)}</dl></section>
+        <section aria-label="请求归属"><h3 className="log-section-title">请求归属</h3><dl className="log-properties">
+          {(Object.keys(dimensionLabels) as LogDimension[]).map(key => <div key={key}><dt>{dimensionLabels[key]}</dt><dd className="mono">{row[key] || '未识别'}</dd></div>)}
+        </dl></section>
         <section aria-label="服务档位"><h3 className="log-section-title">服务档位</h3><dl className="log-properties">
           <div><dt>请求档位</dt><dd><TierValue tier={tierSnapshot(row.evidence, 'requested')} /></dd></div>
           {row.evidence.mapping_service_tier && <div><dt>Anchor 固定档位</dt><dd>{serviceTierLabel(row.evidence.mapping_service_tier)}</dd></div>}

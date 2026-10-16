@@ -39,6 +39,12 @@ type Attempt struct {
 	Output    *int64 `json:"output"`
 }
 type Request struct {
+	// Agent and Binding come from authenticated enrollment, never caller labels.
+	Agent   string `json:"agent,omitempty"`
+	Binding string `json:"binding,omitempty"`
+	// Project and Session are optional, client-declared opaque identifiers.
+	Project           string            `json:"project,omitempty"`
+	Session           string            `json:"session,omitempty"`
 	ID                string            `json:"id"`
 	StartedAtMS       int64             `json:"started_at_ms"`
 	Status            string            `json:"status"`
@@ -76,22 +82,27 @@ type Event struct {
 	Fields    map[string]string `json:"fields"`
 }
 type Query struct {
-	Kind     string `json:"kind"`
-	Limit    int    `json:"limit"`
-	Cursor   int64  `json:"cursor"`
-	Until    int64  `json:"until"`
-	SinceMS  int64  `json:"since_ms"`
-	BeforeMS int64  `json:"before_ms"`
-	Status   string `json:"status"`
-	Source   string `json:"source"`
-	Provider string `json:"provider"`
-	Model    string `json:"model"`
-	Key      string `json:"key"`
-	HTTP     *int   `json:"http"`
-	Code     string `json:"code"`
-	Stage    string `json:"stage"`
-	Level    string `json:"level"`
-	Search   string `json:"search"`
+	// nil means all; a pointer to an empty string selects unattributed records.
+	Agent    *string `json:"agent,omitempty"`
+	Binding  *string `json:"binding,omitempty"`
+	Project  *string `json:"project,omitempty"`
+	Session  *string `json:"session,omitempty"`
+	Kind     string  `json:"kind"`
+	Limit    int     `json:"limit"`
+	Cursor   int64   `json:"cursor"`
+	Until    int64   `json:"until"`
+	SinceMS  int64   `json:"since_ms"`
+	BeforeMS int64   `json:"before_ms"`
+	Status   string  `json:"status"`
+	Source   string  `json:"source"`
+	Provider string  `json:"provider"`
+	Model    string  `json:"model"`
+	Key      string  `json:"key"`
+	HTTP     *int    `json:"http"`
+	Code     string  `json:"code"`
+	Stage    string  `json:"stage"`
+	Level    string  `json:"level"`
+	Search   string  `json:"search"`
 }
 type Page struct {
 	Requests   []Request `json:"requests"`
@@ -148,6 +159,11 @@ func (q *Query) Validate() error {
 	}
 	if q.SinceMS < 0 || q.BeforeMS < 0 || (q.BeforeMS != 0 && q.BeforeMS < q.SinceMS) {
 		return ErrInvalid
+	}
+	for _, value := range []*string{q.Agent, q.Binding, q.Project, q.Session} {
+		if value != nil && (q.Kind != "requests" || len(*value) > 512) {
+			return ErrInvalid
+		}
 	}
 	for _, s := range []string{q.Status, q.Source, q.Provider, q.Model, q.Key, q.Code, q.Stage, q.Level, q.Search} {
 		if len(s) > 512 {
