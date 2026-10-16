@@ -332,7 +332,7 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 	}
 	callerCtx := ctx
 	stream := notify != nil
-	row := logbook.Request{ID: id, StartedAtMS: start.UnixMilli(), Status: "pending", Source: "probe", ReasoningObserved: true, Stream: &stream, UpstreamModel: model, Model: model, Protocol: p.Protocol, Provider: p.ID, Key: key.ID, Revision: p.Revision, Delivery: "none", Stage: "route", Attempts: []logbook.Attempt{}, Evidence: map[string]string{}}
+	row := logbook.Request{ID: id, StartedAtMS: start.UnixMilli(), Status: "pending", Source: "probe", ReasoningObserved: true, Stream: &stream, UpstreamModel: model, Model: model, Protocol: p.Protocol, Provider: p.ID, Key: key.ID, Revision: p.Revision, Delivery: "none", Stage: "route", Attempts: []logbook.Attempt{}, Evidence: map[string]string{"sent_service_tier": "not_sent", "fast_triggered": "unknown"}}
 	if s.logs != nil {
 		s.logs.Request(row)
 	}
@@ -431,6 +431,7 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 	}
 	req.Header.Set("Content-Type", "application/json")
 	authorizeUpstream(req, p, key.Secret)
+	recordSentServiceTier(row.Evidence, body, key.Secret)
 	attempted = true
 	stage = "upstream_connect"
 	resp, err := s.inferenceResponse(req, p.BaseURL, p.Protocol, row.Evidence)
@@ -471,6 +472,7 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 			output := &probeOutput{header: http.Header{}, secret: key.Secret, notify: notify}
 			observation := &protocol.Observation{}
 			u, err = protocol.StreamObserved(output, io.LimitReader(resp.Body, (1<<20)+1), p.Protocol, "responses", model, observation)
+			recordReturnedServiceTier(row.Evidence, observation.ServiceTier, observation.ServiceTierRaw, key.Secret)
 			stage = "response_validate"
 			if err != nil || observation.Status == "failed" || observation.Status == "incomplete" {
 				out.Failure = "invalid_response"
@@ -492,6 +494,10 @@ func (s *Server) probeObserved(ctx context.Context, p state.Provider, keyID, mod
 	stage = "response_validate"
 	row.Evidence["body_bytes"] = strconv.Itoa(len(data))
 	row.Evidence["json_valid"] = strconv.FormatBool(json.Valid(data))
+	var response protocol.Object
+	if json.Unmarshal(data, &response) == nil {
+		recordReturnedServiceTier(row.Evidence, protocol.ReadServiceTier(response, p.Protocol), protocol.ReadRawServiceTier(data, p.Protocol, key.Secret))
+	}
 	usage, err := protocol.ValidateProbeResponse(data, p.Protocol)
 	if err != nil {
 		out.Failure = "invalid_response"

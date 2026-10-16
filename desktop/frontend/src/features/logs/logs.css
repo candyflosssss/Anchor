@@ -170,3 +170,20 @@
 }
 
 .log-metric-note { display: block; margin-top: 3px; font-size: 10px; line-height: 1.2; font-weight: 400; color: hsl(var(--muted-foreground)); }
+
+/* Raw values remain primary; shape + text distinguish Fast from Ultrafast. */
+.log-tier { display: grid; justify-items: start; gap: 5px; min-width: 0; white-space: normal; --tier-color: var(--muted-foreground); }
+.log-tier[data-tier="fast"] { --tier-color: var(--log-speed); }
+.log-tier[data-tier="ultrafast"] { --tier-color: var(--log-reasoning); }
+.log-tier-raw { font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
+.log-tier-caption { display: flex; align-items: center; gap: 5px; }
+.log-tier-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 6px; border: 1px solid hsl(var(--tier-color) / .22); border-radius: 6px; background: hsl(var(--tier-color) / .07); color: hsl(var(--tier-color)); font-size: 11px; font-weight: 600; line-height: 1.2; }
+.log-tier[data-tier="fast"] .log-tier-badge svg { fill: hsl(var(--tier-color) / .18); }
+.log-tier[data-tier="ultrafast"] .log-tier-badge { background: linear-gradient(125deg, hsl(var(--tier-color) / .12), hsl(var(--tier-color) / .03)); }
+.log-tier-note { color: hsl(var(--muted-foreground)); font-size: 10px; }
+.log-tier-warning { color: hsl(var(--log-output)); font-size: 10px; }
+.log-tier-confirmed { color: hsl(var(--log-cache)); }
+@media (forced-colors: active) {
+  .log-tier-badge { border-color: CanvasText; color: CanvasText; background: Canvas; }
+  .log-tier-warning, .log-tier-confirmed { color: CanvasText; }
+}

@@ -99,6 +99,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   update apply --approve             Replace local CLI; core must be stopped
   version
 Normal output is JSON; logs export is JSONL, logs follow emits repeated JSON pages, agent token is raw secret.
+Logs include safe raw service-tier evidence; fast_triggered is true/false/unknown from upstream reports, not measured speed.
 Diagnostics and service logs go to stderr.
 Agent failures distinguish revision conflicts, external configuration edits, unsafe configuration, unavailable default models and invalid catalogs; unclassified failures remain agent_operation_failed.
 Model deletion protects enabled Binding defaults; disabled Bindings do not block deletion.

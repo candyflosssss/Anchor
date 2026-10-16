@@ -736,9 +736,11 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | max-requests | 初始 50,000，100–200,000 |
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
 
-`list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts/evidence 大字段，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
+`list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts 及其他 evidence 大字段，仅保留下述五项档位证据，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 
-2026-10-15 当前源码（未发布）：`logs detail REQUEST_ID` 与 `logs export` 在代理请求的已有 `evidence` 字典中提供 `requested_service_tier`（入站 JSON 请求值，未指定为 `unspecified`）和可选 `upstream_service_tier`（最后候选的上游 JSON / SSE 返回值）。`priority` / `fast` 代表 Fast，`ultrafast` 代表 Ultrafast，`default` 代表 Standard；`auto` 不等于已确认 Standard 或 Fast。未知／非字符串值脱敏为固定 `unknown`，缺少上游字段表示未知，不以请求值补齐。不改变请求或跨协议能力，历史不补写；`list` 仍省略 evidence，命令参数与退出码不变。
+2026-10-16 当前源码（未发布）：代理及推理测试的 `logs list` / `logs follow` 在已有 `evidence` 字典中保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`。`logs detail REQUEST_ID` 与 `logs export` 仍返回完整安全证据，还包括入站 `requested_service_tier` / `requested_service_tier_raw` 与固定映射策略。派发字段取协议转换后的实际请求体，未派发为 `not_sent`、无档位参数为 `unspecified`；上游未报告时返回档位缺省。`*_raw` 为 JSON 标量文本，保留未知短名称、空字符串、null、布尔和数字，不把任意值强行解析成档位。字符串最多 128 UTF-8 字节、序列化后最多 256 字节，抑制对象／数组、控制字符与可识别凭据，不保存请求／响应正文。
+
+规范化 `priority/fast` 代表 Fast、`ultrafast` 代表 Ultrafast、`default` 代表 Standard；其余保留已知 auto/flex/scale 或固定 `unknown`。`fast_triggered` 是字符串三态：上游明确报告 priority/fast/ultrafast 为 `true`、default/flex/scale 为 `false`，缺失／auto／未知为 `unknown`；只表示报告档位，不保证实际速度、计费或与请求完全匹配。SSE 以最后报告为准，切换候选清除旧快照；这些字段不是逐尝试历史。不改变请求或跨协议能力，不回填旧历史，无数据库迁移；命令参数与退出码不变，旧客户端可忽略新增 evidence 项。
 
 2026-10-15 当前源码（未发布）：请求 `metrics` 新增可空的 `time_to_first_output_ms`，表示从根请求开始到首个非空正文或工具调用参数增量（含 Responses 自定义工具输入）；角色、心跳、空增量、工具空壳与单独思考不计入。`time_to_first_text_ms` 继续只表示正文首字，原有正文指标继续保留，当前界面按下述根请求总输出与总耗时计算总 TPS。旧历史缺少新字段时不补算；升级正在处理请求的核心后仅对新请求采集，旧桌面可忽略新增字段。
 

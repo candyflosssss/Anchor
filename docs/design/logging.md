@@ -6,7 +6,7 @@
 
 日志围绕一次请求的排障组织：请求表格、可选字段、详情与尝试时间线、系统页签。HTTP、Anchor 结果、生成状态与客户端交付分别记录，因此 HTTP 200 可以同时显示 `invalid_response`、`response_validate` 和失败结果。该状态证明传输成功但 Anchor 校验未通过；不能仅凭原始报错推断具体缺失字段。
 
-页面只保留标题、字段名、数据、操作控件、必要状态及错误；释义和指标口径写在文档，不放说明段落或解释性 Tooltip。27 项字段归为 12 个显示块，默认布局及预设见[可选显示内容](log-columns.md)。列选择和顺序只属于展示偏好；隐藏字段不改变采集、计算、持久化、详情或导出。
+页面只保留标题、字段名、数据、操作控件、必要状态及错误；释义和指标口径写在文档，不放说明段落或解释性 Tooltip。原有 12 个显示块加上发送档位、加速状态，共 14 个显示块，默认布局及预设见[可选显示内容](log-columns.md)。列选择和顺序只属于展示偏好；隐藏字段不改变采集、计算、持久化、详情或导出。
 
 当前提供请求/系统查询、结果/来源/供应商/模型/Key/HTTP/错误码/阶段筛选、标识前缀搜索、暂停轮询、刷新、历史翻页、请求详情、系统请求关联、复制安全摘要、JSONL 导出及保留设置。详情保存最后一次上游快照和最多 64 次尝试，另保留实际尝试总数及截断标识。未收到上游 HTTP、缺失用量或不能可靠计算的指标保持 null，界面显示“未知”或“未收到”。
 
@@ -33,11 +33,21 @@
 
 一次尝试缺失 usage 时，根请求输入/输出/总 Token 均未知，详情仍显示各次确认值；不会把已知小计当完整总量。明确报告的零与未报告分开。现有累计用量继续独立写入 state.db，日志到期不删除累计用量。
 
-日志不记录请求/响应正文、提示词、思考原文、工具参数、认证头、密钥或任意上游错误文本。probe 只记录固定错误码及 `body_bytes`、`json_valid`、校验通过等有限结构事实。2026-10-13 当前源码（未发布）在失败详情的 `evidence` 中增加 `validation_reason`：`invalid_json`、`missing_response_id`、`upstream_error`、`unsupported_content`、`unsupported_output`、`invalid_tool_call`、`invalid_choices`、`refusal`，未知错误固定为 `invalid_structure`；不直接存储解析错误字符串，其中可能含任意上游字段名。已有 evidence 字典契约、查询/复制/导出沿用，列表仍省略 evidence，历史记录不补写。文本项的 `logprobs` 和 `annotations` 只用于测试结构校验，不进入日志。系统事件使用代码消息与属性白名单。复制和导出来自这些安全结构化字段，不触发新的上游请求。未知 reasoning effort 不作为任意字符串写入日志。
+日志不记录请求/响应正文、提示词、思考原文、工具参数、认证头、密钥或任意上游错误文本。probe 只记录固定错误码及 `body_bytes`、`json_valid`、校验通过等有限结构事实。2026-10-13 当前源码（未发布）在失败详情的 `evidence` 中增加 `validation_reason`：`invalid_json`、`missing_response_id`、`upstream_error`、`unsupported_content`、`unsupported_output`、`invalid_tool_call`、`invalid_choices`、`refusal`，未知错误固定为 `invalid_structure`；不直接存储解析错误字符串，其中可能含任意上游字段名。已有 evidence 字典契约、查询/复制/导出沿用，列表仅保留下述档位证据白名单，历史记录不补写。文本项的 `logprobs` 和 `annotations` 只用于测试结构校验，不进入日志。系统事件使用代码消息与属性白名单。复制和导出来自这些安全结构化字段，不触发新的上游请求。未知 reasoning effort 不作为任意字符串写入日志。
 
 2026-10-13 当前源码（未发布）修正完成响应的取消误判：协议正常结束且响应写入成功后，即使客户端在日志／用量收尾前断开，也保留 succeeded/complete；尚未完成或写入失败时的客户端取消仍保存 cancelled。已经写出 HTTP 200 数据的失败请求保存 partial；没有写出数据则 none。success/complete 只表示本机写入没有报错，不代表最终用户确认收到。历史记录不自动重判；总 TPS 仅对成功且总输出与总耗时已确认的记录计算，不以首字后的区间作为依据。旧 pending 在核心重新打开数据库时改为 interrupted/core_interrupted，交付结果 unknown；NORMAL WAL 在突然断电时可能丢失最近批次，不承诺断电零损失。
 
-2026-10-15 当前源码（未发布）：代理日志详情及 JSONL 导出的 `evidence.requested_service_tier` 记录入站 JSON 的 `service_tier`，未传为 `unspecified`；`evidence.upstream_service_tier` 记录最后候选的 OpenAI 兼容 JSON 或 SSE `response` / Chat Completions 对象返回值，未返回则缺省，不能用请求档位推断实际档位。`priority` / `fast` 显示 Fast，`ultrafast` 显示 Ultrafast，`default` 显示 Standard；`auto`、`flex`、`scale` 单独显示，不算已确认 Fast。未知或非字符串值只保存固定 `unknown`，不存任意原始值。SSE 后续报告覆盖先前报告（例如 priority → default）；切换候选清除前一候选的返回档位，中断／失败中已观测到的返回值仍保留。桌面详情新增“服务档位”区与复制摘要，不新增列表字段或逐尝试持久字段；列表仍省略 evidence，历史日志显示未知且不补写，probe 不据此推断档位。核心运行日志 `model request` 也输出安全的请求／上游档位；仅观测，不改写请求、不启用服务档位、不改变跨协议转换支持范围，不根据速度判断付费服务档位。
+2026-10-16 当前源码（未发布）：服务档位采用原值优先、可识别值附加标注的方式，代理及推理测试共用以下 `evidence` 口径：
+
+- `requested_service_tier` 是入站 JSON 值的规范化标签，未传为 `unspecified`；固定映射策略仍单独记录在 `mapping_service_tier`。`sent_service_tier` 取固定策略及协议转换后的实际派发请求体，未派发为 `not_sent`、未带参数为 `unspecified`。派发表示进入网络发送步骤，不证明上游收到。
+- `upstream_service_tier` 取最后候选的 OpenAI 兼容 JSON 或 SSE 返回值；缺少报告则缺省。上述三个观测各自可带同前缀的 `*_service_tier_raw`，值为 **JSON 标量的文本**，如 `"ultrafast"`、`"turbo-v2"`、`""`、`null`、`false`、`42`。保留未知名称与标量类型，不把原始字符串 `"unknown"`、`"unspecified"` 混同缺失哨兵；JSON 字符串转义会规范化，不承诺保留线上字节排版。
+- 安全边界：原始字符串最多 128 UTF-8 字节、序列化后最多 256 字节；对象、数组、控制字符、可识别凭据片段及当前可用的认证秘密不进入原值字段。被抑制的值保留 `unknown` 标签而不保存原值，不保存请求／响应正文。规范化标签只允许 `auto/default/priority/fast/ultrafast/flex/scale`；其余为 `unknown`。
+- `fast_triggered` 为字符串 `true/false/unknown`：上游明确报告 `priority/fast/ultrafast` 为 true，`default/flex/scale` 为 false，缺失、auto 或其他值为 unknown。它只代表**上游报告的档位**，不证明实际速度、计费或完全符合请求。界面另外比较派发与返回档位：Ultrafast → Fast 标“仅确认 Fast”，请求加速但返回非 Fast 标“未按请求加速”；未知不误判成失败或未加速。
+- SSE 后续报告覆盖先前报告（含未知或被抑制值）；切换候选清空前一候选的派发／返回快照。失败／中断时保留已观测报告，不与请求成功混为一谈；非 200、错误内容类型或无法解码等提前退出路径不额外读取正文取证，仍为未知。字段描述最后候选，不新增逐尝试档位历史。
+- 列表与 `follow` 仅保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`，仍省略 attempts 及其他 evidence。详情、复制与 JSONL 导出保留完整安全证据；历史不补写，旧日志已知标签可继续标注，但不从模型名、固定策略或速度反推原值。
+
+桌面增加“发送档位”“加速状态”显示块：原始 JSON 值为主，青色闪电标 Fast、紫色火箭标 Ultrafast，辅以文字和确认／不匹配状态。`auto`、`flex`、`scale` 单独显示，不算已确认 Fast。核心运行日志 `model request` 只输出安全规范化的请求／派发／返回档位与 fast_triggered，不输出任意原值。本改动仅观测，不改写请求、不启用服务档位、不改变跨协议转换支持范围。
+
 
 ## 4. 存储、性能与保留
 

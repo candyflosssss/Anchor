@@ -1,3 +1,4 @@
+import { accelerationSummary, tierSnapshot } from './log-service-tier.model';
 export type LogStatus = 'succeeded' | 'failed' | 'cancelled' | 'interrupted' | 'pending';
 export type LogSource = 'proxy' | 'probe';
 export interface LogAttempt {
@@ -33,9 +34,11 @@ export function filterRequests(rows: RequestLog[], filters: LogFilters): Request
 export function safeSummary(row: RequestLog): string {
   return ['Anchor 日志', `request_id: ${row.id}`, `结果: ${statusLabels[row.status]} · ${row.summary}`,
     `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
-    `请求档位: ${serviceTierLabel(row.evidence.requested_service_tier, true)}`,
+    `请求档位: ${serviceTierLabel(row.evidence.requested_service_tier, true)} · 原始值 ${tierSnapshot(row.evidence, 'requested').raw}`,
+    `发送档位（最后候选）: ${tierSnapshot(row.evidence, 'sent').raw}`,
+    `加速状态（上游报告）: ${accelerationSummary(row.evidence).label} · ${accelerationSummary(row.evidence).tier.label}`,
     ...(row.evidence.mapping_service_tier ? [`Anchor 固定档位: ${serviceTierLabel(row.evidence.mapping_service_tier)}`] : []),
-    `上游返回档位（最后候选）: ${serviceTierLabel(row.evidence.upstream_service_tier)}`,
+    `上游返回档位（最后候选）: ${serviceTierLabel(row.evidence.upstream_service_tier)} · 原始值 ${tierSnapshot(row.evidence, 'upstream').raw}`,
     `上游 HTTP: ${row.http ?? '未收到'}`, `阶段: ${row.stage}`, `错误代码: ${row.code ?? '无'}`,
     `交付: ${row.delivery}`, `耗时: ${row.elapsed === null ? '未知' : `${row.elapsed} ms`}`,
     ...Object.entries(row.evidence).map(([key, value]) => `${key}: ${String(value)}`)].join('\n');

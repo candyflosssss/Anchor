@@ -17,7 +17,7 @@ async function openLogs(page: Page, data = fixture) {
         if (window.logTest.unavailable) return { contract: f.contract, data: null, problem: { code: 'offline' } };
         if (q.kind === 'system') return result(f.system);
         const selected = rows.filter(r => (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
-        return result({ ...f.page, requests: selected.map(r => ({ ...r, attempts: [], evidence: {} })), latest: q.cursor ? 3 : 2, has_more: window.logTest.paged && !q.cursor, next_cursor: 1 });
+        return result({ ...f.page, requests: selected.map(r => ({ ...r, attempts: [], evidence: Object.fromEntries(Object.entries(r.evidence).filter(([key]) => ['sent_service_tier', 'sent_service_tier_raw', 'upstream_service_tier', 'upstream_service_tier_raw', 'fast_triggered'].includes(key))) })), latest: q.cursor ? 3 : 2, has_more: window.logTest.paged && !q.cursor, next_cursor: 1 });
       },
       LogDetail: async (id: string) => result(rows.find(r => r.id === id)),
       LogSettings: async () => result(window.logTest.settings),
@@ -35,7 +35,7 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   await openLogs(page);
   const list = page.getByRole('region', { name: '请求日志列表' });
   await expect(list.getByRole('row')).toHaveCount(3);
-  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '详情']);
+  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '发送档位', '加速状态', '详情']);
   const success = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
   const timing = success.getByRole('cell').nth(4), tokens = success.getByRole('cell').nth(5);
   for (const label of ['总耗时', '首字', '输出', '总TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
@@ -86,7 +86,7 @@ test('column preferences preserve collected values and survive reload', async ({
   await expect(opener).toBeFocused();
   await expect(list.getByRole('columnheader', { name: '供应商 / Key', exact: true })).toHaveCount(0);
   const headers = await list.getByRole('columnheader').allTextContents();
-  expect(headers.indexOf('请求方式')).toBeLessThan(headers.indexOf('Token 用量'));
+  expect(headers.indexOf('请求方式')).toBeLessThan(headers.indexOf('加速状态'));
   await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) })).toContainText('high');
   expect(await page.evaluate(() => window.logTest.queries.every(q => !('columns' in q)))).toBe(true);
   await page.reload(); await page.getByRole('button', { name: '日志', exact: true }).click();
@@ -221,4 +221,38 @@ test('log search and name filters keep Chinese preedit across query refreshes', 
     await expect.poll(() => page.evaluate(k => window.logTest.queries.at(-1)?.[k], key)).toBe(text);
   }
   await session.detach();
+});
+
+test('raw service tiers use distinct Fast and Ultrafast icons and retain unknown values', async ({ page }) => {
+  await openLogs(page);
+  const list = page.getByRole('region', { name: '请求日志列表' });
+  const fast = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_failed' }) });
+  const ultra = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
+  await expect(fast.locator('[data-tier="fast"] .lucide-zap')).toBeVisible();
+  await expect(fast).toContainText('"priority"');
+  await expect(fast).toContainText('上游报告加速');
+  await expect(ultra.locator('[data-tier="ultrafast"] .lucide-rocket')).toHaveCount(2);
+  await expect(ultra).toContainText('已确认加速');
+  // Bring the wider new columns into view without scrolling the whole document.
+  await ultra.getByText('已确认加速').scrollIntoViewIfNeeded();
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-service-tiers-light.png'), fullPage: true });
+  await page.getByRole('button', { name: '深色', exact: true }).click();
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-service-tiers-dark.png'), fullPage: true });
+  await page.getByRole('button', { name: '查看请求 fixture_success' }).click();
+  const detail = page.getByRole('dialog');
+  await expect(detail).toContainText('"ultrafast"');
+  await expect(detail).toContainText('已确认加速');
+  if (capture) await page.screenshot({ path: resolve(capture, 'logs-service-tiers-detail.png') });
+});
+
+test('unknown raw tiers and lower returned tiers are never labelled as requested acceleration', async ({ page }) => {
+  const data = structuredClone(fixture);
+  Object.assign(data.page.requests[0].evidence, { sent_service_tier: 'ultrafast', sent_service_tier_raw: '"ultrafast"', upstream_service_tier: 'priority', upstream_service_tier_raw: '"priority"' });
+  Object.assign(data.page.requests[1].evidence, { upstream_service_tier: 'unknown', upstream_service_tier_raw: '"turbo-v2"' });
+  await openLogs(page, data);
+  const list = page.getByRole('region', { name: '请求日志列表' });
+  await expect(list).toContainText('仅确认 Fast');
+  await expect(list).toContainText('"turbo-v2"');
+  await expect(list).toContainText('无法确认加速');
+  await expect(list.getByText('已确认加速', { exact: true })).toHaveCount(0);
 });

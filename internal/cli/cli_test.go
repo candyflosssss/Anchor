@@ -436,3 +436,15 @@ func TestHelpDocumentsCodexReasoningProjection(t *testing.T) {
 		}
 	}
 }
+
+func TestHelpDocumentsLogServiceTier(t *testing.T) {
+	var out bytes.Buffer
+	if err := (App{Out: &out, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, hint := range []string{"safe raw service-tier evidence", "fast_triggered is true/false/unknown", "not measured speed"} {
+		if !strings.Contains(out.String(), hint) {
+			t.Fatal("log tier help missing", hint)
+		}
+	}
+}

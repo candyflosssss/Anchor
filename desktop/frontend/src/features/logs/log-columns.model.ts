@@ -12,6 +12,8 @@ export const logColumns = [
   { id: 'provider', label: '供应商 / Key', group: '模型与路由', description: '最后一次尝试的供应商与 Key 安全标签；不显示密钥本体。', width: 130 },
   { id: 'protocol', label: '请求方式', group: '模型与路由', description: '请求与上游协议路径，以及是否流式返回。', width: 170 },
   { id: 'revision', label: '配置版本', group: '模型与路由', description: '请求当时的配置 revision 快照。', width: 105 },
+  { id: 'sentTier', label: '发送档位', group: '速度与用量', description: '最后候选实际派发的 service_tier 原始值；与未指定、未发送和历史未记录区分。', width: 155 },
+  { id: 'acceleration', label: '加速状态', group: '速度与用量', description: '最后候选上游返回的原始档位，已知值才解析 Fast / Ultrafast 并与发送值核对；不是实际速度或计费保证。', width: 175 },
   { id: 'timing', label: '耗时与速度', group: '速度与用量', description: '总耗时、首次有效输出时间、输出区间与总 TPS。总 TPS = 总输出 Token（已含思考，不重复累加）/ 请求总耗时，包含首字前等待、思考、重试和传输，并非纯解码速度。成功结束且总输出和耗时已确认时可计算，不要求流式或首字观测；失败、中断或数据缺失显示未知。输出区间仅供参考，不作为 TPS 分母。', width: 230 },
   { id: 'tokens', label: 'Token 用量', group: '速度与用量', description: '输入、输出、缓存命中、思考与输入输出合计。缓存和思考不重复累加，未报告不补零；多次尝试仅为已知小计。', width: 240 },
   { id: 'attempts', label: '尝试次数', group: '结果与诊断', description: '本次根请求实际派发的上游尝试次数，允许为零。', width: 100 },
@@ -19,8 +21,8 @@ export const logColumns = [
 ] as const satisfies readonly ColumnDefinition[];
 export type LogColumnId = typeof logColumns[number]['id'];
 export const columnPresets = {
-  common: { label: '常用', ids: ['time', 'status', 'model', 'provider', 'timing', 'tokens'] },
-  performance: { label: '性能', ids: ['time', 'model', 'provider', 'protocol', 'timing', 'tokens'] },
+  common: { label: '常用', ids: ['time', 'status', 'model', 'provider', 'timing', 'tokens', 'sentTier', 'acceleration'] },
+  performance: { label: '性能', ids: ['time', 'model', 'provider', 'protocol', 'timing', 'tokens', 'sentTier', 'acceleration'] },
   debugging: { label: '排障', ids: ['time', 'status', 'requestId', 'provider', 'diagnostics', 'attempts'] },
 } satisfies Record<string, { label: string; ids: LogColumnId[] }>;
 export const defaultColumns: LogColumnId[] = [...columnPresets.common.ids];

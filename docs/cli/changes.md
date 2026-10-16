@@ -504,3 +504,11 @@
 - 旧 → 新：删除最后一个候选原先扫描全部 Binding，现在只保护已启用 Binding 的默认模型；禁用 Binding 保留原有默认模型、revision、凭据与目录归属，不再阻止删除。重新启用在事务内核对默认模型存在，缺失时返回 HTTP 409 `agent_model_unavailable`，不递增 revision、不恢复凭据。补齐类型化客户端对已声明 `all-mapped` 范围的支持，使 set-models 能保留此范围并替换已删除的默认模型。
 - 兼容与迁移：无数据库迁移；需升级运行中的核心，已安装旧版不会自动改变。启用中的默认模型仍不可直接删除；先显式改选默认模型或禁用 Binding。被删除的默认模型须用 set-models 改选或重建同 ID 映射后才能重新启用，不自动更换模型、不应用 Agent 配置。
 - 验证：新增隔离 state 回归覆盖完整模型／最后候选删除、四种模型范围、启用与禁用混合引用、revision、价格回滚与清理、Binding 保留和重新启用；CLI 经本机测试管理 API 验证拒绝删除 → 禁用 → 删除 → 拒绝启用 → all-mapped 改选 → 成功启用，帮助测试通过。完整受影响包与独立提交快照验证结果见本任务记录；未修改真实配置、未请求真实上游、未打包发布。
+
+## 2026-10-16 — 日志原始服务档位与加速报告（源码未发布）
+
+- 类型：输出增量；无新增命令、参数或退出码。
+- 指令与参数：`logs list`、`logs follow`、`logs detail REQUEST_ID`、`logs export`；顶层帮助同步说明原值与三态报告。
+- 旧 → 新：列表原先省略整个 evidence，现在保留 sent_service_tier / sent_service_tier_raw / upstream_service_tier / upstream_service_tier_raw / fast_triggered 五项紧凑证据，其他诊断仍只在详情／导出。新增协议转换后的派发观测与原始 JSON 标量文本，详情／导出还保留入站原值；未知短名称不再一律丢弃。代理与推理测试共用安全限制。fast_triggered 仅基于上游已报告档位为字符串 true/false/unknown，不是实测速度或与请求完全匹配的保证。
+- 兼容与迁移：复用 evidence 字典，不迁移数据库、不补写旧历史；新旧客户端可忽略未知项。未派发 not_sent、未指定 unspecified、上游缺失／auto／未知分开处理；SSE 最后报告覆盖前值，候选切换清空旧快照，不新增逐尝试档位字段。原值仅保存有界安全标量（字符串最多128 UTF-8字节、序列化最多256字节），抑制对象／数组、控制字符与可识别凭据；不改写请求或扩展跨协议能力。
+- 验证：完整 protocol/core/desktop/cli 四包测试通过，覆盖 JSON/SSE、未知与非字符串、数值精度、凭据抑制、映射注入、候选清理、列表／详情／导出、真实隔离 CLI 和桌面桥接、契约漂移及帮助。前端类型检查、日志37项单测、定向 ESLint 及单 worker 的9项日志浏览器测试通过。浏览器使用缓存 headless shell（系统 Chrome 启动 SIGTRAP）；未调用真实付费上游、未操作真实 Agent 配置、未验收原生双平台、未打包发布。

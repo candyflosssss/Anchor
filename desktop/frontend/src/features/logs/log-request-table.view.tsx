@@ -3,6 +3,7 @@ import { Button } from '../../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { cacheHitRate, outputTps, type LogColumnId } from './log-columns.model';
 import { sourceLabels, statusLabels, type RequestLog } from './log.model';
+import { Acceleration, SentTier } from './log-service-tier.view';
 import type { LogController } from './use-log-controller';
 import type { LogColumnsController } from './use-log-columns-controller';
 
@@ -17,6 +18,8 @@ function Metric({ label, value, tone, icon: Icon, detail }: { label: string; val
 }
 export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
   switch (id) {
+    case 'sentTier': return <SentTier row={row} />;
+    case 'acceleration': return <Acceleration row={row} />;
     case 'time': return <div className="log-time"><span className="mono">{row.time}</span><small>{row.ageMinutes} 分钟前</small></div>;
     case 'status': return <div className="log-info-block">
       <div className="log-result-line"><span className={`log-result log-result-${row.status}`}><span className="mini-dot" />{row.status === 'failed' && ['invalid_response', 'unexpected_html'].includes(row.code ?? '') ? '校验失败' : statusLabels[row.status]}</span><span className="log-http mono">{row.http === null ? 'HTTP 未收到' : `HTTP ${row.http}`}</span></div>

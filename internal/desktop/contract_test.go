@@ -159,6 +159,9 @@ func TestSharedLogContract(t *testing.T) {
 		ok.Metrics.OutputGenerationMS == nil || *ok.Metrics.OutputGenerationMS != 1500 || ok.Metrics.NonReasoningOutputTokens == nil || *ok.Metrics.NonReasoningOutputTokens != 100 || !ok.Metrics.OutputIntervalComplete || ok.Metrics.OutputTextTokens != nil || ok.Metrics.TextIntervalComplete {
 		t.Fatal("output TPS contract drift")
 	}
+	if failed.Evidence["sent_service_tier"] != "unspecified" || failed.Evidence["upstream_service_tier_raw"] != `"priority"` || ok.Evidence["sent_service_tier_raw"] != `"ultrafast"` || ok.Evidence["upstream_service_tier_raw"] != `"ultrafast"` || ok.Evidence["fast_triggered"] != "true" {
+		t.Fatal("raw tier/acceleration contract drift")
+	}
 	encoded, _ := json.Marshal(failed)
 	var keys map[string]any
 	json.Unmarshal(encoded, &keys)

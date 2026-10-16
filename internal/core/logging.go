@@ -48,7 +48,7 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 			return
 		}
 		now := time.Now()
-		t := &requestTrace{start: now, row: logbook.Request{ID: id[:16], StartedAtMS: now.UnixMilli(), Status: "pending", Source: "proxy", Stage: "request_parse", Delivery: "none", Attempts: []logbook.Attempt{}, Evidence: map[string]string{}}}
+		t := &requestTrace{start: now, row: logbook.Request{ID: id[:16], StartedAtMS: now.UnixMilli(), Status: "pending", Source: "proxy", Stage: "request_parse", Delivery: "none", Attempts: []logbook.Attempt{}, Evidence: map[string]string{"sent_service_tier": "not_sent", "fast_triggered": "unknown"}}}
 		switch r.URL.Path {
 		case "/v1/messages":
 			t.row.Protocol = "anthropic"
@@ -155,9 +155,10 @@ func setLogMetrics(t *requestTrace, obs protocol.Observation, u protocol.Usage, 
 	if t == nil {
 		return
 	}
-	if obs.ServiceTier != "" {
-		t.row.Evidence["upstream_service_tier"] = obs.ServiceTier
+	if t.row.Evidence == nil {
+		t.row.Evidence = map[string]string{}
 	}
+	recordReturnedServiceTier(t.row.Evidence, obs.ServiceTier, obs.ServiceTierRaw)
 	if !obs.FirstOutput.IsZero() {
 		ms := obs.FirstOutput.Sub(t.start).Milliseconds()
 		t.row.Metrics.TimeToFirstOutputMS = &ms

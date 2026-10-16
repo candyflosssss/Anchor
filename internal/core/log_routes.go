@@ -43,10 +43,16 @@ func (s *Server) logRoutes(m *http.ServeMux) {
 			logError(w, err)
 			return
 		}
-		// List documents omit large per-attempt diagnostics; detail/export retain them.
+		// List documents retain only compact service-tier evidence; detail/export retain all diagnostics.
 		for i := range p.Requests {
 			p.Requests[i].Attempts = []logbook.Attempt{}
-			p.Requests[i].Evidence = map[string]string{}
+			evidence := map[string]string{}
+			for _, name := range []string{"sent_service_tier", "sent_service_tier_raw", "fast_triggered", "upstream_service_tier", "upstream_service_tier_raw"} {
+				if value, ok := p.Requests[i].Evidence[name]; ok {
+					evidence[name] = value
+				}
+			}
+			p.Requests[i].Evidence = evidence
 		}
 		writeJSON(w, 200, p)
 	})

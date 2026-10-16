@@ -259,6 +259,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	status := 0
 	success := false
 	attempted := false
+	sentTier := "not_sent"
 	after := ""
 	usage := protocol.Usage{}
 	observation := protocol.Observation{}
@@ -269,8 +270,14 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		if _, exists := t.row.Evidence["model_revision"]; !exists {
 			t.row.Evidence["model_revision"] = strconv.FormatInt(t.row.Revision, 10)
 		}
-		// Do not carry a prior candidate's reported tier into a failed retry.
+		// The selected upstream credential is now available to scrub ingress metadata too.
+		recordRawServiceTier(t.row.Evidence, "requested_service_tier_raw", json.RawMessage(t.row.Evidence["requested_service_tier_raw"]), key.Secret)
+		// Do not carry a prior candidate's sent/reported tier into a failed retry.
 		delete(t.row.Evidence, "upstream_service_tier")
+		delete(t.row.Evidence, "upstream_service_tier_raw")
+		delete(t.row.Evidence, "sent_service_tier_raw")
+		t.row.Evidence["sent_service_tier"] = "not_sent"
+		t.row.Evidence["fast_triggered"] = "unknown"
 		t.row.Revision = p.Revision
 		t.row.Code = ""
 	}
@@ -329,6 +336,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		if t != nil {
 			a.Number = t.row.AttemptCount + 1
 			t.addAttempt(a, usage)
+			observation.ServiceTierRaw = protocol.SanitizeRawServiceTier([]byte(observation.ServiceTierRaw), key.Secret, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key"))
 			setLogMetrics(t, observation, usage, p.Protocol, success)
 		}
 		u := state.Usage{ProviderID: p.ID, Model: public, Requests: 1, ElapsedMS: time.Since(started).Milliseconds(), InputTokens: usage.Input, OutputTokens: usage.Output, CacheRead: usage.CacheRead, CacheWrite: usage.CacheWrite}
@@ -345,7 +353,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		if reportedTier == "" {
 			reportedTier = "unknown"
 		}
-		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "upstream_model", c.Model, "protocol", p.Protocol, "status", status, "success", success, "elapsed_ms", u.ElapsedMS, "requested_service_tier", requestedServiceTier(request), "upstream_service_tier", reportedTier)
+		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "upstream_model", c.Model, "protocol", p.Protocol, "status", status, "success", success, "elapsed_ms", u.ElapsedMS, "requested_service_tier", requestedServiceTier(request), "sent_service_tier", sentTier, "fast_triggered", fastTriggered(observation.ServiceTier), "upstream_service_tier", reportedTier)
 	}()
 	request["model"], _ = json.Marshal(c.Model)
 	raw, _ := json.Marshal(request)
@@ -373,6 +381,10 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		up.Header.Set("Accept", "application/json")
 	}
 	authorizeUpstream(up, p, key.Secret)
+	sentTier = sentServiceTier(body)
+	if t := trace(r); t != nil {
+		recordSentServiceTier(t.row.Evidence, body, key.Secret, strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key"))
+	}
 	attempted = true
 	setLogStage(r, "dispatch")
 	evidence := map[string]string{}
@@ -468,6 +480,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	m, decodeErr := protocol.Decode(data)
 	if decodeErr == nil {
 		observation.ServiceTier = protocol.ReadServiceTier(m, p.Protocol)
+		observation.ServiceTierRaw = protocol.ReadRawServiceTier(data, p.Protocol, key.Secret)
 	}
 	if p.Protocol == to {
 		if decodeErr != nil {

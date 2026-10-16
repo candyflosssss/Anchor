@@ -61,7 +61,7 @@ func TestMappingSpeedInjection(t *testing.T) {
 					if caller != "" {
 						wantCaller = "default"
 					}
-					if err != nil || row.Evidence["mapping_service_tier"] != tier || row.Evidence["requested_service_tier"] != wantCaller || row.Evidence["upstream_service_tier"] != "default" {
+					if err != nil || row.Evidence["sent_service_tier"] != tier || row.Evidence["sent_service_tier_raw"] != `"`+tier+`"` || row.Evidence["fast_triggered"] != "false" || row.Evidence["mapping_service_tier"] != tier || row.Evidence["requested_service_tier"] != wantCaller || row.Evidence["upstream_service_tier"] != "default" {
 						t.Fatalf("%+v %v", row, err)
 					}
 				}

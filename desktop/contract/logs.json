@@ -57,6 +57,10 @@
         "attempt_count": 1,
         "attempts_truncated": false,
         "evidence": {
+          "sent_service_tier": "unspecified",
+          "upstream_service_tier": "priority",
+          "upstream_service_tier_raw": "\"priority\"",
+          "fast_triggered": "true",
           "json_valid": "true",
           "body_bytes": "128"
         },
@@ -114,6 +118,13 @@
         "attempt_count": 1,
         "attempts_truncated": false,
         "evidence": {
+          "requested_service_tier": "unspecified",
+          "mapping_service_tier": "ultrafast",
+          "sent_service_tier": "ultrafast",
+          "sent_service_tier_raw": "\"ultrafast\"",
+          "upstream_service_tier": "ultrafast",
+          "upstream_service_tier_raw": "\"ultrafast\"",
+          "fast_triggered": "true",
           "json_valid": "true",
           "body_bytes": "128"
         },

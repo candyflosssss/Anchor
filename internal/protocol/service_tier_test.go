@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"encoding/json"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -56,5 +57,63 @@ func TestServiceTierStreamObservation(t *testing.T) {
 	_, err := StreamObserved(httptest.NewRecorder(), strings.NewReader("data: {\"service_tier\":\"ultrafast\",\"choices\":[]}\n\ndata: [DONE]\n\n"), "chat-completions", "chat-completions", "m", &o)
 	if err != nil || o.ServiceTier != "ultrafast" {
 		t.Fatalf("chat tier: %+v %v", o, err)
+	}
+}
+
+func TestRawServiceTier(t *testing.T) {
+	for _, tc := range []struct {
+		value any
+		want  string
+	}{
+		{"priority", `"priority"`}, {"turbo-v2", `"turbo-v2"`}, {"ultrafast", `"ultrafast"`}, {"unknown", `"unknown"`},
+		{"", `""`}, {nil, `null`}, {false, `false`}, {float64(42), `42`},
+		{Object{"secret": "DO_NOT_STORE"}, ""}, {[]any{"DO_NOT_STORE"}, ""},
+		{strings.Repeat("x", 129), ""}, {"hello\nworld", ""}, {"sk-test-only", ""},
+		{"Bearer private", ""}, {"private-key", ""},
+	} {
+		if got := RawServiceTier(tc.value, "private-key"); got != tc.want {
+			t.Fatalf("raw tier got %q, want %q", got, tc.want)
+		}
+	}
+	if ReadRawServiceTier([]byte(`{}`), "responses") != "" || ReadRawServiceTier([]byte(`{"service_tier":"fast"}`), "anthropic") != "" {
+		t.Fatal("missing/unsupported tier recorded")
+	}
+}
+
+func TestRawServiceTierStreamReplacesEarlierObservation(t *testing.T) {
+	for _, protocol := range []string{"responses", "chat-completions"} {
+		for _, value := range []any{"turbo-v2", nil, Object{"secret": "DO_NOT_STORE"}} {
+			o := &Observation{}
+			first, last := Object{"service_tier": "priority"}, Object{"service_tier": value}
+			if protocol == "responses" {
+				first = Object{"response": first}
+				last = Object{"response": last}
+			}
+			firstRaw, _ := json.Marshal(first)
+			lastRaw, _ := json.Marshal(last)
+			o.observeServiceTier(first, protocol, firstRaw)
+			o.observeServiceTier(last, protocol, lastRaw)
+			if o.ServiceTier != "unknown" || o.ServiceTierRaw != RawServiceTier(value) {
+				t.Fatalf("stale observation: %+v", o)
+			}
+		}
+	}
+}
+
+func TestRawServiceTierNumberPrecision(t *testing.T) {
+	const raw = "9007199254740993"
+	if got := ReadRawServiceTier([]byte(`{"service_tier":`+raw+`}`), "responses"); got != raw {
+		t.Fatalf("rounded raw tier: %s", got)
+	}
+	for _, p := range []string{"responses", "chat-completions"} {
+		payload := `{"service_tier":` + raw + `,"choices":[]}`
+		if p == "responses" {
+			payload = `{"type":"response.completed","response":{"service_tier":` + raw + `,"status":"completed","output":[]}}`
+		}
+		o := Observation{}
+		_, _ = StreamObserved(httptest.NewRecorder(), strings.NewReader("data: "+payload+"\n\ndata: [DONE]\n\n"), p, p, "m", &o)
+		if o.ServiceTierRaw != raw || o.ServiceTier != "unknown" {
+			t.Fatalf("rounded stream tier: %+v", o)
+		}
 	}
 }

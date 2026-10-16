@@ -4,13 +4,14 @@ import "time"
 
 // Observation retains timing and structural facts only, never generated content.
 type Observation struct {
-	ServiceTier string
-	FirstOutput time.Time
-	FirstText   time.Time
-	Terminal    time.Time
-	Status      string
-	NonText     bool
-	Reasoning   bool
+	ServiceTier    string
+	ServiceTierRaw string
+	FirstOutput    time.Time
+	FirstText      time.Time
+	Terminal       time.Time
+	Status         string
+	NonText        bool
+	Reasoning      bool
 }
 
 // output records usable generated content, not stream envelopes or reasoning.
