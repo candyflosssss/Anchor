@@ -368,3 +368,16 @@ type ConnectionProfilesResult struct {
 // Text-only conversation tests use the shared core validation and transient progress.
 type ChatMessage = catalog.ChatMessage
 type ChatRequest = catalog.ChatRequest
+
+// Proxy DTOs are shared with the core and CLI; secrets are write-only.
+type ProxyProfile = state.ProxyProfile
+type ProxyBinding = state.ProxyBinding
+type ProxyTarget = state.ProxyTarget
+type ProxyEngine = state.ProxyEngine
+type ProxyWorkspace = state.ProxyWorkspace
+type ProxyAction = state.ProxyAction
+type ProxyWorkspaceResult struct {
+	Contract string          `json:"contract"`
+	Data     *ProxyWorkspace `json:"data"`
+	Problem  *Problem        `json:"problem"`
+}

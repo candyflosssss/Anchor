@@ -25,3 +25,7 @@ Thumbs.db
 *.test
 /state.db*
 /owner.token
+
+# Verified third-party payloads generated before release builds
+/internal/egress/payload/linux/*.gz
+/internal/egress/payload/windows/*.zip

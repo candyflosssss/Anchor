@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
@@ -34,12 +35,13 @@ var Version = "0.1.0-dev"
 const MaxRequestBytes = 32 << 20
 
 type Server struct {
-	Skills           *skills.Manager
 	AgentEnvironment func() (managed.Environment, error)
+	Skills           *skills.Manager
 	Agents           *managed.Manager
 	Store            *state.Store
 	Log              *slog.Logger
 	upstream         *http.Client
+	egress           *egress.Manager
 	modelCatalog     *modeldev.Client
 	mu               sync.Mutex
 	active           map[string]int
@@ -78,7 +80,8 @@ func NewWithModelCatalog(store *state.Store, log *slog.Logger, catalogClient *mo
 	tr.MaxConnsPerHost = 64
 	tr.MaxIdleConns = 32
 	tr.ResponseHeaderTimeout = 30 * time.Second
-	return &Server{Skills: skills.New(store.Dir), modelCatalog: catalogClient, Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
+	outbound := egress.New(store, tr)
+	return &Server{egress: outbound, Skills: skills.New(store.Dir), modelCatalog: catalogClient, Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: outbound, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
@@ -95,6 +98,7 @@ func (s *Server) Close() {
 			<-run.done
 		}
 		s.upstream.CloseIdleConnections()
+		s.egress.Close()
 		s.modelCatalog.Close()
 		if s.logs != nil {
 			_ = s.logs.Close()
@@ -187,6 +191,7 @@ func (s *Server) Control() http.Handler {
 	s.logRoutes(mux)
 	s.modelCatalogRoutes(mux)
 	s.skillRoutes(mux)
+	s.proxyRoutes(mux)
 	mux.HandleFunc("POST /control/v1/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		if !s.identity(w, r) {
 			return
@@ -241,7 +246,7 @@ func (s *Server) Control() http.Handler {
 		if u, err := user.Current(); err == nil {
 			username = u.Username
 		}
-		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "process_id": os.Getpid(), "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"graceful_stop", "restart_handoff", "responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth", "skill_library_v1"}})
+		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "process_id": os.Getpid(), "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"graceful_stop", "restart_handoff", "responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth", "skill_library_v1", "proxy_v1"}})
 	})
 	mux.HandleFunc("GET /control/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		agents, err := s.Agents.Status()

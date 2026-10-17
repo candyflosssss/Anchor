@@ -22,6 +22,8 @@
 
 2026-10-17 源码增量：新增 Skill 中心库／来源差异／固定版本软链接管理，已随 desktop.46 宿主／核心发布；独立 alpha.6 CLI 不含，见 §14。
 
+2026-10-17 代理源码增量：新增 Windows/Linux AMD64 内置 mihomo、代理设置与供应商/Key 覆盖，尚未打包发布，见 §15；状态自动升级至 schema9，旧核心不能打开升级后的状态库。
+
 ## 1. 调用与公共约定
 
 下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。公开 Release 是安装源；实际公开版本及平台附件见发行页。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
@@ -33,7 +35,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill`、`proxy` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
 | `--ssh-password-stdin` | 从 stdin 读取本次 SSH 密码（最多 8192 bytes，去掉末尾 CR/LF，非空），仅本次使用，不保存；SSH add 时选择密码模式，已保存密码 Context 每次管理请求重新提供。不能与供应商 `--secret-stdin` 同用 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
@@ -53,6 +55,10 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 
 | 指令 | 用途 | 作用域 / 前置条件 |
 | --- | --- | --- |
+| `proxy list` | 查看脱敏代理、绑定和 mihomo 状态 | 当前 Context；核心在线 |
+| `proxy put` | 新建/编辑外部代理或内置 mihomo 节点 | revision + approve；秘密可从 stdin 输入 |
+| `proxy delete` | 删除无引用代理 | revision + approve |
+| `proxy bind` | 供应商默认及 Key 代理覆盖 | revision + approve |
 | `help` | 查看总帮助 | 无需初始化 |
 | `version` | 查看程序版本 | 无需初始化 |
 | `update config` | 查看本机更新渠道与源 | 无需初始化 |
@@ -738,6 +744,7 @@ anchor recover [--id ID]
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；27 项列选择、顺序与预设是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；desktop.45 dev 已发布认证 Codex 原生线程及同机项目元数据关联，其他客户端仍需显式标签；历史不回填 |
+| 出站代理 / 内置 mihomo | proxy list/put/delete/bind；代理设置页及供应商详情 | Windows/Linux amd64；Key 支持继承、强制直连、指定代理；节点 YAML 导入，不含订阅刷新/测速 |
 | Skill 中心库、来源差异、固定版本链接 | skill 管理子命令（§14） | 当前源码未发布；非全盘扫描；无自动原件替换、合并或批量升级 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
@@ -749,7 +756,6 @@ anchor recover [--id ID]
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
 发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；stop、update 与第一优先供应商命令已在当前 CLI 源码中；对应桌面能力已随 desktop.16 dev 发布，不反写 alpha.6 CLI 的能力。
-
 
 ## 11. 本机在线更新
 
@@ -883,6 +889,7 @@ anchor catalog estimate --provider PROVIDER_ID --model MODEL_ID \
 
 这是能力默认值和日志参考价的共享基础。目前已提供核心、CLI、桌面桥接与前端 Model 方法；映射表单显式导入与模型参考快照已接入当前源码（§6）；日志逐请求比价及逐请求价格快照尚未接入。仅估算文本 token，不推断音视频、图像专用费、请求费、路由倍率、折扣或平台账单。详见[模型参考目录契约](../design/model-catalog.md)。
 
+
 ## 14. Skill 中心库
 
 `--content-stdin` 不能与 `--ssh-password-stdin` 共用标准输入；命令会在读取输入前拒绝该组合。
@@ -924,3 +931,23 @@ anchor skill delete SKILL_ID --revision R --approve
 所有写动作必须 `--revision R --approve`，R 来自最近的 scan/action workspace；导入另需来源 hash。版本冲突需重读与重新确认；传输失败结果未知时先核对，不自动重试。并发写有全局 revision 与文件锁，挂载有恢复 intent；扫描不执行恢复，下一次明确操作可能先完成之前已批准事务并要求刷新 revision。
 
 发现范围为共享目录、已有配置目录证据下 Codex／Claude／Gemini／OpenCode 的已知全局位置、Codex 有界工作区索引及手动登记项目；不声称所有 Agent／项目全量发现，外部软链接只列出不跟随。单树8 MiB／256文件；编辑文本48 KiB，API JSON请求128 KiB；完整预算及不支持路径见设计。Windows软链接权限失败不退化为复制。中心库使用 `--data-dir` 对应核心状态目录下的 `skills/`。
+
+## 15. 出站代理（当前源码，未发布）
+
+仅控制当前 Context 核心所在主机的上游请求，不改变本机系统代理；远程 Context 在远端启动 mihomo。推理、对话测试、模型发现、账户查询共用解析规则：Key 指定代理 > 供应商默认；Key `direct` 强制直连、`inherit` 继承，未配置的供应商直连。环境代理不参与。代理故障不会降级为直连，也不会因连接失败自动切换到其他直连 Key/候选。
+
+```text
+anchor [--context NAME] proxy list
+anchor [--context NAME] proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] --revision N --approve
+anchor [--context NAME] proxy delete ID --revision N --approve
+anchor [--context NAME] proxy bind PROVIDER [--key KEY] --mode direct|inherit|proxy [--proxy ID] --revision N --approve
+```
+
+- `list` 不访问上游，输出 `revision/profiles/bindings/targets/engine`；profile 只含 ID、名称、类型、revision，没有代理 URL、认证或节点内容。engine 给出固定版本、平台、是否内置、运行节点数。
+- 写入的 `--revision` 是 **proxy list 的 workspace revision**，不是供应商 revision；`--approve` 必须显式提供。成功输出更新后的整个 workspace。并发冲突先重新读取，不自动重试。断线写入结果未知时同样先读取。
+- `put`：ID 使用项目名称规则，名称非空且最多 100 bytes，类型必填。`--secret-stdin` 最多 64 KiB：`http` 接受带端口的 `http://` 或 `https://` URL；`socks5` 接受 `socks5://` / `socks5h://`；可在 URL 中包含认证。不要把秘密写进命令参数。编辑省略 `--secret-stdin` 保留原秘密（类型不可改变）；新建必须输入。
+- `mihomo` 接受单节点 YAML，或包含 `proxies` 的 Clash YAML；多节点必须 `--node NAME` 精确选中唯一节点。仅提取该节点，忽略根级规则、DNS、TUN、控制器。支持 http、socks5、ss、vmess、vless、trojan、hysteria2、tuic；拒绝文件证书、插件、代理链等外部引用。不接受订阅 URL、URI/Base64 列表，不自动刷新订阅。
+- `bind`：省略 `--key` 设置供应商默认，此时只能 `direct|proxy`；指定 Key 可以 `inherit|direct|proxy`。`proxy` 必须配 `--proxy ID`，其他模式不得同时提供代理 ID。供应商、Key 和代理必须已存在。
+- `delete`：仍被引用返回 referenced，先解绑。供应商改名、删除和复制遵循外键/复制规则；复制 Key 时也复制其代理覆盖。
+- 默认最多 64 个 profile，16 个存活（含正在结束旧流）的 mihomo 节点子进程。节点按需启动、仅本机回环监听、随机认证，不需要管理员权限。编辑不切断旧 SSE，旧代最后一个响应关闭后回收；核心关闭回收全部子进程。
+- 固定 mihomo v1.19.32；正式构建入口自动校验并嵌入 Windows/Linux amd64 payload。直接 `go build` 且未准备 payload 时显示未内置，选用 mihomo 报错，但外部 HTTP/SOCKS5 仍可用。构建方法和 GPLv3 通知见 [代理设计](../design/proxy-settings.md) 与 [mihomo notice](../../third_party/mihomo/NOTICE.md)。秘密依赖实例目录权限保护，**不是静态加密**。

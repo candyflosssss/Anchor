@@ -14,7 +14,7 @@ export function checkedPrice(p: Price): Price {
 }
 function checkedProbe(p: Probe | null): Probe | null {
   if (!p) return null;
-  if (![p.revision, p.at, p.http_status, p.elapsed_ms].every(count) || typeof p.key_id !== 'string' || typeof p.model !== 'string' || !['', 'busy', 'authentication', 'rate_limited', 'network', 'timeout', 'invalid_response', 'unexpected_html', 'http_error'].includes(p.failure)) throw new ProviderProblem('read_error');
+  if (![p.revision, p.at, p.http_status, p.elapsed_ms].every(count) || typeof p.key_id !== 'string' || typeof p.model !== 'string' || !['', 'busy', 'authentication', 'rate_limited', 'network', 'proxy_unavailable', 'timeout', 'invalid_response', 'unexpected_html', 'http_error'].includes(p.failure)) throw new ProviderProblem('read_error');
   return { revision: p.revision, at: p.at, http_status: p.http_status, elapsed_ms: p.elapsed_ms, key_id: p.key_id, model: p.model, failure: p.failure };
 }
 export function checkedKeyRate(rate: KeyRateCache | null): KeyRateCache | null {

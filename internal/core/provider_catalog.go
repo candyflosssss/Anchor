@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -69,6 +70,7 @@ func (s *Server) readProviderCatalog(ctx context.Context, p state.Provider) ([]s
 }
 
 func (s *Server) readProviderCatalogBudget(ctx context.Context, p state.Provider, budget *catalogBudget) ([]string, int, string) {
+	ctx = egress.DefaultRoute(ctx, p.ID)
 	endpoints := providerCatalogEndpoints(p.BaseURL)
 	empty := []string{}
 	if budget.bytes > catalog.MaxBytes {

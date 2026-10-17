@@ -1,3 +1,4 @@
+import { ProviderProxyPanel } from '../proxies/proxies.view';
 import { useMappingSelection } from './use-provider-mapping-batch';
 import { KeyMultiplierView } from './key-multiplier.view';
 import { probeFailureText } from './provider-test.model';
@@ -73,8 +74,8 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
     <div role="tabpanel" id={`panel-${c.detailTab}`} aria-labelledby={`tab-${c.detailTab}`} className="detail-panel" tabIndex={0}>
       {f.error && !c.dialog && <div className="feedback error-feedback" role="alert"><CircleAlert size={16} /><span>{f.error}</span><Button variant="outline" size="sm" disabled={f.busy} onClick={() => void (f.needsRead ? c.load() : f.refresh())}>重新读取</Button></div>}
       {c.detailTab === 'account' ? <ProviderAccountView c={c} /> : !w ? (!f.error && <div className="empty-state compact" role="status"><LoaderCircle className="loading-icon" size={24} /><p>正在读取 Key、模型与用量…</p></div>)
-        : c.detailTab === 'overview' ? <OverviewTab c={c} p={p} w={w} />
-        : c.detailTab === 'keys' ? <KeysTab c={c} w={w} disabled={blocked} ask={setAsk} />
+        : c.detailTab === 'overview' ? <><OverviewTab c={c} p={p} w={w} /><ProviderProxyPanel key={p.id} providerId={p.id} disabled={blocked} /></>
+        : c.detailTab === 'keys' ? <><KeysTab c={c} w={w} disabled={blocked} ask={setAsk} /><ProviderProxyPanel key={p.id} providerId={p.id} disabled={blocked} /></>
         : c.detailTab === 'models' ? <ModelsTab key={w.provider_id} c={c} w={w} disabled={blocked} ask={setAsk} />
         : <UsageTab c={c} w={w} disabled={blocked} />}
     </div>

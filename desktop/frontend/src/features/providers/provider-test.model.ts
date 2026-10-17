@@ -24,7 +24,7 @@ export function checkedProgress(value: ProbeProgress, input: ProbeRequest, maxTe
   const result = value.result;
   if (result && (result.revision !== value.revision || result.key_id !== value.key_id || result.model !== value.model ||
     ![result.at, result.elapsed_ms, result.http_status].every(n => Number.isSafeInteger(n) && n >= 0) ||
-    !['', 'busy', 'authentication', 'rate_limited', 'network', 'timeout', 'invalid_response', 'unexpected_html', 'http_error'].includes(result.failure))) throw new ProviderProblem('read_error');
+    !['', 'busy', 'authentication', 'rate_limited', 'network', 'proxy_unavailable', 'timeout', 'invalid_response', 'unexpected_html', 'http_error'].includes(result.failure))) throw new ProviderProblem('read_error');
   return { provider_id: value.provider_id, revision: value.revision, run_id: value.run_id, key_id: value.key_id,
     model: value.model, status: value.status, phase: value.phase, text: value.text, elapsed_ms: value.elapsed_ms,
     result: result ? { revision: result.revision, key_id: result.key_id, model: result.model, at: result.at,
@@ -32,6 +32,7 @@ export function checkedProgress(value: ProbeProgress, input: ProbeRequest, maxTe
 }
 
 export function probeFailureText(code: string): string {
+  if (code === 'proxy_unavailable') return '配置的代理不可用，已阻止自动直连。请检查代理设置和内置 mihomo 状态。';
   if (code === 'unexpected_html') return '上游返回了 HTML 网页，而不是模型响应。请检查请求地址是否为 API 地址（通常以 /v1 结尾），不要填写网站主页。';
   return code;
 }

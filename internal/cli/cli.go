@@ -102,6 +102,10 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   agent apply ID --revision N --fingerprint SHA256
   agent sync|restore|enable|disable ID --revision N
   agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|all-mapped|single
+  proxy list                        List proxies, bindings and built-in mihomo status
+  proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] --revision N --approve
+  proxy delete ID --revision N --approve
+  proxy bind PROVIDER [--key KEY] --mode direct|inherit|proxy [--proxy ID] --revision N --approve
   skill scan | list                  Read-only Skill inventory and immutable library
   skill inspect | diff [ID]           Inspect snapshots or --source ID; see CLI docs
   skill register-project PATH        Add an explicitly approved project root
@@ -396,6 +400,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.output(v)
 	case "agent":
 		return a.agents(ctx, cl, args[1:])
+	case "proxy":
+		return a.proxies(ctx, cl, args[1:])
 	case "skill":
 		return a.skills(ctx, cl, args[1:])
 	case "usage":

@@ -180,6 +180,10 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 新增受控 `ProviderChat` 桥接与核心 `/control/v1/providers/{id}/chat`；start/read/cancel 使用 `ChatRequest` 与既有 `ProbeProgressResult`，只允许所选已存供应商、准确 Key 和纯文本多轮消息。固定目标、不自动重试、不保存聊天正文；可选 `ChatRequest.reasoning_effort`（空／省略为默认），按所选 Key 的实际模型协议发送原生参数，UI 修改深度不清空上下文。沿用管理鉴权、实例核验和协议转换。既有 Probe/CLI test 不变，旧宿主／核心明确不支持，不回退 Mock。限制、取消、脱敏和共享样例见[对话测试契约](chat-testing.md)。
 
+## mihomo 核心子进程
+
+出站代理归核心 `internal/egress` 所有，不归桌面窗口：隐藏/关闭窗口不会单独停止代理，核心关闭统一回收。Windows 使用隐藏子进程与 KILL_ON_JOB_CLOSE Job；Linux 设置父进程死亡信号。每个活动 profile 代际有独立回环监听和认证，旧响应关闭后退役，UI 不获得端口认证及节点秘密。远程 Context 使用远程核心的 payload/进程，旧核心管理接口缺失返回 unsupported。详见 [proxy-v1](proxy-settings.md)。
+
 ## Skill 中心库桥接（2026-10-17 源码，未发布）
 
 新增 `Bridge.SkillWorkspace()`、`Bridge.SkillDetail(SkillQuery)`、`Bridge.ManageSkill(SkillAction)`，规范 DTO 从 `internal/skills` 以别名纳入生成器，共享 `desktop/contract/skills.json`。薄桥接经认证客户端调用 `/control/v1/skills`、`/detail`、`/action`，所有写入仍在核心校验 approval / revision / hash。只读详情 POST 的传输失败不标记未知写入，实际动作不自动重试。新增错误 skill_unsafe / skill_changed / skill_limit / skill_link_unavailable。Skill 响应有独立16 MiB客户端上限，不改变其他接口1 MiB上限。发现、版本、冲突与恢复行为见 [设计](skills.md)，CLI 见 [大全 §14](../cli/commands.md#14-skill-中心库当前源码未发布)。不代表原生窗口或真实 Agent 加载已验收。

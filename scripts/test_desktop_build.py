@@ -72,8 +72,17 @@ class DesktopBuildTests(unittest.TestCase):
             bundle.write_text("anchor-desktop-v1 " + marker)
             with self.subTest(marker=marker), self.assertRaisesRegex(RuntimeError, "Prototype-only"):
                 build.verify_assets()
-        bundle.write_text("anchor-desktop-v1")
+        bundle.write_text("anchor-desktop-v1 代理设置 ProxyWorkspace ManageProxy")
         build.verify_assets()
+
+    def test_assets_reject_missing_proxy_navigation_or_bridge(self):
+        assets = self.frontend / "dist/assets"
+        assets.mkdir(parents=True)
+        markers = ("代理设置", "ProxyWorkspace", "ManageProxy")
+        for missing in markers:
+            (assets / "test.js").write_text("anchor-desktop-v1 " + " ".join(m for m in markers if m != missing))
+            with self.subTest(missing=missing), self.assertRaisesRegex(RuntimeError, "Proxy settings missing"):
+                build.verify_assets()
 
     def test_public_version_is_rejected_before_preflight(self):
         with patch("sys.argv", ["build", "--target", "windows-amd64", "--version", "0.1.0-alpha.6"]), \

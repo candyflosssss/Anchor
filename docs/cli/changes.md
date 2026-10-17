@@ -574,6 +574,14 @@
 - 兼容与迁移：新增可选 `ChatRequest.reasoning_effort`，旧客户端省略时行为不变；启用新字段需同步升级核心／宿主／CLI，旧核心可能严格拒绝该字段，不回退或绕过；不改持久配置，不打包／发布。
 - 验证：本轮合成上游的契约、核心、桥接、CLI、前端类型／Model和浏览器检查的实际结果见同轮任务记录；不请求真实付费上游，不以浏览器替代原生桌面验收。
 
+## 2026-10-17 — 内置 mihomo 与供应商 / Key 代理覆盖（当前源码，未发布）
+
+- 类型：新增管理命令与出站路由能力。
+- 指令与参数：新增 `proxy list`、`proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] --revision N --approve`、`proxy delete ID --revision N --approve`、`proxy bind PROVIDER [--key KEY] --mode direct|inherit|proxy [--proxy ID] --revision N --approve`。作用域为所选 Context 的核心，写入使用代理 workspace revision；秘密仅从 stdin 输入、不会回显。
+- 旧 → 新：此前没有独立代理配置；现在可复用外部 HTTP(S) / SOCKS5 或 Windows/Linux AMD64 内置 mihomo 节点，供应商默认代理可被 Key 显式直连或指定代理覆盖；Key `inherit` 恢复继承。代理错误不降级直连、不自动重试其他直连候选，活动响应保留旧配置直到关闭。桌面新增独立代理页和供应商详情选择器，复用同一核心规则。
+- 兼容与迁移：状态库自动从 schema8 升级至 schema9，升级前备份并同步更新客户端与核心；旧核心不能打开升级后的数据库。固定 mihomo v1.19.32 构件由构建脚本校验 SHA256 后嵌入，源码开发未准备构件时明确显示不可用；不修改系统代理，不启用 TUN，不接收订阅 URL / 自动订阅刷新。当前只改源码，没有新安装包或公开发行。
+- 验证：六个受影响 Go 包测试通过；实际 Linux mihomo 的本地转发、回环认证、异常退出重建与退出回收通过；Windows AMD64 egress / desktop 测试程序交叉编译通过。前端类型检查、定向 lint、298 项单元测试和 2 项隔离 Chromium 桥接交互测试通过；Python 构建工具回归 63 项（9 项原生 Windows 条件用例跳过）。浏览器测试不是原生 Wails 验收，未请求真实付费上游或改动真实 Agent 配置。
+
 ## 2026-10-17 — Skill 中心库与固定版本软链接（当前源码，未发布）
 
 - 类型：新增用户管理命令与桌面入口。

@@ -2,6 +2,49 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed", "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe", "skill_unsafe", "skill_changed", "skill_limit", "skill_link_unavailable"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface ProxyProfile {
+  id: string;
+  name: string;
+  kind: string;
+  revision: number;
+}
+export interface ProxyBinding {
+  provider_id: string;
+  key_id: string;
+  mode: string;
+  proxy_id: string;
+}
+export interface ProxyTarget {
+  provider_id: string;
+  key_id: string;
+}
+export interface ProxyEngine {
+  available: boolean;
+  version: string;
+  platform: string;
+  running: number;
+}
+export interface ProxyWorkspace {
+  revision: number;
+  profiles: ProxyProfile[];
+  bindings: ProxyBinding[];
+  targets: ProxyTarget[];
+  engine: ProxyEngine;
+}
+export interface ProxyAction {
+  action: string;
+  expected_revision: number;
+  approved: boolean;
+  profile: ProxyProfile;
+  secret: string | null;
+  node_name: string;
+  binding: ProxyBinding;
+}
+export interface ProxyWorkspaceResult {
+  contract: string;
+  data: ProxyWorkspace | null;
+  problem: Problem | null;
+}
 export interface SkillFile {
   path: string;
   hash: string;
@@ -953,6 +996,7 @@ export interface DesktopBridge {
   LogSuggestions(input1: SuggestionsQuery): Promise<LogSuggestionsResult>;
   Logs(input1: Query): Promise<LogsResult>;
   ManageAgent(input1: ManageAgent): Promise<AgentWorkspaceResult>;
+  ManageProxy(input1: ProxyAction): Promise<ProxyWorkspaceResult>;
   ManageSkill(input1: SkillAction): Promise<SkillWorkspaceResult>;
   ModelCatalog(input1: ModelCatalogQuery): Promise<ModelCatalogResult>;
   ModelSettings(input1: ModelSettingsQuery): Promise<ModelSettingsResult>;
@@ -964,6 +1008,7 @@ export interface DesktopBridge {
   ProviderRate(input1: AccountQuery): Promise<AccountRateObservationResult>;
   ProviderWorkspace(input1: WorkspaceQuery): Promise<WorkspaceResult>;
   Providers(): Promise<ProvidersResult>;
+  ProxyWorkspace(): Promise<ProxyWorkspaceResult>;
   RestartCore(input1: ConfirmStop): Promise<SessionResult>;
   SaveModelSettings(input1: SaveModelSettings): Promise<ModelSettingsResult>;
   SaveProvider(input1: SaveProvider): Promise<SaveResult>;

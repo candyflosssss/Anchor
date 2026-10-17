@@ -919,3 +919,7 @@ dist/desktop/0.1.0-dev.desktop.7/
 - 中文：Key 名称、公开模型 ID／别名、Context／设备连接名称和 Agent Binding ID 支持中文。用户名称允许 1–128 个 Unicode 字母／十进制数字或 `._-`，首字符须为字母／数字；Binding ID 另限 64 个 UTF-8 字节。令牌、实例／授权 ID、错误码和 SSH 技术字段继续使用各自技术约束；Codex TOML 中文供应商表名正确编码与恢复。
 - 验证：复用已提交功能的八个 Go 包测试、49 项前端定向测试、typecheck／lint 结果；本次执行双平台生产构建、安装包校验、源码及 vendored 依赖／元数据核对。隔离源码 CLI 从默认 GitHub dev 源以 .32 为当前版本发现 .33，实际下载 Linux .deb（6,009,304 字节）并验证 SHA256；Windows 远端 digest 与本地一致。
 - 边界：独立 CLI 正式预发行仍为 alpha.6；使用中文名称须更新桌面／源码 CLI 及核心。本次仅打包并在线投放，没有替换本机程序、停止真实核心或改动 Agent 配置；未执行原生窗口、apt／NSIS 或 apply 验收，开发安装器未签名。工作区未提交的余额相关改动未包含在构建中。
+
+## 内置 mihomo 构建输入
+
+Windows/Linux amd64 桌面构建入口会先执行 `scripts/prepare-mihomo.py --target TARGET`，下载固定 v1.19.32 compatible archive 并核对 SHA256；生成物位于被 Git 忽略的 `internal/egress/payload/`。失败必须中止，不构建声称内置但缺少内核的包。CLI release 同样准备对应 payload。直接 Go 开发构建可不带 payload，代理页会准确显示缺失。独立可执行文件内嵌 GPLv3 及来源通知，安装包第三方声明也包括它们；分发须继续提供对应版本源码下载，见 `third_party/mihomo/NOTICE.md`。此改动不是已经发布的安装包。

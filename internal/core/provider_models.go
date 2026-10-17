@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/providerapi"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -112,7 +113,7 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 	for _, key := range keys {
 		provider := p
 		provider.Protocol, provider.Secret = key.Protocol, key.Secret
-		ids, status, failure := s.readProviderCatalogBudget(ctx, provider, budget)
+		ids, status, failure := s.readProviderCatalogBudget(egress.WithKeyRoute(ctx, p.ID, key.ID, key.Secret != ""), provider, budget)
 		// Reject echoes of any saved credential, including another Key's secret.
 		for _, id := range ids {
 			for _, k := range allKeys {
@@ -164,7 +165,7 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 	// Read catalogs first so missing/slow billing permissions never hide models.
 	for i, key := range keys {
 		adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: key.Secret}
-		rate := adapter.QueryKeyRate(ctx)
+		rate := adapter.QueryKeyRate(egress.WithKeyRoute(ctx, p.ID, key.ID, key.Secret != ""))
 		if cacheErr = s.cacheKeyRate(p, allKeys, key.ID, &rate); cacheErr != nil {
 			return
 		}

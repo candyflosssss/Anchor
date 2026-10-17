@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -356,7 +357,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	defer cancel()
 	var connected atomic.Bool
 	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { connected.Store(true) }})
-	up, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))
+	up, err := http.NewRequestWithContext(egress.WithKeyRoute(ctx, p.ID, key.ID, key.Secret != ""), http.MethodPost, target, bytes.NewReader(body))
 	if err != nil {
 		apiError(w, err)
 		return false
@@ -387,6 +388,12 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		}
 	}
 	if err != nil {
+		if errors.Is(err, egress.ErrUnavailable) {
+			code = "proxy_unavailable"
+			status = 502
+			fail(w, 502, "proxy_unavailable", "configured proxy is unavailable; direct fallback is disabled")
+			return false
+		}
 		if r.Context().Err() != nil {
 			return false
 		}

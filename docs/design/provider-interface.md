@@ -223,3 +223,7 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 ## 多轮对话测试（2026-10-16，当前源码未发布）
 
 新增受控 `ProviderChat` 桥接与核心 `/control/v1/providers/{id}/chat`；start/read/cancel 使用 `ChatRequest` 与既有 `ProbeProgressResult`，只允许所选已存供应商、准确 Key 和纯文本多轮消息。固定目标、不自动重试、不保存聊天正文；可选 `ChatRequest.reasoning_effort`（空／省略为默认），按所选 Key 的实际模型协议发送原生参数，UI 修改深度不清空上下文。沿用管理鉴权、实例核验和协议转换。既有 Probe/CLI test 不变，旧宿主／核心明确不支持，不回退 Mock。限制、取消、脱敏和共享样例见[对话测试契约](chat-testing.md)。
+
+## 出站选择（proxy-v1）
+
+供应商协议、认证、模型名不包含代理实现；`internal/egress` 根据 provider ID / 实际 Key ID 解析独立绑定。Key 可以继承、直连、指定 profile。核心将路由上下文传给推理、catalog 和 providerapi 账户客户端；适配器不关心 mihomo。代理连接错误保留 fail-closed 行为，不因既有候选故障切换逻辑绕到直连。管理及桌面契约见 [代理设置](proxy-settings.md)。

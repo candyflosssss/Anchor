@@ -74,6 +74,8 @@ def notices(binaries: list[Path]) -> str:
         else:
             result.append(license_text(directory, label))
     result.append((ROOT / "desktop/packaging/notices/README.md").read_text())
+    result.append((ROOT / "third_party/mihomo/NOTICE.md").read_text())
+    result.append((ROOT / "third_party/mihomo/LICENSE").read_text())
     result.append("\nMicrosoft Edge WebView2 Runtime bootstrapper: Copyright Microsoft Corporation.\n"
                   "Bundled from the locked Wails module; the runtime is a separate Microsoft product.\n"
                   "Distribution/installation terms: https://developer.microsoft.com/microsoft-edge/webview2/\n")

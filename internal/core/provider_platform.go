@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/providerapi"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -121,6 +122,7 @@ func (s *Server) QueryProvider(parent context.Context, in providerapi.Query) (pr
 	defer s.release(p.ID)
 	ctx, cancel := context.WithTimeout(parent, min(time.Duration(p.TimeoutSeconds)*time.Second, 8*time.Second))
 	defer cancel()
+	ctx = egress.WithKeyRoute(ctx, p.ID, selected.ID, found)
 	if in.Operation == "models" {
 		if !found && len(keys) > 0 {
 			out.Failure = "auth_required"

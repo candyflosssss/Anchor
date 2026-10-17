@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/protocol"
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -454,7 +455,7 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	}
 	ctx, cancel := context.WithTimeout(ctx, min(time.Duration(p.TimeoutSeconds)*time.Second, timeout))
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "POST", strings.TrimRight(p.BaseURL, "/")+protocol.Endpoint(p.Protocol), bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(egress.WithKeyRoute(ctx, p.ID, key.ID, key.Secret != ""), "POST", strings.TrimRight(p.BaseURL, "/")+protocol.Endpoint(p.Protocol), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -464,6 +465,10 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	attempted = true
 	stage = "upstream_connect"
 	resp, err := s.inferenceResponse(req, p.BaseURL, p.Protocol, row.Evidence)
+	if errors.Is(err, egress.ErrUnavailable) {
+		out.Failure = "proxy_unavailable"
+		return out, nil
+	}
 	if err != nil {
 		out.Failure = "network"
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {

@@ -194,8 +194,14 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 			if err != nil {
 				return err
 			}
+			if _, err = tx.Exec(`INSERT INTO provider_proxy SELECT ?,mode,proxy_id FROM provider_proxy WHERE provider_id=?`, target, id); err != nil {
+				return err
+			}
 			if copyKeys {
 				_, err = tx.Exec(`INSERT INTO provider_keys SELECT ?,id,secret,enabled,protocol FROM provider_keys WHERE provider_id=?`, target, id)
+			}
+			if err == nil && copyKeys {
+				_, err = tx.Exec(`INSERT INTO key_proxy SELECT ?,key_id,mode,proxy_id FROM key_proxy WHERE provider_id=?`, target, id)
 			}
 			if err == nil && copyKeys {
 				_, err = tx.Exec(`INSERT INTO key_model_protocols SELECT ?,key_id,model,protocol FROM key_model_protocols WHERE provider_id=?`, target, id)

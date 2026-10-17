@@ -11,6 +11,7 @@ const session = { instance_id: 'synthetic-instance', phase: 'ready', source: 'st
 const input = { provider: publicRow, expected_revision: publicRow.revision, secret: 'synthetic-secret' };
 function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   return {
+    ProxyWorkspace: vi.fn(), ManageProxy: vi.fn(),
     Connections: vi.fn(), ConnectSSH: vi.fn(), UseConnection: vi.fn(),
  Start: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),
     Status: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),

@@ -25,6 +25,8 @@ async function host(page: Page, rateMappings = false) {
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const modelStates: Record<string, ModelSettingsState> = {};
     const api: DesktopBridge = {
+      ProxyWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      ManageProxy: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
  Connections: async () => ({ contract, data: [], problem: null }),
  ConnectSSH: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
  UseConnection: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),

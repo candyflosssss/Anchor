@@ -141,6 +141,7 @@ def dependencies(env: dict[str, str]) -> tuple[list[dict[str, object]], str]:
             if file.is_symlink() or file.stat().st_size > 2 << 20:
                 raise RuntimeError(f"invalid dependency notice: {module['Path']}/{file.name}")
             notices.append(f"\n--- {file.name} ---\n" + file.read_text(errors="replace"))
+    notices.extend((ROOT / "third_party/mihomo" / n).read_text() for n in ("NOTICE.md", "LICENSE"))
     return modules, "Bundled module notices (not a legal completeness audit).\n" + "\n".join(notices)
 
 
@@ -295,6 +296,7 @@ def build(args: argparse.Namespace, env: dict[str, str], source: dict[str, objec
             with tempfile.TemporaryDirectory(prefix="anchor-package-") as tmp:
                 scratch = Path(tmp)
                 for target in args.targets:
+                    command([sys.executable, str(ROOT / "scripts/prepare-mihomo.py"), "--target", target], env=env, timeout=240)
                     goos, goarch = TARGETS[target]
                     payload = scratch / f"anchor_{args.version}_{goos}_{goarch}"
                     payload.mkdir()

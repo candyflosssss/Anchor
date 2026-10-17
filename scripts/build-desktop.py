@@ -64,6 +64,11 @@ def verify_assets() -> None:
     for marker in ("https://backup.example.com/v1", "本地调试", "原型场景"):
         if marker in bundle:
             raise RuntimeError(f"Prototype-only content leaked into the desktop bundle: {marker}")
+    # A successful build must include both navigation and the live proxy bridge.
+    # Inspect compiled output, not just the presence of uncommitted source files.
+    for marker in ("代理设置", "ProxyWorkspace", "ManageProxy"):
+        if marker not in bundle:
+            raise RuntimeError(f"Proxy settings missing from the desktop bundle: {marker}")
 
 
 def main() -> int:
@@ -88,6 +93,7 @@ def main() -> int:
         env.pop(key, None)
     env.update(GOMAXPROCS="2", GOFLAGS="-p=2", GOWORK="off", GOTOOLCHAIN="local")
     # Drift is a build error, not silent regeneration of the reviewed contract.
+    run([sys.executable, str(ROOT / "scripts/prepare-mihomo.py"), "--target", args.target], env=env)
     verify_contract(env)
     run(["npm", "run", "build"], cwd=FRONTEND, env=env)
     verify_assets()

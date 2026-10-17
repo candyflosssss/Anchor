@@ -37,11 +37,11 @@ def digest(path: Path) -> str:
 def inputs_digest() -> str:
     # Only build inputs, never arbitrary worktree state, credentials or node_modules.
     files = [ROOT / "go.mod", ROOT / "go.sum", ROOT / "LICENSE"]
-    for folder in ("cmd", "internal", "desktop/branding", "desktop/packaging"):
+    for folder in ("cmd", "internal", "desktop/branding", "desktop/packaging", "third_party/mihomo"):
         files.extend(p for p in (ROOT / folder).rglob("*") if p.is_file())
     files.extend(p for p in (ROOT / "desktop/frontend/src").rglob("*") if p.is_file())
     files.extend(p for p in (ROOT / "desktop/frontend").iterdir() if p.is_file())
-    files.extend(ROOT / "scripts" / n for n in ("build-desktop.py", "package-desktop.py", "package-desktop.sh", "desktop-package-worker.py", "update_manifest.py"))
+    files.extend(ROOT / "scripts" / n for n in ("build-desktop.py", "package-desktop.py", "package-desktop.sh", "desktop-package-worker.py", "update_manifest.py", "prepare-mihomo.py"))
     result = hashlib.sha256()
     for path in sorted(set(files)):
         if path.suffix == ".pyc" or "__pycache__" in path.parts:
@@ -95,6 +95,7 @@ def main() -> int:
     build.verify_contract(env)
     build.run(["npm", "run", "build"], cwd=build.FRONTEND, env=env)
     build.verify_assets()
+    build.run([sys.executable, str(ROOT / "scripts/prepare-mihomo.py"), "--target", "linux-amd64", "--target", "windows-amd64"], env=env)
     output.mkdir(parents=True)
     for target in build.TARGETS:
         (output / target).mkdir()
