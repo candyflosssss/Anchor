@@ -15,6 +15,9 @@ SetCompressorDictSize 16
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "${OUTPUT_FILE}"
 InstallDir "$LOCALAPPDATA\Programs\Anchor Desktop"
+; HKCU Software is shared between registry views. NSIS gives /D= precedence.
+InstallDirRegKey HKCU "${UNINSTALL_KEY}" "InstallLocation"
+Var PreviousInstallDir
 VIProductVersion "${NUMERIC_VERSION}"
 VIAddVersionKey /LANG=2052 "ProductName" "${APP_NAME}"
 VIAddVersionKey /LANG=2052 "FileDescription" "Anchor 当前用户开发版安装程序"
@@ -31,6 +34,9 @@ VIAddVersionKey /LANG=2052 "LegalCopyright" "Anchor contributors; AGPL-3.0-only"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "${DOCS_DIR}/LICENSE"
 !insertmacro MUI_PAGE_COMPONENTS
+!define MUI_DIRECTORYPAGE_TEXT_TOP "选择当前用户有写入权限的本地文件夹，可更换盘符，支持中文和空格。升级默认沿用原目录；更换位置会先确认卸载旧程序，保留配置和数据库。"
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE ValidateInstallDirectory
+!insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -69,9 +75,106 @@ Function .onInit
     SetErrorLevel 2
     Abort
   ${EndIf}
-  ; Deliberately fixed per-user location; ignore an NSIS /D override.
-  StrCpy $INSTDIR "$LOCALAPPDATA\Programs\Anchor Desktop"
+  ; Keep NSIS /D= or the remembered InstallLocation; never force the default.
+  ReadRegStr $PreviousInstallDir HKCU "${UNINSTALL_KEY}" "InstallLocation"
+  Call CheckPreviousStopped
   Call CheckStopped
+FunctionEnd
+
+Function ValidateInstallDirectory
+  ; Run on directory-page leave AND in the install section (including /S).
+  ; Reject relative/UNC paths and drive roots before creating or removing files.
+  StrCpy $0 "$INSTDIR" 2 1
+  ${If} $0 != ":\"
+  ${AndIf} $0 != ":/"
+    Goto invalid_directory
+  ${EndIf}
+  ClearErrors
+  GetFullPathName $INSTDIR "$INSTDIR"
+  IfErrors invalid_directory
+  StrLen $0 "$INSTDIR"
+  ${If} $0 <= 3
+    Goto invalid_directory
+  ${EndIf}
+  ; Strip a trailing separator so choosing the same folder is not relocation.
+  StrCpy $0 "$INSTDIR" 1 -1
+  ${If} $0 == "\"
+  ${OrIf} $0 == "/"
+    StrCpy $INSTDIR "$INSTDIR" -1
+  ${EndIf}
+  ; Re-read to avoid relying on a stale registry value after directory selection.
+  ReadRegStr $PreviousInstallDir HKCU "${UNINSTALL_KEY}" "InstallLocation"
+  ${If} $PreviousInstallDir != ""
+    GetFullPathName $PreviousInstallDir "$PreviousInstallDir"
+    IfErrors invalid_directory
+    StrCpy $0 "$PreviousInstallDir" 1 -1
+    ${If} $0 == "\"
+    ${OrIf} $0 == "/"
+      StrCpy $PreviousInstallDir "$PreviousInstallDir" -1
+    ${EndIf}
+  ${EndIf}
+  SetErrorLevel 0
+  Return
+  invalid_directory:
+  MessageBox MB_OK|MB_ICONSTOP "请选择本地盘符下的完整文件夹，例如 D:\Anchor 或 E:\应用程序\Anchor Desktop。不能使用盘符根目录、相对路径或网络共享；所选文件夹须允许当前用户写入。" /SD IDOK
+  SetErrorLevel 2
+  Abort
+FunctionEnd
+
+Function CheckPreviousStopped
+  ${If} $PreviousInstallDir == ""
+  ${OrIf} $PreviousInstallDir == $INSTDIR
+    Return
+  ${EndIf}
+  ; Check the old core/window as well as the selected destination. No killing.
+  Push $INSTDIR
+  StrCpy $INSTDIR "$PreviousInstallDir"
+  Call CheckStopped
+  Pop $INSTDIR
+FunctionEnd
+
+Function RelocateInstalledApp
+  ${If} $PreviousInstallDir == ""
+  ${OrIf} $PreviousInstallDir == $INSTDIR
+    Return
+  ${EndIf}
+  IfFileExists "$PreviousInstallDir\Uninstall.exe" 0 relocation_failed
+  ; Silent installs cannot approve a location change implicitly.
+  MessageBox MB_YESNO|MB_ICONQUESTION|MB_DEFBUTTON2 "将安装位置从：$\r$\n$PreviousInstallDir$\r$\n更改为：$\r$\n$INSTDIR$\r$\n$\r$\n确认后先卸载旧程序，再安装到新位置。配置、凭据和数据库会保留在原用户数据目录，不随程序移动。如果新安装失败，请重新运行安装包。是否继续？" /SD IDNO IDYES relocate
+  SetErrorLevel 2
+  Abort
+  relocate:
+  ; Prove the destination is writable BEFORE uninstalling the working copy.
+  ClearErrors
+  CreateDirectory "$INSTDIR"
+  IfErrors relocation_failed
+  GetTempFileName $0 "$INSTDIR"
+  IfErrors relocation_failed
+  Delete "$0"
+  IfErrors relocation_failed
+  Call CheckPreviousStopped
+  Call CheckStopped
+  ClearErrors
+  ; _?= must be last and unquoted, even with spaces: wait for the original
+  ; uninstaller instead of a detached temporary copy. It retains all user state.
+  ExecWait '"$PreviousInstallDir\Uninstall.exe" /S _?=$PreviousInstallDir' $0
+  IfErrors relocation_failed
+  ${If} $0 != 0
+    Goto relocation_failed
+  ${EndIf}
+  ReadRegStr $0 HKCU "${UNINSTALL_KEY}" "InstallLocation"
+  ${If} $0 != ""
+    Goto relocation_failed
+  ${EndIf}
+  ; _?= leaves the uninstaller itself behind. Never recurse into the old folder.
+  Delete "$PreviousInstallDir\Uninstall.exe"
+  RMDir "$PreviousInstallDir"
+  ClearErrors
+  Return
+  relocation_failed:
+  MessageBox MB_OK|MB_ICONSTOP "无法更换安装位置：新目录可能不可写，或旧版卸载未完成。未强制结束任何进程，配置和数据库不会删除。请停止核心、退出界面，检查目录权限或通过「已安装的应用」卸载旧版后重试。" /SD IDOK
+  SetErrorLevel 2
+  Abort
 FunctionEnd
 
 Function HasWebView2
@@ -125,11 +228,15 @@ FunctionEnd
 
 Section "Anchor（必需）" main
   SectionIn RO
+  Call ValidateInstallDirectory
+  Call CheckPreviousStopped
   Call CheckStopped
   Call EnsureWebView2
-  SetOutPath "$INSTDIR"
-  SetOverwrite on
+  Call RelocateInstalledApp
   ClearErrors
+  SetOutPath "$INSTDIR"
+  IfErrors install_failed
+  SetOverwrite on
   File /oname=anchor-desktop.exe "${APP_EXE}"
   IfErrors install_failed
   File /oname=anchor.ico "${ICON_FILE}"

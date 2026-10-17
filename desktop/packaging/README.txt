@@ -1,8 +1,20 @@
 Anchor Desktop — internal desktop-dev package (unsigned, not a public release)
 
 Windows: install for the current user; open Anchor from the Start menu or the
-optional desktop shortcut. If WebView2 is missing, the installer asks before
-running Microsoft's online bootstrapper. Internet access is then required.
+optional desktop shortcut. Choose a writable local-drive folder on the directory
+page (Unicode and spaces supported); the default is
+%LOCALAPPDATA%\Programs\Anchor Desktop. Upgrades remember the registered install
+folder. Selecting a different folder asks for confirmation, checks destination
+write access, then waits for the old uninstaller before writing the new copy.
+This preserves user state in its original location; it does not move the database.
+Stop the core and close all windows first. If installation after removal fails,
+rerun the installer; program-file rollback is not automatic.
+NSIS /D=<absolute local folder> overrides the default/remembered location; put it
+last and do not quote its value, even with spaces. Drive roots, relative paths and
+UNC shares are rejected. /S cannot approve relocation (exit code 2); use the GUI
+or explicitly uninstall first. No elevation is requested for protected folders.
+If WebView2 is missing, the installer asks before running Microsoft's online
+bootstrapper. Internet access is then required.
 
 Linux: this .deb targets Ubuntu 24.04 LTS amd64 with a graphical session.
 Install with the graphical package manager, or `sudo apt install ./<file>.deb`
