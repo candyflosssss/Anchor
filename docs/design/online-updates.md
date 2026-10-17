@@ -1,11 +1,11 @@
 # 在线更新 v1
 
-- 日期：2026-10-17；**`0.1.0-dev.desktop.46` 已于北京时间 2026-10-17 01:04:25 发布到默认 GitHub Releases dev 渠道**，非 latest，两平台安装包与 flat 清单同版投放。
-- 本版将托管 Agent 操作合并为「更新配置」，一次确认更新默认模型、映射与连接；显式重新接管先保存外部变化作为恢复基线，后台不覆盖第三方值。日志趋势面板可收起。
-- 构建：干净隔离源码 `0d9f8479cba2c7c6ca0b58af1c3c9b313154d79f`，SOURCE.json dirty=false；排除未提交的代理／mihomo、余额及打包器改动。沿用 state.db schema8，不支持降级。
-- 在线验证：六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.45` 为当前版发现并真实下载 `.46` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。 详见[当前在线 dev 版 `.46`](../release/desktop.md#当前在线-dev-版-46)。
-- 当前本机：本机 CLI／核心／GUI 已于2026-10-17 01:06统一升级为 `.46`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop46-20261017-010601`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持；Codex conflict／DSH applied 与升级前一致，不借安装自动重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
-- **首次迁移限制**：沿用 `.35` 的 restart_handoff；desktop.34 及更早版须先备份、普通停止旧核心并退出界面，再人工安装 `.46`。缺能力旧核心拒绝在线安装，不降级／强杀；升级仍有停机窗口，SSH 远端另行升级。
+- 日期：2026-10-17；**`0.1.0-dev.desktop.47` 已于北京时间 2026-10-17 22:37:49 发布到默认 GitHub Releases dev 渠道**，非 latest，两平台安装包与 flat 清单同版投放。
+- 本版：模型映射新增「同一渠道重试次数」，默认额外3次，可设0–10；502/503/504与取得连接前失败按共享超时预算重试，已输出流式响应或执行结果未知时不重放。另交付托盘完整退出、本机安全重启及离线恢复。
+- 构建：干净隔离源码 `6d3d4146b2b02000d2aa8830318791d21a713e1e`，SOURCE.json dirty=false；排除未提交的代理／mihomo、余额及打包器改动。沿用 state.db schema8，不支持降级。
+- 在线验证：六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.46` 为当前版发现并真实下载 `.47` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。 详见[当前在线 dev 版 `.47`](../release/desktop.md#当前在线-dev-版-47)。
+- 当前本机：本机 CLI／核心／GUI 已于2026-10-17 22:39统一升级为 `.47`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop47-20261017-223946`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway／agent_management ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH 均维持 applied；不借安装重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
+- **首次迁移限制**：沿用 `.35` 的 restart_handoff；desktop.34 及更早版须先备份、普通停止旧核心并退出界面，再人工安装 `.47`。缺能力旧核心拒绝在线安装，不降级／强杀；升级仍有停机窗口，SSH 远端另行升级。
 - 基线：`e35a85a`；共享契约采用 `anchor-desktop-v1` 的增量扩展，由同一实现者维护 Go DTO、生成 TS、`desktop/contract/updates.json` 和前后端测试。
 - 目标：缩短测试版本的投放／安装步骤，不做静默升级、数据库回滚、服务管理器接管或新的托管授权。
 

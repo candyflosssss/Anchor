@@ -22,7 +22,7 @@ GUI 在当前用户的默认 Anchor 配置目录取得独立的 `desktop-host.lo
 
 Status 只查询，不启动／重启；核心退出后 UI 禁写，用户明确重新连接时才再次 Start。StopCore 须明确确认当前实例身份，通过带管理鉴权和 X-Anchor-Instance 的 POST /control/v1/shutdown 请求核心正常停服。返回 accepted 仅代表请求接受，不等于退出或恢复成功；UI 随后转为断开，不显示“恢复成功”。CLI 对应 `stop --approve`，无强杀和自动重试。
 
-### 本机重启与恢复（2026-10-17 源码，未打包发布）
+### 本机重启与恢复（2026-10-17，已随 desktop.47 dev 发布）
 
 `RestartCore(ConfirmStop) -> SessionResult` 为有副作用的本机宿主操作，复用 `approved:true` 与非空 `instance_id`。请求样例与返回见 `desktop/contract/core-restart.json`；Go Bridge 方法/DTO 生成 TS，Go 与 TS 测试共用样例。只允许当前选中的本机实例；活动或持久选中远程连接均拒绝，不因 SSH 掉线启动/停止本机。前端记住最后已核验的目标身份以提供离线恢复，不把它当在线状态；尚未取得身份时使用现有明确重新连接入口。
 
@@ -51,7 +51,7 @@ desktop.14 起，`Quit` 普通关闭请求由 OnBeforeClose 拦截：只有系�
 
 ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置原子退出标记，再调用 Quit，绕过隐藏，确保更新 helper 不会卡在等待窗口退出。ExitDesktop 不要求核心在线，更新交接中返回 conflict；未绑定宿主退出回调时返回 unsupported。宿主退出会清理托盘。最小化 / 最大化 / 还原 / 托盘是本机窗口展示行为，不增加 CLI 管理指令。定向 Go 测试覆盖关闭隐藏、无托盘退出、显式退出及更新交接保护；Windows / Linux 原生托盘、拖动、缩放及按钮行为仍需原生验收。
 
-### 3.2 托盘完整退出（2026-10-17 源码，未打包发布）
+### 3.2 托盘完整退出（2026-10-17，已随 desktop.47 dev 发布）
 
 托盘保留「退出界面（核心继续运行）」，另提供「退出 Anchor（同时停止本机核心）」。新入口先恢复主窗口，再显示原生确认框，明确本机实例 ID、停止代理和条件恢复托管配置的影响，默认／取消按钮均为「取消」。无本机核心时只确认退出宿主，不初始化状态、不启动核心。即使当前页面连接 SSH 设备，该入口也仅针对宿主 `--data-dir` 对应的本机实例，不停止远程核心；页面 StopCore 仍针对当前选中实例。
 
@@ -189,6 +189,8 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 既有 ManageAgent(action=sync) 与 CLI agent sync 均明确请求重新应用当前已批准策略：外部变化的托管字段／生成目录先保存为恢复基线，再原位生成；未变化字段不吸收上次 Anchor 写入值。DTO 与错误白名单不变，仍校验 revision、实例身份、权限、路径和最终写入快照。GUI 始终确认影响后再提交；取消不请求核心。后台同步／启动继续拒绝外部漂移，prepared previous journal 仍需先恢复；实际失败与 unknown 不盲重试。详见[托管层增量](agent-management-layer.md)，未打包或验证 Windows/Linux 原生窗口。
 
 ## 模型映射重试契约（retry-v1）
+
+**发行状态**：已随 [desktop.47 dev](../release/desktop.md#当前在线-dev-版-47) 的宿主／核心发布，本机 CLI／核心／GUI 同版升级；原生窗口及安装器／apply 未验收，公开 alpha.6 CLI 不含新字段。
 
 基线为同渠道重试实现 `25bd34c`；规范源沿用 `internal/catalog/model_settings.go`（由 `internal/desktop/contract.go` 别名导出），生成 `desktop/frontend/src/desktop/contract.generated.ts`，共享样例 `desktop/contract/model-settings.json`。本次仅扩展既有 ModelSettings / SaveModelSettings，不新增桥接方法，沿用所选实例身份／管理鉴权、取消、revision 和写入未知结果规则。
 

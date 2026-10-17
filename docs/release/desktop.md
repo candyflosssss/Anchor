@@ -1,12 +1,12 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-17。
-- 当前线上桌面 dev 版：`0.1.0-dev.desktop.46`，北京时间 2026-10-17 01:04:25 发布；非 latest 的 prerelease，两平台包与 flat 清单同版投放。
-- 本版范围：托管 Agent 的「保存并应用」与独立同步合并为「更新配置」，一次确认更新默认模型、最新映射及托管连接。显式接管会先保存外部变化值作为恢复基线，后台／启动不覆盖第三方修改；日志趋势面板支持收起。
-- 构建：干净隔离提交 `0d9f8479cba2c7c6ca0b58af1c3c9b313154d79f`；不包含工作区未提交的代理／mihomo、余额与打包器改动。沿用 state.db schema8，无数据库降级。
+- 当前线上桌面 dev 版：`0.1.0-dev.desktop.47`，北京时间 2026-10-17 22:37:49 发布；非 latest 的 prerelease，两平台包与 flat 清单同版投放。
+- 本版范围：模型映射新增「同一渠道重试次数」，默认额外3次，可设0–10；502/503/504与取得连接前失败按共享超时预算重试，已输出流式响应或执行结果未知时不重放。另交付托盘完整退出、本机安全重启及离线恢复。
+- 构建：干净隔离提交 `6d3d4146b2b02000d2aa8830318791d21a713e1e`；不包含工作区未提交的代理／mihomo、余额与打包器改动。沿用 state.db schema8，无数据库降级。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff；desktop.34 及更早版首次仍须备份、停止旧核心并退出界面，再人工安装新版。升级有停机窗口，不承诺会话自动重连，SSH 远端另行升级。
-- 在线验证：六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.45` 为当前版发现并真实下载 `.46` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。
-- 当前本机安装：本机 CLI／核心／GUI 已于2026-10-17 01:06统一升级为 `.46`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop46-20261017-010601`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持；Codex conflict／DSH applied 与升级前一致，不借安装自动重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
+- 在线验证：六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.46` 为当前版发现并真实下载 `.47` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。
+- 当前本机安装：本机 CLI／核心／GUI 已于2026-10-17 22:39统一升级为 `.47`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop47-20261017-223946`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway／agent_management ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH 均维持 applied；不借安装重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
 
 ## 1. 安装与使用行为
 
@@ -29,7 +29,7 @@
 通过系统包安装工具打开 `.deb`，或使用包管理器解析运行库依赖：
 
 ```bash
-sudo apt install ./anchor-desktop_0.1.0-dev.desktop.46_amd64.deb
+sudo apt install ./anchor-desktop_0.1.0-dev.desktop.47_amd64.deb
 ```
 
 文件安装到 `/usr/bin/anchor-desktop`，应用菜单入口位于 `/usr/share/applications/anchor-desktop.desktop`；包含 SVG / PNG 图标。包的 GTK3 / WebKitGTK4.1 / libc 等依赖从实际 ELF 用 `dpkg-shlibdeps` 提取。没有安装／卸载脚本自动启服务，没有 systemd unit 或自启动项。安装后从应用菜单打开 GUI，无需手动 `init` / `serve`。没有图形会话的服务器继续使用 CLI。
@@ -85,7 +85,28 @@ Linux 直接构建仍要求宿主 `pkg-config gtk+-3.0 webkit2gtk-4.1`；宿主�
 
 ## 3. 产物、在线投放与实际构建状态
 
-### 当前在线 dev 版 `.46`
+### 当前在线 dev 版 `.47`
+
+本版于北京时间 2026-10-17 22:37:49 发布为[非 latest 的 dev prerelease](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.47)，源码 `6d3d4146b2b02000d2aa8830318791d21a713e1e`，SOURCE.json dirty=false。安装包、flat 清单、含 Go vendor 的对应源码、许可／构建元数据与 SHA256SUMS 共六附件同版投放，原 BUILD.json 保留打包时事实，实际发布及本机状态单独记录。
+
+模型映射新增「同一渠道重试次数」，默认额外3次，可设0–10；502/503/504与取得连接前失败按共享超时预算重试，已输出流式响应或执行结果未知时不重放。另交付托盘完整退出、本机安全重启及离线恢复。 设置路径为「模型映射 → 模型设置 → 重试、上下文与能力」；0关闭同渠道额外重试但仍可换 Key／候选，3表示含首次最多4次尝试。CLI复用 `model settings` 的 `channel_retries`，省略／null保留既有值；保存只影响后续请求，活动请求保留原快照。401/403/429直接换 Key／候选，额外尝试可能增加等待或上游计费，5xx不保证上游未执行。
+
+产物：`dist/desktop/0.1.0-dev.desktop.47/`；生产契约比对、TypeScript／Vite、Windows 与 Ubuntu 24.04 AMD64 编译、NSIS／deb 打包通过。Linux deb 版本 `0.1.0~dev.desktop.47`、架构 amd64、GUI payload 哈希与本地 ELF 一致。复用功能提交已通过的7包Go测试、31项前端单测、4项模拟桌面浏览器用例及typecheck／定向lint，不重复全量／race或原生窗口验收。
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.47-windows-amd64-setup.exe` | 8,374,370 | `ab81433de79469c1fbca24304c842e64bbba3f46c6da41a7e51e047e5bec4cc4` |
+| linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.47_amd64.deb` | 6,172,856 | `0fe277880651638f1b622e6608bd662889d1e4efd8193749eaca4250f3b32677` |
+
+六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.46` 为当前版发现并真实下载 `.47` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。
+
+**本机更新**：本机 CLI／核心／GUI 已于2026-10-17 22:39统一升级为 `.47`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop47-20261017-223946`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway／agent_management ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH 均维持 applied；不借安装重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
+
+发布初次创建草稿后，GitHub 列表尚未立即可见，预检安全停止，未上传或公开；核对同版空草稿的 target revision 后复用并完成六附件校验与发布，没有覆盖旧附件或移动标签。
+
+<a id="当前在线-dev-版-46"></a>
+
+### 历史在线 dev 版 `.46`
 
 本版于北京时间 2026-10-17 01:04:25 发布为非 latest 的 dev prerelease，源码 `0d9f8479cba2c7c6ca0b58af1c3c9b313154d79f`，SOURCE.json dirty=false。 安装包、flat 清单、含 Go vendor 的对应源码、许可／构建元数据与 SHA256SUMS 共六附件同版投放，原构建元数据保留打包时事实。
 

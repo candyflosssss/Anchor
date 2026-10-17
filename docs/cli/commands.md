@@ -4,10 +4,10 @@
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
-- `restart --approve [--timeout 30s]` 与桌面「重启核心／恢复本机核心」已在当前源码实现，尚未打包发布；desktop.46 与 alpha.6 不含这些入口。在线重启要求已有核心支持 `restart_handoff`，离线恢复不新建状态目录。
+- `restart --approve [--timeout 30s]` 与桌面「重启核心／恢复本机核心」已随 desktop.47 宿主／核心发布，本机 CLI 同版升级；desktop.46 与公开 alpha.6 不含这些入口。在线重启要求已有核心支持 `restart_handoff`，离线恢复不新建状态目录。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.46 已发布到默认 GitHub 源的 dev 渠道**，并已完成本机 CLI／核心／GUI 同版升级。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.47 已发布到默认 GitHub 源的 dev 渠道**，并已完成本机 CLI／核心／GUI 同版升级。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -334,7 +334,7 @@ anchor usage
 
 配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
-**网关默认同渠道重试（当前源码，未打包发布）**：同一渠道指供应商 + Key + 候选上游模型。HTTP 502/503/504 或尚未取得连接的失败，首次请求后默认额外重试3次（最多4次尝试），按250ms/500ms/1s退避（之后上限1秒）；可在模型映射的 `channel_retries` 配置0–10次，0禁用额外重试。保留所选 Key 和原请求，仍按供应商多地址轮询取址。全部尝试与退避共享 `provider add/put --timeout`（默认120秒），不因重试延长预算；预算耗尽返回504 `upstream_timeout`，客户端取消立即停止。重试耗尽后再切换其他可用 Key／候选，全部不可用／失败返回503 `no_available_candidate`。
+**网关默认同渠道重试（desktop.47 宿主／核心已发布，公开 alpha.6 CLI 不含）**：同一渠道指供应商 + Key + 候选上游模型。HTTP 502/503/504 或尚未取得连接的失败，首次请求后默认额外重试3次（最多4次尝试），按250ms/500ms/1s退避（之后上限1秒）；可在模型映射的 `channel_retries` 配置0–10次，0禁用额外重试。保留所选 Key 和原请求，仍按供应商多地址轮询取址。全部尝试与退避共享 `provider add/put --timeout`（默认120秒），不因重试延长预算；预算耗尽返回504 `upstream_timeout`，客户端取消立即停止。重试耗尽后再切换其他可用 Key／候选，全部不可用／失败返回503 `no_available_candidate`。
 
 401/403/429 不在同一 Key 重试，沿用切换与冷却；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康按实际尝试计数，在重试组结束后统一生效；失败3次的熔断不提前截断本组配置的重试，半开探测名额覆盖整组。`anchor logs detail REQUEST_ID` 可查看每次尝试，根请求仍只算一次。此策略默认生效，可通过 `model settings --id ID --file FILE` 的 `channel_retries` 调整；不改变 `provider test/chat` 或管理写操作，已安装核心需升级后生效。
 
@@ -501,7 +501,7 @@ anchor model settings --id ID --file FILE
 
 写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、可选 `channel_retries`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
 
-`channel_retries` 为该公开模型映射的**同一渠道额外重试次数**，整数0–10，旧映射／未保存值默认3，读取始终返回有效数值；0禁用额外重试（仍允许切换其他 Key／候选）。此字段在写入时省略或设为 null 保留既有值，不随 configuration 替换／参考模型导入清空。3表示含首次最多4次上游尝试；每个供应商 + Key + 上游模型分别使用该上限。保存后只影响后续网关请求，正在处理的请求保持原快照，无需同步或重启 Agent。非法类型／范围返回 invalid，不增加 revision；旧 revision 返回 conflict，不自动重放写入。`model put --file` 的 `settings.channel_retries` 也支持相同范围，完整替换 settings 时未设置该字段则恢复默认3；普通省略整个 settings 的映射更新保留已有设置。
+`channel_retries` 已随 desktop.47 宿主／核心发布，并用于本机同版 CLI；公开 alpha.6 不含该字段。`channel_retries` 为该公开模型映射的**同一渠道额外重试次数**，整数0–10，旧映射／未保存值默认3，读取始终返回有效数值；0禁用额外重试（仍允许切换其他 Key／候选）。此字段在写入时省略或设为 null 保留既有值，不随 configuration 替换／参考模型导入清空。3表示含首次最多4次上游尝试；每个供应商 + Key + 上游模型分别使用该上限。保存后只影响后续网关请求，正在处理的请求保持原快照，无需同步或重启 Agent。非法类型／范围返回 invalid，不增加 revision；旧 revision 返回 conflict，不自动重放写入。`model put --file` 的 `settings.channel_retries` 也支持相同范围，完整替换 settings 时未设置该字段则恢复默认3；普通省略整个 settings 的映射更新保留已有设置。
 
 `reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照，同时补齐未声明的上下文、限制、能力及思考范围）。补值保留显式设置，目录输入/输出与手工上下文或默认输出预算冲突时跳过相应限制；未知默认思考值不猜测。clear 只清除已保存快照，不禁用后续读取的自动建议。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
 
