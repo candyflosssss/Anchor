@@ -19,8 +19,11 @@ describe('context price explanations', () => {
     state.context_policy = model.context_policy; state.configuration.limits.context = 500000;
     const html = renderToStaticMarkup(createElement(ContextPriceNotice, { state, acknowledged: false, acknowledge: () => {}, change: () => {} }));
     expect(html).toContain('1,050,000'); expect(html).toContain('500,000'); expect(html).toContain('272,000');
+    expect(html).toContain('<details class="model-settings-help"><summary>计费说明</summary>');
+    expect(html).not.toContain('<details open');
+    expect(html).toMatch(/<\/details>.*role="alert"/);
     expect(html).toContain('我已了解跨档费用'); expect(html).toContain('不是只对超出部分加价');
     expect(html).toContain('不能据此确认 Fast / Ultrafast');
-    expect(html).toContain('不是上游费用硬限额');
+    expect(html).toContain('不是自动压缩阈值或费用硬限额');
   });
 });

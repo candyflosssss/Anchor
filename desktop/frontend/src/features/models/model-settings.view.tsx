@@ -3,11 +3,12 @@ import type { ProviderTransport } from '../providers/provider.model';
 import type { ModelGroup } from '../providers/provider-summary.model';
 import { ModelSpeedSettingsDialog } from './model-speed-settings.view';
 import type { ModelConfiguration, ReasoningOption } from '../../desktop/contract.generated';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogContent } from '../../components/ui/dialog';
 import { Button } from '../../components/ui/button';
 import { useModelSettings } from './use-model-settings';
 import { ContextPriceNotice, ContextPriceTable } from './model-context-settings.view';
-import { crossesPriceBand } from './model-settings.model';
+import { crossesPriceBand, settingsReadDraft } from './model-settings.model';
+import { ModelSettingsHeader } from './model-settings-header.view';
 import './model-settings.css';
 
 const triValue = (v: boolean | null) => v === null ? 'unknown' : v ? 'yes' : 'no';
@@ -35,7 +36,7 @@ function ReasoningFields({ cfg, change }: { cfg: ModelConfiguration; change: (cf
 
 type SettingsProps = { id: string; active: boolean; close: () => void; saved: () => Promise<void> };
 export function ModelSettingsDialog({ group, transport, ...props }: SettingsProps & { group?: ModelGroup; transport?: ProviderTransport }) {
-  const [page, setPage] = useState<'speed' | 'capabilities'>('speed');
+  const [page, setPage] = useState<'speed' | 'capabilities'>('capabilities');
   if (group && transport && page === 'speed') return <ModelSpeedSettingsDialog group={group} transport={transport} {...props} capabilities={() => setPage('capabilities')} />;
   return <ModelCapabilitiesDialog {...props} speed={group && transport ? () => setPage('speed') : undefined} />;
 }
@@ -51,31 +52,37 @@ function ModelCapabilitiesDialog({ id, active, close, saved, speed }: SettingsPr
     c.change(next);
   };
   const reference = state?.reference, sourceModel = reference?.models[0], pricing = sourceModel?.pricing;
+  const defaultsNotice = state ? settingsReadDraft(state).notice : '';
+  const operationNotice = c.notice !== defaultsNotice ? c.notice : '';
+  const catalogStatus = ({ matched: c.unchanged ? '已补全' : '已补全 · 待保存', reference: '已关联', unmatched: '未匹配', unavailable: '暂不可用', incompatible: '需核对' } as Record<string, string>)[state?.defaults_status ?? ''];
   return <Dialog open={active} onOpenChange={open => { if (!open && !c.busy) close(); }}><DialogContent className="model-settings-dialog" onRequestClose={() => { if (!c.busy) close(); }}>
-    <header><DialogTitle>模型设置 · {id}</DialogTitle><DialogDescription>打开时自动从 models.dev 补充未设置的能力与限制，保留手工设置；点击保存后生效，不会请求推理接口。</DialogDescription></header>
-    {speed && <nav className="settings-actions" aria-label="模型设置分类"><Button variant="outline" disabled={c.busy} onClick={speed}>速度与分身</Button><Button variant="secondary" disabled>重试、上下文与能力</Button><p className="card-hint">切换页面不保留未保存草稿；请先保存当前设置。</p></nav>}
-    {c.error && <p className="feedback error-feedback" role="alert">{c.error}</p>}{c.notice && <p className="feedback" role="status">{c.notice}</p>}
+    <ModelSettingsHeader alias={id} page="general" busy={c.busy} switchPage={speed} />
+    {c.error && <p className="feedback error-feedback model-settings-feedback" role="alert">{c.error}</p>}{operationNotice && <p className="feedback model-settings-feedback" role="status">{operationNotice}</p>}
     {(c.needsRead || (!state && !c.busy)) && <Button variant="outline" onClick={() => void c.read()} disabled={c.busy}>重新读取设置</Button>}
     {!state ? <p className="card-hint">{c.busy ? '正在读取模型设置…' : '未取得模型设置。'}</p> : cfg && <form onSubmit={e => { e.preventDefault(); if (!locked) void c.save(); }}>
-      <fieldset disabled={locked} className="model-settings-fields">
-        {state.candidate_count > 1 && <p className="card-hint">此映射有 {state.candidate_count} 个上游候选。能力和限制应适用于所有候选；导入一个目录条目不会验证其他候选。</p>}
+      <div className="model-settings-body"><fieldset disabled={locked} className="model-settings-fields">
+        <div className="model-settings-grid model-settings-basics">
         <label className="model-setting-field"><span>显示名称</span><input className="input-field" maxLength={256} value={state.display_name} onChange={e => c.displayName(e.target.value)} /></label>
-        <section className="settings-section"><h3>渠道重试</h3>
-          <label className="model-setting-field"><span>同一渠道重试次数</span><input className="input-field" type="number" min={0} max={10} step={1} required value={c.retryCount} onChange={e => c.changeRetries(e.target.value)} aria-describedby="model-retry-help" aria-invalid={!!c.retryValidation} /></label>
-          <p id="model-retry-help" className="card-hint">默认 3 次，可填 0–10；0 表示不重试。首次请求不计入重试次数，3 次重试最多请求 4 次。对本映射的所有渠道分别生效，同一供应商、Key 和上游模型重试耗尽后才切换渠道。</p>
-          <p className="card-hint">仅重试 502 / 503 / 504 或建立连接前的失败；所有尝试共享供应商超时，退避 250ms、500ms，之后最多 1s。已输出的流式响应或执行状态不明时不重放。401 / 403 / 429 直接尝试其他 Key 或候选。</p>
-          {c.retryValidation && <p className="feedback error-feedback" role="alert">{c.retryValidation}</p>}
-        </section>
-        <section className="settings-section"><h3>上下文与输出限制</h3><div className="model-settings-grid"><NumberField label="上下文窗口（tokens）" value={cfg.limits.context} change={v => c.change({ ...cfg, limits: { ...cfg.limits, context: v } })} /><NumberField label="最大输出（tokens）" value={cfg.limits.output} change={v => c.change({ ...cfg, limits: { ...cfg.limits, output: v } })} /></div><ContextPriceNotice state={state} acknowledged={c.longContextAcknowledged} acknowledge={c.setLongContextAcknowledged} change={c.change} /></section>
-        <section className="settings-section"><h3>模型能力</h3><div className="model-settings-grid"><Capability label="视觉输入" value={cfg.capabilities.vision} change={v => setCap('vision', v)} /><Capability label="工具调用" value={cfg.capabilities.tool_call} change={v => setCap('tool_call', v)} /><Capability label="流式输出" value={cfg.streaming} change={v => c.change({ ...cfg, streaming: v })} /><Capability label="结构化输出" value={cfg.capabilities.structured_output} change={v => setCap('structured_output', v)} /></div></section>
-        <section className="settings-section"><h3>思考选项与默认值</h3><ReasoningFields cfg={cfg} change={c.change} /><p className="card-hint">支持范围属于模型能力；默认值只能从范围内选择。未知范围不推断为 low / medium / high。</p></section>
+        <div className="model-setting-field"><label htmlFor="model-channel-retries">同一渠道重试次数</label><input id="model-channel-retries" className="input-field" type="number" min={0} max={10} step={1} required value={c.retryCount} onChange={e => c.changeRetries(e.target.value)} aria-describedby="model-retry-help" aria-invalid={!!c.retryValidation} />
+          <p id="model-retry-help" className="card-hint">0–10 次，0 表示不重试；默认 3 次。</p>
+          {c.retryValidation && <p className="error-feedback" role="alert">{c.retryValidation}</p>}
+        </div></div>
+        <section className="settings-section"><h3>上下文与输出</h3><div className="model-settings-grid"><NumberField label="上下文窗口（tokens）" value={cfg.limits.context} change={v => c.change({ ...cfg, limits: { ...cfg.limits, context: v } })} /><NumberField label="最大输出（tokens）" value={cfg.limits.output} change={v => c.change({ ...cfg, limits: { ...cfg.limits, output: v } })} /></div><ContextPriceNotice state={state} acknowledged={c.longContextAcknowledged} acknowledge={c.setLongContextAcknowledged} change={c.change} /></section>
+        <details className="settings-section"><summary>模型能力</summary><div className="model-settings-grid"><Capability label="视觉输入" value={cfg.capabilities.vision} change={v => setCap('vision', v)} /><Capability label="工具调用" value={cfg.capabilities.tool_call} change={v => setCap('tool_call', v)} /><Capability label="流式输出" value={cfg.streaming} change={v => c.change({ ...cfg, streaming: v })} /><Capability label="结构化输出" value={cfg.capabilities.structured_output} change={v => setCap('structured_output', v)} /></div></details>
+        <details className="settings-section"><summary>思考设置</summary><ReasoningFields cfg={cfg} change={c.change} /></details>
         <details className="settings-section"><summary>高级设置</summary><div className="model-settings-grid"><NumberField label="最大输入（tokens）" value={cfg.limits.input} change={v => c.change({ ...cfg, limits: { ...cfg.limits, input: v } })} /><NumberField label="默认输出预算（tokens）" value={cfg.default_output_tokens} change={v => c.change({ ...cfg, default_output_tokens: v })} /><Capability label="附件输入" value={cfg.capabilities.attachment} change={v => setCap('attachment', v)} /><Capability label="Temperature 参数" value={cfg.capabilities.temperature} change={v => setCap('temperature', v)} /><NumberField label="默认 Temperature（0–2）" value={cfg.default_temperature} min={0} step="any" change={v => c.change({ ...cfg, default_temperature: v })} /><Capability label="并行工具调用" value={cfg.parallel_tool_calls} change={v => c.change({ ...cfg, parallel_tool_calls: v })} /></div>
         {(['input_modalities', 'output_modalities'] as const).map(key => <label key={key} className="model-setting-field"><span>{key === 'input_modalities' ? '输入模态' : '输出模态'}（逗号分隔）</span><input className="input-field" key={JSON.stringify(cfg.capabilities[key])} defaultValue={cfg.capabilities[key].join(', ')} onBlur={e => { const v = [...new Set(e.target.value.split(',').map(x => x.trim()).filter(Boolean))]; const capabilities = { ...cfg.capabilities, [key]: v }; if (key === 'input_modalities' && v.length) capabilities.vision = v.includes('image'); c.change({ ...cfg, capabilities }); }} /></label>)}</details>
-        <section className="settings-section"><h3>目录默认值与参考价格</h3><Button type="button" variant="outline" size="sm" onClick={() => void c.loadProviders()}>读取 models.dev 供应商</Button><div className="model-settings-grid"><label className="model-setting-field"><span>目录供应商</span><select className="select-field" value={c.provider} onChange={e => void c.selectProvider(e.target.value)}><option value="">请选择</option>{c.provider && !c.providers.some(p => p.id === c.provider) && <option value={c.provider}>{c.provider}</option>}{c.providers.map(p => <option key={p.id} value={p.id}>{p.name} · {p.id}</option>)}</select></label><label className="model-setting-field"><span>精确模型 ID</span><input className="input-field" list={`catalog-models-${id}`} value={c.model} onChange={e => c.setModel(e.target.value)} placeholder="可选择或输入完整 ID" /><datalist id={`catalog-models-${id}`}>{c.models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</datalist></label></div><div className="settings-actions"><Button type="button" size="sm" variant="outline" disabled={!c.provider || !c.model} onClick={() => void c.importModel(false)}>补充未设置的默认值</Button><Button type="button" size="sm" variant="outline" disabled={!c.provider || !c.model} onClick={() => void c.importModel(true)}>用目录值替换草稿</Button></div>
-        {reference && sourceModel ? <div className="reference-snapshot"><p>models.dev / {sourceModel.provider_id} / {sourceModel.id}</p><p className="card-hint">抓取于 {new Date(reference.fetched_at * 1000).toLocaleString()}；模型更新：{sourceModel.source_updated_at || '未提供'}。版本 {reference.version.slice(0, 12)}。</p>{pricing ? <><p className="card-hint">参考价（USD / 百万 tokens），空项为未知；“0”为免费。实际费用以请求所用上游为准。</p><dl className="reference-prices">{Object.entries(pricing.rates).map(([key, value]) => <div key={key}><dt>{({ input: '输入', output: '输出', cache_read: '缓存读取', cache_write: '缓存写入', reasoning: '思考', input_audio: '音频输入', output_audio: '音频输出' } as Record<string, string>)[key]}</dt><dd>{value ?? '未知'}</dd></div>)}</dl><ContextPriceTable pricing={pricing} /></> : <p className="card-hint">目录没有提供价格。</p>}<Button type="button" size="sm" variant="outline" onClick={c.clearReference}>清除参考来源与快照</Button></div> : <p className="card-hint">未匹配或未选择参考来源；自动匹配失败时，可在此选择精确模型后导入。目录刷新不会自动覆盖已保存的手工设置。</p>}</section>
-        <p className="card-hint">Codex 同步导出可应用上下文、视觉输入、可表示的 effort 等级与默认值、并行工具调用。开关 / 预算式思考、输出预算、Temperature 等目前保存为声明和默认值元数据，不自动改写请求；不支持的 effort 会阻止 Codex 同步。运行中的 Agent 需同步后重启。</p>
-        <footer className="settings-actions"><Button type="submit" disabled={c.unchanged || !!c.retryValidation || (crossesPriceBand(state) && !c.longContextAcknowledged)}>{c.busy ? '处理中…' : '保存模型设置'}</Button><Button type="button" variant="outline" onClick={() => void c.read()}>重新读取并自动补全</Button></footer>
-      </fieldset>
+        <details className="settings-section model-settings-catalog"><summary>目录与参考价格{catalogStatus && <span className="model-settings-summary-meta">{catalogStatus}</span>}</summary>{defaultsNotice && <p className="card-hint">{defaultsNotice}</p>}<Button type="button" variant="outline" size="sm" onClick={() => void c.loadProviders()}>读取 models.dev 供应商</Button><div className="model-settings-grid"><label className="model-setting-field"><span>目录供应商</span><select className="select-field" value={c.provider} onChange={e => void c.selectProvider(e.target.value)}><option value="">请选择</option>{c.provider && !c.providers.some(p => p.id === c.provider) && <option value={c.provider}>{c.provider}</option>}{c.providers.map(p => <option key={p.id} value={p.id}>{p.name} · {p.id}</option>)}</select></label><label className="model-setting-field"><span>精确模型 ID</span><input className="input-field" list={`catalog-models-${id}`} value={c.model} onChange={e => c.setModel(e.target.value)} placeholder="可选择或输入完整 ID" /><datalist id={`catalog-models-${id}`}>{c.models.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</datalist></label></div><div className="settings-actions"><Button type="button" size="sm" variant="outline" disabled={!c.provider || !c.model} onClick={() => void c.importModel(false)}>补充未设置的默认值</Button><Button type="button" size="sm" variant="outline" disabled={!c.provider || !c.model} onClick={() => void c.importModel(true)}>用目录值替换草稿</Button></div>
+        {reference && sourceModel ? <div className="reference-snapshot"><p>models.dev / {sourceModel.provider_id} / {sourceModel.id}</p><p className="card-hint">抓取于 {new Date(reference.fetched_at * 1000).toLocaleString()}；模型更新：{sourceModel.source_updated_at || '未提供'}。版本 {reference.version.slice(0, 12)}。</p>{pricing ? <><p className="card-hint">参考价（USD / 百万 tokens），空项为未知；“0”为免费。实际费用以请求所用上游为准。</p><dl className="reference-prices">{Object.entries(pricing.rates).map(([key, value]) => <div key={key}><dt>{({ input: '输入', output: '输出', cache_read: '缓存读取', cache_write: '缓存写入', reasoning: '思考', input_audio: '音频输入', output_audio: '音频输出' } as Record<string, string>)[key]}</dt><dd>{value ?? '未知'}</dd></div>)}</dl><ContextPriceTable pricing={pricing} /></> : <p className="card-hint">目录没有提供价格。</p>}<Button type="button" size="sm" variant="outline" onClick={c.clearReference}>清除参考来源与快照</Button></div> : <p className="card-hint">未关联参考来源，可选择精确模型后导入。</p>}</details>
+        <details className="model-settings-help"><summary>使用说明</summary>
+          <p>重试次数不含首次请求，默认最多请求 4 次。同一渠道重试耗尽后再切换渠道。</p>
+          <p>仅重试 502 / 503 / 504 和建立连接前的失败，共享供应商超时。已输出内容或执行状态不明时不重放。</p>
+          <p>重试设置保存后立即生效；Agent 配置需同步并重启。开关式／预算式思考、输出预算和 Temperature 仅保存为元数据，不自动改写请求。</p>
+          {state.candidate_count > 1 && <p>此映射有 {state.candidate_count} 个上游候选，能力和限制应适用于所有候选；导入目录不会验证其他候选。</p>}
+          <p>切换分类前请保存，未保存的修改会丢弃。</p>
+        </details>
+      </fieldset></div>
+      <footer className="model-settings-footer"><Button type="button" variant="ghost" aria-label="重新读取并自动补全" disabled={locked} onClick={() => void c.read()}>重新读取</Button><div className="settings-actions"><Button type="button" variant="outline" disabled={c.busy} onClick={close}>关闭</Button><Button type="submit" disabled={locked || c.unchanged || !!c.retryValidation || (crossesPriceBand(state) && !c.longContextAcknowledged)}>{c.busy ? '处理中…' : '保存模型设置'}</Button></div></footer>
     </form>}
   </DialogContent></Dialog>;
 }

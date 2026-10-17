@@ -19,8 +19,24 @@ describe('mapping model settings form', () => {
     expect(html).toContain('同一渠道重试次数'); expect(html).toContain('0 表示不重试'); expect(html).toContain('max="10"');
     expect(html).toContain('272000'); expect(html).toContain('最大输出'); expect(html).toContain('默认思考等级');
     expect(html).toContain('2 个上游候选'); expect(html).toContain('补充未设置的默认值'); expect(html).toContain('用目录值替换草稿');
-    expect(html).toContain('不自动改写请求'); expect(html).toContain('未匹配或未选择参考来源');
+    expect(html).toContain('不自动改写请求'); expect(html).toContain('未关联参考来源');
     expect(html).toContain('value="&quot;high&quot;" selected'); expect(html).not.toContain('value="&quot;medium&quot;"');
+  });
+  it('keeps secondary settings and explanations collapsed without hiding errors', () => {
+    const html = render({ error: '保存结果未知' });
+    for (const title of ['模型能力', '思考设置', '高级设置', '目录与参考价格', '使用说明']) {
+      expect(html).toContain(`<summary>${title}`);
+    }
+    expect(html).not.toContain('<details open');
+    expect(html).toContain('role="alert">保存结果未知');
+    expect(html).not.toContain('打开时自动从 models.dev');
+  });
+  it('moves automatic defaults guidance into the catalog section, not an opening banner', () => {
+    const state = checkedModelSettings(fixture, 'mapped'); state.defaults_status = 'matched';
+    const html = render({ state, notice: '已自动从 models.dev 补充基础模型默认值；速度变体不套用标准参考价格，点击「保存模型设置」后生效。' });
+    expect(html).not.toContain('role="status"');
+    expect(html).toContain('已补全 · 待保存');
+    expect(html).toMatch(/<details[^>]*model-settings-catalog[^>]*>.*已自动从 models.dev/);
   });
   it('shows explicit zero and blocks invalid retry drafts', () => {
     expect(render({ retryCount: '0' })).toContain('value="0"');

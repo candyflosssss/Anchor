@@ -29,7 +29,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
   const unknown = !g.complete || candidates.some(c => c.availability.state === 'unknown');
   const availability = available ? 'available' : unknown ? 'unknown' : 'unavailable';
   return <article className={`detail-card model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} aria-label={`模型 ${g.alias}`}>
-    <header><h2 className="mono">{g.alias}</h2><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="速度与分身、上下文、能力与思考选项" onClick={settings}><Settings2 size={15} /><span>设置</span></Button></header>
+    <header><h2 className="mono">{g.alias}</h2><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="重试、上下文、能力与速度" onClick={settings}><Settings2 size={15} /><span>设置</span></Button></header>
     <div className="model-card-summary"><span className="model-strategy">{ruleLabel(draft.strategy)}</span><span>{candidates.length} 个来源 · {keyCount} 个 Key</span></div>
     <div className="model-availability" role="status"><span className={`channel-status state-${availability}`}>{available ? '当前可用' : unknown ? '可用性待确认' : '当前不可用'}</span><span>{available} / {candidates.length} 个渠道当前可用</span></div>
     {availability === 'unavailable' && <p className="model-unavailable-notice"><strong>无有效渠道</strong>所有来源的供应商已停用，或限定的 Key 已停用、失效、冷却或不存在。请检查供应商与 Key 开关；映射配置仍保留。</p>}

@@ -672,17 +672,17 @@ test('model settings opens from each card, saves context and reasoning and survi
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toBeVisible();
   await dialog.getByLabel('上下文窗口（tokens）').fill('300000');
+  await dialog.locator('summary').filter({ hasText: /^思考设置$/ }).click();
   await dialog.getByLabel('默认思考等级').selectOption('"low"');
   expect(await dialog.locator('input:invalid').count()).toBe(0);
   await dialog.getByRole('button', { name: '保存模型设置', exact: true }).click();
   await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
   await dialog.getByRole('button', { name: '关闭编辑面板', exact: true }).click();
   await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
-  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('300000');
+  await dialog.locator('summary').filter({ hasText: /^思考设置$/ }).click();
   await expect(dialog.getByLabel('默认思考等级')).toHaveValue('"low"');
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
 });
@@ -795,6 +795,7 @@ for (const failure of ['conflict', 'unknown'] as const) test(`mapping speed sett
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '速度与分身', exact: true }).click();
   await dialog.getByLabel('分身来源渠道').selectOption('摸鱼AI');
   const tier = dialog.getByLabel('Anchor 固定速度档位');
   await expect(tier).toBeEnabled();
@@ -834,6 +835,7 @@ test('mapping speed settings cannot replay an acknowledged malformed result or a
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '速度与分身', exact: true }).click();
   await dialog.getByLabel('分身来源渠道').selectOption('摸鱼AI');
   const tier = dialog.getByLabel('Anchor 固定速度档位');
   await expect(tier).toBeEnabled();
@@ -868,13 +870,15 @@ test('model settings automatically fills defaults and saves the matched referenc
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('250000');
   await expect(dialog.getByLabel('最大输出（tokens）', { exact: true })).toHaveValue('100000');
-  await expect(dialog.getByRole('status')).toContainText('已自动从 models.dev');
+  await expect(dialog.getByRole('status')).toHaveCount(0);
+  await expect(dialog.locator('summary').filter({ hasText: '目录与参考价格' })).toContainText('已补全');
+  await dialog.locator('summary').filter({ hasText: '目录与参考价格' }).click();
+  await expect(dialog.getByText('已自动从 models.dev', { exact: false })).toBeVisible();
   await expect(dialog.getByLabel('目录供应商')).toHaveValue('lab');
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
-  await expect(dialog.getByText('模型规格上限：400,000 tokens', { exact: false })).toBeVisible();
+  await expect(dialog.getByText('模型上限 400,000', { exact: false })).toBeVisible();
   await dialog.getByLabel('上下文窗口（tokens）').fill('500000');
   await expect(dialog.getByRole('button', { name: '保存模型设置', exact: true })).toBeDisabled();
   await dialog.getByRole('button', { name: '重新读取并自动补全', exact: true }).click();
@@ -903,10 +907,10 @@ test('model settings exposes long context prices and requires acknowledgement wi
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   const save = dialog.getByRole('button', { name: '保存模型设置', exact: true });
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('500000');
-  await expect(dialog.getByText('模型规格上限：1,050,000 tokens', { exact: false })).toBeVisible();
+  await expect(dialog.getByText('模型上限 1,050,000', { exact: false })).toBeVisible();
+  await dialog.locator('summary').filter({ hasText: '目录与参考价格' }).click();
   await expect(dialog.getByRole('table')).toContainText('≤ 272,000');
   await expect(dialog.getByRole('table')).toContainText('> 272,000');
   await expect(save).toBeDisabled();
@@ -935,7 +939,6 @@ test('mapping retry count defaults, validates, persists zero and locks on confli
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const open = async () => {
     await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
-    await page.getByRole('dialog').getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   };
   await open();
   const dialog = page.getByRole('dialog'), retries = dialog.getByLabel('同一渠道重试次数');
@@ -961,4 +964,53 @@ test('mapping retry count defaults, validates, persists zero and locks on confli
   await page.evaluate(() => { window.desktopTest.writeError = null; });
   await dialog.getByRole('button', { name: '重新读取设置', exact: true }).click();
   await expect(retries).toHaveValue('0'); await expect(retries).toBeEnabled();
+});
+
+
+test('model settings opens on a compact general form with a fixed footer in light, dark and small windows (simulated host)', async ({ page }, testInfo) => {
+  await host(page, true);
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  const dialog = page.getByRole('dialog'), save = dialog.getByRole('button', { name: '保存模型设置', exact: true });
+  await expect(dialog.getByRole('button', { name: '常规设置', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(dialog.getByLabel('同一渠道重试次数')).toBeVisible();
+  await expect(dialog.getByLabel('同一渠道重试次数')).toHaveValue('3');
+  for (const title of ['模型能力', '思考设置', '高级设置', '目录与参考价格']) {
+    await expect(dialog.locator('details').filter({ has: page.locator('summary').filter({ hasText: title }) })).not.toHaveAttribute('open');
+  }
+  await expect(dialog.getByLabel('视觉输入')).toBeHidden();
+  await expect(dialog.getByLabel('目录供应商')).toBeHidden();
+  for (const viewport of [{ width: 1120, height: 860 }, { width: 800, height: 600 }, { width: 480, height: 680 }]) {
+    await page.setViewportSize(viewport);
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
+      await expect(save).toBeInViewport();
+      await expect(dialog.getByLabel('同一渠道重试次数')).toBeInViewport();
+      expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      const bounds = await dialog.boundingBox();
+      expect(bounds!.y).toBeGreaterThanOrEqual(0);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
+      await dialog.screenshot({ path: testInfo.outputPath(`model-settings-${viewport.width}-${theme}.png`) });
+    }
+  }
+  const capabilities = dialog.locator('summary').filter({ hasText: /^模型能力$/ });
+  await capabilities.click();
+  await capabilities.press('Enter');
+  await expect(dialog.getByLabel('视觉输入')).toBeHidden();
+  await capabilities.press('Enter');
+  await expect(dialog.getByLabel('视觉输入')).toBeVisible();
+  await dialog.getByLabel('视觉输入').selectOption('no');
+  await expect(save).toBeInViewport();
+  await dialog.locator('.model-settings-body').evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await expect(save).toBeInViewport();
+  await save.click();
+  await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
+  await dialog.getByRole('button', { name: '速度与分身', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '速度与分身', exact: true })).toHaveAttribute('aria-current', 'page');
+  await expect(dialog.getByLabel('分身来源渠道')).toBeVisible();
+  await dialog.getByRole('button', { name: '常规设置', exact: true }).click();
+  await expect(dialog.getByLabel('同一渠道重试次数')).toHaveValue('3');
+  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });

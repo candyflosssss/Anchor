@@ -52,6 +52,7 @@ test('mapping settings directly creates speed siblings without navigating to pro
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 coding-main', exact: true });
   await card.getByRole('button', { name: '模型设置 coding-main', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '速度与分身', exact: true }).click();
   const dialog = page.getByRole('dialog');
   const source = dialog.getByLabel('分身来源渠道', { exact: true });
   // A shared model requires an explicit source, not an arbitrary first channel.
@@ -70,18 +71,20 @@ test('mapping settings directly creates speed siblings without navigating to pro
     const sibling = page.getByRole('article', { name: `模型 coding-main(${speed})`, exact: true });
     await expect(sibling).toContainText('1 个来源');
     await sibling.getByRole('button', { name: `模型设置 coding-main(${speed})`, exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '速度与分身', exact: true }).click();
     await expect(dialog.getByLabel('Anchor 固定速度档位')).toHaveValue(speed === 'fast' ? 'priority' : 'ultrafast');
     await expect(dialog.getByRole('checkbox')).toHaveCount(0);
     await dialog.getByRole('button', { name: '关闭', exact: true }).click();
   }
   await card.getByRole('button', { name: '模型设置 coding-main', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '速度与分身', exact: true }).click();
   await source.selectOption('摸鱼AI');
   await expect(dialog.getByLabel('Anchor 固定速度档位')).toHaveValue('');
   await dialog.getByRole('checkbox', { name: 'Fast · coding-main(fast)', exact: true }).check();
   await expect(dialog.getByRole('alert')).toContainText('已有同名速度分身');
   await expect(dialog.getByRole('button', { name: '保存速度设置', exact: true })).toBeDisabled();
-  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
-  await expect(dialog).toContainText('声明此映射的能力与默认值');
+  await dialog.getByRole('button', { name: '常规设置', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '常规设置', exact: true })).toHaveAttribute('aria-current', 'page');
   await dialog.getByRole('button', { name: '速度与分身', exact: true }).click();
   await expect(source).toHaveValue('');
 });
@@ -91,6 +94,7 @@ test('mapping settings changes and clears a shared model tier without creating s
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 coding-main', exact: true });
   await card.getByRole('button', { name: '模型设置 coding-main', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: '速度与分身', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('分身来源渠道').selectOption('摸鱼AI');
   const tier = dialog.getByLabel('Anchor 固定速度档位');
