@@ -1,6 +1,7 @@
 # 在线更新 v1
 
 - 日期：2026-10-18；**[0.1.0-dev.desktop.50](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.50) 已于北京时间 2026-10-17 23:52:30 发布到默认 GitHub Releases dev 渠道**，非 latest，两平台安装包与 flat 清单同版投放。
+- 本地安装器增量：`0.1.0-dev.desktop.51` 已生成 Windows 自选盘符／路径安装包及同版 Linux 包，**未发布在线清单或 Release**；此处默认 dev 源仍为 `.50`。新安装器记忆旧安装位置，交互换位置明确确认并先卸载旧程序，保留原用户数据目录；不改变现有更新交接契约。构建与未验收边界见[本地 `.51` 说明](../release/desktop.md#自选盘符与安装路径-51仅本地打包未发布)。
 - 本版统一集成最近已提交的内置mihomo／代理设置、供应商与Key代理绑定、映射重试、本机与远程重启、Agent配置更新、Skill版本挂载、日志折叠及对话推理；不含旧工作区余额缓存／刷新改动。
 - 构建：干净隔离源码 `b456835e41a8595e96577d07827cfc10f3345603`，SOURCE.json dirty=false；沿用既有 `.50` 安装包，未重新构建。**state.db schema8→9，升级前备份并配套升级核心与桌面；旧核心不能打开新库，不支持降级，SSH远端单独升级。**
 - 本次在线验证：六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Anchor与mihomo的Go vendor、元数据ZIP CRC及tag revision核验通过。隔离构建源码CLI从默认GitHub dev源以 `.47` 为当前版真实发现并下载 `.50` Linux包，大小／SHA256通过；Windows远端digest一致，非latest状态不变。在线发布阶段未执行安装器／apply、未运行原生窗口或真实SSH／付费上游验收。详见[最近功能统一集成包 `.50`](../release/desktop.md#最近功能统一集成包-50已发布-dev本机已升级)。

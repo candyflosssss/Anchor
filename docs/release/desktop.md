@@ -8,6 +8,19 @@
 - 本次在线验证：六附件大小／SHA256 digest、tag revision、对应提交源码逐文件内容／构建输入摘要、Anchor与mihomo的Go vendor、元数据ZIP CRC均通过。隔离构建源码CLI从默认GitHub dev源以 `.47` 为当前版真实发现并下载 `.50` Linux包，大小／SHA256通过；Windows远端附件digest一致。保持非latest，原有无stable/latest状态不变。安装器未签名，未运行安装／apply、原生窗口、真实SSH或付费上游验收。
 - 当前本机安装：本机 CLI／核心／GUI 已于2026-10-18 00:02从 `.47` 配套升级为 `.50`。CLI 从同版发布的干净提交 `b456835` 对应源码及 vendor 离线构建，桌面复用已发布 Linux 包的相同 ELF；运行二进制哈希均已核对。备份 `/home/mosaki/.config/anchor/backups/pre-desktop50-20261018-000208`（目录0700、文件0600）；通过 restart_handoff 正常保留交接，恢复原有受限 transient user units，Restart=no，无新增持久服务或自启动。core／gateway／agent_management ready，schema8→9，SQLite quick_check／foreign_key_check通过。实例身份、既有配置表与绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH维持 applied；不借升级重新接管。鉴权后的 proxy list 通过，内置 mihomo v1.19.32 可用，尚无代理配置、未启动节点。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口可见性验收；未请求真实上游，SSH远端未更新，新库不支持降级。
 
+## 自选盘符与安装路径 .51（仅本地打包，未发布）
+
+`0.1.0-dev.desktop.51` 从干净隔离提交 `bcec1ba9c1d574bea51631903fc042b28709f8ef` 构建，`SOURCE.json` dirty=false；只包含本轮安装器和相关文档／回归增量，不混入原工作区余额缓存／刷新改动。Windows 新增目录选择页，升级沿用当前用户注册的 `InstallLocation`，支持 `/D=` 覆盖；交互式换位置先确认、检查新目录可写、核验新旧程序已停止，再等待旧卸载器完成。程序位置与原有用户数据目录独立，换盘不移动数据库或凭据；不会提权、强杀或递归删除旧目录中的额外文件。新安装失败不自动回滚程序文件，停止核心后可重试。
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| windows-amd64 | `Anchor-Desktop-0.1.0-dev.desktop.51-windows-amd64-setup.exe` | 31,023,216 | `8893147741db354dc695bc39f50a6ff1b13af3e8c39db025006a7519eed19027` |
+| linux-amd64 | `anchor-desktop_0.1.0-dev.desktop.51_amd64.deb` | 29,007,920 | `3696f4cc40ffd377b02236b95f92f2e011730d084e0e4dc294543f29f0640c1a` |
+
+产物位于 `dist/desktop/0.1.0-dev.desktop.51/`。18项定向 Python 构建／安装器源码契约测试、NSIS `-WX` 编译、生产契约比对、TypeScript／Vite、Windows AMD64／Ubuntu24.04 AMD64 编译与 NSIS／deb 打包通过。两平台 BUILD.json／SHA256SUMS 与所有登记文件哈希通过，Linux deb 的版本／架构及内嵌 GUI ELF 与单独二进制一致；证据在本版本 `verification/`。源码测试不等于 Windows 安装流程实测。
+
+本轮仅本地交付，没有生成或上传 `.51` 在线清单、创建 Release／标签、执行 apply 或替换本机程序；线上 dev 与本机运行版仍为 `.50`。未执行 Windows 原生首次安装、同目录升级、跨目录迁移、卸载或真实窗口验收；未运行全量／race／浏览器测试，不修改真实 Agent 配置或请求付费上游。开发安装包未签名，使用前先备份并正常停止核心、退出所有窗口。
+
 ## 最近功能统一集成包 .50（已发布 dev，本机已升级）
 
 `0.1.0-dev.desktop.50` 从干净基线 `b456835e41a8595e96577d07827cfc10f3345603` 构建，`SOURCE.json` dirty=false。这里的“统一集成”指最近各会话已提交的功能，不把旧工作区改动一并采纳；旧余额缓存／单行刷新源码仍作为原有未提交工作保留，不在本包中。

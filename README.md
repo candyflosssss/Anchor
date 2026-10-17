@@ -11,6 +11,8 @@
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
+Windows 自选盘符／安装路径已在 **desktop.51 本地安装包**实现，尚未投放线上；以下公开下载与应用内更新仍为 `.50`。详见[本地 `.51` 构建与安装说明](docs/release/desktop.md#自选盘符与安装路径-51仅本地打包未发布)。
+
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
 - [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.50/Anchor-Desktop-0.1.0-dev.desktop.50-windows-amd64-setup.exe)
