@@ -8,6 +8,14 @@
 - 在线验证：六附件大小／SHA256 digest、对应提交源码逐文件内容／构建输入摘要、Go vendor、元数据 ZIP CRC 和 tag revision 核验通过。隔离源码 CLI 从默认 GitHub dev 源以 `.46` 为当前版发现并真实下载 `.47` Linux 包，大小／SHA256 校验通过；Windows 远端附件 digest 与本地一致。安装器未签名，未执行原生窗口、系统安装器／apply 或真实付费上游验收。
 - 当前本机安装：本机 CLI／核心／GUI 已于2026-10-17 22:39统一升级为 `.47`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop47-20261017-223946`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway／agent_management ready，运行 ELF 与本版构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH 均维持 applied；不借安装重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
 
+## 本地代理集成包 .48（尚未公开发布／安装）
+
+`0.1.0-dev.desktop.47` 明确不含代理／mihomo；当前已安装的 `.47` 不会通过重启自动出现代理页面。此前代理实现停留在未提交工作区，被干净源码打包排除；现已独立提交为 `090a729b7f96b252ab9538b75d417741fec99fa7`，未混入余额缓存改动。
+
+- 本轮从该干净提交构建 `dist/desktop/0.1.0-dev.desktop.48/` 的 Windows AMD64 NSIS 和 Ubuntu24.04 AMD64 `.deb`，`SOURCE.json` dirty=false。两平台均嵌入固定 mihomo v1.19.32；新增构建回归门禁检查生产 JS 的代理页面及桥接标识。
+- 核验两平台构建元数据与 SHA256SUMS、可执行文件内的精确生产 JS 和对应 mihomo archive、Linux deb 的版本／架构／实际 GUI 哈希与许可；均通过。对**同一份生产 dist** 用隔离模拟桥接运行两项 Chromium 页面交互测试，通过实际侧栏点击进入“代理设置”，覆盖秘密保留、Key 覆盖与未知写入后显式重读。截图及日志在产物 `verification/` 中，不代表原生 Wails 或 Windows 验收。
+- 仍未上传 GitHub Release、生成线上更新投放或替换本机 `.47` 的 CLI／核心／窗口，不影响当前请求。下次安装须备份并同步升级核心与桌面：schema8 将迁移到 schema9，旧核心不能打开新库；SSH 远端仍需独立升级。未执行原生 Windows、安装器／apply 或真实付费上游验收。
+
 ## 1. 安装与使用行为
 
 ### Windows AMD64
