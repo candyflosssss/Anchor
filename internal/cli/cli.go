@@ -29,7 +29,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
       Model settings channel_retries: 0..10 extra attempts (0 disables; omitted/null preserves).
       Backoff 250ms/500ms/1s (capped at 1s) shares the provider timeout; no replay after output or unknown execution.
       401/403/429 switch keys/candidates instead; management writes are not retried.
-  restart --approve [--timeout 30s]   Restart/recover local core; preserve managed configuration
+  restart --approve [--timeout 30s]   Restart local core, or explicit --context SSH target; preserve configuration
+      Local safety pins: [--expected-instance ID] [--control-port N] (not with --context).
   context add NAME --local           Authenticate and bind a local instance
   context add NAME --ssh TARGET [--ssh-port N] [--identity-file PATH]
       [--remote-anchor anchor] [--remote-control-port 17861] [--trust-new-host]
@@ -130,7 +131,7 @@ Agent enable requires an existing default model; use agent set-models to replace
 Provider, Key, public model and Context names accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
 Agent binding names use the same characters, with a 64 UTF-8 byte limit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
-init/serve/restart/access/context/recover/update/agent token operate locally. Business commands use the selected context.
+init/serve/access/context/recover/update/agent token operate locally. restart is local unless --context explicitly selects SSH. Business commands use the selected context.
 Codex, Claude Code user settings and independent DSH Web (dsh) / Desktop (dsh-desktop) profile management are available; runtime connection remains unverified.
 DSH Web/Desktop sync mapped display names, vision/input, context and supported off/minimal/low/medium/high/xhigh/max efforts.
 DSH defaults use the binding default model; native none/default/null and toggle/budget reasoning are not relabelled.
@@ -292,10 +293,7 @@ func (a App) Run(ctx context.Context, args []string) error {
 		}
 		return a.output(map[string]any{"initialized": true, "settings": cfg, "credential_protection": "current-user permissions/ACL; not encryption"})
 	case "restart":
-		if target != "" {
-			return errors.New("restart is local-only; do not specify --context")
-		}
-		return a.restart(ctx, dir, args[1:])
+		return a.restart(ctx, dir, target, args[1:])
 	case "serve":
 		if target != "" {
 			return errors.New("serve is local-only; do not specify --context")

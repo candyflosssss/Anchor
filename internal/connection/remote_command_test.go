@@ -101,3 +101,64 @@ func TestRemoteBootstrapDiagnosticsNeverExposeStderr(t *testing.T) {
 		}
 	}
 }
+
+func TestRemoteRestartDiscoveryAndVersionProbe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("remote POSIX shell fixture")
+	}
+	for _, mode := range []string{"user-local", "explicit", "old-cli", "missing"} {
+		t.Run(mode, func(t *testing.T) {
+			home := filepath.Join(t.TempDir(), "home with spaces;$(false)")
+			pathDir := filepath.Join(home, "path")
+			if err := os.MkdirAll(pathDir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			shell, err := exec.LookPath("sh")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(shell, filepath.Join(pathDir, "sh")); err != nil {
+				t.Fatal(err)
+			}
+			installed := filepath.Join(home, ".local", "bin", "anchor")
+			if err := os.MkdirAll(filepath.Dir(installed), 0700); err != nil {
+				t.Fatal(err)
+			}
+			script := "#!/bin/sh\nif [ \"$*\" = 'restart --help' ]; then printf '%s\\n' '-expected-instance'; exit 0; fi\nprintf '%s\\n' invoked >>\"$HOME/mutations\"\nprintf '%s\\n' \"$@\"\n"
+			if mode == "old-cli" {
+				script = "#!/bin/sh\nif [ \"$*\" = 'restart --help' ]; then printf '%s\\n' 'synthetic-secret unsupported' >&2; exit 1; fi\nprintf '%s\\n' invoked >>\"$HOME/mutations\"\n"
+			}
+			if err := os.WriteFile(installed, []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			requested := "anchor"
+			if mode == "explicit" {
+				requested = installed
+			}
+			if mode == "missing" {
+				requested = "~/missing/anchor"
+			}
+			cmd := exec.Command(shell, "-c", remoteRestartCommand(state.Context{RemoteExecutable: requested, InstanceID: "confirmed-instance", RemoteControlPort: 17861}, 29))
+			cmd.Env = []string{"HOME=" + home, "PATH=" + pathDir}
+			var stderr strings.Builder
+			cmd.Stderr = &stderr
+			stdout, err := cmd.Output()
+			if mode == "old-cli" || mode == "missing" {
+				code := "remote_anchor_unsupported"
+				if mode == "missing" {
+					code = "remote_anchor_missing"
+				}
+				if err == nil || !strings.Contains(stderr.String(), ": "+code) || strings.Contains(stderr.String(), "synthetic-secret") || len(stdout) != 0 {
+					t.Fatalf("unsafe diagnostic: %v %q", err, stderr.String())
+				}
+				if _, err := os.Stat(filepath.Join(home, "mutations")); !os.IsNotExist(err) {
+					t.Fatal("version/missing probe executed restart")
+				}
+				return
+			}
+			if err != nil || string(stdout) != "restart\n--approve\n--expected-instance\nconfirmed-instance\n--control-port\n17861\n--timeout\n29s\n" {
+				t.Fatalf("unsafe command: %v %q %s", err, stdout, stderr.String())
+			}
+		})
+	}
+}

@@ -115,6 +115,20 @@ describe('core restart boundary', () => {
     await expect(desktopSession.restart(info)).resolves.toEqual(info);
     expect(restart).toHaveBeenCalledExactlyOnceWith(restartFixture.request);
   });
+  it('preserves the confirmed remote identity, profile and target', async () => {
+    const info = checkedSession(restartFixture.remote_success.data);
+    const restart = vi.fn(async () => restartFixture.remote_success);
+    vi.stubGlobal('window', { go: { desktop: { Bridge: testBridge({ RestartCore: restart }) } } });
+    await expect(desktopSession.restart(info)).resolves.toEqual(info);
+    expect(restart).toHaveBeenCalledExactlyOnceWith(restartFixture.request);
+  });
+  it.each(['profile_name', 'target', 'transport', 'instance_id'] as const)('rejects remote %s replacement after the write', async field => {
+    const info = checkedSession(restartFixture.remote_success.data);
+    const restart = vi.fn(async () => ({ ...restartFixture.remote_success, data: { ...info, [field]: field === 'transport' ? 'local' : 'different' } }));
+    vi.stubGlobal('window', { go: { desktop: { Bridge: testBridge({ RestartCore: restart }) } } });
+    await expect(desktopSession.restart(info)).rejects.toMatchObject({ code: 'unknown' });
+    expect(restart).toHaveBeenCalledTimes(1);
+  });
   it.each(['identity', 'unsupported', 'conflict', 'startup_failed', 'unknown'] as const)('preserves %s without replay', async code => {
     expect(restartFixture.errors[code]).toEqual({ code });
     const restart = vi.fn(async (): Promise<SessionResult> => ({ contract: CONTRACT, data: null, problem: { code } }));

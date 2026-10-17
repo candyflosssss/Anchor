@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -144,5 +146,45 @@ func TestRestartLocalDoesNotInitializeMissingState(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, "state.db")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("created database", err)
+	}
+}
+
+func TestRestartLocalPinsRejectBeforeContact(t *testing.T) {
+	var contacts atomic.Int32
+	web := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { contacts.Add(1); w.WriteHeader(500) }))
+	defer web.Close()
+	st, err := state.Open(t.TempDir(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	cfg, err := st.Initialize(web.Listener.Addr().String(), "127.0.0.1:17860")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, portText, _ := net.SplitHostPort(cfg.ControlAddress)
+	port, _ := strconv.Atoi(portText)
+	for _, tc := range []struct {
+		id   string
+		port int
+		code string
+	}{
+		{"wrong-instance", port, "identity"},
+		{cfg.InstanceID, port%65535 + 1, "remote_control_port"},
+	} {
+		launches := 0
+		_, err := RestartLocalPinned(context.Background(), st.Dir, tc.id, tc.port, func() (int, <-chan error, error) { launches++; return 0, nil, nil })
+		if err == nil || contacts.Load() != 0 || launches != 0 {
+			t.Fatalf("pin mismatch mutated state: %v", err)
+		}
+		if tc.code == "identity" && !errors.Is(err, client.ErrIdentity) {
+			t.Fatal(err)
+		}
+		if tc.code != "identity" {
+			var e *Error
+			if !errors.As(err, &e) || e.Code != tc.code {
+				t.Fatal(err)
+			}
+		}
 	}
 }

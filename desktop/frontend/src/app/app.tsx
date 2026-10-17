@@ -65,9 +65,9 @@ export function App() {
         </div>}
       </section>}
       {session.notice && <p role="status" className="border-t px-4 py-2 text-sm text-muted-foreground">{session.notice}</p>}
-      <ConfirmAction open={confirmRestart} title="重启本机核心？" busy={session.restarting} onCancel={() => setConfirmRestart(false)} onConfirm={() => { void session.restart().finally(() => setConfirmRestart(false)); }}>
+      <ConfirmAction open={confirmRestart} title={session.target?.transport === 'ssh' ? `重启远程设备 ${session.target.profile_name} 的核心？` : '重启本机核心？'} busy={session.restarting} onCancel={() => setConfirmRestart(false)} onConfirm={() => { void session.restart().finally(() => setConfirmRestart(false)); }}>
         {session.restarting && <p role="status">正在重启核心，请稍候…</p>}
-        <p className="break-all">本机实例：{session.target?.instance_id}</p><p>请求会短暂中断。在线时正常交接后重新启动；已停止时尝试恢复。保留托管配置、模型目录和凭据，不强杀进程，也不会重启 Codex 等客户端。</p>
+        <p className="break-all">目标设备：{session.target?.target}；实例：{session.target?.instance_id}</p><p>请求会短暂中断。在线时正常交接后重新启动；本机已停止时尝试恢复。保留托管配置、模型目录和凭据，不强杀进程，也不会重启 Codex 等客户端。{session.target?.transport === 'ssh' && '只重启此远程设备，不操作本机；远程 Anchor 需要支持身份核验重启。'}</p>
       </ConfirmAction>
       <ConfirmAction open={confirmStop} title={session.info?.transport === 'ssh' ? `停止远程设备 ${session.info.target} 的核心？` : '停止本机核心？'} busy={session.stopping} onCancel={() => setConfirmStop(false)} onConfirm={() => { void session.stop().finally(() => setConfirmStop(false)); }}>
         <p className="break-all">实例：{session.info?.instance_id}</p><p>连接来源：{session.info?.transport === 'ssh' ? `远程设备 ${session.info.target}` : session.info?.source === 'started' ? '本次由桌面宿主启动' : '核验后复用的已有核心'}。</p><p>这会停止代理服务并按既有规则恢复托管配置，可能影响使用该实例的其他程序。仅关闭窗口不需要停止核心。</p>

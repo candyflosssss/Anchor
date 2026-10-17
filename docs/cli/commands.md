@@ -4,7 +4,7 @@
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
-- `restart --approve [--timeout 30s]` 与桌面「重启核心／恢复本机核心」已随 desktop.47 宿主／核心发布，本机 CLI 同版升级；desktop.46 与公开 alpha.6 不含这些入口。在线重启要求已有核心支持 `restart_handoff`，离线恢复不新建状态目录。
+- `restart --approve [--timeout 30s]` 与桌面「重启核心／恢复本机核心」已随 desktop.47 宿主／核心发布，本机 CLI 同版升级；desktop.46 与公开 alpha.6 不含这些入口。在线重启要求已有核心支持 `restart_handoff`，离线恢复不新建状态目录。显式 `--context NAME` 的 SSH 重启与远程菜单入口是后续源码增量，尚未打包发布；desktop.47 不含远程入口，远程 CLI 也须升级到支持身份/端口核验的版本。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
 - 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.47 已发布到默认 GitHub 源的 dev 渠道**，并已完成本机 CLI／核心／GUI 同版升级。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
@@ -35,7 +35,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill`、`proxy` 管理动作（不含 token）。本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill`、`proxy` 管理动作（不含 token）。`restart` 是例外：只有显式提供 SSH Context 才操作远程，未提供仍操作本机，不受默认 Context 影响；其他本机操作显式提供非空 Context 会失败 |
 | `--ssh-password-stdin` | 从 stdin 读取本次 SSH 密码（最多 8192 bytes，去掉末尾 CR/LF，非空），仅本次使用，不保存；SSH add 时选择密码模式，已保存密码 Context 每次管理请求重新提供。不能与供应商 `--secret-stdin` 同用 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
@@ -68,7 +68,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `update apply --approve` | 原位更新本机 CLI，保留上一版 | 已下载、核心已退出、用户可写安装路径；不自动重启 |
 | `init` | 初始化本机状态 | 本机；核心不应占用该状态目录 |
 | `serve` | 前台运行核心 | 本机已初始化 |
-| `restart --approve [--timeout 30s]` | 本机重启／离线恢复，成功等待 ready | 本机已初始化；拒绝显式 `--context`；在线核心需支持 restart_handoff |
+| `restart --approve [--timeout 30s]` | 本机重启／离线恢复，或显式 `--context NAME` 重启已登记 SSH 设备；等待 ready | 已初始化/核验目标；在线核心需支持 restart_handoff；远程 CLI 须支持身份与端口 pin |
 | `context add` | 登记本机或 SSH 实例 | 本机已初始化；SSH 目标已安装支持 bootstrap 的 Anchor |
 | `context bootstrap` | 远端账户初始化／启动核心并签发管理授权 | 本机操作；明确 `--show-once`；输出含秘密 |
 | `context use` | 选择默认 Context | 本机；名称已登记 |
@@ -188,17 +188,21 @@ anchor [--context NAME] stop --approve [--for-restart]
 - 交接成功 stdout 在普通结果上增加 `"bindings_preserved":true,"restart_required":true`；必须同时收到 `accepted:true` 和 `bindings_preserved:true`，缺失／无效确认按结果未知失败，不重放。结果仍是 `shutdown_complete:false`，不证明核心已退出或新核心 ready。调用方等待退出后，用相同数据目录、监听地址和可兼容的新程序启动 `serve`／桌面核心；新核心核验并复用日志，不把 Anchor 的当前配置记作原始基线。
 - 交接不是零停机：核心未启动期间网关不可用；放弃维护时，可重新启动兼容核心后普通 `stop --approve`，或确认核心离线后使用 `recover` 条件恢复。不要将 `--for-restart` 用于最终卸载／永久停服。Ctrl+C／SIGTERM 仍执行普通停服恢复；历史会话缓存的旧提供商／地址不会自动迁移，配置校验成功不等于实际连接验证。
 
-### `restart`（当前源码，未打包发布）
+### `restart`（本机已随 desktop.47 发布；SSH 为未发布源码增量）
 
 ```bash
 anchor [--data-dir DIR] restart --approve [--timeout 30s]
+  [--expected-instance ID] [--control-port N]
+anchor [--data-dir DIR] --context NAME [--ssh-password-stdin] restart --approve [--timeout 30s]
 ```
 
-- 仅操作 `--data-dir` 对应的本机状态，不受 CLI 默认 Context 影响，显式提供非空 `--context` 会失败。要求已有数据库与本机 owner 凭据，不隐式初始化；不支持 SSH 远程重启。
+- 未显式提供 `--context` 时，仅操作 `--data-dir` 对应的本机状态，不受 CLI 默认 Context 影响。要求已有数据库与本机 owner 凭据，不隐式初始化。
+- 显式 `--context NAME` 仅允许已登记 SSH Context：复用已保存目标、主机核验与管理凭据，密钥/Agent 和本次密码模式均支持。先认证目标及 `restart_handoff`，再通过 SSH 调用该账户配置的远程 Anchor 可执行文件；只读帮助检测 `--expected-instance` 后才执行携带实例 ID 和 control port 的安全重启。不运行 bootstrap、不重新登记、不续签凭据、不回退本机。旧远程 CLI 返回 `remote_anchor_unsupported`，未执行停服；先升级远程 CLI 后再试。远程核心离线时此入口拒绝，不借机恢复本机。
+- `--expected-instance ID` 默认空，为合法 opaque ID，操作前要求本机状态身份一致；`--control-port N` 默认0（未指定），非零须为1..65535且同时提供身份 pin，要求状态 control address 精确匹配 `127.0.0.1:N`。这些是远程命令校验目标的本机安全 pin，不能与 `--context` 混用；不匹配时零停服、零拉起。
 - `--approve` 必需，默认 false；`--timeout` 为 Go duration，默认 `30s`，范围 `1s..30s`，覆盖停服、等待退出和新核心就绪的总时间。无位置参数。未知参数、缺少确认或超时参数越界在操作前失败。
 - 在线时先核验实例身份/API/授权和 `restart_handoff`，只发送一次保留配置的正常停服请求；收到 `accepted:true` 与 `bindings_preserved:true` 后等待旧核心释放实例锁，再用**当前 CLI 可执行文件**启动同目录的独立 `serve` 子进程。原有配置、模型目录、Binding 凭据和恢复日志保留；不恢复到旧代理后再接管。
 - 离线时只在同一实例身份的生命周期锁可获取后尝试拉起；身份不符、401/403、不兼容核心、并发启动/升级、未知端口占用或停服超时均失败，不强杀、不抢端口、不改用普通 Stop、不自动重试写操作。若已停服但启动失败，托管配置可能仍指向暂不可用的 Anchor；应先检查状态与端口，再显式恢复，不伪报成功。
-- 成功退出0，stdout 为 `{"ready":true,"instance_id":"…","process_id":123,"recovered":false}`；离线恢复时 `recovered:true`。只有同身份实例的 `/status` 已报告 ready 才输出成功，不代表真实付费上游已验证。失败退出1、诊断 stderr；写入响应异常为结果未知，不自动重放。
+- 成功退出0，stdout 为 `{"ready":true,"instance_id":"…","process_id":123,"recovered":false}`；本机离线恢复时 `recovered:true`，SSH 成功为 false。远程回包严格校验后，还须使用原管理凭据再次核验相同实例/进程且 Status ready；坏回包、SSH 中断或未证实完成均视为 unknown，不重放命令、不降级普通 stop。只有同身份实例的 `/status` 已报告 ready 才输出成功，不代表真实付费上游已验证。失败退出1、诊断 stderr；写入响应异常为结果未知，不自动重放。
 - 与 `stop --approve --for-restart` 的区别：后者只停、不拉起；本命令完成停服到 ready 的完整流程。会短暂中断请求；不升级程序、不注册/重配系统服务或自启动、不重启 Codex/Claude/DSH，也不迁移客户端缓存的旧地址。外部服务管理器的自动重拉仍受同实例锁保护，不保证替代进程一定由本命令创建。
 
 ## 4. Context 与状态

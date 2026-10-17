@@ -1,17 +1,53 @@
 {
   "contract": "anchor-desktop-v1",
-  "request": { "instance_id": "fixture-local", "approved": true },
+  "request": {
+    "instance_id": "fixture-local",
+    "approved": true
+  },
   "success": {
     "contract": "anchor-desktop-v1",
-    "data": { "profile_name": "@local", "transport": "local", "target": "本机", "instance_id": "fixture-local", "phase": "ready", "source": "started", "can_stop": true },
+    "data": {
+      "profile_name": "@local",
+      "transport": "local",
+      "target": "本机",
+      "instance_id": "fixture-local",
+      "phase": "ready",
+      "source": "started",
+      "can_stop": true
+    },
     "problem": null
   },
   "errors": {
-    "invalid": { "code": "invalid" },
-    "identity": { "code": "identity" },
-    "unsupported": { "code": "unsupported" },
-    "unknown": { "code": "unknown" },
-    "startup_failed": { "code": "startup_failed" },
-    "conflict": { "code": "conflict" }
+    "invalid": {
+      "code": "invalid"
+    },
+    "identity": {
+      "code": "identity"
+    },
+    "unsupported": {
+      "code": "unsupported"
+    },
+    "unknown": {
+      "code": "unknown"
+    },
+    "startup_failed": {
+      "code": "startup_failed"
+    },
+    "conflict": {
+      "code": "conflict"
+    }
+  },
+  "remote_success": {
+    "contract": "anchor-desktop-v1",
+    "data": {
+      "profile_name": "remote-device",
+      "transport": "ssh",
+      "target": "fixture@192.0.2.1",
+      "instance_id": "fixture-local",
+      "phase": "ready",
+      "source": "remote",
+      "can_stop": true
+    },
+    "problem": null
   }
 }

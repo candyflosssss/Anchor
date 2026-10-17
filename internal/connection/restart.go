@@ -3,10 +3,12 @@ package connection
 import (
 	"context"
 	"errors"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/client"
@@ -29,6 +31,11 @@ type RestartResult struct {
 // acceptance of shutdown. An offline instance can be recovered under the same
 // identity; an occupied/unresponsive instance is not replaced.
 func RestartLocal(ctx context.Context, dir, expectedID string, launch CoreLauncher) (RestartResult, error) {
+	return RestartLocalPinned(ctx, dir, expectedID, 0, launch)
+}
+
+// RestartLocalPinned additionally checks the enrolled SSH control port before any mutation.
+func RestartLocalPinned(ctx context.Context, dir, expectedID string, expectedPort int, launch CoreLauncher) (RestartResult, error) {
 	var out RestartResult
 	if launch == nil {
 		return out, failure("invalid")
@@ -39,6 +46,9 @@ func RestartLocal(ctx context.Context, dir, expectedID string, launch CoreLaunch
 	cfg, token, err := restartState(dir)
 	if err != nil {
 		return out, err
+	}
+	if expectedPort != 0 && (expectedPort < 1 || expectedPort > 65535 || cfg.ControlAddress != net.JoinHostPort("127.0.0.1", strconv.Itoa(expectedPort))) {
+		return out, failure("remote_control_port")
 	}
 	if expectedID != "" && expectedID != cfg.InstanceID {
 		return out, client.ErrIdentity

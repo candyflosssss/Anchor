@@ -28,6 +28,10 @@ import (
 // A real OpenSSH client connects to an isolated SSH server and core. This fixture
 // never reads the user's SSH config/keys/known_hosts or opens a public listener.
 func isolatedSSH(t *testing.T) (SSHConnectionInput, *state.Store) {
+	return isolatedSSHCommands(t, nil)
+}
+
+func isolatedSSHCommands(t *testing.T, restart func([]string) (string, uint32)) (SSHConnectionInput, *state.Store) {
 	t.Helper()
 	if runtime.GOOS != "linux" {
 		t.Skip("isolated OpenSSH launcher is Linux-only")
@@ -96,6 +100,9 @@ func isolatedSSH(t *testing.T) (SSHConnectionInput, *state.Store) {
 		t.Fatal(err)
 	}
 	remoteScript := "#!/bin/sh\nif [ \"$*\" = 'context bootstrap --help' ]; then exit 0; fi\nprintf '%s\\n' \"$@\"\n"
+	if restart != nil {
+		remoteScript = "#!/bin/sh\nif [ \"$*\" = 'context bootstrap --help' ]; then exit 0; fi\nif [ \"$*\" = 'restart --help' ]; then printf '%s\\n' '-expected-instance'; exit 0; fi\nprintf '%s\\n' \"$@\"\n"
+	}
 	if err := os.WriteFile(filepath.Join(remoteBin, "anchor"), []byte(remoteScript), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +155,22 @@ func isolatedSSH(t *testing.T) (SSHConnectionInput, *state.Store) {
 								_ = ssh.Unmarshal(request.Payload, &command)
 								probe := exec.Command("/bin/sh", "-c", command.Command)
 								probe.Env = []string{"HOME=" + remoteHome, "PATH=/usr/bin:/bin"}
+								var diagnostic bytes.Buffer
+								probe.Stderr = &diagnostic
 								args, probeErr := probe.Output()
+								if probeErr != nil {
+									request.Reply(true, nil)
+									_, _ = ch.Stderr().Write(diagnostic.Bytes())
+									_, _ = ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{1}))
+									return
+								}
+								if probeErr == nil && restart != nil && strings.HasPrefix(string(args), "restart\n") {
+									request.Reply(true, nil)
+									output, status := restart(strings.Split(strings.TrimSuffix(string(args), "\n"), "\n"))
+									_, _ = io.WriteString(ch, output)
+									_, _ = ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{status}))
+									return
+								}
 								if probeErr != nil || string(args) != fmt.Sprintf("context\nbootstrap\n--control-port\n%d\n--show-once\n", controlPort) {
 									request.Reply(false, nil)
 									return

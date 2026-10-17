@@ -4,14 +4,14 @@ import type { ConfirmStop, DesktopBridge, SessionResult } from '../src/desktop/c
 
 declare global { interface Window { restartTest: {
   starts: number; requests: ConfirmStop[]; offline: boolean; remote: boolean;
-  failure: 'unknown' | 'startup_failed' | null; pendingStatus: boolean;
+  failure: 'unknown' | 'startup_failed' | 'remote_anchor_unsupported' | null; pendingStatus: boolean;
   deferStatus: boolean; releaseStatus?: () => void; holdRestart?: boolean; releaseRestart?: () => void;
 } } }
 async function host(page: Page, remote = false) {
   await page.addInitScript(({ fixture, remote }) => {
     const contract = fixture.contract;
     const state = window.restartTest = { starts: 0, requests: [] as ConfirmStop[], offline: false, remote, failure: null, pendingStatus: false, deferStatus: false } as Window['restartTest'];
-    const ready = (): SessionResult => ({ ...fixture.success, data: state.remote ? { ...fixture.success.data, profile_name: 'remote-device', transport: 'ssh', source: 'remote', target: 'fixture@192.0.2.1' } : fixture.success.data });
+    const ready = (): SessionResult => (state.remote ? fixture.remote_success : fixture.success) as SessionResult;
     const offline = (): SessionResult => ({ contract, data: null, problem: { code: 'offline' } });
     const operations = {
       Start: async () => { state.starts++; return ready(); },
@@ -101,11 +101,39 @@ test('old polling failures cannot overwrite successful restart', async ({ page }
 test('offline remote retains its label and never offers local recovery', async ({ page }) => {
   await host(page, true);
   await page.getByRole('button', { name: /remote-device · 已连接/ }).click();
-  await expect(page.getByRole('button', { name: '重启核心', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '重启核心', exact: true })).toBeEnabled();
   await page.keyboard.press('Escape');
   await page.evaluate(() => { window.restartTest.offline = true; });
   await expect(page.getByRole('heading', { name: '当前设备暂不可用' })).toBeVisible({ timeout: 8000 });
   await expect(page.getByRole('button', { name: /remote-device · 未连接/ })).toBeVisible();
   await expect(page.getByRole('button', { name: '恢复本机核心', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: /remote-device · 未连接/ }).click();
+  await expect(page.getByRole('button', { name: '重启核心', exact: true })).toBeDisabled();
   expect(await page.evaluate(() => window.restartTest.requests.length)).toBe(0);
+});
+
+
+test('remote restart confirms the selected device and keeps the remote session', async ({ page }) => {
+  await host(page, true);
+  await openRestart(page);
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toContainText('重启远程设备 remote-device 的核心？');
+  await expect(dialog).toContainText('fixture@192.0.2.1');
+  await expect(dialog).toContainText('不操作本机');
+  await dialog.getByRole('button', { name: '确认变更' }).click();
+  await expect(page.getByText('核心已恢复，服务已就绪。', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /remote-device · 已连接/ })).toBeVisible();
+  expect(await page.evaluate(() => window.restartTest.requests)).toEqual([fixture.request]);
+  expect(await page.evaluate(() => window.restartTest.starts)).toBe(1);
+});
+
+test('old remote Anchor shows upgrade guidance without ordinary stop fallback', async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(() => { window.restartTest.failure = 'remote_anchor_unsupported'; });
+  await openRestart(page);
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认变更' }).click();
+  await expect(page.getByText('远程 Anchor 版本不支持身份核验重启，请先更新远程 Anchor。没有停止远程核心。', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.restartTest.requests.length)).toBe(1);
+  expect(await page.evaluate(() => window.restartTest.starts)).toBe(1);
+  await expect(page.getByRole('button', { name: '恢复本机核心', exact: true })).toHaveCount(0);
 });

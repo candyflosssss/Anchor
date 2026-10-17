@@ -86,7 +86,7 @@ export function useDesktopSession() {
     finally { stopLock.current = false; if (active.current) setStopping(false); }
   }
   async function restart() {
-    if (!target || target.transport !== 'local' || stopLock.current || starting.current || error === 'unknown') return;
+    if (!target || (target.transport === 'ssh' && !info) || stopLock.current || starting.current || error === 'unknown') return;
     stopLock.current = true; setRestartFailed(false); setRestarting(true); setNotice(null); setError(null);
     const epoch = ++generation.current;
     setInfo(null); setPhase('starting');
@@ -117,6 +117,8 @@ export function useDesktopSession() {
   const select = useCallback((next: SessionInfo) => { generation.current++; setInfo(next); setTarget(next); setPhase('ready'); setError(null); setNotice(null); setRestartFailed(false); }, []);
   const restartMessages: Partial<Record<ProblemCode, string>> = {
     unsupported: '当前核心版本不支持安全重启，请先升级核心；未降级为普通停服。',
+    remote_anchor_unsupported: '远程 Anchor 版本不支持身份核验重启，请先更新远程 Anchor。没有停止远程核心。',
+    remote_anchor_missing: '远程设备找不到配置的 Anchor 程序，请检查远程可执行路径。没有停止核心。',
     conflict: '另一个启动、重启或更新操作正在进行，请等待后检查核心状态。',
     startup_failed: '核心重启未完成，可能仍在退出或尚未就绪。请检查状态、端口和运行日志；不会强杀。',
   };

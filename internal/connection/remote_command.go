@@ -7,11 +7,10 @@ import (
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
-// bootstrapCommand runs in a fresh POSIX shell without sourcing login files.
+// remoteExecutableDiscovery runs in a fresh POSIX shell without sourcing login files.
 // Both authentication modes share discovery and diagnostics. A custom executable
 // is authoritative; it never silently falls back to another installation.
-func bootstrapCommand(c state.Context) string {
-	const script = `requested=$1
+const remoteExecutableDiscovery = `requested=$1
 case "$requested" in
   anchor)
     executable=$(command -v anchor 2>/dev/null) || executable=
@@ -28,7 +27,10 @@ if [ -z "$executable" ] || [ ! -x "$executable" ] || [ -d "$executable" ]; then
   printf '%s\n' 'anchor-bootstrap: remote_anchor_missing' >&2
   exit 127
 fi
-if ! "$executable" context bootstrap --help >/dev/null 2>&1; then
+`
+
+func bootstrapCommand(c state.Context) string {
+	const script = remoteExecutableDiscovery + `if ! "$executable" context bootstrap --help >/dev/null 2>&1; then
   printf '%s\n' 'anchor-bootstrap: remote_anchor_unsupported' >&2
   exit 78
 fi

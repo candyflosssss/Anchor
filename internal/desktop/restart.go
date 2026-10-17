@@ -8,8 +8,7 @@ import (
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
-// RestartCore only controls this host's selected local instance. A dropped SSH
-// connection must never fall back to starting or stopping the host's core.
+// RestartCore controls only the confirmed selected instance. SSH never falls back to local.
 func (b *Bridge) RestartCore(in ConfirmStop) SessionResult {
 	s := b.session
 	out := SessionResult{Contract: Contract}
@@ -31,7 +30,18 @@ func (b *Bridge) RestartCore(in ConfirmStop) SessionResult {
 		return out
 	}
 	if s.remote != nil {
-		out.Problem = &Problem{"unsupported"}
+		if s.remote.Profile.InstanceID != in.InstanceID {
+			out.Problem = &Problem{"identity"}
+			return out
+		}
+		ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
+		defer cancel()
+		info, err := s.remote.RestartCore(ctx)
+		if err != nil {
+			out.Problem = problem(err, true)
+			return out
+		}
+		out.Data = s.sessionInfo(info)
 		return out
 	}
 	if s.cfg != nil && s.cfg.InstanceID != in.InstanceID {

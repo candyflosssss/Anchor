@@ -130,7 +130,7 @@ export const desktopSession = {
     // A malformed post-mutation result is unknown, never a retryable read error.
     try {
       const next = checkedSession(await call(() => bridge().RestartCore({ instance_id: info.instance_id, approved: true }), true));
-      if (next.instance_id !== info.instance_id || next.transport !== 'local') throw new DesktopProblem('unknown');
+      if (next.instance_id !== info.instance_id || next.transport !== info.transport || next.profile_name !== info.profile_name || next.target !== info.target) throw new DesktopProblem('unknown');
       return next;
     } catch (error) {
       if (error instanceof DesktopProblem && error.code !== 'read_error') throw error;

@@ -24,13 +24,17 @@ Status 只查询，不启动／重启；核心退出后 UI 禁写，用户明确
 
 ### 本机重启与恢复（2026-10-17，已随 desktop.47 dev 发布）
 
-`RestartCore(ConfirmStop) -> SessionResult` 为有副作用的本机宿主操作，复用 `approved:true` 与非空 `instance_id`。请求样例与返回见 `desktop/contract/core-restart.json`；Go Bridge 方法/DTO 生成 TS，Go 与 TS 测试共用样例。只允许当前选中的本机实例；活动或持久选中远程连接均拒绝，不因 SSH 掉线启动/停止本机。前端记住最后已核验的目标身份以提供离线恢复，不把它当在线状态；尚未取得身份时使用现有明确重新连接入口。
+`RestartCore(ConfirmStop) -> SessionResult` 为有副作用的当前设备操作，复用 `approved:true` 与非空 `instance_id`。请求样例与返回见 `desktop/contract/core-restart.json`；Go Bridge 方法/DTO 生成 TS，Go 与 TS 测试共用样例。desktop.47 最初只支持本机；后续未发布源码增量支持当前已连接并核验的 SSH 实例，确认身份不符即拒绝。不因 SSH 掉线启动/停止本机；持久选中远程但没有活动连接时仍拒绝，不回退本机。前端记住最后已核验的目标身份以提供离线恢复，不把它当在线状态；尚未取得身份时使用现有明确重新连接入口。
 
 CLI 与桌面共用 `connection.RestartLocal`：读取已有本机状态、核对确认身份及 owner 凭据，持有 `desktop-start.lock` 和 `remote-start.lock` 协调启动/更新/SSH bootstrap。在线时要求 `restart_handoff`，一次 StopForRestart 保留 Agent 配置、目录、凭据与恢复日志；等待旧 `instance.lock` 可取得后，重新核对状态/凭据未被替换，再启动宿主指定的同一可执行文件核心模式。离线只允许恢复同身份，不初始化、强杀或接管外部服务管理器。总期限最多30秒（桌面 StartTimeout 加10秒，但共享层仍上限30秒）。未知写结果不启动替代核心、不重发；旧核心无能力返回 unsupported，无普通 Stop 降级。启动失败/超时返回 startup_failed，端口身份/授权错误保持原分类。
 
 仅替代实例已认证、同身份且 Status 为 ready 才返回 SessionInfo；不把 shutdown accepted 当成功。设备菜单「重启核心」、本机断线页/菜单「恢复本机核心」均确认短暂中断与配置保留；提交中禁用再次重启、停止与切设备，显示进度，成功重新挂载业务页面并提示就绪。轮询结果用 generation 隔离，重启前的失败不得覆盖新连接。未知结果只提供「检查核心状态」只读核对，不直接重放；失败不回退 Mock。
 
-本轮源码已有隔离真实核心和模拟边界验证；不修改真实 Agent 文件、不请求付费上游、不打包发布或原生验收。该操作不修正供应商模型分组、不重启客户端；缓存了旧代理地址的 Codex/app-server 仍需其自身重新加载。
+远程重启复用 `connection.Live.RestartCore` 与原 SessionResult，无新增任意命令桥接。通过既有 SSH 密钥/Agent 或本次密码连接，先只读核验核心能力，再查远程可执行文件帮助；支持身份 pin 后只执行一次 `restart --approve --expected-instance ID --control-port N --timeout Ns`。远程 CLI 复用 `RestartLocalPinned`，任何写入前核对已登记身份与 loopback 端口；全部参数引用，不加载登录脚本，不 bootstrap/续签或更换路径。总期限最多30秒，超时只断管理连接、不强杀核心。旧 CLI 返回 remote_anchor_unsupported、缺程序返回 remote_anchor_missing，均零停服；其他执行错误、坏回包或后续核验失败为 unknown，不重放。返回须 ready/ID/PID 有效，随后原凭据再认证相同实例、相同 PID 和 Status ready 才成功。
+
+在线 SSH 也显示「重启核心」，确认框列出设备名称、地址和实例 ID，并明确不操作本机；离线远程保留入口但禁用并提示先重新连接，不提供本机恢复。前端回包同时校验实例身份、transport、profile_name 与 target，防止替换目标。unknown 仅允许只读核对。远程入口和身份 pin CLI 是未发布源码增量，desktop.47 不含；隔离 SSH 测试只模拟远程进程交接，不代表真实远程主机已升级或重启。
+
+本机部分已有隔离真实核心和模拟边界验证，已随 desktop.47 dev 发布；本次远程增量仅源码验证，不修改真实 Agent 文件、不请求付费上游，未打包发布、操作真实远程主机或执行原生验收。该操作不修正供应商模型分组、不重启客户端；缓存了旧代理地址的 Codex/app-server 仍需其自身重新加载。
 
 
 首次启动仅复用已批准的托管策略，不新增 Agent 授权。安装器沿用本契约，不在安装期间启动核心或登记服务；用户级开机自启动未实现，也不显示假开关，保持默认关闭。无图形环境继续使用 CLI。

@@ -77,7 +77,7 @@ func TestRestartCoreGuards(t *testing.T) {
 	}
 	s.updating = false
 	s.remote = &connection.Live{Profile: state.Context{Name: "remote"}}
-	if r := b.RestartCore(ConfirmStop{InstanceID: info.InstanceID, Approved: true}); r.Problem == nil || r.Problem.Code != "unsupported" {
+	if r := b.RestartCore(ConfirmStop{InstanceID: info.InstanceID, Approved: true}); r.Problem == nil || r.Problem.Code != "identity" {
 		t.Fatalf("remote: %+v", r)
 	}
 	s.remote = nil
@@ -145,16 +145,20 @@ func TestSharedCoreRestartContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	var f struct {
-		Contract string
-		Request  ConfirmStop
-		Success  SessionResult
-		Errors   map[string]Problem
+		Contract      string
+		Request       ConfirmStop
+		Success       SessionResult
+		RemoteSuccess SessionResult `json:"remote_success"`
+		Errors        map[string]Problem
 	}
 	if err := json.Unmarshal(raw, &f); err != nil {
 		t.Fatal(err)
 	}
 	if f.Contract != Contract || !f.Request.Approved || f.Success.Data == nil || f.Success.Data.InstanceID != f.Request.InstanceID || f.Success.Data.Transport != "local" || f.Success.Problem != nil {
 		t.Fatal("restart contract drift")
+	}
+	if f.RemoteSuccess.Data == nil || f.RemoteSuccess.Data.Transport != "ssh" || f.RemoteSuccess.Data.Source != "remote" {
+		t.Fatal("remote restart fixture drift")
 	}
 	if *problem(&connection.Error{Code: "startup_failed"}, true) != f.Errors["startup_failed"] {
 		t.Fatal("restart problem drift")
