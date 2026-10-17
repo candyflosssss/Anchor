@@ -187,3 +187,12 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 ## Agent 显式重新接管语义（2026-10-17，当前源码未发布）
 
 既有 ManageAgent(action=sync) 与 CLI agent sync 均明确请求重新应用当前已批准策略：外部变化的托管字段／生成目录先保存为恢复基线，再原位生成；未变化字段不吸收上次 Anchor 写入值。DTO 与错误白名单不变，仍校验 revision、实例身份、权限、路径和最终写入快照。GUI 始终确认影响后再提交；取消不请求核心。后台同步／启动继续拒绝外部漂移，prepared previous journal 仍需先恢复；实际失败与 unknown 不盲重试。详见[托管层增量](agent-management-layer.md)，未打包或验证 Windows/Linux 原生窗口。
+
+## 模型映射重试契约（retry-v1）
+
+基线为同渠道重试实现 `25bd34c`；规范源沿用 `internal/catalog/model_settings.go`（由 `internal/desktop/contract.go` 别名导出），生成 `desktop/frontend/src/desktop/contract.generated.ts`，共享样例 `desktop/contract/model-settings.json`。本次仅扩展既有 ModelSettings / SaveModelSettings，不新增桥接方法，沿用所选实例身份／管理鉴权、取消、revision 和写入未知结果规则。
+
+- `ModelSettingsState.channel_retries`：当前核心始终返回非空整数0–10；Go／生成TS保留可空类型以识别旧核心遗漏字段，缺失／null表示unsupported，不当成0。返回当前映射有效的额外重试数；未存储或旧模型默认3。读取不持久化默认值，不递增 revision，models.dev 预览不能改变重试策略。
+- `SaveModelSettings.channel_retries`：可省略／null／整数0–10。省略或null保留原值，显式0禁用额外重试；与显示名、configuration在同一次 revision 检查后保存。clear/set参考快照不会重置此值，速度分身按既有快照规则继承后独立编辑。非法值为invalid／HTTP400，过期revision为conflict／HTTP409，未知结果只允许显式重读，不自动重放。
+- 持久化为模型 settings JSON 的可选 channel_retries 指针，无数据库schema迁移。网关每次请求使用已读模型快照，各供应商+Key+候选上游分别获得该次数；首次不计入，0仍允许其他Key／候选回退。退避250ms、500ms、之后1s封顶，整个渠道组共享供应商timeout和半开名额；流式已输出／结果未知不重放，401/403/429不在原Key重试。
+- 旧调用方不发新字段时保持既有次数；旧核心不返回该字段时，前端Model报unsupported要求升级，不能猜默认值后写入。CLI操作见[最新大全](../cli/commands.md)。

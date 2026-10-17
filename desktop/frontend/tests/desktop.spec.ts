@@ -76,7 +76,7 @@ async function host(page: Page, rateMappings = false) {
       SaveModelSettings: async input => {
         const old = modelStates[input.model_id] ?? { ...modelSettings, revision: routingState[input.model_id]?.revision ?? 1 };
         if (old.revision !== input.expected_revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
-        const saved = { ...old, model_id: input.model_id, revision: old.revision + 1, display_name: input.display_name, configuration: input.configuration };
+        const saved = { ...old, model_id: input.model_id, revision: old.revision + 1, display_name: input.display_name, configuration: input.configuration, channel_retries: input.channel_retries ?? old.channel_retries };
         modelStates[input.model_id] = saved;
         if (routingState[input.model_id]) routingState[input.model_id].revision = saved.revision;
         counters.saves++;
@@ -670,7 +670,7 @@ test('model settings opens from each card, saves context and reasoning and survi
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
+  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toBeVisible();
   await dialog.getByLabel('上下文窗口（tokens）').fill('300000');
   await dialog.getByLabel('默认思考等级').selectOption('"low"');
@@ -679,7 +679,7 @@ test('model settings opens from each card, saves context and reasoning and survi
   await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
   await dialog.getByRole('button', { name: '关闭编辑面板', exact: true }).click();
   await card.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
-  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
+  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('300000');
   await expect(dialog.getByLabel('默认思考等级')).toHaveValue('"low"');
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
@@ -866,7 +866,7 @@ test('model settings automatically fills defaults and saves the matched referenc
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
+  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('250000');
   await expect(dialog.getByLabel('最大输出（tokens）', { exact: true })).toHaveValue('100000');
   await expect(dialog.getByRole('status')).toContainText('已自动从 models.dev');
@@ -901,7 +901,7 @@ test('model settings exposes long context prices and requires acknowledgement wi
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: '上下文、能力与思考', exact: true }).click();
+  await dialog.getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
   const save = dialog.getByRole('button', { name: '保存模型设置', exact: true });
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('500000');
   await expect(dialog.getByText('模型规格上限：1,050,000 tokens', { exact: false })).toBeVisible();
@@ -925,4 +925,38 @@ test('model settings exposes long context prices and requires acknowledgement wi
   await expect(dialog.getByLabel('上下文窗口（tokens）')).toHaveValue('500000');
   await expect(save).toBeDisabled();
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(2);
+});
+
+
+test('mapping retry count defaults, validates, persists zero and locks on conflict (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const open = async () => {
+    await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '重试、上下文与能力', exact: true }).click();
+  };
+  await open();
+  const dialog = page.getByRole('dialog'), retries = dialog.getByLabel('同一渠道重试次数');
+  const save = dialog.getByRole('button', { name: '保存模型设置', exact: true });
+  await expect(retries).toHaveValue('3');
+  for (const invalid of ['11', '-1', '1.5', '']) {
+    await retries.fill(invalid);
+    await expect(save).toBeDisabled();
+    await expect(dialog.getByRole('alert')).toContainText('0–10 的整数');
+  }
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
+  await retries.fill('0');
+  await save.dblclick();
+  await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
+  await dialog.getByRole('button', { name: '关闭编辑面板', exact: true }).click();
+  await open(); await expect(retries).toHaveValue('0');
+  await retries.fill('2');
+  await page.evaluate(() => { window.desktopTest.writeError = 'conflict'; });
+  await save.click();
+  await expect(dialog.getByRole('alert')).toContainText('配置已被其他操作修改');
+  await expect(retries).toBeDisabled(); await expect(save).toBeDisabled();
+  await page.evaluate(() => { window.desktopTest.writeError = null; });
+  await dialog.getByRole('button', { name: '重新读取设置', exact: true }).click();
+  await expect(retries).toHaveValue('0'); await expect(retries).toBeEnabled();
 });

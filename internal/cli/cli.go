@@ -25,8 +25,9 @@ const help = `Anchor — headless model gateway (development milestone)
 Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
   init [--control-address 127.0.0.1:17861] [--gateway-address 127.0.0.1:17860]
   serve                              Run the local foreground core
-      Inference: 3 same-channel retries (4 attempts) for 502/503/504 or pre-connection failures.
-      Backoff 250ms/500ms/1s shares the provider timeout; no replay after output or unknown execution.
+      Inference: default 3 same-channel retries (4 attempts) for 502/503/504 or pre-connection failures.
+      Model settings channel_retries: 0..10 extra attempts (0 disables; omitted/null preserves).
+      Backoff 250ms/500ms/1s (capped at 1s) shares the provider timeout; no replay after output or unknown execution.
       401/403/429 switch keys/candidates instead; management writes are not retried.
   restart --approve [--timeout 30s]   Restart/recover local core; preserve managed configuration
   context add NAME --local           Authenticate and bind a local instance
@@ -685,7 +686,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	if args[0] == "settings" {
 		f := a.flags("model settings")
 		id := f.String("id", "", "public model ID (Chinese supported)")
-		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); omitted previews price-aware models.dev defaults and context_policy (no write)")
+		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); channel_retries=0..10, omitted/null keeps existing; file omitted previews price-aware models.dev defaults and context_policy (no write)")
 		if err := parse(f, args[1:]); err != nil {
 			return err
 		}

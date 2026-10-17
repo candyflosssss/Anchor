@@ -10,7 +10,9 @@ type ModelSettingsQuery struct {
 	ModelID string `json:"model_id"`
 }
 type ModelSettingsState struct {
-	ContextPolicy *modeldev.ContextPolicy `json:"context_policy"`
+	// Nil is reserved for older cores lacking this field; current core always resolves it.
+	ChannelRetries *int                    `json:"channel_retries"`
+	ContextPolicy  *modeldev.ContextPolicy `json:"context_policy"`
 	// Read-only draft provenance; reading never persists defaults or increments revision.
 	DefaultsStatus string                         `json:"defaults_status"`
 	ModelID        string                         `json:"model_id"`
@@ -24,6 +26,8 @@ type ModelSettingsState struct {
 // Configuration is replaced explicitly. Reference is independently kept,
 // replaced using exact public catalog identity, or cleared.
 type SaveModelSettings struct {
+	// Omitted/null preserves the existing mapping limit; explicit 0 disables retries.
+	ChannelRetries      *int                           `json:"channel_retries,omitempty"`
 	ModelID             string                         `json:"model_id"`
 	ExpectedRevision    int64                          `json:"expected_revision"`
 	DisplayName         string                         `json:"display_name"`
@@ -34,6 +38,9 @@ type SaveModelSettings struct {
 }
 
 func (in SaveModelSettings) Validate() error {
+	if err := modelconfig.ValidateChannelRetries(in.ChannelRetries); err != nil {
+		return err
+	}
 	if !naming.ValidModelID(in.ModelID) || in.ExpectedRevision < 1 || in.ExpectedRevision >= modeldev.MaxSafeInteger || len(in.DisplayName) > 256 {
 		return modeldev.ErrInvalid
 	}

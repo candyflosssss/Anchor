@@ -9,7 +9,8 @@ import (
 )
 
 func modelSettingsState(m state.Model) catalog.ModelSettingsState {
-	out := catalog.ModelSettingsState{DefaultsStatus: "saved", ModelID: m.ID, Revision: m.Revision, DisplayName: m.DisplayName, CandidateCount: len(m.Candidates)}
+	retries := m.Settings.RetryLimit()
+	out := catalog.ModelSettingsState{ChannelRetries: &retries, DefaultsStatus: "saved", ModelID: m.ID, Revision: m.Revision, DisplayName: m.DisplayName, CandidateCount: len(m.Candidates)}
 	if m.Settings != nil {
 		out.Configuration = m.Settings.Configuration
 		out.Reference = m.Settings.Reference
@@ -72,7 +73,10 @@ func (s *Server) saveModelSettings(w http.ResponseWriter, r *http.Request) {
 		apiError(w, state.ErrConflict)
 		return
 	}
-	settings := state.ModelSettings{Configuration: in.Configuration}
+	settings := state.ModelSettings{Configuration: in.Configuration, ChannelRetries: in.ChannelRetries}
+	if settings.ChannelRetries == nil && m.Settings != nil {
+		settings.ChannelRetries = m.Settings.ChannelRetries
+	}
 	if in.ReferenceAction == "keep" && m.Settings != nil {
 		settings.Reference = m.Settings.Reference
 	}

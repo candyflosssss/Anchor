@@ -44,8 +44,13 @@ export function checkedConfiguration(v: unknown): ModelConfiguration {
   if (capabilities.reasoning === false && (supported_reasoning.length || default_reasoning !== null)) return bad();
   return { limits, capabilities, streaming: bool(c.streaming), parallel_tool_calls: bool(c.parallel_tool_calls), supported_reasoning, default_reasoning, default_output_tokens: output, default_temperature: temp };
 }
+export const validChannelRetries = (value: unknown): value is number => typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 10;
+export const parseChannelRetries = (value: string): number | null => /^\d+$/.test(value) && validChannelRetries(Number(value)) ? Number(value) : null;
+
 export function checkedModelSettings(value: unknown, id: string): ModelSettingsState {
   const s = obj(value);
+  if (s.channel_retries == null) throw new DesktopProblem('unsupported');
+  if (!validChannelRetries(s.channel_retries)) return bad();
   if (s.model_id !== id || typeof s.display_name !== 'string' || s.display_name.length > 256) return bad();
   const revision = count(s.revision), candidate_count = count(s.candidate_count);
   if (revision === null || candidate_count === null || candidate_count > 16) return bad();
@@ -53,7 +58,7 @@ export function checkedModelSettings(value: unknown, id: string): ModelSettingsS
   if (reference && reference.models.length !== 1) return bad();
   const defaults_status = s.defaults_status ?? 'saved';
   if (typeof defaults_status !== 'string' || !['saved', 'reference', 'matched', 'unmatched', 'unavailable', 'incompatible'].includes(defaults_status)) return bad();
-  return { context_policy: checkedContextPolicy(s.context_policy), defaults_status, model_id: id, revision, candidate_count, display_name: s.display_name, configuration: checkedConfiguration(s.configuration), reference };
+  return { channel_retries: s.channel_retries, context_policy: checkedContextPolicy(s.context_policy), defaults_status, model_id: id, revision, candidate_count, display_name: s.display_name, configuration: checkedConfiguration(s.configuration), reference };
 }
 // Import is explicit. Fill mode protects configured values; replacement mode
 // resets defaults that may not exist in the new provider's reasoning range.
@@ -89,13 +94,13 @@ export function importConfiguration(old: ModelConfiguration, catalog: ModelCatal
 export function createModelSettingsService(getBridge: () => Pick<DesktopBridge, 'ModelSettings' | 'SaveModelSettings'> = bridge) {
   return {
     read: async (id: string, signal: AbortSignal) => { signal.throwIfAborted(); const api = getBridge(); if (!api.ModelSettings) throw new DesktopProblem('unsupported'); const out = await call(() => api.ModelSettings({ model_id: id })); signal.throwIfAborted(); return checkedModelSettings(out, id); },
-    save: async (input: SaveModelSettings, signal: AbortSignal) => { signal.throwIfAborted(); try { checkedConfiguration(input.configuration); } catch { throw new DesktopProblem('invalid'); } const api = getBridge(); if (!api.SaveModelSettings) throw new DesktopProblem('unsupported'); const out = await call(() => api.SaveModelSettings(input), true); signal.throwIfAborted(); let s: ModelSettingsState; try { s = checkedModelSettings(out, input.model_id); } catch { throw new DesktopProblem('unknown'); } if (s.revision !== input.expected_revision + 1) throw new DesktopProblem('unknown'); return s; },
+    save: async (input: SaveModelSettings, signal: AbortSignal) => { signal.throwIfAborted(); try { checkedConfiguration(input.configuration); if (input.channel_retries != null && !validChannelRetries(input.channel_retries)) throw new Error('invalid retries'); } catch { throw new DesktopProblem('invalid'); } const api = getBridge(); if (!api.SaveModelSettings) throw new DesktopProblem('unsupported'); const out = await call(() => api.SaveModelSettings(input), true); signal.throwIfAborted(); let s: ModelSettingsState; try { s = checkedModelSettings(out, input.model_id); } catch { throw new DesktopProblem('unknown'); } if (s.revision !== input.expected_revision + 1 || (input.channel_retries != null && s.channel_retries !== input.channel_retries)) throw new DesktopProblem('unknown'); return s; },
   };
 }
 export const modelSettingsService = createModelSettingsService();
 export const settingsError = (error: unknown): string => {
   const code = error instanceof DesktopProblem ? error.code : 'read_error';
-  return code === 'conflict' ? '配置已被其他操作修改，请重新读取后编辑。' : code === 'unknown' ? '保存结果未知，请重新读取并核对；不会自动重试。' : code === 'invalid' ? '设置无效，请核对限制与默认思考值。' : code === 'unsupported' ? '当前桌面核心不支持模型设置，请升级后重试。' : '读取或保存失败，请检查连接与输入后重试。';
+  return code === 'conflict' ? '配置已被其他操作修改，请重新读取后编辑。' : code === 'unknown' ? '保存结果未知，请重新读取并核对；不会自动重试。' : code === 'invalid' ? '设置无效，请核对重试次数（0–10）、限制与默认思考值。' : code === 'unsupported' ? '当前桌面核心不支持模型设置，请升级后重试。' : '读取或保存失败，请检查连接与输入后重试。';
 };
 
 // The core returns a read-only defaults preview. Only new automatic references

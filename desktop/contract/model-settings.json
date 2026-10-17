@@ -1,4 +1,5 @@
 {
+  "channel_retries": 3,
   "context_policy": null,
   "defaults_status": "saved",
   "model_id": "mapped",

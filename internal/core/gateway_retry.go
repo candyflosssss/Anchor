@@ -9,10 +9,8 @@ import (
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
-// A channel is one provider/key/model route. These are retries after the first
-// attempt, not the total attempt count. All attempts share the provider timeout.
-const defaultChannelRetries = 3
-
+// A channel is one provider/key/model route. Its per-mapping retry count excludes
+// the first attempt. All attempts and capped backoff share the provider timeout.
 const channelRetryBackoff = 250 * time.Millisecond
 
 type forwardAttemptResult struct {
@@ -24,12 +22,13 @@ type forwardAttemptResult struct {
 }
 
 func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string) bool {
+	retryLimit := routeModel.Settings.RetryLimit()
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.TimeoutSeconds)*time.Second)
 	defer cancel()
 
 	// Keep a half-open reservation for the entire retry group. Apply health
-	// results afterwards so the third failed attempt cannot preempt retry #3.
-	attempts := make([]forwardAttemptResult, 0, defaultChannelRetries+1)
+	// results afterwards so a circuit transition cannot preempt this retry group.
+	attempts := make([]forwardAttemptResult, 0, retryLimit+1)
 	defer func() {
 		if len(attempts) == 0 || r.Context().Err() != nil {
 			s.mu.Lock()
@@ -56,7 +55,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 			}
 			return false
 		}
-		if !next || !result.retrySame || retries == defaultChannelRetries {
+		if !next || !result.retrySame || retries >= retryLimit {
 			return next
 		}
 		if err := waitChannelRetry(ctx, retries); err != nil {
@@ -68,8 +67,13 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	}
 }
 
+func channelRetryDelay(retry int) time.Duration {
+	return channelRetryBackoff << min(max(retry, 0), 2)
+}
+
 func waitChannelRetry(ctx context.Context, retry int) error {
-	timer := time.NewTimer(channelRetryBackoff << retry)
+	// Additional configurable retries retain the 1s cap, avoiding duration overflow.
+	timer := time.NewTimer(channelRetryDelay(retry))
 	defer timer.Stop()
 	select {
 	case <-ctx.Done():

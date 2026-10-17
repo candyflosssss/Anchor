@@ -14,8 +14,8 @@ export function ModelSpeedSettingsDialog({ group, active, transport, close, save
   const locked = !active || c.busy || c.needsRead || !c.workspace || !group.complete;
   const canCreate = !c.tier && !/\((fast|ultrafast)\)$/.test(group.alias);
   return <Dialog open={active} onOpenChange={open => { if (!open && !c.busy) close(); }}><DialogContent className="model-settings-dialog" onRequestClose={() => { if (!c.busy) close(); }}>
-    <header><DialogTitle>模型设置 · {group.alias}</DialogTitle><DialogDescription>直接配置 Fast / Ultrafast。速度设置与上下文、能力和思考参数分开保存，切换页面不保留未保存草稿。</DialogDescription></header>
-    <nav className="settings-actions" aria-label="模型设置分类"><Button variant="secondary" disabled>速度与分身</Button><Button variant="outline" disabled={c.busy} onClick={capabilities}>上下文、能力与思考</Button></nav>
+    <header><DialogTitle>模型设置 · {group.alias}</DialogTitle><DialogDescription>直接配置 Fast / Ultrafast。速度设置与重试次数、上下文、能力和思考参数分开保存，切换页面不保留未保存草稿。</DialogDescription></header>
+    <nav className="settings-actions" aria-label="模型设置分类"><Button variant="secondary" disabled>速度与分身</Button><Button variant="outline" disabled={c.busy} onClick={capabilities}>重试、上下文与能力</Button></nav>
     {c.error && <p className="feedback error-feedback" role="alert">{c.error}</p>}{c.notice && <p className="feedback" role="status">{c.notice}</p>}
     <div className="model-setting-field"><label htmlFor="model-speed-source">分身来源渠道</label><select id="model-speed-source" className="select-field" value={provider} disabled={c.busy} onChange={e => setProvider(e.target.value)}><option value="">请选择供应商渠道</option>{sources.map(id => <option key={id} value={id}>{id} · {group.candidates.find(c => c.provider_id === id)?.upstream}</option>)}</select></div>
     <p className="card-hint">固定档位对当前公开模型的所有渠道生效；新分身只复制所选供应商渠道，不复制其他渠道。</p>

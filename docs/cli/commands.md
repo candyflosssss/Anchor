@@ -334,9 +334,9 @@ anchor usage
 
 配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
-**网关默认同渠道重试（当前源码，未打包发布）**：同一渠道指供应商 + Key + 候选上游模型。HTTP 502/503/504 或尚未取得连接的失败，首次请求后默认额外重试3次（最多4次尝试），按250ms/500ms/1s退避；保留所选 Key 和原请求，仍按供应商多地址轮询取址。全部尝试与退避共享 `provider add/put --timeout`（默认120秒），不因重试延长预算；预算耗尽返回504 `upstream_timeout`，客户端取消立即停止。重试耗尽后再切换其他可用 Key／候选，全部不可用／失败返回503 `no_available_candidate`。
+**网关默认同渠道重试（当前源码，未打包发布）**：同一渠道指供应商 + Key + 候选上游模型。HTTP 502/503/504 或尚未取得连接的失败，首次请求后默认额外重试3次（最多4次尝试），按250ms/500ms/1s退避（之后上限1秒）；可在模型映射的 `channel_retries` 配置0–10次，0禁用额外重试。保留所选 Key 和原请求，仍按供应商多地址轮询取址。全部尝试与退避共享 `provider add/put --timeout`（默认120秒），不因重试延长预算；预算耗尽返回504 `upstream_timeout`，客户端取消立即停止。重试耗尽后再切换其他可用 Key／候选，全部不可用／失败返回503 `no_available_candidate`。
 
-401/403/429 不在同一 Key 重试，沿用切换与冷却；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康按实际尝试计数，在重试组结束后统一生效；失败3次的熔断不提前截断本组的第3次重试，半开探测名额覆盖整组。`anchor logs detail REQUEST_ID` 可查看每次尝试，根请求仍只算一次。此策略固定默认生效，无独立重试次数配置命令；不改变 `provider test/chat` 或管理写操作，已安装核心需升级后生效。
+401/403/429 不在同一 Key 重试，沿用切换与冷却；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康按实际尝试计数，在重试组结束后统一生效；失败3次的熔断不提前截断本组配置的重试，半开探测名额覆盖整组。`anchor logs detail REQUEST_ID` 可查看每次尝试，根请求仍只算一次。此策略默认生效，可通过 `model settings --id ID --file FILE` 的 `channel_retries` 调整；不改变 `provider test/chat` 或管理写操作，已安装核心需升级后生效。
 
 usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含同渠道重试、换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
 
@@ -490,16 +490,18 @@ anchor model add --id anchor-code --candidate primary:upstream-model --tools --s
 
 删除使用 `provider model-delete`（见 §5），核对供应商和模型 revision，只移除该供应商候选；删除最后一个候选时仅保护**已启用 Binding** 的默认模型，已禁用 Binding 不阻止删除。禁用 Binding 的默认模型、revision、凭据和配置目录归属保持不变；再次启用前须用 `agent set-models` 选择存在的默认模型，或重建同 ID 映射。此修复仅在当前源码中，旧核心仍会检查全部 Binding。这里的示例不会证明真实供应商或 Codex 已兼容。
 
-### 模型能力与默认值设置（2026-10-14，源码未发布）
+### 模型能力与默认值设置（2026-10-17，源码未发布）
 
 ```text
 anchor model settings --id ID
 anchor model settings --id ID --file FILE
 ```
 
-前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、configuration、reference、defaults_status、context_policy。读取会从已保存参考快照，或按所有候选上游精确 ID 自动匹配 models.dev（最多等待 8 秒）补充未设置值，作为草稿返回；不写库、不增加 revision、不同步 Agent，手工值保持不变。`defaults_status` 为 saved（保存响应/旧核心）、reference（使用已保存快照）、matched（新自动匹配）、unmatched（未找到唯一一致的条目）、unavailable（目录失败/超时/陈旧）或 incompatible（目录值与手工配置不兼容）。未匹配或失败仍返回现有配置，可重新读取重试或手工指定来源。速度变体可补基础能力，但不自动附加标准价格快照。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
+前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、channel_retries、configuration、reference、defaults_status、context_policy。读取会从已保存参考快照，或按所有候选上游精确 ID 自动匹配 models.dev（最多等待 8 秒）补充未设置值，作为草稿返回；不写库、不增加 revision、不同步 Agent，手工值保持不变。`defaults_status` 为 saved（保存响应/旧核心）、reference（使用已保存快照）、matched（新自动匹配）、unmatched（未找到唯一一致的条目）、unavailable（目录失败/超时/陈旧）或 incompatible（目录值与手工配置不兼容）。未匹配或失败仍返回现有配置，可重新读取重试或手工指定来源。速度变体可补基础能力，但不自动附加标准价格快照。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
 
-写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
+写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、可选 `channel_retries`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
+
+`channel_retries` 为该公开模型映射的**同一渠道额外重试次数**，整数0–10，旧映射／未保存值默认3，读取始终返回有效数值；0禁用额外重试（仍允许切换其他 Key／候选）。此字段在写入时省略或设为 null 保留既有值，不随 configuration 替换／参考模型导入清空。3表示含首次最多4次上游尝试；每个供应商 + Key + 上游模型分别使用该上限。保存后只影响后续网关请求，正在处理的请求保持原快照，无需同步或重启 Agent。非法类型／范围返回 invalid，不增加 revision；旧 revision 返回 conflict，不自动重放写入。`model put --file` 的 `settings.channel_retries` 也支持相同范围，完整替换 settings 时未设置该字段则恢复默认3；普通省略整个 settings 的映射更新保留已有设置。
 
 `reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照，同时补齐未声明的上下文、限制、能力及思考范围）。补值保留显式设置，目录输入/输出与手工上下文或默认输出预算冲突时跳过相应限制；未知默认思考值不猜测。clear 只清除已保存快照，不禁用后续读取的自动建议。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
 
@@ -510,11 +512,18 @@ anchor model settings --id ID --file FILE
 ```sh
 anchor model settings --id public > current-settings.json
 jq '(.defaults_status == "matched" and .reference != null) as $matched
-    | {model_id, expected_revision: .revision, display_name, configuration,
+    | {model_id, expected_revision: .revision, display_name, channel_retries, configuration,
        reference_action: (if $matched then "set" else "keep" end),
        reference_provider_id: (if $matched then .reference.models[0].provider_id else "" end),
        reference_model_id: (if $matched then .reference.models[0].id else "" end)}' current-settings.json > model-settings.json
 anchor model settings --id public --file model-settings.json
+```
+
+修改重试次数（例如关闭重试），在上述生成的文件上修改顶层字段后保存；不是全局或供应商设置：
+
+```sh
+jq '.channel_retries = 0' model-settings.json > no-retries.json
+anchor model settings --id public --file no-retries.json
 ```
 
 如需显式采用核心建议窗口（例如已保存大窗口需要调小），在上述生成的写入文件上应用建议并收敛现有预算：

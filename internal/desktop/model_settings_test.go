@@ -46,14 +46,15 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 	session.cfg = &cfg
 	b := NewBridge(session)
 	out := b.ModelSettings(ModelSettingsQuery{ModelID: "中文模型"})
-	if out.Problem != nil || out.Data == nil {
+	if out.Problem != nil || out.Data == nil || out.Data.ChannelRetries == nil || *out.Data.ChannelRetries != 3 {
 		t.Fatal(out)
 	}
 	n := int64(272000)
 	out.Data.Configuration.Limits.Context = &n
-	input := SaveModelSettings{ModelID: "中文模型", ExpectedRevision: 1, DisplayName: "日常对话模型", Configuration: out.Data.Configuration, ReferenceAction: "keep"}
+	retries := 0
+	input := SaveModelSettings{ChannelRetries: &retries, ModelID: "中文模型", ExpectedRevision: 1, DisplayName: "日常对话模型", Configuration: out.Data.Configuration, ReferenceAction: "keep"}
 	saved := b.SaveModelSettings(input)
-	if saved.Problem != nil || saved.Data.Revision != 2 || *saved.Data.Configuration.Limits.Context != n {
+	if saved.Problem != nil || saved.Data.Revision != 2 || saved.Data.ChannelRetries == nil || *saved.Data.ChannelRetries != 0 || *saved.Data.Configuration.Limits.Context != n {
 		t.Fatal(saved)
 	}
 	stale := b.SaveModelSettings(input)
@@ -67,6 +68,7 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 	}
 	input.Configuration.DefaultReasoning = nil
 	input.ExpectedRevision = 2
+	retries = 2
 	run := func(wantErr bool, args ...string) string {
 		t.Helper()
 		var output bytes.Buffer
@@ -79,7 +81,7 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 	}
 	run(false, "context", "add", "本机连接", "--local")
 	run(false, "context", "use", "本机连接")
-	if out := run(false, "model", "settings", "--id", "中文模型"); !strings.Contains(out, `"context":272000`) {
+	if out := run(false, "model", "settings", "--id", "中文模型"); !strings.Contains(out, `"context":272000`) || !strings.Contains(out, `"channel_retries":0`) {
 		t.Fatal(out)
 	}
 	path := filepath.Join(dir, "settings.json")
@@ -87,7 +89,7 @@ func TestModelSettingsBridgeAndCLI(t *testing.T) {
 	if err = os.WriteFile(path, raw, 0600); err != nil {
 		t.Fatal(err)
 	}
-	if out := run(false, "model", "settings", "--id", "中文模型", "--file", path); !strings.Contains(out, `"revision":3`) {
+	if out := run(false, "model", "settings", "--id", "中文模型", "--file", path); !strings.Contains(out, `"revision":3`) || !strings.Contains(out, `"channel_retries":2`) {
 		t.Fatal(out)
 	}
 	run(true, "model", "settings", "--id", "中文模型", "--file", path)
@@ -104,7 +106,7 @@ func TestSharedModelSettingsFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var out ModelSettingsState
-	if json.Unmarshal(raw, &out) != nil || out.ModelID != "mapped" || out.Revision != 2 || out.Configuration.Validate() != nil {
+	if json.Unmarshal(raw, &out) != nil || out.ModelID != "mapped" || out.Revision != 2 || out.Configuration.Validate() != nil || out.ChannelRetries == nil || *out.ChannelRetries != 3 {
 		t.Fatal(string(raw))
 	}
 	encoded, err := json.Marshal(out)
@@ -116,5 +118,20 @@ func TestSharedModelSettingsFixture(t *testing.T) {
 	json.Unmarshal(encoded, &b)
 	if !reflect.DeepEqual(a, b) {
 		t.Fatal("model settings contract roundtrip drift")
+	}
+}
+
+// A new desktop host must not turn an old core's missing field into explicit 0.
+func TestLegacyModelSettingsResponseRetainsMissingRetryLimit(t *testing.T) {
+	var out ModelSettingsState
+	if err := json.Unmarshal([]byte(`{"model_id":"mapped","revision":1}`), &out); err != nil {
+		t.Fatal(err)
+	}
+	if out.ChannelRetries != nil {
+		t.Fatal("invented retry limit")
+	}
+	raw, err := json.Marshal(out)
+	if err != nil || !bytes.Contains(raw, []byte(`"channel_retries":null`)) {
+		t.Fatal(string(raw), err)
 	}
 }

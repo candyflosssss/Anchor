@@ -160,6 +160,7 @@ export interface ModelSettingsQuery {
   model_id: string;
 }
 export interface ModelSettingsState {
+  channel_retries: number | null;
   context_policy: ContextPolicy | null;
   defaults_status: string;
   model_id: string;
@@ -170,6 +171,7 @@ export interface ModelSettingsState {
   reference: ModelCatalog | null;
 }
 export interface SaveModelSettings {
+  channel_retries?: number | null;
   model_id: string;
   expected_revision: number;
   display_name: string;

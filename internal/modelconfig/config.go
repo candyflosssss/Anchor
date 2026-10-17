@@ -31,9 +31,14 @@ type ModelConfiguration struct {
 	DefaultTemperature  *float64                     `json:"default_temperature"`
 }
 
+// Retry counts exclude the first attempt and apply to each provider/key/model channel.
+const DefaultChannelRetries = 3
+const MaxChannelRetries = 10
+
 type ModelSettings struct {
-	Configuration ModelConfiguration     `json:"configuration"`
-	Reference     *modeldev.ModelCatalog `json:"reference"`
+	ChannelRetries *int                   `json:"channel_retries,omitempty"`
+	Configuration  ModelConfiguration     `json:"configuration"`
+	Reference      *modeldev.ModelCatalog `json:"reference"`
 }
 
 func validSettingText(v string) bool {
@@ -184,7 +189,25 @@ func (c ModelConfiguration) Validate() error {
 	return nil
 }
 
+// RetryLimit resolves legacy/missing settings without confusing explicit zero with unset.
+func (s *ModelSettings) RetryLimit() int {
+	if s == nil || s.ChannelRetries == nil {
+		return DefaultChannelRetries
+	}
+	return *s.ChannelRetries
+}
+
+func ValidateChannelRetries(retries *int) error {
+	if retries != nil && (*retries < 0 || *retries > MaxChannelRetries) {
+		return errors.New("channel retries must be an integer in 0..10")
+	}
+	return nil
+}
+
 func (s ModelSettings) Validate() error {
+	if err := ValidateChannelRetries(s.ChannelRetries); err != nil {
+		return err
+	}
 	if err := s.Configuration.Validate(); err != nil {
 		return err
 	}
