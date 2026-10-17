@@ -198,7 +198,7 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 ## 模型映射重试契约（retry-v1）
 
-**发行状态**：已随 [desktop.47 dev](../release/desktop.md#当前在线-dev-版-47) 的宿主／核心发布，本机 CLI／核心／GUI 同版升级；原生窗口及安装器／apply 未验收，公开 alpha.6 CLI 不含新字段。
+**发行状态**：已随 [desktop.47 dev](../release/desktop.md#历史在线-dev-版-47) 的宿主／核心发布，本机 CLI／核心／GUI 同版升级；原生窗口及安装器／apply 未验收，公开 alpha.6 CLI 不含新字段。
 
 基线为同渠道重试实现 `25bd34c`；规范源沿用 `internal/catalog/model_settings.go`（由 `internal/desktop/contract.go` 别名导出），生成 `desktop/frontend/src/desktop/contract.generated.ts`，共享样例 `desktop/contract/model-settings.json`。本次仅扩展既有 ModelSettings / SaveModelSettings，不新增桥接方法，沿用所选实例身份／管理鉴权、取消、revision 和写入未知结果规则。
 
