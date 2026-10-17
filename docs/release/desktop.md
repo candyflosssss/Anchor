@@ -1,14 +1,14 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-17。
+- 更新：2026-10-18。
 - 当前线上桌面 dev 版：[0.1.0-dev.desktop.50](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.50)，北京时间 2026-10-17 23:52:30 发布；非 latest 的 prerelease，两平台包与 flat 清单同版投放。
-- 本版为最近功能统一集成包，包含内置 mihomo／代理设置、供应商与Key代理继承／直连／覆盖、映射重试、本机与远程核心重启、Agent统一更新、Skill库、日志折叠及对话推理；范围与构建轮验证见[下节](#最近功能统一集成包-50已发布-dev未安装)。不含旧工作区余额缓存／刷新改动。
+- 本版为最近功能统一集成包，包含内置 mihomo／代理设置、供应商与Key代理继承／直连／覆盖、映射重试、本机与远程核心重启、Agent统一更新、Skill库、日志折叠及对话推理；范围与构建轮验证见[下节](#最近功能统一集成包-50已发布-dev本机已升级)。不含旧工作区余额缓存／刷新改动。
 - 构建：沿用干净隔离提交 `b456835e41a8595e96577d07827cfc10f3345603` 的既有同版安装包，不重构建。**核心将 state.db schema8 迁移到 schema9；升级前备份，核心与桌面须配套，旧核心不能打开新库，不支持数据库降级。**
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff；desktop.34 及更早版首次仍须备份、停止旧核心并退出界面，再人工安装新版。升级有停机窗口，不承诺会话自动重连，SSH 远端另行升级。
 - 本次在线验证：六附件大小／SHA256 digest、tag revision、对应提交源码逐文件内容／构建输入摘要、Anchor与mihomo的Go vendor、元数据ZIP CRC均通过。隔离构建源码CLI从默认GitHub dev源以 `.47` 为当前版真实发现并下载 `.50` Linux包，大小／SHA256通过；Windows远端附件digest一致。保持非latest，原有无stable/latest状态不变。安装器未签名，未运行安装／apply、原生窗口、真实SSH或付费上游验收。
-- 当前本机安装：本机 CLI／核心／GUI 已于2026-10-17 22:39统一升级为 `.47`；备份 `/home/mosaki/.config/anchor/backups/pre-desktop47-20261017-223946`（目录0700、文件0600），正常保留交接后恢复原有受限 transient user units，无新增持久服务或自启动。core／gateway／agent_management ready，运行 ELF 与 .47 构建哈希一致。实例身份、配置表、绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH 均维持 applied；不借安装重新接管。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口验收，SSH 远端未更新。
+- 当前本机安装：本机 CLI／核心／GUI 已于2026-10-18 00:02从 `.47` 配套升级为 `.50`。CLI 从同版发布的干净提交 `b456835` 对应源码及 vendor 离线构建，桌面复用已发布 Linux 包的相同 ELF；运行二进制哈希均已核对。备份 `/home/mosaki/.config/anchor/backups/pre-desktop50-20261018-000208`（目录0700、文件0600）；通过 restart_handoff 正常保留交接，恢复原有受限 transient user units，Restart=no，无新增持久服务或自启动。core／gateway／agent_management ready，schema8→9，SQLite quick_check／foreign_key_check通过。实例身份、既有配置表与绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH维持 applied；不借升级重新接管。鉴权后的 proxy list 通过，内置 mihomo v1.19.32 可用，尚无代理配置、未启动节点。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口可见性验收；未请求真实上游，SSH远端未更新，新库不支持降级。
 
-## 最近功能统一集成包 .50（已发布 dev，未安装）
+## 最近功能统一集成包 .50（已发布 dev，本机已升级）
 
 `0.1.0-dev.desktop.50` 从干净基线 `b456835e41a8595e96577d07827cfc10f3345603` 构建，`SOURCE.json` dirty=false。这里的“统一集成”指最近各会话已提交的功能，不把旧工作区改动一并采纳；旧余额缓存／单行刷新源码仍作为原有未提交工作保留，不在本包中。
 
@@ -28,7 +28,7 @@
 - 对同一份生产 dist 串行执行19项 Chromium隔离模拟桥接回归，覆盖代理／Key覆盖、本机及远程重启、映射重试、Agent统一更新、Skill版本挂载、日志折叠、多轮对话及推理强度，全部通过。证据保存在产物 `verification/`；不等于原生 Wails／Windows窗口或实际 SSH、安装器／apply、真实付费上游验收。
 - 本轮此前执行的7个Go包测试通过，Python64项中55通过、9项Windows原生条件跳过；相关后端／契约／脚本输入与正确基线逐字节一致，复用该结果，不把旧余额前端测试计入本包验收。
 - 误含旧余额的 .49 尝试已取消，仅留下一个未完成包装的Windows可执行文件和取消记录，隔离在 `dist/desktop/desktop49-attempt1-cancelled/`；不是整合安装包，未发布／安装，不复用该版本号。
-- 已于北京时间 2026-10-17 23:52:30 [发布到默认 dev 更新源](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.50)；六个附件与更新清单齐全。本机运行仍为 .47；本次未安装或替换CLI／核心／窗口。安装整合包前须备份并同步升级核心与桌面：代理迁移schema8→9后旧核心不能打开数据库，SSH远端仍需独立升级。仅重启 .47 不会出现代理页面。
+- 已于北京时间 2026-10-17 23:52:30 [发布到默认 dev 更新源](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.50)；六个附件与更新清单齐全。后续经用户授权，本机于2026-10-18 00:02完成 `.47`→`.50` CLI／核心／GUI 配套升级，schema8→9；运行与配置保留检查见页首。SSH远端未更新，未执行系统安装器／apply或原生窗口可见性验收。仅重启旧二进制不会取得代理页面。
 
 - 本次发布复用上述已验证安装包，未重新构建或重跑构建轮测试。发布证据在 `dist/desktop/0.1.0-dev.desktop.50/publication/`：同版flat清单、六附件、默认源真实下载、tag与非latest核验。
 - 对应源码包含Anchor的Go vendor、两个固定mihomo archive，以及未修改的mihomo v1.19.32完整对应源码与Go vendor（`bundled-sources/mihomo-v1.19.32/`，上游commit `88dcbf7f1614a67c3b36b848ee3592dfa92ada36`）。原始BUILD字段保留构建时未发布／未安装事实，发布状态单独记录。
