@@ -221,17 +221,7 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 				return ErrInvalid
 			}
 			if action == "key-delete" {
-				if err = checkKeyUnreferenced(tx, id, target); err != nil {
-					return err
-				}
-				var res sql.Result
-				res, err = tx.Exec(`DELETE FROM provider_keys WHERE provider_id=? AND id=?`, id, target)
-				if err == nil {
-					n, _ := res.RowsAffected()
-					if n != 1 {
-						return ErrNotFound
-					}
-				}
+				err = deleteProviderKey(tx, id, target)
 			} else {
 				if strings.ContainsAny(secret, "\r\n") || len(secret) > 8192 {
 					return ErrInvalid
@@ -357,6 +347,14 @@ func (s *Store) DeleteProviderModel(id string, revision int64, providerID string
 			return tx.Commit()
 		}
 	}
+	if err = deleteModelTx(tx, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// deleteModelTx preserves the default-model protection for every removal path.
+func deleteModelTx(tx *sql.Tx, id string) error {
 	// Disabled bindings retain their configuration for later reuse, not a live
 	// dependency on this model. EnableBinding rechecks the default on activation.
 	rows, err := tx.Query(`SELECT document FROM bindings WHERE enabled=1`)
@@ -390,7 +388,7 @@ func (s *Store) DeleteProviderModel(id string, revision int64, providerID string
 	if _, err = tx.Exec(`DELETE FROM models WHERE id=?`, id); err != nil {
 		return err
 	}
-	return tx.Commit()
+	return nil
 }
 func (s *Store) RecordUsage(u Usage) error {
 	_, err := s.db.Exec(`INSERT INTO usage_totals VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(provider_id,model) DO UPDATE SET requests=requests+excluded.requests,failures=failures+excluded.failures,elapsed_ms=elapsed_ms+excluded.elapsed_ms,known=known+excluded.known,input_tokens=input_tokens+excluded.input_tokens,output_tokens=output_tokens+excluded.output_tokens,cache_read=cache_read+excluded.cache_read,cache_write=cache_write+excluded.cache_write`, u.ProviderID, u.Model, u.Requests, u.Failures, u.ElapsedMS, u.Known, u.InputTokens, u.OutputTokens, u.CacheRead, u.CacheWrite)

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestModelSourceKeysPersistenceAndDeletionProtection(t *testing.T) {
+func TestModelSourceKeysPersistenceAndValidation(t *testing.T) {
 	s := newStore(t)
 	secret := "synthetic"
 	p, err := s.PutProvider(provider("p"), 0, &secret)
@@ -15,13 +15,6 @@ func TestModelSourceKeysPersistenceAndDeletionProtection(t *testing.T) {
 	m, err := s.PutModel(Model{ID: "alias", Strategy: "cache-priority", Candidates: []Candidate{{ProviderID: p.ID, Model: "up", KeyIDs: []string{"default"}}}}, 0)
 	if err != nil {
 		t.Fatal(err)
-	}
-	if err = s.MutateProvider("p", 1, "key-delete", "default", "", "", false, false); !errors.Is(err, ErrReferenced) {
-		t.Fatal(err)
-	}
-	empty := ""
-	if _, err = s.PutProvider(p, 1, &empty); !errors.Is(err, ErrReferenced) {
-		t.Fatal("default clearance ignored reference", err)
 	}
 	bad := m
 	bad.Candidates = []Candidate{{ProviderID: p.ID, Model: "up", KeyIDs: []string{"missing"}}}
@@ -55,7 +48,7 @@ func TestModelSourceKeysPersistenceAndDeletionProtection(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = s.MutateProvider("p", 1, "key-delete", "default", "", "", false, false); err != nil {
-		t.Fatal("legacy unrestricted model incorrectly blocks delete", err)
+		t.Fatal("unrestricted model deletion failed", err)
 	}
 }
 

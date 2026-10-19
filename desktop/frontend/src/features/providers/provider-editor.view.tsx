@@ -67,7 +67,7 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
                 <button type="button" aria-label={showSecret ? '隐藏新密钥' : '显示新密钥'} onClick={() => setShowSecret(value => !value)}>{showSecret ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
             </Field>}
             {!source && <p className="field-hint">填写后保存为默认 Key，并在当前页面获取、导入可用模型。留空可稍后配置。</p>}
-            {source && draft.secretMode === 'clear' && <div className="warning-box"><p>清除后，依赖密钥认证的上游请求可能失败；此操作不等于停用供应商。</p><label className="check-label"><input id="secret" aria-describedby="secret-hint" aria-invalid={!!c.errors.secret} type="checkbox" checked={draft.confirmClear} onChange={event => c.changeDraft('confirmClear', event.target.checked)} />我确认清除 {source.id} 的密钥</label><p id="secret-hint" className="field-error" role="alert">{c.errors.secret}</p></div>}
+            {source && draft.secretMode === 'clear' && <div className="warning-box"><p>清除默认密钥会同步移除它对应的模型来源；其他 Key 的同名模型保留，没有剩余来源的模型映射一并删除。若模型仍是已启用 Agent 的默认模型，需先更换默认模型或停用该 Agent。</p><label className="check-label"><input id="secret" aria-describedby="secret-hint" aria-invalid={!!c.errors.secret} type="checkbox" checked={draft.confirmClear} onChange={event => c.changeDraft('confirmClear', event.target.checked)} />我确认清除 {source.id} 的密钥</label><p id="secret-hint" className="field-error" role="alert">{c.errors.secret}</p></div>}
           </section>
           <Field name="costMultiplier" title="供应商倍率" errors={c.errors}>
             <Input {...errorProps('costMultiplier')} type="number" min="0.000001" max="1000" step="any" value={draft.costMultiplier} onChange={event => c.changeDraft('costMultiplier', event.target.value)} />

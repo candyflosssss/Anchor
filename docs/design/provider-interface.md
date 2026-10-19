@@ -168,7 +168,7 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 ## 9. 来源 Key与模型调度（2026-10-13，当前源码）
 
-模型 candidates 新增可选 key_ids：空／缺失表示所有启用 Key，非空仅允许列出的本机 Key ID。写入检查 Key 属于候选供应商，去重且最多64项；anonymous 仅能用于没有 Key 的供应商。目录导入保留实际 entries.key_ids，禁止调度到目录未报告的其他 Key。停用／认证失效／冷却／半开探测等既有健康门禁照常生效，指定 Key 都不可用时切换其他候选，不越过范围。仍被显式来源引用的 Key 不允许删除（包括清除 default 凭据）；先在映射编辑中解除引用。schema5→6 顺序迁移保留模型、供应商与凭据，无新表；schema版本保护防止旧核心忽略 Key 限制。
+模型 candidates 新增可选 key_ids：空／缺失表示所有启用 Key，非空仅允许列出的本机 Key ID。写入检查 Key 属于候选供应商，去重且最多64项；anonymous 仅能用于没有 Key 的供应商。目录导入保留实际 entries.key_ids，禁止调度到目录未报告的其他 Key。停用／认证失效／冷却／半开探测等既有健康门禁照常生效，指定 Key 都不可用时切换其他候选，不越过范围。删除 Key（包括清除 default 凭据）在同一事务移除该供应商候选中的对应 key_ids；仍有其他来源 Key 时保留候选，列表耗尽则移除候选，禁止将空列表写回并扩大为全部 Key。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免隐式变为匿名来源。其他供应商及其他 Key 提供的同名模型、候选元数据与顺序均保留；受影响的存续模型 revision 加一，仅当前供应商已无候选时清理其价格。公开模型失去全部候选才删除；已启用 Binding 默认模型引用仍返回 referenced 并整体回滚，已禁用 Binding 不阻止删除。该行为于 2026-10-19 在当前源码实现，尚未打包发布。schema5→6 顺序迁移保留模型、供应商与凭据，无新表；schema版本保护防止旧核心忽略 Key 限制。
 
 Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始，核心真实顺序）；revision／strategy／candidate_count 仍描述共享公开模型。多个平台可以映射同一别名；一个候选可包含多个 Key，具体 Key 沿用该供应商的 priority／round-robin 策略。
 

@@ -257,7 +257,7 @@ anchor provider put --id ID --base-url URL [--base-url URL ...] [--homepage-url 
 | `--revision` | `0` | add 必须为 0；put 必填当前值且 ≥1，通过 list 获取 |
 | `--secret-stdin` | `false` | 从 stdin 读取密钥，最多 8192 字节，去除首尾空白；内部换行无效 |
 
-更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商，省略 `--homepage-url` 会清除主页，`--base-url` 列表整体替换。供应商倍率也是例外：省略 `--cost-multiplier` 保留既有值，新建默认1。密钥是例外：put 未提供 `--secret-stdin` 保留 default Key，提供并读到空值会清除 default Key；其他命名 Key 保留。has_secret 表示至少存在一个已存 Key，不等于全部启用。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
+更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商，省略 `--homepage-url` 会清除主页，`--base-url` 列表整体替换。供应商倍率也是例外：省略 `--cost-multiplier` 保留既有值，新建默认1。密钥是例外：put 未提供 `--secret-stdin` 保留 default Key，提供并读到空值会清除 default Key，并按下方 key-delete 规则清理对应模型来源；其他命名 Key 保留。has_secret 表示至少存在一个已存 Key，不等于全部启用。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
 
 安全输入示例（变量须由用户安全提供；URL 为占位值）：
 
@@ -330,7 +330,7 @@ anchor usage
 | copy | target 必填且不能已存在；默认不复制 Key，`--copy-keys` 才复制秘密、Key 默认协议和模型覆盖；新对象 revision=1、默认停用，复制配置/策略，不复制映射/价格/用量 |
 | key-put | target 必填，最多64个 Key；新 Key 必须有非空 stdin 秘密，已有 Key 省略或空 stdin 保留秘密；默认 enabled，`--disabled` 停用；替换秘密只经 stdin，删除用 key-delete；protocol 省略/空值保留已有 Key 协议，新 Key 默认 responses；可显式选 responses / chat-completions / anthropic |
 | key-model-protocol | target 必填已存 Key，model 为实际模型名（不是公开别名，1..256 UTF-8 字节，无首尾空白/控制/格式字符）；protocol 为上述三协议；省略、空值或 inherit 删除覆盖，恢复动态继承 Key 默认值；不修改模型映射 |
-| key-delete / key-reset | target 与 approve 必填；delete 删除秘密，reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
+| key-delete / key-reset | target 与 approve 必填；delete 在同一事务删除指定 Key、秘密和对应模型来源：共享来源列表只移除该 Key，来源耗尽才移除候选；保留其他 Key／供应商提供的同名模型。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免意外转为匿名。仅失去全部候选时删除公开模型；已启用 Binding 默认模型引用仍返回409 referenced并整体回滚。受影响模型 revision 加一，失去本供应商候选时清理其价格，供应商 revision 加一；reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
 | strategy | 默认 round-robin，另可 priority；前者轮流用可用 Key，后者按 Key ID 排序先用首个可用 Key；都跳过停用/失效/冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/冷却 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
 | model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段仅预留，当前不参与路由。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
@@ -359,7 +359,7 @@ GUI 在供应商详情的三个页签提供同等操作。数据库启动自动�
 当前源码（未打包）使用 **供应商倍率 × Key缓存分组倍率**。同供应商的不同 Key 独立参与价格／加权调度，同 Key 全部模型复用缓存。已知可用路由优先，未知仅回退；全部未知时等权，零倍率路由优先等权。固定优先／低延迟规则保持原义。缓存没有后台刷新或TTL，失败沿用旧观察并显示时间；详细口径、schema8迁移与失效规则见[倍率设计](../design/provider-multipliers.md)。
 
 
-`provider model-put` 支持可重复 `--source-key ID` 限制候选Key；省略时编辑保留原范围、新建允许所有启用Key。`--all-keys` 显式清空限制，与 source-key互斥。导入的指定来源Key参与真实调度；健康失败只切换范围内Key或其他候选，仍被引用的Key不能删除。`workspace.models` 返回 key_ids／candidate_index。schema5→6自动迁移，旧核心不能打开，需同步升级CLI与核心。
+`provider model-put` 支持可重复 `--source-key ID` 限制候选Key；省略时编辑保留原范围、新建允许所有启用Key。`--all-keys` 显式清空限制，与 source-key互斥。导入的指定来源Key参与真实调度；健康失败只切换范围内Key或其他候选，删除 Key 自动移除该供应商的对应来源，保留其他 Key 的同名模型；最后一个来源的已启用 Binding 默认模型保护仍有效。`workspace.models` 返回 key_ids／candidate_index。schema5→6自动迁移，旧核心不能打开，需同步升级CLI与核心。
 
 `model routing` 的 candidate列表必须完整且成员不变，原子修改共享模型顺序／规则、递增模型revision，保留所有来源Key、预留模型倍率、tools／streaming及Codex元数据。策略语义见[供应商接口 §9](../design/provider-interface.md#9-来源-key与模型调度2026-10-13当前源码)：缓存亲和10分钟（不保证缓存命中），低价按供应商倍率×Key缓存分组倍率，低延迟成功EWMA观察30分钟。输出JSON含model_id／revision／strategy／order。旧revision返回conflict，不自动重试写入。
 

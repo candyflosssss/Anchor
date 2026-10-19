@@ -53,6 +53,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--protocol PROTOCOL]
   provider key-model-protocol --id ID --revision N --target KEY --model MODEL [--protocol PROTOCOL|inherit]
   provider key-delete|key-reset --id ID --revision N --target KEY --approve
+      key-delete removes only this Key's mapping sources; other Keys and providers keep shared models.
+      Removing the last source deletes the model; enabled Binding defaults still block deletion.
   provider strategy --id ID --revision N --strategy round-robin|priority
   provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve
       Read a JSON user/assistant message array from stdin; print the final transient reply.

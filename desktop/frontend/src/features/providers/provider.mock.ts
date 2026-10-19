@@ -194,6 +194,26 @@ export class MockProviderTransport implements ProviderTransport {
     if (this.scenario === 'unknown') throw fixtureError('unknown');
     return checkedRouting({ model_id: input.model_id, revision: input.expected_revision + 1, strategy: input.strategy, order: input.order }, input);
   }
+  private deleteKey(w: Workspace, keyID: string) {
+    if (!w.keys.some(k => k.id === keyID)) throw fixtureError('invalid');
+    const all = this.rows.map(p => this.detail(p));
+    w.keys = w.keys.filter(k => k.id !== keyID);
+    const affected = new Set<string>();
+    w.models = w.models.filter(m => {
+      if (m.key_ids.length ? !m.key_ids.includes(keyID) : w.keys.length > 0) return true;
+      affected.add(m.id);
+      m.key_ids = m.key_ids.filter(id => id !== keyID);
+      return m.key_ids.length > 0;
+    });
+    for (const id of affected) {
+      const remaining = all.flatMap(w => w.models.filter(m => m.id === id));
+      remaining.sort((a, b) => a.candidate_index - b.candidate_index).forEach((m, i) => {
+        m.revision++; m.candidate_count = remaining.length; m.candidate_index = i;
+      });
+      if (!w.models.some(m => m.id === id)) w.prices = w.prices.filter(p => p.model !== id);
+      if (!remaining.length) for (const workspace of all) workspace.prices = workspace.prices.filter(p => p.model !== id);
+    }
+  }
   async action(a: Action, signal: AbortSignal): Promise<Workspace> {
     await delay(signal);
     if (this.scenario === 'offline' || this.scenario === 'unauthorized') throw fixtureError(this.scenario);
@@ -221,7 +241,7 @@ export class MockProviderTransport implements ProviderTransport {
         if (a.protocol && a.protocol !== 'inherit') k.model_protocols.push({ model: a.model, protocol: a.protocol });
         p.revision++; break;
       }
-      case 'key-delete': if (!a.approved) throw fixtureError('invalid'); w.keys = w.keys.filter(k => k.id !== a.target); p.has_secret = !!w.keys.length; p.revision++; break;
+      case 'key-delete': if (!a.approved) throw fixtureError('invalid'); this.deleteKey(w, a.target); p.has_secret = !!w.keys.length; p.revision++; break;
       case 'key-reset': { const k = w.keys.find(k => k.id === a.target); if (!a.approved || !k) throw fixtureError('invalid'); k.failures = 0; k.retry_at = 0; k.state = k.enabled ? 'ready' : 'disabled'; break; }
       case 'strategy': w.strategy = a.strategy; p.revision++; break;
       case 'model-put': {
@@ -293,7 +313,7 @@ export class MockProviderTransport implements ProviderTransport {
       const w = this.detail(current);
       if (input.secret !== null) {
         const k = w.keys.find(k => k.id === 'default');
-        if (!input.secret) w.keys = w.keys.filter(k => k.id !== 'default');
+        if (!input.secret) { if (k) this.deleteKey(w, 'default'); }
         else if (k) { k.enabled = true; k.state = 'ready'; }
         else w.keys.push({ rate: null, effective_multiplier: null, id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
       }

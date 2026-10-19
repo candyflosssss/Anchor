@@ -44,9 +44,6 @@ func TestChineseNamesPersistenceAndReferences(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = s.MutateProvider(p.ID, p.Revision, "key-delete", "主力密钥", "", "", false, false); !errors.Is(err, ErrReferenced) {
-		t.Fatal("referenced Chinese Key was not protected", err)
-	}
 	if err = s.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -67,11 +64,10 @@ func TestChineseNamesPersistenceAndReferences(t *testing.T) {
 	if err != nil || stored.ID != m.ID || stored.Candidates[0].KeyIDs[0] != "主力密钥" {
 		t.Fatal(stored, err)
 	}
-	// Remove the model first; deletion must still find the exact Chinese Key.
-	if err = reopened.DeleteModel(m.ID, m.Revision); err != nil {
-		t.Fatal(err)
-	}
 	if err = reopened.MutateProvider(p.ID, p.Revision, "key-delete", "主力密钥", "", "", false, false); err != nil {
 		t.Fatal(err)
+	}
+	if _, err = reopened.Model(m.ID); !errors.Is(err, ErrNotFound) {
+		t.Fatal("Chinese Key mapping was not removed", err)
 	}
 }
