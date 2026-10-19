@@ -16,6 +16,7 @@ import { SettingsPage } from '../pages/settings-page';
 import { LogsPreview } from '../features/logs/log-workspace.view';
 import { ChatWorkspace } from '../features/chat/chat-workspace.view';
 import { WorkbenchPage } from '../pages/workbench-page';
+import { ProviderBalanceCache } from '../features/providers/provider-balance.model';
 import { CoreStatus } from './core-status.view';
 import { useAppearance } from './use-appearance';
 import { useWindowController } from '../features/window/use-window-controller';
@@ -29,6 +30,7 @@ export function App() {
   const environment = useMemo(createEnvironment, []);
   const session = useDesktopSession();
   const instanceId = session.info?.instance_id ?? (prototype ? 'prototype' : '');
+  const balanceCache = useMemo(() => new ProviderBalanceCache(instanceId), [instanceId]);
   const windowController = useWindowController(!prototype);
   const [page, setPage] = useState<Page>('providers');
   const [navSeq, setNavSeq] = useState(0);
@@ -56,7 +58,7 @@ export function App() {
         </div>
       </header>
       {windowController.error && <p role="status" className="border-b px-4 py-2 text-xs text-destructive">{windowController.error}</p>}
-      {page === 'connections' ? <ConnectionsView currentProfile={session.info?.profile_name} disabled={busy || session.stopping || session.restarting || session.phase === 'starting'} onConnected={session.select} onActivity={setBusy} /> : page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'chat' && (prototype || session.phase === 'ready') ? <ChatWorkspace key={session.info?.instance_id ?? session.phase} environment={environment} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'proxies' && (prototype || session.phase === 'ready') ? <ProxiesView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'skills' && (prototype || session.phase === 'ready') ? <SkillsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <SettingsPage key={session.info?.instance_id ?? session.phase} coreReady={session.phase === 'ready'} appearance={appearance} setAppearance={setAppearance} onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage key={instanceId} environment={environment} page={page === 'agents' || page === 'chat' || page === 'skills' || page === 'proxies' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
+      {page === 'connections' ? <ConnectionsView currentProfile={session.info?.profile_name} disabled={busy || session.stopping || session.restarting || session.phase === 'starting'} onConnected={session.select} onActivity={setBusy} /> : page === 'logs' ? <LogsPreview key={session.info?.instance_id ?? session.phase} /> : page === 'chat' && (prototype || session.phase === 'ready') ? <ChatWorkspace key={session.info?.instance_id ?? session.phase} environment={environment} /> : page === 'agents' && (prototype || session.phase === 'ready') ? <AgentsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'proxies' && (prototype || session.phase === 'ready') ? <ProxiesView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'skills' && (prototype || session.phase === 'ready') ? <SkillsView key={session.info?.instance_id ?? session.phase} onActivity={setBusy} /> : page === 'settings' ? <SettingsPage key={session.info?.instance_id ?? session.phase} coreReady={session.phase === 'ready'} appearance={appearance} setAppearance={setAppearance} onActivity={setBusy} /> : session.phase === 'ready' ? <WorkbenchPage key={instanceId} environment={environment} balanceCache={balanceCache} page={page === 'agents' || page === 'chat' || page === 'skills' || page === 'proxies' ? 'overview' : page} navSeq={navSeq} onNavigate={setPage} onActivity={setBusy} /> : <section className="m-6 rounded-lg border p-6" aria-live="polite">
         <h1 className="text-xl font-semibold">{session.restarting ? '正在重启核心…' : session.phase === 'starting' ? '正在连接核心…' : session.phase === 'stopped' ? '停服请求已接受' : '当前设备暂不可用'}</h1>
         {(session.error || session.phase === 'stopped') && <p className="my-4 text-sm text-muted-foreground">{session.error ? session.errorMessage : '核心正在处理退出与配置恢复。'}</p>}
         {session.phase !== 'starting' && <div className="flex flex-wrap gap-2">

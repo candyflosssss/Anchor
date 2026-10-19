@@ -19,15 +19,16 @@ import type { Provider } from '../features/providers/provider.model';
 import type { DetailTab, ProviderDialog } from '../features/providers/provider-summary.model';
 import { useProviderController } from '../features/providers/use-provider-controller';
 import { useProviderBalances } from '../features/providers/use-provider-balances';
+import type { ProviderBalanceCache } from '../features/providers/provider-balance.model';
 import { useProviderSummaries } from '../features/providers/use-provider-summaries';
 
 /** Overview, providers and models share one controller so navigating between them keeps state and data. */
-export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivity }: {
-  environment: ProviderEnvironment; page: Exclude<Page, 'settings' | 'logs'>; navSeq: number; onNavigate: (page: Page) => void; onActivity: (busy: boolean) => void;
+export function WorkbenchPage({ environment, balanceCache, page, navSeq, onNavigate, onActivity }: {
+  environment: ProviderEnvironment; balanceCache: ProviderBalanceCache; page: Exclude<Page, 'settings' | 'logs'>; navSeq: number; onNavigate: (page: Page) => void; onActivity: (busy: boolean) => void;
 }) {
   const c = useProviderController(environment);
   const summaries = useProviderSummaries(c.providers, c.phase === 'ready', environment.transport, c.features.data);
-  const balances = useProviderBalances(c.providers, c.phase === 'ready' && page === 'providers' && !c.selected, environment.transport);
+  const balances = useProviderBalances(c.providers, c.phase === 'ready' && page === 'providers' && !c.selected, environment.transport, balanceCache);
   const rates = useMappingRates(c.providers, c.phase === 'ready' && page === 'models', environment.transport);
   const routing = useModelRouting(aggregateModels(summaries), page === 'models', environment.transport, async () => { if (!await c.load()) throw new Error('配置读取失败'); });
   const opener = useRef<HTMLElement | null>(null);
@@ -47,7 +48,7 @@ export function WorkbenchPage({ environment, page, navSeq, onNavigate, onActivit
     {page === 'overview' ? <Overview summaries={summaries} loading={loading} readFailed={c.phase === 'error'} disabled={c.blocked} onOpen={open} onCreate={() => { onNavigate('providers'); edit(); }} onShowProviders={() => onNavigate('providers')} onShowModels={() => onNavigate('models')}>{banner}</Overview>
       : page === 'models' ? <ModelsView transport={environment.transport} routing={routing} rates={rates} summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onShowProviders={() => onNavigate('providers')}>{banner}</ModelsView>
       : c.selected && !c.quickId ? <div className="workspace">{banner}<Notice text={c.features.notice || c.notice} /><ProviderDetail c={c} summary={summary} onEdit={() => edit(c.selected ?? undefined)} /></div>
-      : <ProviderList c={c} summaries={summaries} balances={balances} onEdit={edit} onCreate={() => edit()}>{banner}<Notice text={c.notice} /></ProviderList>}
+      : <ProviderList c={c} summaries={summaries} balances={balances.entries} onRefreshBalance={balances.refresh} onEdit={edit} onCreate={() => edit()}>{banner}<Notice text={c.notice} /></ProviderList>}
     {prototype && c.mock && <div className="workspace pt-0"><footer className="prototype-controls mt-4"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={busy} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></footer></div>}
     {c.editor && <ProviderEditor c={c} restoreFocus={() => { requestAnimationFrame(() => { if (opener.current?.isConnected) opener.current.focus(); }); }} />}
     <ProviderDialogs c={c} />

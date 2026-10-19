@@ -755,7 +755,7 @@ anchor recover [--id ID]
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；冷却/熔断为内部机制 |
-| 平台自动识别与列表余额（desktop.27） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；NewAPI 已配置系统令牌时优先读账户余额，未配置时查默认 Key billing／额度；已随 desktop.27 投放。当前源码 GUI 切页先显示同实例／同配置的会话缓存并刷新，失败保留旧值标注「余额未刷新」，支持单行刷新按钮；仅桌面展示行为，沿用既有 balance-summary，无新增 CLI 契约 |
+| 平台自动识别与列表余额（desktop.27） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；NewAPI 已配置系统令牌时优先读账户余额，未配置时查默认 Key billing／额度；已随 desktop.27 投放。当前源码（未打包／未发布）GUI 切页立即显示同实例／同配置的上次余额，后台刷新成功后更新，首次无缓存时查询；失败保留旧值标注「余额未刷新」，支持单行刷新按钮；仅桌面展示行为，沿用既有 balance-summary，无新增 CLI 契约 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |

@@ -424,7 +424,9 @@ Go DTO、生成 TS 和 provider-model-mapping.json 样例同步；Mock 跨平台
 
 供应商列表增加「余额／额度」列，列表加载与刷新使用默认推理 Key；显示实际探测平台、账户余额或 Key 额度标签，保持十进制字符串与原始单位。未知、加载、授权不足和失败分别展示，不伪造余额0。金额与 Key／查询时间悬浮提示由 View 展示，健康提示保留状态依据。账户配置默认自动探测，无需先保存平台即可查询，支持具体平台覆盖。
 
-Model 沿用类型化 ProviderAllowance；Controller `use-provider-balances.ts` 独立管理列表观察，每轮最多并发2个查询、无轮询，按供应商列表快照、revision、传输实例和导航丢弃旧结果。`provider-balance.view.tsx` 展示明确 account/key scope；平台探测和默认 Key 规则只由 Go 核心实现，前端不请求上游、不保存凭据。CLI 同步支持 detect-platform/balance-summary，契约详见 provider-interface.md §8。原生窗口与真实站点授权未验收，未构建安装包。
+Model 沿用类型化 ProviderAllowance，平台探测和默认 Key 规则只由 Go 核心实现，前端不请求上游、不保存凭据。CLI 同步支持 detect-platform/balance-summary，契约详见 provider-interface.md §8。
+
+2026-10-19 当前源码增量（未打包／未发布）：`provider-balance.model.ts` 保存当前连接实例的会话内余额缓存，按供应商 ID 和 revision 隔离，配置变化、删除供应商或切换实例时失效，不持久保存凭据。缓存由应用持有，切到设置等页面卸载工作台后仍保留。Controller `use-provider-balances.ts` 在进入列表时立即展示上次查询的缓存金额，后台查询成功后原位更新，刷新期间不清空已有金额；首次没有缓存时显示查询中。自动与单行手动刷新共用最多2个并发查询、无余额轮询，离开页面或变更列表快照时取消旧查询并丢弃迟到结果。刷新成功替换余额并清除失败标注；平台失败和传输失败均保留旧金额及其查询时间，显示「余额未刷新」，无缓存时保留明确未知／授权状态，不伪造0。`provider-balance.view.tsx` 展示明确 account/key/billing scope，每行使用简洁圆箭头按钮手动刷新，刷新时转动并禁用重复点击，支持减少动态效果与可访问名称，失败原因放在悬停提示中。缓存和按钮为桌面展示行为，无新增 CLI 契约。原生窗口与真实站点授权未验收，未构建本次安装包。
 
 ### 供应商模型目录布局（2026-10-13，当前源码未发布）
 
