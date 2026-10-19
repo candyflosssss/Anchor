@@ -344,7 +344,7 @@ anchor usage
 
 `provider test` 与真实模型转发先使用配置地址；若未带版本号的 API 基址返回 HTML（HTTP 200／404／405），核心保留部署前缀并追加 `/v1` 重试一次。两个请求共用原有超时与并发名额，不修改配置；已带 `/v1` 等版本路径、鉴权／限流／JSON 错误和已开始的 SSE 不触发补路径。若最终 HTTP 200 仍为 HTML，`probe.failure` 返回 `unexpected_html`，表示收到网站页面，应检查 API 基址。诊断日志的 `endpoint_resolution`、`endpoint_requests`、`initial_http`、`response_kind` 只记录结构事实。命令参数、输出字段结构与退出码保持不变；`failure` 增加上述枚举值。
 
-配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
+配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；自动冷却默认开启，429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。自动冷却开关、失败阈值及两类默认时长可由 `settings key-cooldown` 配置（§16）。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
 当前网关每个供应商／Key／候选模型仅尝试一次，可安全失败时切换其他Key或候选。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
 
@@ -760,7 +760,7 @@ anchor recover [--id ID]
 | 多轮文本对话测试（当前源码，未发布） | provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve；stdin 为完整消息数组，支持可选原生思考深度 | 共享核心与桌面 ProviderChat；CLI 输出最终 JSON，不单独提供终端交互／流式展示命令，复制和清空为页面生命周期 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
-| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；冷却/熔断为内部机制 |
+| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；冷却策略设置见 settings key-cooldown（§16） |
 | 平台自动识别与列表余额（desktop.27，缓存随desktop.52交付） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；切页立即显示同实例／同配置的上次余额，后台刷新，失败保留旧值并支持单行重试。当前源码（未打包）余额显示两位小数；NewAPI 新增 Key 获准返回的账户余额与只读 Key 额度兼容，按站点公开比例换算；沿用既有命令，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
@@ -979,3 +979,25 @@ anchor [--context NAME] proxy bind PROVIDER [--key KEY] --mode direct|inherit|pr
 - `delete`：仍被引用返回 referenced，先解绑。供应商改名、删除和复制遵循外键/复制规则；复制 Key 时也复制其代理覆盖。
 - 默认最多 64 个 profile，16 个存活（含正在结束旧流）的 mihomo 节点子进程。节点按需启动、仅本机回环监听、随机认证，不需要管理员权限。编辑不切断旧 SSE，旧代最后一个响应关闭后回收；核心关闭回收全部子进程。
 - 固定 mihomo v1.19.32；正式构建入口自动校验并嵌入 Windows/Linux amd64 payload。直接 `go build` 且未准备 payload 时显示未内置，选用 mihomo 报错，但外部 HTTP/SOCKS5 仍可用。构建方法和 GPLv3 通知见 [代理设计](../design/proxy-settings.md) 与 [mihomo notice](../../third_party/mihomo/NOTICE.md)。秘密依赖实例目录权限保护，**不是静态加密**。
+
+
+## 16. Key 自动冷却设置（当前源码，未发布）
+
+```text
+anchor settings key-cooldown
+anchor settings key-cooldown --revision N [--enabled=true|false] [--failure-threshold N] [--cooldown-seconds N] [--rate-limit-seconds N]
+```
+
+| 参数 | 范围 / 默认 |
+| --- | --- |
+| `--enabled` | 自动冷却开关，初始 true；关闭使用 `--enabled=false` |
+| `--failure-threshold` | 连续失败次数，整数 1..100，初始 3 |
+| `--cooldown-seconds` | 一般失败冷却秒数，整数 1..3600，初始 30 |
+| `--rate-limit-seconds` | 429 无有效 Retry-After 时的默认冷却秒数，整数 1..3600，初始 30 |
+| `--revision` | 写入必填，取最近读取的 revision；仅查询时不得提供 |
+
+前置条件：已初始化本机状态，已有可用 Context 和对应核心管理授权；沿用全局 `--context NAME`，配置作用于所选核心的全部供应商和 Key，不是仅宿主的外观偏好。旧核心无此接口需升级。无修改参数时只查询；提供任何修改项时条件保存，未提供项保留当前已存值，不回到初始默认。
+
+查询与保存均输出 `{enabled,failure_threshold,cooldown_seconds,rate_limit_seconds,revision}` JSON；成功退出 0，参数越界／缺 revision／冲突／身份不符／鉴权或连接失败非零，不自动重试写入。保存成功 revision +1，立即清除临时失败计数、冷却和半开预约；不解除 401/403 认证失效，不修改供应商 revision，不调用上游、不改 Agent 文件。写入结果未知须重新查询。
+
+开关默认 true，保持原固定策略。开启时达到失败阈值进入冷却，429 优先有效 Retry-After（秒数或 HTTP 日期），最终限制 1 秒..1 小时；到期单次半开探测，成功恢复。关闭只停用一般失败及 429 自动冷却，停用 Key 和认证失效保护照旧。配置持久化，重启后策略保留、临时健康重置。GUI 在「设置 → Key 自动冷却」提供相同能力；菜单精简不新增其他 CLI 契约。

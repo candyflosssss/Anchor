@@ -1,3 +1,4 @@
+import keyCooldownFixture from '../../contract/key-cooldown.json' with { type: 'json' };
 import codexSettingsFixture from '../../contract/codex-settings.json' with { type: 'json' };
 import modelCatalogFixture from '../../contract/model-catalog.json' with { type: 'json' };
 import contextPricingFixture from '../../contract/context-pricing.json' with { type: 'json' };
@@ -9,10 +10,11 @@ import updateFixture from '../../contract/updates.json' with { type: 'json' };
 import { CONTRACT, type AccountSettings, type DesktopBridge, type KeyRateCache, type ModelSettingsState, type Provider } from '../src/desktop/contract.generated';
 
 declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | 'invalid' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
+declare global { interface Window { keyCooldownTest: { saves: number } } }
 declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
 async function host(page: Page, rateMappings = false) {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, rateMappings }) => {
+  await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, keyCooldown, rateMappings }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     window.accountTest = { saves: 0, queries: 0, failure: '' };
@@ -26,7 +28,17 @@ async function host(page: Page, rateMappings = false) {
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const modelStates: Record<string, ModelSettingsState> = {};
     let codexState = structuredClone(codexSettings);
+    let cooldownState = structuredClone(keyCooldown);
+    window.keyCooldownTest = { saves: 0 };
     const api: DesktopBridge = {
+      KeyCooldownSettings: async () => ({ contract, data: cooldownState, problem: null }),
+      SaveKeyCooldownSettings: async input => {
+        window.keyCooldownTest.saves++;
+        if (counters.writeError) return { contract, data: null, problem: { code: counters.writeError } };
+        if (input.expected_revision !== cooldownState.revision) return { contract, data: null, problem: { code: 'conflict' } };
+        cooldownState = { enabled: input.enabled!, failure_threshold: input.failure_threshold!, cooldown_seconds: input.cooldown_seconds!, rate_limit_seconds: input.rate_limit_seconds!, revision: cooldownState.revision + 1 };
+        return { contract, data: cooldownState, problem: null };
+      },
       CodexSettings: async () => ({ contract, data: codexState, problem: null }),
       SaveCodexSettings: async input => {
         counters.saves++;
@@ -143,7 +155,7 @@ async function host(page: Page, rateMappings = false) {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, codexSettings: codexSettingsFixture, rateMappings });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, codexSettings: codexSettingsFixture, keyCooldown: keyCooldownFixture, rateMappings });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -232,9 +244,9 @@ test('online updates require a verified download and explicit confirmation (simu
   await expect(page.getByRole('heading', { name: '在线更新', exact: true })).toBeVisible();
   await page.getByLabel('更新渠道').selectOption('dev');
   await page.getByRole('button', { name: '检查更新', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '发现新版本 0.1.0-dev.desktop.10' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '新版本 0.1.0-dev.desktop.10' })).toBeVisible();
   await page.getByRole('button', { name: '下载更新', exact: true }).dblclick();
-  await expect(page.getByRole('heading', { name: '安装包已下载并通过 SHA256 校验' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '已校验' })).toBeVisible();
   expect(await page.evaluate(() => window.desktopTest.downloads)).toBe(1);
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
   await page.getByRole('button', { name: '安装更新…', exact: true }).click();
@@ -243,7 +255,7 @@ test('online updates require a verified download and explicit confirmation (simu
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
   await page.getByRole('button', { name: '安装更新…', exact: true }).click();
   await page.getByRole('button', { name: '确认变更', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '正在交接安装器' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '安装中' })).toBeVisible();
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(1);
   await expect(page.getByRole('button', { name: '检查更新', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: '供应商', exact: true })).toBeDisabled();
@@ -1003,8 +1015,8 @@ test('unified Codex retries default to five, save zero and lock on conflict (sim
   const retries = page.getByLabel('Codex 重试次数');
   await expect(retries).toHaveValue('5');
   await retries.fill('0');
-  await page.getByRole('button', { name: '保存 Codex 设置', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: '请重启 Codex' })).toBeVisible();
+  await page.getByRole('region', { name: 'Codex', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '待重启' })).toBeVisible();
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   await expect(page.getByLabel('同一渠道重试次数')).toHaveCount(0);
@@ -1013,20 +1025,20 @@ test('unified Codex retries default to five, save zero and lock on conflict (sim
   await expect(retries).toHaveValue('0');
   await page.evaluate(() => { window.desktopTest.writeError = 'conflict'; });
   await retries.fill('2');
-  await page.getByRole('button', { name: '保存 Codex 设置', exact: true }).click();
+  await page.getByRole('region', { name: 'Codex', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
   await expect(retries).toBeDisabled();
-  await expect(page.getByRole('alert')).toContainText('重新读取');
+  await expect(page.getByRole('alert')).toContainText('版本冲突');
   await page.evaluate(() => { window.desktopTest.writeError = null; });
-  await page.getByRole('button', { name: '重新读取 Codex 设置', exact: true }).click();
+  await page.getByRole('region', { name: 'Codex', exact: true }).getByRole('button', { name: '读取', exact: true }).click();
   await expect(retries).toHaveValue('0');
   await expect(retries).toBeEnabled();
   await retries.fill('11');
-  await expect(page.getByRole('button', { name: '保存 Codex 设置', exact: true })).toBeDisabled();
+  await expect(page.getByRole('region', { name: 'Codex', exact: true }).getByRole('button', { name: '保存', exact: true })).toBeDisabled();
   await retries.fill('8');
   await page.evaluate(() => { window.desktopTest.writeError = 'unknown'; });
-  await page.getByRole('button', { name: '保存 Codex 设置', exact: true }).click();
+  await page.getByRole('region', { name: 'Codex', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
   await expect(retries).toBeDisabled();
-  await expect(page.getByRole('alert')).toContainText('保存结果未知');
+  await expect(page.getByRole('alert')).toContainText('结果未知');
 });
 
 test('model settings opens on a compact general form with a fixed footer in light, dark and small windows (simulated host)', async ({ page }, testInfo) => {
@@ -1075,4 +1087,55 @@ test('model settings opens on a compact general form with a fixed footer in ligh
   await expect(dialog.getByLabel('显示名称')).toBeVisible();
   await dialog.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+
+test('Key cooldown settings persist, validate and lock uncertain writes (simulated host)', async ({ page }) => {
+  await host(page);
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  const menu = page.getByRole('region', { name: 'Key 自动冷却', exact: true });
+  const threshold = menu.getByLabel('连续失败次数');
+  const seconds = menu.getByLabel('冷却时长（秒）', { exact: true });
+  const rate = menu.getByLabel('429 冷却时长（秒）', { exact: true });
+  const toggle = menu.getByRole('switch', { name: '自动冷却', exact: true });
+  const save = menu.getByRole('button', { name: '保存', exact: true });
+  const read = menu.getByRole('button', { name: '读取', exact: true });
+  await expect(threshold).toHaveValue('3');
+  await expect(seconds).toHaveValue('30');
+  await expect(rate).toHaveValue('30');
+  await expect(toggle).toBeChecked();
+  await expect(menu.locator('.card-hint, [data-slot="tooltip-trigger"]')).toHaveCount(0);
+  await threshold.fill('0');
+  await expect(save).toBeDisabled();
+  await threshold.fill('2'); await seconds.fill('70'); await rate.fill('90');
+  await save.click();
+  await expect(menu.getByRole('status')).toHaveText('已保存');
+  await toggle.click();
+  await expect(threshold).toBeDisabled();
+  await save.click();
+  await read.click();
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();
+  await expect(seconds).toHaveValue('70');
+  await expect(rate).toHaveValue('90');
+  await page.evaluate(() => { window.desktopTest.writeError = 'conflict'; });
+  await save.click();
+  await expect(menu.getByRole('alert')).toHaveText('版本冲突');
+  await expect(save).toBeDisabled();
+  await expect(toggle).toBeDisabled();
+  expect(await page.evaluate(() => window.keyCooldownTest.saves)).toBe(3);
+  await page.evaluate(() => { window.desktopTest.writeError = null; });
+  await read.click(); await toggle.click();
+  await page.evaluate(() => { window.desktopTest.writeError = 'unknown'; });
+  await save.click();
+  await expect(menu.getByRole('alert')).toHaveText('结果未知');
+  await expect(save).toBeDisabled();
+  expect(await page.evaluate(() => window.keyCooldownTest.saves)).toBe(4);
+  await page.evaluate(() => { window.desktopTest.writeError = null; });
+  await read.click();
+  await expect(toggle).not.toBeChecked();
+  await page.getByRole('button', { name: '供应商', exact: true }).click();
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await expect(toggle).not.toBeChecked();
+  await expect(threshold).toHaveValue('2');
 });

@@ -393,3 +393,12 @@ type CodexSettingsResult struct {
 	Data     *CodexSettingsState `json:"data"`
 	Problem  *Problem            `json:"problem"`
 }
+
+// Key cooldown policy is shared by CLI and desktop and scoped to the selected core.
+type KeyCooldownSettings = state.KeyCooldownSettings
+type SaveKeyCooldownSettings = state.SaveKeyCooldownSettings
+type KeyCooldownSettingsResult struct {
+	Contract string               `json:"contract"`
+	Data     *KeyCooldownSettings `json:"data"`
+	Problem  *Problem             `json:"problem"`
+}

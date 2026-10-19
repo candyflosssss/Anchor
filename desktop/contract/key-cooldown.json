@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "failure_threshold": 3,
+  "cooldown_seconds": 30,
+  "rate_limit_seconds": 30,
+  "revision": 1
+}

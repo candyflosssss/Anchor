@@ -228,3 +228,15 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 ## 出站选择（proxy-v1）
 
 供应商协议、认证、模型名不包含代理实现；`internal/egress` 根据 provider ID / 实际 Key ID 解析独立绑定。Key 可以继承、直连、指定 profile。核心将路由上下文传给推理、catalog 和 providerapi 账户客户端；适配器不关心 mihomo。代理连接错误保留 fail-closed 行为，不因既有候选故障切换逻辑绕到直连。管理及桌面契约见 [代理设置](proxy-settings.md)。
+
+
+## Key 自动冷却设置
+
+2026-10-19 当前源码未发布，契约沿用 `anchor-desktop-v1` 的向后兼容增量。Go 规范源 `internal/desktop/contract.go`；共享样例 `desktop/contract/key-cooldown.json`，TS 由生成器派生。
+
+- `Bridge.KeyCooldownSettings()` → client → `GET /control/v1/settings/key-cooldown`；`Bridge.SaveKeyCooldownSettings(input)` → `POST` 同一路径。沿用当前所选本机／SSH 核心、管理鉴权、实例核验和 15 秒桌面调用上限，不访问真实上游。
+- 返回 `KeyCooldownSettings`：`enabled` 布尔、`failure_threshold` 整数 1..100、`cooldown_seconds` 整数 1..3600、`rate_limit_seconds` 整数 1..3600、`revision` 正 JS 安全整数。默认 true／3／30／30／1，持久化于当前核心 meta，不包含 Key 或管理令牌。
+- `SaveKeyCooldownSettings` 要求四个非空字段及 `expected_revision`（1..MAX_SAFE_INTEGER-1）。条件写入成功 revision +1，沿用标准 `{contract,data,problem}`；冲突不改设置或健康，读失败不回退 Mock，写入不自动重试。前端验证回包全部字段及 revision；无法确认时返回 unknown，先读取再操作。
+- 全局策略作用于所有供应商（含匿名来源）。开启时连续失败达到阈值后冷却指定时长；429 优先使用有效 `Retry-After`，否则使用默认限流时长，最终限制 1 秒..1 小时。到期仍只允许单次半开探测，成功恢复；401/403 继续认证失效保护，与冷却开关独立。
+- 保存与请求结果归约串行，保存成功清除已有临时失败计数、冷却和半开预约，后续结果使用新策略；不清除认证失效或最近测试，不修改供应商 revision。关闭时不对一般失败和 429 新建冷却；核心重启保留策略但清空既有临时健康。旧核心不支持时菜单显示「不支持」，需升级对应核心。
+- CLI 同能力为 `settings key-cooldown`，部分字段写入只沿用读取到的其他字段，仍以显式 revision 防止并发覆盖；详见[指令大全](../cli/commands.md#16-key-自动冷却设置当前源码未发布)。

@@ -30,5 +30,5 @@ export function createCodexSettingsService(getBridge: () => Pick<DesktopBridge, 
 export const codexSettingsService = createCodexSettingsService();
 export function codexSettingsError(error: unknown) {
   const code = error instanceof DesktopProblem ? error.code : 'read_error';
-  return code === 'conflict' ? '设置已被其他操作修改，请重新读取后编辑。' : code === 'unknown' ? '保存结果未知，请重新读取并核对。' : code === 'unsupported' ? '当前核心不支持 Codex 统一重试设置，请升级核心。' : code === 'invalid' ? '重试次数须为 0–10 的整数。' : '无法读取或保存 Codex 设置，请检查核心连接后重试。';
+  return code === 'conflict' ? '版本冲突' : code === 'unknown' ? '结果未知' : code === 'unsupported' ? '不支持' : code === 'invalid' ? '参数无效' : '连接异常';
 }

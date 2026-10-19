@@ -317,6 +317,7 @@ func (s *Server) Control() http.Handler {
 	mux.HandleFunc("POST /control/v1/providers/{id}/probe", s.providerProbe)
 	mux.HandleFunc("POST /control/v1/providers/{id}/chat", s.providerChat)
 	mux.HandleFunc("POST /control/v1/models/{id}/routing", s.configureModelRouting)
+	s.keyCooldownRoutes(mux)
 	mux.HandleFunc("GET /control/v1/models/{id}/settings", s.getModelSettings)
 	mux.HandleFunc("POST /control/v1/models/{id}/settings", s.saveModelSettings)
 	mux.HandleFunc("GET /control/v1/models", func(w http.ResponseWriter, r *http.Request) {

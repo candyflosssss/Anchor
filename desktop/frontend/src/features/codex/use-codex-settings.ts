@@ -29,7 +29,7 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
       const out = save ? await codexSettingsService.save({ retries, expected_revision: state!.settings.revision }) : await codexSettingsService.read();
       if (at === epoch.current) {
         setState(out); setDraft(String(out.settings.retries)); setNeedsRead(false);
-        if (save) setNotice(out.needs_sync.length ? '重试次数已保存，部分 Codex 配置尚未同步。' : '重试次数已保存并同步，请重启 Codex 后生效。');
+        if (save) setNotice(out.needs_sync.length ? '待同步' : '待重启');
       }
     } catch (e) {
       if (at === epoch.current) {

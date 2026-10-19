@@ -80,9 +80,12 @@ func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed
 	}
 	return state.ProviderKey{}, false
 }
-func retryDelay(v string) time.Duration {
-	d := 30 * time.Second
-	if n, e := strconv.Atoi(v); e == nil && n >= 0 {
+func configuredRetryDelay(v string, fallback int) time.Duration {
+	d := time.Duration(fallback) * time.Second
+	if n, e := strconv.ParseInt(v, 10, 64); e == nil && n >= 0 {
+		if n > 3600 {
+			n = 3600
+		}
 		d = time.Duration(n) * time.Second
 	} else if t, e := http.ParseTime(v); e == nil {
 		d = time.Until(t)
@@ -116,10 +119,17 @@ func (s *Server) finishKey(p state.Provider, k string, status int, after string,
 	if status == 401 || status == 403 {
 		h.Invalid = true
 	}
+	policy, err := s.Store.KeyCooldownSettings()
+	if err != nil {
+		policy = state.DefaultKeyCooldownSettings()
+	}
+	if !policy.Enabled {
+		return
+	}
 	if status == 429 {
-		h.Until = time.Now().Add(retryDelay(after))
-	} else if h.Failures >= 3 {
-		h.Until = time.Now().Add(30 * time.Second)
+		h.Until = time.Now().Add(configuredRetryDelay(after, policy.RateLimitSeconds))
+	} else if h.Failures >= policy.FailureThreshold {
+		h.Until = time.Now().Add(time.Duration(policy.CooldownSeconds) * time.Second)
 	}
 }
 func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeyStatus {
