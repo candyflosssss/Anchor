@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/log-stats.json';
-import { chartPaths, idleBridges, checkedStats, formatStat, statsQuery, validInterval } from './log-stats.model';
+import { chartPaths, checkedStats, formatStat, statsQuery, validInterval } from './log-stats.model';
 import { initialFilters } from './log.model';
 import { logService } from './log.service';
 afterEach(() => vi.unstubAllGlobals());
@@ -19,9 +19,13 @@ it('mirrors all request filters but not pagination and snapshots', () => {
   expect(validInterval('129600', 86400000)).toBe(true);
   expect(validInterval('129600', 0)).toBe(true);
 });
-it('breaks unknown chart segments and keeps observed zero points', () => {
-  expect(chartPaths([0, 5, null, 10], 10)).toEqual(['M0.00,180.00 L333.33,90.00', 'M1000.00,0.00']);
-  expect(chartPaths([null, null], 1)).toEqual([]);
+it('returns missing chart ticks to zero at their original positions', () => {
+  expect(chartPaths([0, 5, null, 10], 10)).toEqual(['M0.00,180.00 L333.33,90.00 L666.67,180.00 L1000.00,0.00']);
+  expect(chartPaths([5, null, null, 10], 10)).toEqual(['M0.00,90.00 L333.33,180.00 L666.67,180.00 L1000.00,0.00']);
+  expect(chartPaths([null, 5, null], 10, 1000, 180, [100, 400, 900])).toEqual(['M100.00,180.00 L400.00,90.00 L900.00,180.00']);
+  expect(chartPaths([null, null], 1)).toEqual(['M0.00,180.00 L1000.00,180.00']);
+  expect(chartPaths([null], 1)).toEqual(['M500.00,180.00']);
+  expect(chartPaths([], 1)).toEqual([]);
   expect(chartPaths([0], 1)).toEqual(['M500.00,180.00']);
   expect(chartPaths([5, 10], 10, 1000, 180, [250, 750])).toEqual(['M250.00,90.00 L750.00,0.00']);
 });
@@ -39,16 +43,4 @@ it('reads through the controlled bridge and never falls back on unavailable host
   await expect(logService.stats(fixture.query)).rejects.toMatchObject({ code: 'unsupported' });
   vi.stubGlobal('window', { go: { desktop: { Bridge: { LogStats: async () => ({ contract: fixture.contract, data: fixture.stats, problem: null }) } } } });
   expect(await logService.stats(fixture.query)).toEqual(fixture.stats);
-});
-
-it('bridges only idle gaps between known observations without filling unknown measurements', () => {
-  expect(idleBridges([5, null, 10], [1, 0, 1], 10)).toEqual(['M0.00,90.00 L1000.00,0.00']);
-  expect(idleBridges([0, null, null, 0], [1, 0, 0, 1], 1)).toEqual(['M0.00,180.00 L1000.00,180.00']);
-  expect(idleBridges([5, null, 10], [1, 1, 1], 10)).toEqual([]);
-  expect(idleBridges([5, null, null, 10], [1, 0, 1, 1], 10)).toEqual([]);
-  expect(idleBridges([null, 5, null], [0, 1, 0], 10)).toEqual([]);
-  expect(idleBridges([null, null], [0, 0], 1)).toEqual([]);
-  expect(idleBridges([0], [1], 1)).toEqual([]);
-  expect(idleBridges([5, 10], [1, 1], 10)).toEqual([]);
-  expect(idleBridges([5, null, 10], [1, 0, 1], 10, 1000, 180, [100, 400, 900])).toEqual(['M100.00,90.00 L900.00,0.00']);
 });

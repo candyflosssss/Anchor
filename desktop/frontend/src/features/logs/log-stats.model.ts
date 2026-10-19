@@ -58,31 +58,10 @@ export function formatStat(value: number | null, compact = false) {
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1, ...(compact ? { notation: 'compact' } : {}) }).format(value);
 }
 export function chartPaths(values: (number | null)[], max: number, width = 1000, height = 180, positions?: number[]): string[] {
-  const paths: string[] = []; let path = '';
+  let path = '';
   values.forEach((v, i) => {
-    if (v === null) { if (path) paths.push(path); path = ''; return; }
-    const x = positions?.[i] ?? (values.length === 1 ? width / 2 : i * width / (values.length - 1)), y = height - v / max * height;
+    const x = positions?.[i] ?? (values.length === 1 ? width / 2 : i * width / (values.length - 1)), y = height - (v ?? 0) / max * height;
     path += `${path ? ' L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`;
   });
-  if (path) paths.push(path);
-  return paths;
-}
-
-// Bridge only idle buckets between observations. A request with an unknown
-// measurement is a hard break; these paths never create interpolated values.
-export function idleBridges(values: (number | null)[], requests: number[], max: number, width = 1000, height = 180, positions?: number[]): string[] {
-  const bridges: string[] = [];
-  let previous: number | null = null;
-  values.forEach((value, index) => {
-    if (value === null) {
-      if (requests[index] !== 0) previous = null;
-      return;
-    }
-    if (previous !== null && index > previous + 1) {
-      const x = (i: number) => positions?.[i] ?? (values.length === 1 ? width / 2 : i * width / (values.length - 1));
-      bridges.push(`M${x(previous).toFixed(2)},${(height - values[previous]! / max * height).toFixed(2)} L${x(index).toFixed(2)},${(height - value / max * height).toFixed(2)}`);
-    }
-    previous = index;
-  });
-  return bridges;
+  return path ? [path] : [];
 }

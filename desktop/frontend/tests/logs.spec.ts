@@ -7,7 +7,7 @@ import fixture from '../../contract/logs.json' with { type: 'json' };
 import type { DesktopBridge, Query } from '../src/desktop/contract.generated';
 const capture = process.env.ANCHOR_LOG_SCREENSHOTS;
 declare global { interface Window { logTest: { queries: Query[]; statsQueries: import('../src/desktop/contract.generated').StatsQuery[]; statsUnavailable: boolean; statsEmpty: boolean; exports: number; exportQueries: Query[]; settings: typeof fixture.settings; unavailable: boolean; paged: boolean; suggestionQueries: import('../src/desktop/contract.generated').SuggestionsQuery[]; suggestionsUnavailable: boolean; suggestionDelays: Record<string, number> } } }
-async function openLogs(page: Page, data = fixture, dimensions = false) {
+async function openLogs(page: Page, data = fixture, dimensions = false, stats = statsFixture) {
   await page.addInitScript(({ f, sf, suggestions, df, dimensions }) => {
     window.logTest = { queries: [], statsQueries: [], statsUnavailable: false, statsEmpty: false, exports: 0, exportQueries: [], settings: f.settings, unavailable: false, paged: false, suggestionQueries: [], suggestionsUnavailable: false, suggestionDelays: {} };
     const result = <T,>(data: T) => ({ contract: f.contract, data, problem: null });
@@ -64,7 +64,7 @@ async function openLogs(page: Page, data = fixture, dimensions = false) {
       ExportLogs: async (q: Query) => { window.logTest.exportQueries.push(q); window.logTest.exports++; return result({ accepted: true }); },
     } as unknown as DesktopBridge;
     window.go = { desktop: { Bridge: api } };
-  }, { f: data, sf: statsFixture, suggestions: suggestionsFixture, df: dimensionsFixture, dimensions });
+  }, { f: data, sf: stats, suggestions: suggestionsFixture, df: dimensionsFixture, dimensions });
   await page.goto('/');
   await page.getByRole('button', { name: '日志', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看请求 fixture_failed' })).toBeVisible();
@@ -388,7 +388,7 @@ for (const width of [1440, 390]) {
     await expect(tooltip).toBeVisible();
     await expect(tooltip.locator('time').first()).toHaveAttribute('datetime', range(0)[0]);
     await page.keyboard.press('ArrowRight');
-    await expect(tooltip).toContainText('合计— Token');
+    await expect(tooltip).toContainText('合计0 Token');
     await trends.getByRole('button', { name: /请求量/ }).click();
     await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight');
     await expect(tooltip).toContainText('请求量0 次');
@@ -562,26 +562,57 @@ test('classification drills into shared list, chart and export filters including
 });
 
 
-test('idle chart gaps are connected visually while tooltips keep raw empty and zero observations', async ({ page }) => {
-  await openLogs(page);
+test('missing chart ticks return to zero with matching pointer and keyboard readings', async ({ page }) => {
+  const stats = structuredClone(statsFixture);
+  stats.stats.buckets[0].values.input_tokens = null;
+  stats.stats.buckets[0].values.tps = null;
+  for (const bucket of stats.stats.buckets) bucket.values.first_output_ms = null;
+  await openLogs(page, fixture, false, stats);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
   const trends = page.getByRole('region', { name: '请求运行趋势' });
   const chart = trends.getByRole('slider');
-  await expect(trends.locator('.log-chart-bridge')).not.toHaveCount(0);
-  await expect(trends.getByText('虚线连接无请求的空档，仅辅助观察趋势，不代表该时段有用量或采样。')).toBeVisible();
+  await expect(trends.locator('.log-chart-line')).toHaveCount(3);
+  await expect(trends.locator('.log-chart-bridge')).toHaveCount(0);
+  for (const path of await trends.locator('.log-chart-line').evaluateAll(paths => paths.map(p => p.getAttribute('d')!))) {
+    const ticks = path.split(' ');
+    expect(ticks).toHaveLength(120);
+    expect(ticks[1]).toBe('L12.50,180.00');
+  }
   await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight');
   const tooltip = trends.getByRole('tooltip');
-  await expect(tooltip).toContainText('此时段无请求');
-  await expect(tooltip.locator('strong')).toHaveText(['— Token', '— Token', '— Token']);
+  await expect(tooltip).toContainText('此时段无请求，缺失值按 0 显示');
+  await expect(tooltip.locator('strong')).toHaveText(['0 Token', '0 Token', '0 Token']);
+  await expect(chart).toHaveAttribute('aria-valuetext', /合计 0 Token，输入 0 Token，输出 0 Token/);
   await expect(tooltip.locator('time')).toHaveCount(2);
-  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Home');
+  await expect(tooltip).toContainText('2 次请求，缺失值按 0 显示');
+  await expect(tooltip.locator('strong')).toHaveText(['150 Token', '0 Token', '50 Token']);
+  await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
   await expect(tooltip).toContainText('1 次请求');
   await expect(tooltip.locator('strong').first()).toHaveText('450 Token');
+  await expect(tooltip).not.toContainText('缺失值');
+  await chart.scrollIntoViewIfNeeded();
+  const bounds = (await chart.boundingBox())!;
+  await page.mouse.move(bounds.x + bounds.width * (12.5 + 4) / 1008, bounds.y + 1);
+  await expect(chart).toHaveAttribute('aria-valuenow', '1');
+  await expect(tooltip.locator('strong')).toHaveText(['0 Token', '0 Token', '0 Token']);
+  for (const [label, unit] of [['请求量', '次'], ['总 TPS', 't/s'], ['错误率', '%'], ['缓存命中率', '%'], ['平均耗时', 'ms'], ['首字延迟', 'ms']]) {
+    await trends.getByRole('button', { name: new RegExp(label) }).click();
+    await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight');
+    await expect(tooltip.locator('strong')).toHaveText(`0 ${unit}`);
+    const path = await trends.locator('.log-chart-line').getAttribute('d');
+    expect(path!.split(' ')[1]).toBe('L12.50,180.00');
+  }
+  await expect(tooltip).toContainText('缺失值按 0 显示');
+  expect((await trends.locator('.log-chart-line').getAttribute('d'))!.split(' ').every(tick => tick.endsWith(',180.00'))).toBe(true);
+  await trends.getByRole('button', { name: /总 TPS/ }).click();
+  await chart.focus(); await page.keyboard.press('Home');
+  await expect(tooltip).toContainText('此时段无可计算的指标，缺失值按 0 显示');
+  await expect(tooltip.locator('strong')).toHaveText('0 t/s');
   await trends.getByRole('button', { name: /缓存命中率/ }).click();
   await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
   await expect(tooltip.locator('strong')).toHaveText('0 %');
-  await trends.getByRole('button', { name: /请求量/ }).click();
-  await expect(trends.locator('.log-chart-bridge')).toHaveCount(0);
-  await expect(trends.locator('.log-chart-note')).toHaveCount(0);
+  await expect(tooltip).not.toContainText('缺失值');
 });
 
 

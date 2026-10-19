@@ -4,7 +4,7 @@ import { Button } from '../../components/ui/button';
 import type { Stats } from '../../desktop/contract.generated';
 import { dimensionLabels, type LogDimension, type LogFilters } from './log.model';
 import { LogGroups } from './log-groups.view';
-import { chartPaths, idleBridges, formatStat, intervals, metrics, validInterval, type MetricID } from './log-stats.model';
+import { chartPaths, formatStat, intervals, metrics, validInterval, type MetricID } from './log-stats.model';
 import { useLogStatsController } from './use-log-stats-controller';
 const width = 1000, height = 180, insetX = 4;
 function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
@@ -22,9 +22,8 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
   const point = data.buckets[index];
   const span = data.before_ms - data.since_ms;
   const positions = data.buckets.map(b => (b.at_ms - data.since_ms + Math.min(data.interval_ms, data.before_ms - b.at_ms) / 2) / span * width);
-  const paths = series.map(s => ({ ...s, bridges: idleBridges(s.values, data.buckets.map(b => b.values.requests), max, width, height, positions) }));
-  const hasBridges = paths.some(s => s.bridges.length > 0);
-  const observation = point.values.requests === 0 ? '此时段无请求' : series.every(s => s.values[index] === null) ? '此时段无可计算的指标' : `${point.values.requests} 次请求`;
+  const observation = (point.values.requests === 0 ? '此时段无请求' : series.every(s => s.values[index] === null) ? '此时段无可计算的指标' : `${point.values.requests} 次请求`)
+    + (series.some(s => s.values[index] === null) ? '，缺失值按 0 显示' : '');
   const time = (at: number, detailed = false) => new Date(at).toLocaleString('zh-CN', { ...(data.before_ms - data.since_ms > 86400000 || detailed ? { month: '2-digit', day: '2-digit' } : {}), hour: '2-digit', minute: '2-digit', ...(data.interval_ms < 60000 ? { second: '2-digit' } : {}), hour12: false });
   const end = Math.min(point.at_ms + data.interval_ms, data.before_ms);
   const timeRange = `${time(point.at_ms, true)} – ${time(end, true)}`;
@@ -43,7 +42,7 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
     <div className="log-chart-body">
       <div className="log-chart-y mono">{[max, max / 2, 0].map((v, i) => <span key={i}>{formatStat(v, true)}</span>)}</div>
       <div className="log-chart-plot" role="slider" tabIndex={0} aria-label={`${spec.label}趋势，左右方向键查看时间点`} aria-valuemin={0} aria-valuemax={data.buckets.length - 1} aria-valuenow={index}
-        aria-valuetext={`${timeRange}，${observation}，${series.map(s => `${s.label} ${formatStat(s.values[index])} ${spec.unit}`).join('，')}`}
+        aria-valuetext={`${timeRange}，${observation}，${series.map(s => `${s.label} ${formatStat(s.values[index] ?? 0)} ${spec.unit}`).join('，')}`}
         aria-describedby={active !== null ? tooltipId : undefined}
         onPointerEnter={inspectPointer} onPointerMove={inspectPointer}
         onPointerLeave={() => setActive(null)} onFocus={() => setActive(current => current ?? data.buckets.length - 1)} onBlur={() => setActive(null)}
@@ -53,22 +52,19 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
         }}>
         <svg viewBox={`${-insetX} -6 ${width + insetX * 2} ${height + 12}`} preserveAspectRatio="none" aria-hidden="true">
           {[0, height / 2, height].map(y => <line key={y} x1="0" x2={width} y1={y} y2={y} className="log-chart-grid" />)}
-          {paths.map(s => <g key={s.label} data-tone={s.tone}>
-            {s.bridges.map((d, i) => <path key={`idle-${i}`} d={d} className="log-chart-line log-chart-bridge" />)}
+          {series.map(s => <g key={s.label} data-tone={s.tone}>
             {chartPaths(s.values, max, width, height, positions).map((d, i) => <path key={i} d={d} className="log-chart-line" />)}
-            {s.values.map((v, i) => v !== null && (s.values.length === 1 || s.values[i - 1] == null && s.values[i + 1] == null) ? <circle key={i} cx={positions[i]} cy={height - v / max * height} r="3" className="log-chart-dot" /> : null)}
+            {s.values.length === 1 && <circle cx={positions[0]} cy={height - (s.values[0] ?? 0) / max * height} r="3" className="log-chart-dot" />}
           </g>)}
           {active !== null && <line x1={positions[index]} x2={positions[index]} y1="0" y2={height} className="log-chart-cursor" />}
         </svg>
-        {known.length === 0 && <div className="log-chart-empty">暂无可计算的指标</div>}
         {active !== null && <div id={tooltipId} role="tooltip" className="log-chart-tooltip" style={{ left: `${anchor}%`, transform: `translateX(-${anchor}%)` }}>
           <div className="log-chart-tooltip-time mono"><time dateTime={new Date(point.at_ms).toISOString()}>{time(point.at_ms, true)}</time><span>–</span><time dateTime={new Date(end).toISOString()}>{time(end, true)}</time></div>
           <div className="log-chart-observation">{observation}</div>
-          {series.map(s => <div key={s.label} className="log-chart-tooltip-value" data-tone={s.tone}><span><i />{s.label}</span><strong className="mono">{formatStat(s.values[index])} {spec.unit}</strong></div>)}
+          {series.map(s => <div key={s.label} className="log-chart-tooltip-value" data-tone={s.tone}><span><i />{s.label}</span><strong className="mono">{formatStat(s.values[index] ?? 0)} {spec.unit}</strong></div>)}
         </div>}
       </div>
     </div>
-    {hasBridges && <p className="log-chart-note">虚线连接无请求的空档，仅辅助观察趋势，不代表该时段有用量或采样。</p>}
     <div className="log-chart-x mono"><span>{time(data.since_ms)}</span><span>{time(data.since_ms + (data.before_ms - data.since_ms) / 2)}</span><span>{time(data.before_ms)}</span></div>
   </>;
 }
