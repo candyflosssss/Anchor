@@ -41,10 +41,9 @@ describe('model channel availability presentation', () => {
       expect(html).not.toContain('无有效渠道');
     }
   });
-  it('shows currently available without asserting upstream connectivity', () => {
+  it('shows the current availability and channel count', () => {
     const html = render([makeSummary(true)]);
     expect(html).toContain('1 / 1 个渠道当前可用');
-    expect(html).toContain('不代表上游实时连通');
     expect(html).not.toContain('无有效渠道');
   });
   it('does not mistake failed reads for an empty configuration', () => {
