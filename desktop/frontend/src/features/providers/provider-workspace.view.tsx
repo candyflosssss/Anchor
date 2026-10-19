@@ -30,7 +30,7 @@ export function ProviderList({ c, summaries, balances, onRefreshBalance, onEdit,
       </TableRow></TableHeader><TableBody>
         {c.phase === 'ready' && c.visible.map(p => { const s = byId.get(p.id); const loaded = !!s?.workspace; return <TableRow key={p.id} className="clickable-row" onClick={e => rowClick(e, p.id)}>
           <TableCell><div className="provider-cell"><span className="provider-avatar" aria-hidden="true">{Array.from(p.id)[0]}</span><div><button className="provider-name" disabled={c.blocked} onClick={() => c.openProvider(p.id)}>{p.id}</button><span className="provider-url mono" title={p.base_urls.join('\n')}>{p.base_urls[0]}{p.base_urls.length > 1 ? ` +${p.base_urls.length - 1}` : ''}</span></div></div></TableCell>
-          <TableCell><label className="key-toggle" data-state={p.enabled ? 'checked' : 'unchecked'}><Switch className="key-toggle-switch" checked={p.enabled} disabled={c.blocked || !!c.toggle || !!c.dialog || !!c.editor} aria-label={`供应商 ${p.id} 启用状态`} onCheckedChange={() => c.requestToggle(p)} /><span>{p.enabled ? '已启用' : '已停用'}</span></label></TableCell>
+          <TableCell><label className="key-toggle" data-state={p.enabled ? 'checked' : 'unchecked'}><Switch className="key-toggle-switch" checked={p.enabled} disabled={c.blocked || !!c.dialog || !!c.editor} aria-label={`供应商 ${p.id} 启用状态`} onCheckedChange={() => c.toggleProvider(p)} /><span>{p.enabled ? '已启用' : '已停用'}</span></label></TableCell>
           <TableCell>{!p.enabled ? <StatusBadge enabled={false} /> : s ? <HealthPill tone={s.tone} label={s.label} /> : '—'}</TableCell>
           <TableCell><ProviderBalanceCell value={balances[p.id]} providerName={p.id} onRefresh={() => onRefreshBalance(p.id)} disabled={c.blocked} /></TableCell>
           <TableCell><span className="secret-status"><KeyRound size={14} />{!loaded ? (p.has_secret ? '已配置' : '—') : s!.keyCount ? `${s!.enabledKeys} / ${s!.keyCount}` : '匿名'}</span></TableCell>
@@ -40,7 +40,7 @@ export function ProviderList({ c, summaries, balances, onRefreshBalance, onEdit,
             <Button variant="ghost" size="icon" disabled={c.blocked} title="测试连通" aria-label={`测试 ${p.id}`} onClick={() => c.openQuickTest(p.id)}><Play /></Button>
             <Button variant="ghost" size="icon" disabled={c.blocked} title="编辑配置" aria-label={`编辑 ${p.id}`} onClick={() => onEdit(p)}><Pencil /></Button>
             <Popover menu label={`${p.id} 的更多操作`} disabled={c.blocked} trigger={props => <Button variant="ghost" size="icon" title="更多操作" aria-label={`更多操作 ${p.id}`} {...props}><MoreHorizontal /></Button>}>
-              <MenuItem onSelect={() => c.requestToggle(p)}><Power size={14} />{p.enabled ? '停用' : '启用'}</MenuItem>
+              <MenuItem onSelect={() => c.toggleProvider(p)}><Power size={14} />{p.enabled ? '停用' : '启用'}</MenuItem>
               <MenuItem onSelect={() => c.openProvider(p.id, 'overview', { kind: 'copy' })}><Copy size={14} />复制为新供应商</MenuItem>
               <MenuItem onSelect={() => c.openProvider(p.id, 'overview', { kind: 'rename' })}><TextCursorInput size={14} />改名</MenuItem>
               <MenuItem destructive onSelect={() => c.openProvider(p.id, 'overview', { kind: 'delete' })}><Trash2 size={14} />删除</MenuItem>

@@ -58,7 +58,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
       <div className="detail-actions">
         <Button disabled={blocked || !w} onClick={() => c.openDialog({ kind: 'test' })}><Play />测试连通</Button>
         <Button variant="outline" disabled={blocked} onClick={onEdit}><Pencil />编辑配置</Button>
-        <label className="key-toggle" data-state={p.enabled ? 'checked' : 'unchecked'}><Switch className="key-toggle-switch" checked={p.enabled} disabled={blocked || !!c.toggle || !!c.editor} aria-label={`供应商 ${p.id} 启用状态`} onCheckedChange={() => c.requestToggle(p)} /><span>{p.enabled ? '已启用' : '已停用'}</span></label>
+        <label className="key-toggle" data-state={p.enabled ? 'checked' : 'unchecked'}><Switch className="key-toggle-switch" checked={p.enabled} disabled={blocked || !!c.editor} aria-label={`供应商 ${p.id} 启用状态`} onCheckedChange={() => c.toggleProvider(p)} /><span>{p.enabled ? '已启用' : '已停用'}</span></label>
         <Popover menu label={`${p.id} 的更多操作`} disabled={blocked || !w} trigger={props => <Button variant="ghost" size="icon" aria-label="更多操作" {...props}><MoreHorizontal /></Button>}>
           <MenuItem onSelect={() => c.openDialog({ kind: 'copy' })}><Copy size={14} />复制为新供应商</MenuItem>
           <MenuItem onSelect={() => c.openDialog({ kind: 'rename' })}><TextCursorInput size={14} />改名</MenuItem>
@@ -99,7 +99,7 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
   return <div className="overview-grid">
     <section className="detail-card"><div className="card-toolbar"><h2>接入检查</h2><Button size="sm" variant="outline" disabled={disabled} onClick={() => c.setDetailTab('account')}>账户与余额</Button></div>
       <ul className="checklist">
-        {!p.enabled && <Check ok={false} title="供应商已停用" detail="已停用" action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.requestToggle(p)}>重新启用</Button>} />}
+        {!p.enabled && <Check ok={false} title="供应商已停用" detail="已停用" action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.toggleProvider(p)}>重新启用</Button>} />}
         <Check ok title="请求地址" detail={p.base_urls.length > 1 ? `${p.base_urls.length} 个地址轮询 · ${p.base_urls[0]}` : p.base_urls[0]} />
         <Check ok={ready.length > 0} warn={!w.keys.length} title="访问 Key" detail={w.keys.length ? `${ready.length} 个可调度 / 共 ${w.keys.length} 个` : '未配置 · 匿名'}
           action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => w.keys.length ? c.setDetailTab('keys') : c.openDialog({ kind: 'key' })}>{w.keys.length ? '管理 Key' : '添加 Key'}</Button>} />

@@ -2,7 +2,6 @@ import { useModelRouting } from '../features/models/use-model-routing';
 import { aggregateModels } from '../features/providers/provider-summary.model';
 import { useEffect, useRef } from 'react';
 import { SlidersHorizontal } from 'lucide-react';
-import { ConfirmAction } from '../components/shared/confirm-action';
 import type { Page } from '../components/shared/app-sidebar';
 import type { ProviderEnvironment } from '../desktop/environment';
 import { prototype } from '../desktop/environment';
@@ -32,7 +31,7 @@ export function WorkbenchPage({ environment, balanceCache, page, navSeq, onNavig
   const rates = useMappingRates(c.providers, c.phase === 'ready' && page === 'models', environment.transport);
   const routing = useModelRouting(aggregateModels(summaries), page === 'models', environment.transport, async () => { if (!await c.load()) throw new Error('配置读取失败'); });
   const opener = useRef<HTMLElement | null>(null);
-  const busy = routing.busy || rates.busy || c.busy || !!c.editor || !!c.toggle || !!c.dialog;
+  const busy = routing.busy || rates.busy || c.busy || !!c.editor || !!c.dialog;
   useEffect(() => { onActivity(busy); }, [busy, onActivity]);
   useEffect(() => () => onActivity(false), [onActivity]);
   const selectRef = useRef(c.select);
@@ -52,8 +51,5 @@ export function WorkbenchPage({ environment, balanceCache, page, navSeq, onNavig
     {prototype && c.mock && <div className="workspace pt-0"><footer className="prototype-controls mt-4"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={busy} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></footer></div>}
     {c.editor && <ProviderEditor c={c} restoreFocus={() => { requestAnimationFrame(() => { if (opener.current?.isConnected) opener.current.focus(); }); }} />}
     <ProviderDialogs c={c} />
-    <ConfirmAction open={!!c.toggle} title={`${c.toggle?.enabled ? '停用' : '启用'} ${c.toggle?.id ?? ''}？`} busy={c.busy} onCancel={c.cancelToggle} onConfirm={c.confirmToggle}>
-      <p>目标：<strong>{c.toggle?.id}</strong> · 当前 revision {c.toggle?.revision}</p><p>{c.toggle?.enabled ? '此供应商将不再参与新的候选路由选择。配置和已存密钥会保留；不保证终止已在途请求。' : '此供应商将允许被候选路由选用，但不保证上游可用。'}</p><p className="mt-2">{c.mock ? '本次为模拟操作，不会修改真实实例。' : '本次将修改本机实例的真实配置。'}</p>
-    </ConfirmAction>
   </>;
 }

@@ -328,7 +328,7 @@ export class MockProviderTransport implements ProviderTransport {
       }
       saved.has_secret = w.keys.length > 0;
     }
-    this.rows = [...this.rows.filter(p => p.id !== saved.id), saved].sort((a, b) => a.id.localeCompare(b.id, 'zh-CN'));
+    this.rows = current ? this.rows.map(p => p.id === saved.id ? saved : p) : [...this.rows, saved].sort((a, b) => a.id.localeCompare(b.id, 'zh-CN'));
     if (this.scenario === 'unknown') { this.scenario = 'normal'; throw fixtureError('unknown'); }
     return copy(saved);
   }

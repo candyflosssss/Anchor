@@ -111,20 +111,85 @@ test('secret replacement is only-input and clearing requires explicit acknowledg
   await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('未配置密钥');
   await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('revision 5');
 });
-test('toggle confirms object and impact; cancel is the default focused action', async ({ page }) => {
-  await ready(page); await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
-  await page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态', exact: true }).click();
-  const confirm = page.getByRole('alertdialog');
-  await expect(confirm).toContainText('停用 摸鱼AI？'); await expect(confirm).toContainText('配置和已存密钥会保留');
-  await expect(confirm.getByRole('button', { name: '取消' })).toBeFocused();
-  await confirm.getByRole('button', { name: '取消' }).click();
-  await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('已启用');
-  await page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态', exact: true }).click();
-  await confirm.getByRole('button', { name: '确认变更' }).dblclick();
-  await expect(confirm).toBeHidden();
-  await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('已停用');
-  await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('revision 4');
+test('list switches save directly without moving rows or duplicating writes', async ({ page }) => {
+  await ready(page);
+  const names = page.getByLabel('供应商列表', { exact: true }).locator('.provider-name');
+  const order = await names.allTextContents();
+  // Use a non-last row so appending the saved provider would be observable.
+  const id = order[0];
+  const toggle = page.getByRole('switch', { name: `供应商 ${id} 启用状态`, exact: true });
+  const enabled = await toggle.isChecked();
+  await toggle.dblclick();
+  await expect(toggle).toBeChecked({ checked: !enabled });
+  await expect(toggle).toBeEnabled();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(names).toHaveText(order);
+  await toggle.focus();
+  await page.keyboard.press('Space');
+  await expect(toggle).toBeChecked({ checked: enabled });
+  await expect(toggle).toBeEnabled();
+  await expect(names).toHaveText(order);
+  await page.getByRole('button', { name: id, exact: true }).click();
+  // Exactly two saves, including the double click, not three.
+  await expect(page.getByLabel(`${id} 的详情`)).toContainText('revision 5');
+  await page.getByRole('button', { name: '返回供应商列表', exact: true }).click();
+  await page.getByRole('button', { name: '刷新供应商列表', exact: true }).click();
+  await expect(names).toHaveText(order);
 });
+test('detail switch and re-enable action save without confirmation and keep list order', async ({ page }) => {
+  await ready(page);
+  const names = page.getByLabel('供应商列表', { exact: true }).locator('.provider-name');
+  const order = await names.allTextContents();
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByLabel('摸鱼AI 的详情');
+  const toggle = page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态', exact: true });
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  await expect(detail).toContainText('revision 4');
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.getByRole('button', { name: '重新启用', exact: true }).click();
+  await expect(toggle).toBeChecked();
+  await expect(detail).toContainText('revision 5');
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.getByRole('button', { name: '返回供应商列表', exact: true }).click();
+  await expect(names).toHaveText(order);
+});
+test('list menu toggles save without confirmation or reordering', async ({ page }) => {
+  await ready(page);
+  const names = page.getByLabel('供应商列表', { exact: true }).locator('.provider-name');
+  const order = await names.allTextContents();
+  const toggle = page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态', exact: true });
+  for (const enabled of [false, true]) {
+    await page.getByRole('button', { name: '更多操作 摸鱼AI', exact: true }).click();
+    await page.getByRole('menuitem', { name: enabled ? '启用' : '停用', exact: true }).press('Enter');
+    await expect(toggle).toBeChecked({ checked: enabled });
+    await expect(toggle).toBeEnabled();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(names).toHaveText(order);
+  }
+});
+for (const failure of ['conflict', 'unknown'] as const) {
+  test(`direct toggle ${failure} requires reread and never silently retries`, async ({ page }) => {
+    await ready(page); await scenario(page, failure);
+    const names = page.getByLabel('供应商列表', { exact: true }).locator('.provider-name');
+    const order = await names.allTextContents();
+    const toggle = page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态', exact: true });
+    await toggle.click();
+    await expect(page.getByRole('alert')).toContainText(failure === 'conflict' ? '未覆盖新版本' : '写入结果未知');
+    await expect(toggle).toBeChecked();
+    await expect(toggle).toBeDisabled();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(names).toHaveText(order);
+    await page.getByRole('button', { name: '重新读取配置', exact: true }).click();
+    await expect(toggle).toBeEnabled();
+    await expect(toggle).toBeChecked({ checked: failure === 'conflict' });
+    await expect(names).toHaveText(order);
+    await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+    await expect(page.getByLabel('摸鱼AI 的详情')).toContainText('revision 4');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+  });
+}
 test('conflict does not override latest values or silently retry', async ({ page }) => {
   await ready(page); await scenario(page, 'conflict'); await edit(page);
   await page.getByLabel('请求超时（秒）').fill('240');
