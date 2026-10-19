@@ -2,77 +2,52 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProviderProblem, problemText, type Provider, type ProviderTransport } from './provider.model';
 import { accountFailureText, checkedAccountObservation } from './provider-account.model';
 import { ProviderBalanceCache, type ProviderBalance } from './provider-balance.model';
+import { KeyedRefresh } from '../../lib/keyed-refresh';
 
-type Snapshot = { providers: Provider[]; transport: ProviderTransport; cache: ProviderBalanceCache; entries: Record<string, ProviderBalance> };
-type RefreshSession = { providers: Provider[]; enqueue: (provider: Provider) => void };
+type Snapshot = { transport: ProviderTransport; cache: ProviderBalanceCache; entries: Record<string, { revision: number; value: ProviderBalance }> };
 
-/** Show cached observations immediately; automatic and manual refreshes share two workers. */
-export function useProviderBalances(providers: Provider[], active: boolean, transport: ProviderTransport, cache: ProviderBalanceCache) {
+/** Cached observations remain visible; changes and manual refreshes share two workers. */
+export function useProviderBalances(providers: Provider[], active: boolean, transport: ProviderTransport, cache: ProviderBalanceCache, refreshVersion = 0) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const session = useRef<RefreshSession | null>(null);
+  const session = useRef<KeyedRefresh<Provider> | null>(null);
+  const current = useRef({ providers, refreshVersion }); current.current = { providers, refreshVersion };
   useEffect(() => {
     if (!active) return;
-    cache.prune(providers);
-    const abort = new AbortController();
-    const queued: Provider[] = [];
-    const pending = new Set<string>();
-    let running = 0;
-    setSnapshot({ providers, transport, cache, entries: cache.snapshot(providers) });
-
     function publish(provider: Provider, value: ProviderBalance) {
-      setSnapshot(old => old?.providers === providers && old.transport === transport && old.cache === cache
-        ? { ...old, entries: { ...old.entries, [provider.id]: value } } : old);
+      setSnapshot(old => ({ transport, cache, entries: { ...(old?.transport === transport && old.cache === cache ? old.entries : {}), [provider.id]: { revision: provider.revision, value } } }));
     }
-    async function query(provider: Provider) {
+    const queue = new KeyedRefresh<Provider>(async (provider, signal) => {
       const q = { provider_id: provider.id, expected_revision: provider.revision, operation: 'balance-summary', key_id: '', remote_key_id: 0 };
       const previous = cache.read(provider);
       let value: ProviderBalance;
       try {
         if (!transport.allowance) throw new ProviderProblem('read_error');
-        const observation = checkedAccountObservation(await transport.allowance(q, abort.signal), q);
+        const observation = checkedAccountObservation(await transport.allowance(q, signal), q);
         value = observation.failure
-          ? { observation: previous?.observation ?? observation, failure: observation.failure,
-              error: accountFailureText[observation.failure] ?? '查询失败，请稍后刷新。' }
+          ? { observation: previous?.observation ?? observation, failure: observation.failure, error: accountFailureText[observation.failure] ?? '查询失败，请稍后刷新。' }
           : { observation };
       } catch (e) {
         value = { observation: previous?.observation, error: problemText[e instanceof ProviderProblem ? e.code : 'read_error'] };
       }
-      if (abort.signal.aborted) return;
-      cache.write(provider, value);
-      publish(provider, value);
-      pending.delete(provider.id);
-      running--;
-      drain();
-    }
-    function drain() {
-      while (!abort.signal.aborted && running < 2 && queued.length) {
-        running++;
-        void query(queued.shift()!);
-      }
-    }
-    function enqueue(provider: Provider) {
-      if (abort.signal.aborted || pending.has(provider.id)) return;
-      pending.add(provider.id);
-      publish(provider, { ...cache.read(provider), refreshing: true });
-      queued.push(provider);
-      drain();
-    }
-    const current = { providers, enqueue };
-    session.current = current;
-    for (const provider of providers) enqueue(provider);
-    return () => {
-      abort.abort();
-      if (session.current === current) session.current = null;
-    };
-  }, [providers, active, transport, cache]);
-
-  const refresh = useCallback((id: string) => {
-    const current = session.current;
-    if (!current) return;
-    const provider = current.providers.find(provider => provider.id === id);
-    if (provider) current.enqueue(provider);
-  }, []);
-  const entries = active && snapshot?.providers === providers && snapshot.transport === transport && snapshot.cache === cache
-    ? snapshot.entries : cache.snapshot(providers);
+      if (signal.aborted) return;
+      cache.write(provider, value); publish(provider, value);
+    }, 2, provider => publish(provider, { ...cache.read(provider), refreshing: true }));
+    session.current = queue;
+    queue.update(current.current.providers, current.current.refreshVersion);
+    return () => { queue.dispose(); session.current = null; setSnapshot(null); };
+  }, [active, transport, cache]);
+  useEffect(() => {
+    if (!active) return; // An initial empty list is not an authoritative deletion.
+    cache.prune(providers);
+    session.current?.update(providers, refreshVersion);
+    const ids = new Set(providers.map(p => p.id));
+    setSnapshot(old => old && ({ ...old, entries: Object.fromEntries(Object.entries(old.entries).filter(([id]) => ids.has(id))) }));
+  }, [providers, refreshVersion, cache, active]);
+  const refresh = useCallback((id: string) => session.current?.refresh(id), []);
+  const entries = cache.snapshot(providers);
+  if (active && snapshot?.transport === transport && snapshot.cache === cache) for (const provider of providers) {
+    const entry = snapshot.entries[provider.id];
+    if (entry?.revision === provider.revision) entries[provider.id] = entry.value;
+  }
   return { entries, refresh };
 }

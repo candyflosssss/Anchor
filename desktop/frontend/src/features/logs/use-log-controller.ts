@@ -20,7 +20,7 @@ export function useLogController() {
   const load = useCallback(async () => {
     const id = ++lifecycle.request; setLoading(true);
     try { const p = await logService.list({ ...query, since_ms: Date.now() - Number(filters.window) * 60000 }); if (lifecycle.alive && id === lifecycle.request) { setPage(p); setError(''); } }
-    catch { if (lifecycle.alive && id === lifecycle.request) { setPage(null); setError('日志读取失败'); } }
+    catch { if (lifecycle.alive && id === lifecycle.request) { setError('日志读取失败；保留上次读取结果。'); } }
     finally { if (lifecycle.alive && id === lifecycle.request) setLoading(false); }
   }, [query, filters.window, lifecycle]);
   useEffect(() => { lifecycle.alive = true; return () => { lifecycle.alive = false; lifecycle.request++; lifecycle.detail++; }; }, [lifecycle]);

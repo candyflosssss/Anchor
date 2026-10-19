@@ -31,7 +31,6 @@ export function useMappingRates(providers: Provider[], active: boolean, transpor
         const p = providers.find(p => p.id === target.provider_id)!; const id = rateID(target);
         if (abort.signal.aborted || at !== epoch.current) break;
         setPending(id);
-        setValues(old => { const next = { ...old }; delete next[id]; return next; });
         setErrors(old => { const next = { ...old }; delete next[id]; return next; });
         try {
           if (!transport.rate) throw new ProviderProblem('read_error');

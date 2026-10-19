@@ -22,7 +22,7 @@ export function ProviderList({ c, summaries, balances, onRefreshBalance, onEdit,
     <header className="page-header"><div><div className="eyebrow">配置管理</div><h1>供应商</h1></div><Button disabled={c.blocked} onClick={onCreate}><Plus />添加供应商</Button></header>
     {children}
     <div className="list-toolbar"><div className="filter-tabs" role="group" aria-label="供应商状态筛选">{([['all', '全部', c.providers.length], ['enabled', '已启用', enabled], ['disabled', '已停用', c.providers.length - enabled]] as const).map(([value, label, count]) => <button key={value} aria-pressed={c.filter === value} disabled={c.busy} onClick={() => c.setFilter(value)}>{label}<span>{c.phase === 'ready' ? count : '—'}</span></button>)}</div>
-      <div className="toolbar-actions"><div className="search-input"><Search size={15} /><Input disabled={c.busy} aria-label="搜索供应商名称或地址" placeholder="搜索名称或地址…" value={c.search} onChange={event => c.setSearch(event.target.value)} /></div><Button variant="outline" size="icon" disabled={c.busy || !!c.editor || c.phase === 'loading'} onClick={() => void c.load()} aria-label="刷新供应商列表"><RefreshCw /></Button></div>
+      <div className="toolbar-actions"><div className="search-input"><Search size={15} /><Input disabled={c.busy} aria-label="搜索供应商名称或地址" placeholder="搜索名称或地址…" value={c.search} onChange={event => c.setSearch(event.target.value)} /></div><Button variant="outline" size="icon" disabled={c.busy || !!c.editor || c.phase === 'loading'} onClick={() => void c.load()} aria-label="刷新供应商列表"><RefreshCw className={c.refreshing ? 'animate-spin motion-reduce:animate-none' : undefined} /></Button></div>
     </div>
     <section className="provider-surface" aria-label="供应商列表">
       <div className="table-scroll"><Table><TableCaption className="sr-only">{c.mock ? '模拟供应商列表；健康状态来自本地 Key 与测试记录' : '供应商列表；不回传密钥，健康状态来自本地 Key 与测试记录'}</TableCaption><TableHeader><TableRow>
@@ -52,7 +52,7 @@ export function ProviderList({ c, summaries, balances, onRefreshBalance, onEdit,
       {c.phase === 'loading' && <div className="empty-state" role="status"><LoaderCircle className="loading-icon" size={28} /><h2>正在读取供应商</h2><p>加载当前实例的配置…</p></div>}
       {c.phase === 'error' && <div className="empty-state"><Unplug size={32} /><h2>暂时无法展示供应商</h2></div>}
       {c.phase === 'ready' && !c.visible.length && <div className="empty-state"><Server size={32} /><h2>{c.providers.length ? '没有匹配的供应商' : '添加你的第一个供应商'}</h2><Button variant="outline" disabled={c.blocked} onClick={() => { if (c.providers.length) { c.setSearch(''); c.setFilter('all'); } else onCreate(); }}>{c.providers.length ? '清除筛选' : '添加供应商'}</Button></div>}
-      {c.phase === 'ready' && c.providers.length > 0 && <footer className="table-footer"><span>显示 {c.visible.length} / {c.providers.length} 个供应商</span></footer>}
+      {c.phase === 'ready' && c.providers.length > 0 && <footer className="table-footer"><span className="min-w-0" role="status">{c.notice}</span><span className="shrink-0">显示 {c.visible.length} / {c.providers.length} 个供应商</span></footer>}
     </section>
   </div>;
 }

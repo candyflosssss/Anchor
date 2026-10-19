@@ -177,7 +177,8 @@ test('retention, export, stable cursor snapshot and system correlation', async (
   expect(await page.evaluate(() => window.logTest.exports)).toBe(1);
   await page.getByRole('button', { name: '系统日志', exact: true }).click();
   await page.getByRole('button', { name: 'fixture_failed', exact: true }).click(); await expect(dialog).toContainText('invalid_response'); await page.keyboard.press('Escape');
-  await page.evaluate(() => { window.logTest.unavailable = true; }); await page.getByRole('button', { name: '刷新', exact: true }).click(); await expect(page.getByText('日志不可用', { exact: true })).toBeVisible();
+  await page.evaluate(() => { window.logTest.unavailable = true; }); await page.getByRole('button', { name: '刷新', exact: true }).click(); await expect(page.getByText('日志读取失败；保留上次读取结果。', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'fixture_failed', exact: true })).toBeVisible();
 });
 
 test('colored metric tiles stay readable with realistic counts in light and dark themes', async ({ page }) => {
@@ -436,11 +437,15 @@ test('trend errors and empty history are explicit and stale filter responses are
   await page.evaluate(() => { window.logTest.statsUnavailable = true; });
   await page.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(trends).toContainText('趋势读取失败');
-  await expect(trends.locator('.log-chart-line')).toHaveCount(0);
+  await expect(trends.getByRole('slider')).toBeVisible();
+  await expect(trends).toContainText('保留上次读取结果');
   await page.evaluate(() => { window.logTest.statsUnavailable = false; window.logTest.statsEmpty = true; });
   await page.getByRole('button', { name: '刷新', exact: true }).click();
   await expect(trends).toContainText('所选范围内暂无请求');
   await expect(trends.getByRole('button', { name: /已知用量/ })).toContainText('—');
+  await page.evaluate(() => { window.logTest.statsUnavailable = true; });
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(trends.getByRole('status')).toHaveText('趋势读取失败；保留上次读取结果。');
 });
 
 test('filter suggestions use full-range values, counts, mouse and keyboard without self-filtering', async ({ page }) => {
@@ -685,7 +690,7 @@ test('collapsed trends keep errors and empty states out of the log list until ex
     await expect(trends.getByRole('status')).toBeHidden();
     await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toBeVisible();
     await toggle.click();
-    await expect(trends.getByRole('status')).toHaveText(error ? '趋势读取失败' : '所选范围内暂无请求');
+    await expect(trends.getByRole('status')).toHaveText(error ? '趋势读取失败；保留上次读取结果。' : '所选范围内暂无请求');
   }
 });
 
@@ -751,3 +756,31 @@ for (const [version, ids] of [
     await expect(row.locator('.log-cost-line')).toHaveCount(4);
   });
 }
+
+test('refreshing and pausing logs preserve chart and row DOM until the query scope changes', async ({ page }) => {
+  await openLogs(page);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  const chart = await trends.getByRole('slider').elementHandle();
+  const row = await page.getByRole('button', { name: '查看请求 fixture_success' }).elementHandle();
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    const stats = api.LogStats, logs = api.Logs;
+    api.LogStats = async q => { await new Promise(resolve => setTimeout(resolve, 700)); return stats(q); };
+    api.Logs = async q => { await new Promise(resolve => setTimeout(resolve, 700)); return logs(q); };
+  });
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(trends).toHaveAttribute('aria-busy', 'true');
+  expect(await chart!.evaluate(el => el.isConnected)).toBe(true);
+  expect(await row!.evaluate(el => el.isConnected)).toBe(true);
+  await expect(trends.getByText('趋势加载中', { exact: true })).toHaveCount(0);
+  await expect(trends).toHaveAttribute('aria-busy', 'false');
+  expect(await chart!.evaluate(el => el.isConnected)).toBe(true);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  expect(await chart!.evaluate(el => el.isConnected)).toBe(true);
+  await expect(trends).toHaveAttribute('aria-busy', 'false');
+  expect(await chart!.evaluate(el => el.isConnected)).toBe(true);
+  await page.getByLabel('供应商筛选', { exact: true }).fill('different-provider');
+  await expect(trends).toHaveAttribute('aria-busy', 'true');
+  // Never present the previous provider's chart as results for the new filter.
+  await expect(trends.getByRole('slider')).toHaveCount(0);
+});

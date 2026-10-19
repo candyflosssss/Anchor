@@ -72,6 +72,7 @@ export function LogStatsView({ filters, paused, revision, onGroupSelect }: { fil
   const c = useLogStatsController(filters, paused, revision);
   const [collapsed, setCollapsed] = useState(false);
   const contentId = useId();
+  const error = c.error ? `${c.error}${c.data ? '；保留上次读取结果。' : ''}` : '';
   return <section className="log-stats log-surface" aria-label="请求运行趋势" aria-busy={c.loading} data-collapsed={collapsed}>
     <header className="log-stats-header"><h2>运行趋势</h2>{!collapsed && <><label>分类统计<select aria-label="日志分类统计" className="select-field" value={c.groupBy} onChange={e => c.setGroupBy(e.target.value as LogDimension | '')}>
       <option value="">不分类</option>{(Object.keys(dimensionLabels) as LogDimension[]).map(key => <option key={key} value={key}>按{dimensionLabels[key]}</option>)}
@@ -87,8 +88,9 @@ export function LogStatsView({ filters, paused, revision, onGroupSelect }: { fil
       <div className="log-stats-metrics" role="group" aria-label="趋势指标">{metrics.map(m => <button key={m.id} aria-pressed={c.metric === m.id} data-tone={m.id} onClick={() => c.setMetric(m.id)}>
         <span>{m.label}</span><strong>{formatStat(c.data?.summary[m.field] ?? null, true)}<small>{m.unit}</small></strong>
       </button>)}</div>
-      {c.error || c.loading || !c.data || c.data.summary.requests === 0 ? <div className="log-stats-placeholder" role="status">{c.error || (c.loading ? '趋势加载中' : '所选范围内暂无请求')}</div> : <TrendChart data={c.data} metric={c.metric} />}
-      {c.groupBy && !c.loading && !c.error && c.data && <LogGroups data={c.data} dimension={c.groupBy} onSelect={value => onGroupSelect(c.groupBy as LogDimension, value)} />}
+      {error && c.data && c.data.summary.requests > 0 && <p className="px-4 text-sm text-destructive" role="status">{error}</p>}
+      {!c.data || c.data.summary.requests === 0 ? <div className="log-stats-placeholder" role="status">{error || (!c.data && c.loading ? '趋势加载中' : '所选范围内暂无请求')}</div> : <TrendChart data={c.data} metric={c.metric} />}
+      {c.groupBy && c.data && <LogGroups data={c.data} dimension={c.groupBy} onSelect={value => onGroupSelect(c.groupBy as LogDimension, value)} />}
     </div>
   </section>;
 }

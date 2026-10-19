@@ -15,10 +15,14 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
   const abortRef = useRef<AbortController | null>(null);
   const epoch = useRef(0);
   const id = p?.id, revision = p?.revision;
+  const scope = useRef<{ id?: string; revision?: number; transport: ProviderTransport } | null>(null);
   useEffect(() => {
     const abort = new AbortController(); abortRef.current?.abort(); abortRef.current = abort;
     const at = ++epoch.current;
-    setSettings(null); setObservedPlatform(''); setBalance(null); setQuota(null); setRate(null); setError(''); setNeedsRead(false);
+    const previous = scope.current; scope.current = { id, revision, transport };
+    if (previous?.id !== id || previous?.transport !== transport) setSettings(null);
+    if (previous?.id !== id || previous?.transport !== transport || previous?.revision !== revision) { setObservedPlatform(''); setBalance(null); setQuota(null); setRate(null); }
+    setError(''); setNeedsRead(false);
     lock.current = !!id; setBusy(!!id);
     if (id) {
       void (async () => {
@@ -30,7 +34,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
           setSettings(v);
         } catch (e) {
           if (!abort.signal.aborted && at === epoch.current) {
-            const code = e instanceof ProviderProblem ? e.code : 'read_error'; setError(problemText[code]); setNeedsRead(code === 'conflict');
+            const code = e instanceof ProviderProblem ? e.code : 'read_error'; setError(problemText[code]); setNeedsRead(true);
           }
         } finally { if (at === epoch.current) { lock.current = false; setBusy(false); } }
       })();
@@ -42,8 +46,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
     if (!p || !matches || lock.current || blocked() || needsRead) return false;
     if (input.provider_id !== p.id || input.expected_revision !== p.revision) return false;
     lock.current = true; setBusy(true); setError('');
-    if (operation === 'save' || operation === 'balance') setBalance(null); if (operation === 'save' || operation === 'key-quota') setQuota(null);
-    if (operation === 'save' || operation === 'effective-rate') setRate(null);
+    if (operation === 'save') { setBalance(null); setQuota(null); setRate(null); }
     const at = epoch.current, abort = new AbortController(); abortRef.current = abort;
     try {
       if (operation === 'save') {
@@ -72,7 +75,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
       if (at === epoch.current) { lock.current = false; setBusy(false); }
     }
   }
-  return { observedPlatform: matches ? observedPlatform : '', settings: matches ? settings : null, balance: matches ? balance : null, quota: matches ? quota : null, rate: matches ? rate : null, busy, error, needsRead,
+  return { observedPlatform: matches ? observedPlatform : '', ready: matches, settings: settings?.provider_id === id ? settings : null, balance: matches ? balance : null, quota: matches ? quota : null, rate: matches ? rate : null, busy, error, needsRead,
     isBusy: () => lock.current,
     save: (input: SaveAccountSettings) => run('save', input),
     query: (input: AccountQuery) => run(input.operation as 'balance' | 'key-quota' | 'effective-rate', input),

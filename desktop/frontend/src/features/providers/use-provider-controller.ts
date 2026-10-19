@@ -1,3 +1,4 @@
+import { reconcileEntities } from '../../lib/keyed-refresh';
 import { useProviderAccount } from './use-provider-account';
 import { useProviderFeatures } from './use-provider-features';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,6 +10,10 @@ type Phase = 'loading' | 'ready' | 'error';
 export function useProviderController(environment: ProviderEnvironment) {
   const { transport, mock } = environment;
   const [providers, setProviders] = useState<Provider[]>([]);
+  const hasSnapshot = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const [summaryVersion, setSummaryVersion] = useState(0);
   const [phase, setPhase] = useState<Phase>('loading');
   const [readVersion, setReadVersion] = useState(0);
   const [problem, setProblem] = useState<ProblemCode | null>(null);
@@ -43,23 +48,30 @@ export function useProviderController(environment: ProviderEnvironment) {
     if (catalogQuery.current) { catalogEpoch.current++; catalogQuery.current.abort(); catalogQuery.current = null; locked.current = false; setModelsBusy(false); }
   }, []);
   /** prefer: undefined keeps the current selection, null clears it, a string selects that id when present. */
-  const load = useCallback(async (prefer?: string | null) => {
+  const load = useCallback(async (prefer?: string | null, scope: 'all' | 'provider' | 'models' = 'all') => {
     cancelCatalog();
     query.current?.abort();
     const abort = new AbortController(); query.current = abort;
     const epoch = generation.current;
-    setPhase('loading');
+    if (!hasSnapshot.current) setPhase('loading');
+    setRefreshing(true);
     try {
       const result = await transport.list(abort.signal);
       if (abort.signal.aborted || epoch !== generation.current) return false;
-      setProviders(result); setReadVersion(value => value + 1); setPhase('ready'); setProblem(null);
+      setProviders(old => reconcileEntities(old, result));
+      hasSnapshot.current = true;
+      if (scope === 'all') { setReadVersion(value => value + 1); setRefreshVersion(value => value + 1); }
+      if (scope !== 'provider') setSummaryVersion(value => value + 1);
+      setPhase('ready'); setProblem(null);
       setSelectedId(old => { const want = prefer !== undefined ? prefer : old; return result.some(p => p.id === want) ? want : null; });
       return true;
     } catch (error) {
       if (abort.signal.aborted || epoch !== generation.current) return false;
-      setProviders([]); setPhase('error');
+      if (!hasSnapshot.current) setPhase('error');
       setProblem(error instanceof ProviderProblem ? error.code : 'read_error');
       return false;
+    } finally {
+      if (query.current === abort) { query.current = null; setRefreshing(false); }
     }
   }, [transport, cancelCatalog]);
   useEffect(() => {
@@ -68,7 +80,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   }, [load]);
   const visible = useMemo(() => providers.filter(p => (filter === 'all' || p.enabled === (filter === 'enabled')) && `${p.id} ${p.homepage_url} ${p.base_urls.join(' ')}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())), [providers, filter, search]);
   const selected = providers.find(p => p.id === (quickId ?? selectedId)) ?? null;
-  const blocked = phase !== 'ready' || problem === 'unknown' || problem === 'conflict' || busy || modelsBusy;
+  const blocked = phase !== 'ready' || refreshing || (!!problem && problem !== 'invalid' && problem !== 'referenced') || busy || modelsBusy;
   function openEditor(source?: Provider) {
     if (blocked || locked.current || (features.isBusy() || account.isBusy())) return;
     setNotice(''); setEditor({ source, draft: newDraft(source) }); setErrors({});
@@ -93,8 +105,8 @@ export function useProviderController(environment: ProviderEnvironment) {
     const nextErrors = validateDraft(draft);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
-    clearModels();
-    locked.current = true; setBusy(true); setNotice('');
+    if (!toggling) clearModels();
+    locked.current = true; setBusy(true);
     const abort = new AbortController(); write.current = abort;
     const epoch = generation.current;
     // Snapshot only for the transport call; erase the secret from the visible form immediately.
@@ -105,13 +117,13 @@ export function useProviderController(environment: ProviderEnvironment) {
       const saved = await transport.save(input, abort.signal);
       clearSaveSecrets(input);
       if (abort.signal.aborted || epoch !== generation.current) return;
-      clearModels();
+      if (!toggling) clearModels();
       // Update existing rows in place so saving or toggling never changes their position.
       setProviders(old => old.some(p => p.id === saved.id) ? old.map(p => p.id === saved.id ? saved : p) : [...old, saved]);
       if (!source) { setSelectedId(saved.id); setDetailTab('overview'); setDialog(null); }
       setEditor(setup ? { source: saved, draft: newDraft(saved), setup: true, models: true } : null);
       // Reconcile newly created providers with the authoritative list automatically.
-      if (!source) await load(saved.id);
+      if (!source) await load(saved.id, 'provider');
       if (abort.signal.aborted || epoch !== generation.current) return;
       if (setup) {
         setDetailTab('models');
@@ -136,7 +148,9 @@ export function useProviderController(environment: ProviderEnvironment) {
   }
   async function fetchModels(provider: Provider) {
     const target = { provider_id: provider.id, expected_revision: provider.revision, key_id: '' };
-    clearModels(); locked.current = true; setModelsBusy(true);
+    cancelCatalog(); catalogEpoch.current++;
+    setModels(old => old?.provider_id === provider.id && old.revision === provider.revision ? old : null);
+    setModelsProblem(null); locked.current = true; setModelsBusy(true);
     const abort = new AbortController(); catalogQuery.current = abort;
     const epoch = catalogEpoch.current;
     try {
@@ -166,19 +180,23 @@ export function useProviderController(environment: ProviderEnvironment) {
   function changeScenario(value: Scenario) {
     if (!environment.reset || editor || busy || modelsBusy || (features.isBusy() || account.isBusy())) return;
     clearModels(); query.current?.abort(); write.current?.abort(); generation.current++;
+    hasSnapshot.current = false; setProviders([]);
     environment.reset(value); setScenario(value); setQuickId(null); setSelectedId(null); setDetailTab('overview'); setDialog(null); setSearch(''); setFilter('all'); setNotice(''); setProblem(null);
     void load();
   }
   const features = useProviderFeatures(selected, transport, async (id, action, from) => {
     if (['key-put', 'key-delete', 'rename', 'copy', 'delete'].includes(action)) clearModels();
+    // Shared model revisions can change without changing every provider revision.
+    const sharedModels = ['model-put', 'model-delete', 'key-delete', 'rename', 'copy', 'delete'].includes(action);
+    const scope = action === 'conflict' ? 'all' : sharedModels ? 'models' : 'provider';
     if (action === 'rename' || action === 'copy' || action === 'delete') {
-      await load(id);
+      await load(id, scope);
       setDetailTab('overview'); setDialog(null);
       setNotice(action === 'rename' ? `已改名为 ${id}` : action === 'copy' ? `已复制为 ${id}（默认停用）` : `已删除 ${from}`);
-    } else await load();
+    } else await load(undefined, scope);
   }, () => setNotice(''), readVersion);
   const account = useProviderAccount(selected, transport, async () => {
-    clearModels(); await load();
+    clearModels(); await load(undefined, 'provider');
     setNotice(`${mock ? '演示：' : ''}平台配置已保存。可在「账户与余额」刷新余额或 Key 额度。`);
   }, () => blocked || locked.current || features.busy || !!editor || !!dialog, readVersion);
   function openProvider(id: string, tab: DetailTab = 'overview', next?: ProviderDialog) {
@@ -190,8 +208,8 @@ export function useProviderController(environment: ProviderEnvironment) {
     account,
     features: { ...features, importModels: (ids: string[]) => account.isBusy() || locked.current || blocked ? Promise.resolve() : features.importModels(ids, Object.fromEntries((models?.entries ?? []).map(e => [e.id, e.key_ids]))), run: (...args: Parameters<typeof features.run>) => account.isBusy() ? Promise.resolve(false) : features.run(...args) },
     transport, quickId, openQuickTest: (id: string) => { if (!blocked && !locked.current && !dialog && !features.isBusy() && !account.isBusy()) { setQuickId(id); setDialog({ kind: 'test' }); } },
-    mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
-    notice, search, setSearch, filter, setFilter, editor, errors, busy: busy || modelsBusy || features.busy || account.busy, blocked: blocked || features.busy || account.busy, scenario,
+    mock, providers, visible, selected, selectedId, phase, refreshing, refreshVersion, summaryVersion, problem, problemMessage: problem ? problemText[problem] : '',
+    notice, search, setSearch, filter, setFilter, editor, errors, busy: refreshing || busy || modelsBusy || features.busy || account.busy, blocked: blocked || features.busy || account.busy, scenario,
     models: models?.provider_id === selected?.id ? models : null,
     modelsProblem, modelsBusy, discoverModels, editSetup,
     detailTab, setDetailTab, dialog, openProvider,

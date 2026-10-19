@@ -12,7 +12,7 @@ export function ProviderAccountView({ c }: { c: ProviderController }) {
   return <div className="stack">
     {a.error && <div className="feedback error-feedback" role="alert"><span>{a.error}</span><Button size="sm" variant="outline" disabled={c.busy} onClick={() => void c.load()}>重新读取配置</Button></div>}
     {!a.settings ? <div className="empty-state compact" role="status">{a.busy ? <><LoaderCircle className="loading-icon" size={24} /><p>正在读取平台配置…</p></> : <p>请重新读取平台配置后操作。</p>}</div>
-      : <AccountContent key={`${a.settings.provider_id}:${a.settings.revision}`} c={c} settings={a.settings} />}
+      : <AccountContent key={a.settings.provider_id} c={c} settings={a.settings} />}
   </div>;
 }
 function AccountContent({ c, settings: s }: { c: ProviderController; settings: AccountSettings }) {
@@ -25,9 +25,16 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
   const [formError, setFormError] = useState('');
   const [keyID, setKeyID] = useState('');
   const [remoteID, setRemoteID] = useState('');
+  // A revision-only reread must not remount the form or collapse its disclosure.
+  const configKey = JSON.stringify([s.platform, s.site_url, s.user_id, s.has_user_token]);
+  const [baseline, setBaseline] = useState(configKey);
+  if (baseline !== configKey) {
+    setBaseline(configKey); setPlatform(s.platform || 'auto'); setSiteURL(s.site_url); setUserID(s.user_id ? String(s.user_id) : '');
+    setTokenMode('keep'); setToken(''); setConfirmClear(false); setFormError('');
+  }
   const a = c.account;
   const dirty = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || (userID.trim() || '0') !== String(s.user_id) || tokenMode !== 'keep';
-  const disabled = c.blocked || a.needsRead;
+  const disabled = c.blocked || a.needsRead || !a.ready;
   const queryDisabled = disabled || dirty;
   const authTargetChanged = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || Number(userID || '0') !== s.user_id;
   const keys = c.features.data?.keys ?? [];
@@ -46,7 +53,7 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
     if (tokenMode === 'clear' && !confirmClear) { setFormError('请确认清除已保存用户令牌。'); return; }
     const userToken = tokenMode === 'keep' ? null : tokenMode === 'clear' ? '' : token.trim();
     setToken(''); // Never keep a submitted credential in the visible form, including failures.
-    await a.save({ provider_id: s.provider_id, expected_revision: s.revision, platform, site_url: siteURL.trim(), user_id: Number(uid), user_token: userToken });
+    if (await a.save({ provider_id: s.provider_id, expected_revision: s.revision, platform, site_url: siteURL.trim(), user_id: Number(uid), user_token: userToken })) { setTokenMode('keep'); setConfirmClear(false); }
   }
   function query(operation: 'balance' | 'key-quota' | 'effective-rate') {
     if (queryDisabled) return;
