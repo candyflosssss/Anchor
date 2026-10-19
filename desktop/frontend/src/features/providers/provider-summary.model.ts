@@ -50,6 +50,8 @@ export function summarize(provider: Provider, workspace: Workspace | null | unde
   if (enabled.length && enabled.every(k => k.state === 'invalid')) return out('auth', 'bad', '认证失效', '所有启用的 Key 都被上游拒绝');
   const degraded = enabled.filter(k => ['cooling', 'half-open', 'invalid'].includes(k.state));
   if (degraded.length) return out('degraded', 'warn', '部分 Key 冷却/失效', `${degraded.length} / ${enabled.length} 个 Key 暂不可调度`);
+  const downweighted = enabled.filter(k => k.state === 'degraded');
+  if (downweighted.length) return out('degraded', 'warn', 'Key 已降权', `${downweighted.length} / ${enabled.length} 个 Key 已降权，仍可调度`);
   if (!w.models.length) return out('unmapped', 'warn', '未映射模型', 'Agent 还不能通过此供应商使用任何模型');
   if (!keys.length) return out('anonymous', 'warn', '匿名请求', '没有 Key，将以匿名方式请求上游');
   if (lastTest?.failure) return out('test-failed', 'warn', '最近测试失败', `${lastTest.model} · HTTP ${lastTest.http_status || '—'}`);
@@ -62,7 +64,7 @@ const attentionPlan: Partial<Record<HealthCode, { title: string; tab: DetailTab;
   error: { title: '详情读取失败', tab: 'overview', action: '查看详情' },
   'no-enabled-key': { title: '没有启用的 Key', tab: 'keys', action: '管理 Key' },
   auth: { title: 'Key 认证失效', tab: 'keys', action: '替换 Key' },
-  degraded: { title: '部分 Key 暂不可调度', tab: 'keys', action: '查看 Key' },
+  degraded: { title: 'Key 调度状态需留意', tab: 'keys', action: '查看 Key' },
   unmapped: { title: '还没有映射模型', tab: 'models', action: '映射模型' },
   anonymous: { title: '没有配置 Key', tab: 'keys', action: '添加 Key', dialog: { kind: 'key' } },
   'test-failed': { title: '最近一次测试失败', tab: 'overview', action: '重新测试', dialog: { kind: 'test' } },

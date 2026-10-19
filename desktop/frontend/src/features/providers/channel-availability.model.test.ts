@@ -3,7 +3,7 @@ import fixture from '../../../../contract/provider-workspace.json';
 import mapping from '../../../../contract/provider-model-mapping.json';
 import providers from '../../../../contract/providers.json';
 import { channelAvailability, channelKeys, keyAvailability } from './channel-availability.model';
-import { aggregateModels, summarize } from './provider-summary.model';
+import { aggregateModels, attention, summarize } from './provider-summary.model';
 import type { KeyStatus } from '../../desktop/contract.generated';
 const key = (id: string, state = 'ready', enabled = true): KeyStatus => ({ ...fixture.keys[0], id, state, enabled });
 
@@ -24,10 +24,17 @@ describe('mapping channel availability', () => {
     expect(channelAvailability(true, ['missing'], keys).state).toBe('unavailable');
   });
   it('distinguishes cooling, invalid, and ambiguous half-open status', () => {
+    expect(channelAvailability(true, [], [key('a', 'degraded')]).state).toBe('available');
+    expect(keyAvailability({ id: 'a', key: key('a', 'degraded', false), anonymous: false }).state).toBe('unavailable');
     for (const state of ['cooling', 'invalid', 'disabled']) expect(channelAvailability(true, [], [key('a', state)]).state).toBe('unavailable');
     for (const state of ['half-open', 'future-state']) expect(channelAvailability(true, [], [key('a', state)]).state).toBe('unknown');
     expect(channelAvailability(true, [], [key('a', 'half-open'), key('b')]).state).toBe('available');
     expect(keyAvailability({ id: 'a', key: key('a', 'ready', false), anonymous: false }).state).toBe('unavailable');
+  });
+  it('reports downweighting without presenting it as unavailable', () => {
+    const summary = summarize({ ...providers.providers[0], enabled: true }, { ...fixture, keys: [key('a', 'degraded')] });
+    expect(summary).toMatchObject({ code: 'degraded', tone: 'warn', label: 'Key 已降权', hint: '1 / 1 个 Key 已降权，仍可调度' });
+    expect(attention([summary])[0]).toMatchObject({ title: 'Key 调度状态需留意', tab: 'keys' });
   });
   it('allows anonymous only when the core would synthesize an anonymous Key', () => {
     expect(channelAvailability(true, [], []).state).toBe('available');

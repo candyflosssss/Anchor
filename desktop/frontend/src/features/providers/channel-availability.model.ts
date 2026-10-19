@@ -18,6 +18,7 @@ export function keyAvailability(source: SourceKey): ChannelAvailability {
   const k = source.key;
   if (!k) return { state: 'unavailable', label: 'Key 不存在', reason: '映射限定的 Key 已删除或不存在。' };
   if (!k.enabled || k.state === 'disabled') return { state: 'unavailable', label: '已停用', reason: 'Key 开关已关闭。' };
+  if (k.state === 'degraded') return { state: 'available', label: '已降权', reason: '调度权重已降低，仍可参与请求。' };
   if (k.state === 'ready') return { state: 'available', label: '当前可用', reason: 'Key 已启用且未处于冷却或认证失效状态。' };
   if (k.state === 'invalid') return { state: 'unavailable', label: '认证失效', reason: 'Key 被上游拒绝，需替换或恢复。' };
   if (k.state === 'cooling') return { state: 'unavailable', label: '冷却中', reason: 'Key 暂处于冷却状态，请刷新配置核对恢复情况。' };

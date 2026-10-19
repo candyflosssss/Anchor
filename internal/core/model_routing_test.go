@@ -106,24 +106,23 @@ func TestWeightedModelGatewayDistributionAndAvailability(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		send()
 	}
-	if a.Load() != 8 || b.Load() != 7 {
-		t.Fatal("cooling candidate received traffic", a.Load(), b.Load())
-	}
+	beforeRecovery := a.Load()
 	f.core.mu.Lock()
 	f.core.health[healthID(pa, "default")].Until = time.Now().Add(-time.Second)
 	f.core.mu.Unlock()
 	for i := 0; i < 3; i++ {
 		send()
 	}
-	if a.Load() != 10 {
-		t.Fatal("cooled candidate did not recover", a.Load())
+	if a.Load() <= beforeRecovery {
+		t.Fatal("degraded candidate did not recover", a.Load())
 	}
+	beforeBusy := a.Load()
 	if !f.core.take("a", 1) {
 		t.Fatal("reserve")
 	}
 	send()
 	f.core.release("a")
-	if a.Load() != 10 {
+	if a.Load() != beforeBusy {
 		t.Fatal("busy candidate received traffic")
 	}
 	// Refreshing group caches changes weights immediately without model edits or routing debt.
@@ -168,19 +167,19 @@ func TestWeightedCandidatesSkipUnavailableAndFailOver(t *testing.T) {
 	p, _ := f.store.Provider("a")
 	f.core.finishKey(p, "default", 401, "", false)
 	routes, err := f.core.routeCandidates(m)
-	if err != nil || len(routes) != 1 || routes[0].ProviderID != "b" {
+	if err != nil || len(routes) != 2 || routes[0].ProviderID != "b" {
 		t.Fatal(routes, err)
 	}
 	if err = f.store.MutateProvider("b", 1, "key-put", "default", "", "", false, false); err != nil {
 		t.Fatal(err)
 	}
 	routes, err = f.core.routeCandidates(m)
-	if err != nil || len(routes) != 0 {
+	if err != nil || len(routes) != 1 || routes[0].ProviderID != "a" {
 		t.Fatal("disabled key scheduled", routes, err)
 	}
 	r = request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hi"}`)
 	raw = text(t, r)
-	if r.StatusCode != 503 || !strings.Contains(raw, "no_available_candidate") {
+	if r.StatusCode != 503 || failed.Load() < 2 {
 		t.Fatal(r.StatusCode, raw)
 	}
 }

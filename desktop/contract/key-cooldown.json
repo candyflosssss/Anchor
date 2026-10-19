@@ -1,5 +1,6 @@
 {
   "enabled": true,
+  "weight_percent": 10,
   "failure_threshold": 3,
   "cooldown_seconds": 30,
   "rate_limit_seconds": 30,

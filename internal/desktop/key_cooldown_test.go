@@ -23,7 +23,7 @@ func TestKeyCooldownBridgeAndCLI(t *testing.T) {
 		t.Fatal(initial)
 	}
 	enabled, threshold, seconds, rate := false, 2, 60, 90
-	in := SaveKeyCooldownSettings{&enabled, &threshold, &seconds, &rate, 1}
+	in := SaveKeyCooldownSettings{Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 1}
 	out := b.SaveKeyCooldownSettings(in)
 	if out.Problem != nil || out.Data == nil || out.Data.Enabled || out.Data.Revision != 2 {
 		t.Fatal(out)
@@ -48,10 +48,12 @@ func TestKeyCooldownBridgeAndCLI(t *testing.T) {
 	if got := run(false, "settings", "key-cooldown"); !strings.Contains(got, `"enabled":false`) {
 		t.Fatal(got)
 	}
-	if got := run(false, "settings", "key-cooldown", "--enabled=true", "--revision", "2"); !strings.Contains(got, `"enabled":true`) || !strings.Contains(got, `"cooldown_seconds":60`) || !strings.Contains(got, `"revision":3`) {
+	if got := run(false, "settings", "key-cooldown", "--enabled=true", "--weight-percent", "25", "--revision", "2"); !strings.Contains(got, `"weight_percent":25`) || !strings.Contains(got, `"enabled":true`) || !strings.Contains(got, `"cooldown_seconds":60`) || !strings.Contains(got, `"revision":3`) {
 		t.Fatal(got)
 	}
 	run(true, "settings", "key-cooldown", "--cooldown-seconds", "50", "--revision", "2")
+	run(true, "settings", "key-cooldown", "--weight-percent", "0", "--revision", "3")
+	run(true, "settings", "key-cooldown", "--weight-percent", "101", "--revision", "3")
 	run(true, "settings", "key-cooldown", "--cooldown-seconds", "0", "--revision", "3")
 	run(true, "settings", "key-cooldown", "--failure-threshold", "101", "--revision", "3")
 	run(true, "settings", "key-cooldown", "--rate-limit-seconds", "3601", "--revision", "3")

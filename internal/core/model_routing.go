@@ -69,12 +69,9 @@ func (s *Server) routeCandidates(m state.Model) ([]state.Candidate, error) {
 	return s.routeCandidatesFor(m, "")
 }
 
-// Availability is checked without reserving half-open Keys. The selected Key and
-// concurrency are rechecked immediately before forwarding by the existing gates.
+// Health changes scheduling weight without excluding Keys. Manual availability
+// and concurrency are rechecked immediately before forwarding.
 func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Candidate, error) {
-	if m.RoutingStrategy() == "priority" {
-		return m.Candidates, nil
-	}
 	// Cost-based rules schedule actual provider/model/Key routes. The stored
 	// candidate multiplier is reserved and intentionally never used here.
 	strategy := m.RoutingStrategy()
@@ -94,7 +91,7 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 		if len(sourceKeys) == 0 {
 			sourceKeys = []state.ProviderKey{{ID: "anonymous", Enabled: true}}
 		}
-		if strategy == "lowest-latency" {
+		if strategy == "lowest-latency" || strategy == "priority" {
 			routes = append(routes, c)
 			providers = append(providers, p)
 			keys = append(keys, sourceKeys)
@@ -117,23 +114,28 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 	defer s.mu.Unlock()
 	now := time.Now()
 	available := make([]int, 0, len(m.Candidates))
+	healthWeights := make([]float64, len(m.Candidates))
 	for i, c := range m.Candidates {
 		p := providers[i]
 		if !p.Enabled || s.active[p.ID] >= p.MaxConcurrent {
 			continue
 		}
 		for _, k := range keys[i] {
-			h := s.health[healthID(p, k.ID)]
-			if k.Enabled && candidateAllowsKey(c.KeyIDs, k.ID) && (h == nil || (!h.Invalid && !h.Probing && !h.Until.After(now))) {
-				available = append(available, i)
-				break
+			if k.Enabled && candidateAllowsKey(c.KeyIDs, k.ID) {
+				healthWeights[i] = max(healthWeights[i], s.keyWeightLocked(p, k.ID, now))
 			}
+		}
+		if healthWeights[i] > 0 {
+			available = append(available, i)
 		}
 	}
 	if len(available) == 0 {
 		return []state.Candidate{}, nil
 	}
-	if strategy == "lowest-price" {
+	ordered := strategy == "priority" || strategy == "lowest-price" || strategy == "lowest-latency"
+	if strategy == "priority" {
+		// Retain configured order before applying health preference.
+	} else if strategy == "lowest-price" {
 		sort.SliceStable(available, func(i, j int) bool {
 			a, b := costs[available[i]], costs[available[j]]
 			if a == nil || b == nil {
@@ -162,8 +164,7 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 					c := m.Candidates[i]
 					if c.ProviderID == a.provider && c.Model == a.model && a.providerRevision == providers[i].Revision && candidateAllowsKey(c.KeyIDs, a.key) {
 						for _, k := range keys[i] {
-							h := s.health[healthID(providers[i], k.ID)]
-							if k.ID == a.key && k.Enabled && (h == nil || (!h.Invalid && !h.Probing && !h.Until.After(now))) {
+							if k.ID == a.key && k.Enabled {
 								preferred = i
 								break
 							}
@@ -172,10 +173,11 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 				}
 			}
 		}
+		ordered = preferred >= 0
 		if preferred < 0 {
 			// Rebuild smooth weights after cache/config/Key changes, even when the
 			// public model revision and endpoint count have not changed.
-			signatureBytes, _ := json.Marshal([]any{m.Candidates, providers, costs})
+			signatureBytes, _ := json.Marshal([]any{m.Candidates, providers, costs, healthWeights})
 			signature := string(signatureBytes)
 			schedule := s.routing[m.ID]
 			if schedule == nil || schedule.revision != m.Revision || schedule.signature != signature || len(schedule.current) != len(m.Candidates) {
@@ -186,15 +188,21 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 			for _, i := range available {
 				usable[i] = true
 			}
-			// Unknown rates are fallback-only while any known route is usable.
-			// Zero is a valid free route; share evenly among free routes, avoiding 1/0.
+			// Known/free rates retain preference among the healthiest routes.
+			// A degraded free/known route cannot suppress healthier alternatives.
 			known, free := false, false
+			maximumHealth := 0.0
+			for _, i := range available {
+				maximumHealth = max(maximumHealth, healthWeights[i])
+			}
 			minimum := 0.0
 			for _, i := range available {
 				if v := costs[i]; v != nil {
-					known = true
-					if *v == 0 {
-						free = true
+					if healthWeights[i] == maximumHealth {
+						known = true
+						if *v == 0 {
+							free = true
+						}
 					}
 					if *v > 0 && (minimum == 0 || *v < minimum) {
 						minimum = *v
@@ -215,10 +223,11 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 						schedule.current[i] = 0
 						continue
 					}
-					if !free {
+					if !free && *v > 0 {
 						weight = minimum / *v
 					}
 				}
+				weight *= healthWeights[i]
 				total += weight
 				schedule.current[i] += weight
 				if preferred < 0 || schedule.current[i] > schedule.current[preferred] {
@@ -234,6 +243,34 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 			}
 		}
 	}
+	if ordered {
+		// Ordered strategies retain their normal preference for healthy routes.
+		// A degraded first choice periodically leads, otherwise moves behind
+		// healthier alternatives; it always remains in the fallback list.
+		raw, _ := json.Marshal([]any{m.Revision, m.Candidates, providers, healthWeights})
+		id := "health\x00" + m.ID
+		schedule := s.routing[id]
+		if schedule == nil || schedule.signature != string(raw) {
+			schedule = &modelSchedule{signature: string(raw), current: make([]float64, len(m.Candidates))}
+			s.routing[id] = schedule
+		}
+		maximum := 0.0
+		for _, i := range available {
+			maximum = max(maximum, healthWeights[i])
+		}
+		for pos, i := range available {
+			if healthWeights[i] < maximum {
+				schedule.current[i] += healthWeights[i] / maximum
+				if schedule.current[i] < 1-1e-9 {
+					continue
+				}
+				schedule.current[i] -= 1
+			}
+			available = append([]int{i}, append(available[:pos], available[pos+1:]...)...)
+			break
+		}
+	}
+
 	out := make([]state.Candidate, 0, len(available))
 	for _, i := range available {
 		out = append(out, m.Candidates[i])

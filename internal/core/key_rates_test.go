@@ -102,10 +102,10 @@ func TestRoutingUnknownZeroAndCachedFailure(t *testing.T) {
 	if err != nil || r[0].ProviderID != "a" {
 		t.Fatal(r, err)
 	}
-	// Health gates beat free/cached cost and unknown remains a usable fallback.
+	// Health penalties retain free routes while favoring healthier unknown rates.
 	f.core.finishKey(p, "default", 429, "60", false)
 	r, err = f.core.routeCandidates(m)
-	if err != nil || len(r) != 1 || r[0].ProviderID != "b" {
+	if err != nil || len(r) != 2 || r[0].ProviderID != "b" {
 		t.Fatal(r, err)
 	}
 }

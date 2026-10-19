@@ -22,11 +22,6 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	var result forwardAttemptResult
 	defer func() {
 		if !result.attempted || r.Context().Err() != nil {
-			s.mu.Lock()
-			if h := s.health[healthID(p, key.ID)]; h != nil {
-				h.Probing = false
-			}
-			s.mu.Unlock()
 			return
 		}
 		s.finishKey(p, key.ID, result.status, result.after, result.success)

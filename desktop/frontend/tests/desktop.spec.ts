@@ -36,7 +36,7 @@ async function host(page: Page, rateMappings = false) {
         window.keyCooldownTest.saves++;
         if (counters.writeError) return { contract, data: null, problem: { code: counters.writeError } };
         if (input.expected_revision !== cooldownState.revision) return { contract, data: null, problem: { code: 'conflict' } };
-        cooldownState = { enabled: input.enabled!, failure_threshold: input.failure_threshold!, cooldown_seconds: input.cooldown_seconds!, rate_limit_seconds: input.rate_limit_seconds!, revision: cooldownState.revision + 1 };
+        cooldownState = { weight_percent: input.weight_percent ?? cooldownState.weight_percent, enabled: input.enabled!, failure_threshold: input.failure_threshold!, cooldown_seconds: input.cooldown_seconds!, rate_limit_seconds: input.rate_limit_seconds!, revision: cooldownState.revision + 1 };
         return { contract, data: cooldownState, problem: null };
       },
       CodexSettings: async () => ({ contract, data: codexState, problem: null }),
@@ -1093,13 +1093,15 @@ test('model settings opens on a compact general form with a fixed footer in ligh
 test('Key cooldown settings persist, validate and lock uncertain writes (simulated host)', async ({ page }) => {
   await host(page);
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
-  const menu = page.getByRole('region', { name: 'Key 自动冷却', exact: true });
+  const menu = page.getByRole('region', { name: 'Key 自动降权', exact: true });
+  const weight = menu.getByLabel('降权后权重（%）');
   const threshold = menu.getByLabel('连续失败次数');
-  const seconds = menu.getByLabel('冷却时长（秒）', { exact: true });
-  const rate = menu.getByLabel('429 冷却时长（秒）', { exact: true });
-  const toggle = menu.getByRole('switch', { name: '自动冷却', exact: true });
+  const seconds = menu.getByLabel('降权时长（秒）', { exact: true });
+  const rate = menu.getByLabel('429 降权时长（秒）', { exact: true });
+  const toggle = menu.getByRole('switch', { name: '自动降权', exact: true });
   const save = menu.getByRole('button', { name: '保存', exact: true });
   const read = menu.getByRole('button', { name: '读取', exact: true });
+  await expect(weight).toHaveValue('10');
   await expect(threshold).toHaveValue('3');
   await expect(seconds).toHaveValue('30');
   await expect(rate).toHaveValue('30');
@@ -1107,7 +1109,7 @@ test('Key cooldown settings persist, validate and lock uncertain writes (simulat
   await expect(menu.locator('.card-hint, [data-slot="tooltip-trigger"]')).toHaveCount(0);
   await threshold.fill('0');
   await expect(save).toBeDisabled();
-  await threshold.fill('2'); await seconds.fill('70'); await rate.fill('90');
+  await weight.fill('20'); await threshold.fill('2'); await seconds.fill('70'); await rate.fill('90');
   await save.click();
   await expect(menu.getByRole('status')).toHaveText('已保存');
   await toggle.click();
@@ -1138,4 +1140,5 @@ test('Key cooldown settings persist, validate and lock uncertain writes (simulat
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
   await expect(toggle).not.toBeChecked();
   await expect(threshold).toHaveValue('2');
+  await expect(weight).toHaveValue('20');
 });

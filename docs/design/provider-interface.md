@@ -64,11 +64,11 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 
 新增 `Bridge.ProviderWorkspace({provider_id})` 与 `Bridge.ProviderAction(Action)`，对应 GET `/control/v1/providers/{id}/workspace` 与 POST `/control/v1/providers/{id}/action`。动作白名单、默认值和 CLI 等价入口见[指令大全 §5](../cli/commands.md#5-供应商)及[实现契约](provider-priority-one.md)。`internal/catalog/workspace.go` 是核心 DTO 源，桌面规范以别名纳入生成器，共用 `desktop/contract/provider-workspace.json`。
 
-Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、连续失败次数、冷却结束时间和最近测试，以及 protocol 与 model_protocols（[{model,protocol}]，始终数组），绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
+Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、连续失败次数、降权结束时间和最近测试，以及 protocol 与 model_protocols（[{model,protocol}]，始终数组），绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
 
 每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。删除供应商在同一事务清理其全部模型候选及价格，保留其他供应商的同名模型、顺序和元数据，存续模型 revision 加一；失去全部候选才删除公开模型，已启用 Binding 默认模型引用仍返回 referenced 并整体回滚。停用只保留配置并暂停调度，不删除映射。模型映射修改只增加模型 revision；配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
 
-目录查询可指定启用的已存 Key，不存在的 Key 返回 not_found 且不请求上游；指定停用 Key 返回 no_enabled_keys，不抓取目录或分组倍率。省略时自动查询全部启用的已存 Key 并合并模型，列出同名模型的全部可选 Key。认证使用 Key 默认协议，模型覆盖不影响目录认证。仅无已存 Key 时使用匿名目录，全部 Key 停用时不回退匿名。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
+目录查询可指定启用的已存 Key，不存在的 Key 返回 not_found 且不请求上游；指定停用 Key 返回 no_enabled_keys，不抓取目录或分组倍率。省略时自动查询全部启用的已存 Key 并合并模型，列出同名模型的全部可选 Key。认证使用 Key 默认协议，模型覆盖不影响目录认证。仅无已存 Key 时使用匿名目录，全部 Key 停用时不回退匿名。推理测试可以明确指定停用/降权 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
 
 ## 6. Key / 模型协议（2026-10-11，desktop.16 dev 已发布）
 
@@ -85,7 +85,7 @@ Action 新增 multiplier；model-put 使用 strategy=round-robin|priority 设置
 
 model_revision=0 表示当前供应商加入别名，不覆盖它已有的映射；别名不存在则创建并默认round-robin，已存在则追加并保留其他候选、能力、策略及Codex元数据。正 revision 编辑须匹配共享模型 revision，只改当前供应商上游/倍率；tools/streaming/strategy 为共享模型字段。追加写入仍以读取的最新模型 revision 进行CAS及供应商 revision 事务校验，不自动重放并发冲突。model-delete 事务内只删当前供应商候选与价格，剩余模型 revision+1；最后一个候选才删除公开模型、清理模型价格并检查 Binding 默认模型引用。
 
-round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍率1，范围0.01..1000；只在当前可调度候选中分配首选上游，不预占半开Key。真正转发时再次核对并发及Key状态；失败转移仍遵循原有禁止未知结果/流式重放规则。倍率不从外部站点拉取，目录成功不表示可推理。
+round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍率1，范围0.01..1000；只在当前可调度候选中分配首选上游，不预占Key。真正转发时再次核对并发及Key状态；失败转移仍遵循原有禁止未知结果/流式重放规则。倍率不从外部站点拉取，目录成功不表示可推理。
 
 ## 8. 平台账户与计费兼容层（2026-10-13，当前源码）
 
@@ -169,7 +169,7 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 ## 9. 来源 Key与模型调度（2026-10-13，当前源码）
 
-模型 candidates 新增可选 key_ids：空／缺失表示所有启用 Key，非空仅允许列出的本机 Key ID。写入检查 Key 属于候选供应商，去重且最多64项；anonymous 仅能用于没有 Key 的供应商。目录导入保留实际 entries.key_ids，禁止调度到目录未报告的其他 Key。停用／认证失效／冷却／半开探测等既有健康门禁照常生效，指定 Key 都不可用时切换其他候选，不越过范围。删除 Key（包括清除 default 凭据）在同一事务移除该供应商候选中的对应 key_ids；仍有其他来源 Key 时保留候选，列表耗尽则移除候选，禁止将空列表写回并扩大为全部 Key。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免隐式变为匿名来源。其他供应商及其他 Key 提供的同名模型、候选元数据与顺序均保留；受影响的存续模型 revision 加一，仅当前供应商已无候选时清理其价格。公开模型失去全部候选才删除；已启用 Binding 默认模型引用仍返回 referenced 并整体回滚，已禁用 Binding 不阻止删除。该行为于 2026-10-19 在当前源码实现，尚未打包发布。schema5→6 顺序迁移保留模型、供应商与凭据，无新表；schema版本保护防止旧核心忽略 Key 限制。
+模型 candidates 新增可选 key_ids：空／缺失表示所有启用 Key，非空仅允许列出的本机 Key ID。写入检查 Key 属于候选供应商，去重且最多64项；anonymous 仅能用于没有 Key 的供应商。目录导入保留实际 entries.key_ids，禁止调度到目录未报告的其他 Key。手动停用与并发门禁照常生效，故障只降权（见下方自动降权设置），指定 Key 都不可用时切换其他候选，不越过范围。删除 Key（包括清除 default 凭据）在同一事务移除该供应商候选中的对应 key_ids；仍有其他来源 Key 时保留候选，列表耗尽则移除候选，禁止将空列表写回并扩大为全部 Key。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免隐式变为匿名来源。其他供应商及其他 Key 提供的同名模型、候选元数据与顺序均保留；受影响的存续模型 revision 加一，仅当前供应商已无候选时清理其价格。公开模型失去全部候选才删除；已启用 Binding 默认模型引用仍返回 referenced 并整体回滚，已禁用 Binding 不阻止删除。该行为于 2026-10-19 在当前源码实现，尚未打包发布。schema5→6 顺序迁移保留模型、供应商与凭据，无新表；schema版本保护防止旧核心忽略 Key 限制。
 
 Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始，核心真实顺序）；revision／strategy／candidate_count 仍描述共享公开模型。多个平台可以映射同一别名；一个候选可包含多个 Key，具体 Key 沿用该供应商的 priority／round-robin 策略。
 
@@ -179,7 +179,7 @@ Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始�
 | --- | --- | --- |
 | priority | 固定保存顺序 | 健康／并发门禁与失败切换照常 |
 | round-robin | 按供应商／模型／Key展开，权重为供应商倍率×Key缓存分组倍率的倒数，平滑加权轮询 | 跳过不可用候选，revision变化重置权重债务 |
-| cache-priority | 同一认证调用者／模型／instructions／首个input项复用最近成功供应商、上游模型和Key，TTL10分钟 | 没有有效亲和时加权轮询；冷却、配置变化或失败时切换 |
+| cache-priority | 同一认证调用者／模型／instructions／首个input项复用最近成功供应商、上游模型和Key，TTL10分钟 | 没有有效亲和时加权轮询；降权降低亲和首选频率，配置变化或失败时切换 |
 | lowest-price | 按供应商倍率×Key缓存分组倍率升序，相同倍率按保存顺序 | 不推断美元单价；未知作回退，全部未知等权，零倍率优先 |
 | lowest-latency | 先按保存顺序学习无观察来源；有观察后按成功请求首字耗时的EWMA升序（旧值80%／新值20%），无首字时总耗时 | 观察TTL30分钟，过期再学习；相同耗时按保存顺序 |
 
@@ -230,13 +230,15 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 供应商协议、认证、模型名不包含代理实现；`internal/egress` 根据 provider ID / 实际 Key ID 解析独立绑定。Key 可以继承、直连、指定 profile。核心将路由上下文传给推理、catalog 和 providerapi 账户客户端；适配器不关心 mihomo。代理连接错误保留 fail-closed 行为，不因既有候选故障切换逻辑绕到直连。管理及桌面契约见 [代理设置](proxy-settings.md)。
 
 
-## Key 自动冷却设置
+## Key 自动降权设置
 
-2026-10-19 当前源码未发布，契约沿用 `anchor-desktop-v1` 的向后兼容增量。Go 规范源 `internal/desktop/contract.go`；共享样例 `desktop/contract/key-cooldown.json`，TS 由生成器派生。
+2026-10-19 当前源码未发布，契约沿用 `anchor-desktop-v1`。Go 规范源 `internal/desktop/contract.go`（类型别名来自 state）；共享样例 `desktop/contract/key-cooldown.json`，TS 由生成器派生。
 
-- `Bridge.KeyCooldownSettings()` → client → `GET /control/v1/settings/key-cooldown`；`Bridge.SaveKeyCooldownSettings(input)` → `POST` 同一路径。沿用当前所选本机／SSH 核心、管理鉴权、实例核验和 15 秒桌面调用上限，不访问真实上游。
-- 返回 `KeyCooldownSettings`：`enabled` 布尔、`failure_threshold` 整数 1..100、`cooldown_seconds` 整数 1..3600、`rate_limit_seconds` 整数 1..3600、`revision` 正 JS 安全整数。默认 true／3／30／30／1，持久化于当前核心 meta，不包含 Key 或管理令牌。
-- `SaveKeyCooldownSettings` 要求四个非空字段及 `expected_revision`（1..MAX_SAFE_INTEGER-1）。条件写入成功 revision +1，沿用标准 `{contract,data,problem}`；冲突不改设置或健康，读失败不回退 Mock，写入不自动重试。前端验证回包全部字段及 revision；无法确认时返回 unknown，先读取再操作。
-- 全局策略作用于所有供应商（含匿名来源）。开启时连续失败达到阈值后冷却指定时长；429 优先使用有效 `Retry-After`，否则使用默认限流时长，最终限制 1 秒..1 小时。到期仍只允许单次半开探测，成功恢复；401/403 继续认证失效保护，与冷却开关独立。
-- 保存与请求结果归约串行，保存成功清除已有临时失败计数、冷却和半开预约，后续结果使用新策略；不清除认证失效或最近测试，不修改供应商 revision。关闭时不对一般失败和 429 新建冷却；核心重启保留策略但清空既有临时健康。旧核心不支持时菜单显示「不支持」，需升级对应核心。
-- CLI 同能力为 `settings key-cooldown`，部分字段写入只沿用读取到的其他字段，仍以显式 revision 防止并发覆盖；详见[指令大全](../cli/commands.md#16-key-自动冷却设置当前源码未发布)。
+- `Bridge.KeyCooldownSettings()` → client → `GET /control/v1/settings/key-cooldown`；`Bridge.SaveKeyCooldownSettings(input)` → `POST` 同一路径。保留方法及路径名；沿用所选本机／SSH 核心、管理鉴权、实例核验和 15 秒桌面调用上限，不访问真实上游。
+- 返回 `KeyCooldownSettings`：`enabled` 布尔、`weight_percent` 整数 1..100、`failure_threshold` 整数 1..100、`cooldown_seconds` 整数 1..3600、`rate_limit_seconds` 整数 1..3600、`revision` 正 JS 安全整数。默认 true／10／3／30／30／1，持久化于当前核心 meta，不包含 Key 或管理令牌。旧持久设置缺少比例时补 10。
+- `SaveKeyCooldownSettings` 要求原四个非空字段及 `expected_revision`（1..MAX_SAFE_INTEGER-1）；新增可选 `weight_percent`，省略／null 保留已存比例。条件写入成功 revision +1，沿用 `{contract,data,problem}`；冲突不改设置或健康，读失败不回退 Mock，写入不自动重试。新前端总是发送比例并验证回包全部字段及 revision；无法确认时返回 unknown，先读取再操作。旧核心缺字段时显示连接异常，需同步升级。
+- 全局策略作用于所有供应商（含匿名来源）。连续失败达到阈值，或 401/403/429 后立即降至指定正权重；429 优先有效 `Retry-After`，否则用配置时长，限制 1 秒..1 小时，仅影响降权期限。成功或到期恢复；不再永久认证封禁、硬冷却或独占探测。只有一个／全部 Key 降权时仍可调度，手动停用与并发门禁保留。
+- `KeyStatus.state` 新增 `degraded`（可调度），`retry_at` 表示恢复正常权重的 Unix 秒时间。100% 不降低权重，状态为 ready。新核心不再产生 invalid/cooling/half-open；前端仍能展示旧核心的旧状态，但不假设旧核心具有新调度行为。
+- 轮询将健康因子乘入调度权重，不改变计费倍率；有序规则（优先级、最低价格、最低延迟、缓存亲和）降低故障来源的首选频率并保留全部失败转移候选，相同健康因子保留原偏好。轮询的已知／免费来源优先以最高健康因子的来源为准。降权不重复请求同一 provider/key/model，不改变流式结果和未知结果的重放约束。
+- 保存与请求结果归约串行，成功保存清除失败计数／临时降权／调度债务，保留最近测试，不修改供应商 revision。关闭时所有自动降权停止；核心启动读取策略，内存保留最近成功策略，结果归约不再因读取失败启用默认策略。启动读取失败时不自动降权，设置读取仍返回真实错误。重启保留策略，清空临时健康。
+- CLI 同能力为 `settings key-cooldown`；详见[指令大全](../cli/commands.md#16-key-自动降权设置当前源码未发布)。

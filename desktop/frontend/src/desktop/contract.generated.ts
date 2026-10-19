@@ -3,6 +3,7 @@ export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed", "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe", "skill_unsafe", "skill_changed", "skill_limit", "skill_link_unavailable"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
 export interface KeyCooldownSettings {
+  weight_percent: number;
   enabled: boolean;
   failure_threshold: number;
   cooldown_seconds: number;
@@ -10,6 +11,7 @@ export interface KeyCooldownSettings {
   revision: number;
 }
 export interface SaveKeyCooldownSettings {
+  weight_percent?: number | null;
   enabled: boolean | null;
   failure_threshold: number | null;
   cooldown_seconds: number | null;

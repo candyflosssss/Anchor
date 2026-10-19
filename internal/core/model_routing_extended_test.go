@@ -179,8 +179,8 @@ func TestCacheAffinityCallerIsolationExpiryAndKeyFailover(t *testing.T) {
 	}
 	f.core.finishKey(p, "source", 429, "60", false)
 	routes, _ = f.core.routeCandidatesFor(m, affinity)
-	if len(routes) != 1 || routes[0].ProviderID != "a" {
-		t.Fatal("unavailable affinity blocked failover", routes)
+	if len(routes) != 2 || routes[0].ProviderID != "a" {
+		t.Fatal("degraded affinity blocked failover", routes)
 	}
 	f.core.mu.Lock()
 	entry := f.core.affinity[affinity]

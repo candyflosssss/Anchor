@@ -31,7 +31,7 @@ export function checkedWorkspace(w: Workspace): Workspace {
     if (typeof e.model !== 'string' || (e.usd !== null && (!Number.isFinite(e.usd) || e.usd < 0))) throw new ProviderProblem('read_error');
     return { model: e.model, usd: e.usd };
   }), provider_id: w.provider_id, revision: w.revision, deleted: w.deleted, strategy: w.strategy, probe: checkedProbe(w.probe), keys: w.keys.map(k => {
-    if (!Object.hasOwn(protocolName, k.protocol) || !Array.isArray(k.model_protocols) || k.model_protocols.some(m => typeof m.model !== 'string' || !m.model || !Object.hasOwn(protocolName, m.protocol)) || new Set(k.model_protocols.map(m => m.model)).size !== k.model_protocols.length || typeof k.id !== 'string' || typeof k.enabled !== 'boolean' || !count(k.failures) || !count(k.retry_at) || !['ready', 'disabled', 'cooling', 'invalid', 'half-open'].includes(k.state)) throw new ProviderProblem('read_error');
+    if (!Object.hasOwn(protocolName, k.protocol) || !Array.isArray(k.model_protocols) || k.model_protocols.some(m => typeof m.model !== 'string' || !m.model || !Object.hasOwn(protocolName, m.protocol)) || new Set(k.model_protocols.map(m => m.model)).size !== k.model_protocols.length || typeof k.id !== 'string' || typeof k.enabled !== 'boolean' || !count(k.failures) || !count(k.retry_at) || !['ready', 'degraded', 'disabled', 'cooling', 'invalid', 'half-open'].includes(k.state)) throw new ProviderProblem('read_error');
     if (k.effective_multiplier != null && (!Number.isFinite(k.effective_multiplier) || k.effective_multiplier < 0)) throw new ProviderProblem('read_error');
     return { rate: checkedKeyRate(k.rate), effective_multiplier: k.effective_multiplier ?? null, id: k.id, protocol: k.protocol, model_protocols: k.model_protocols.map(m => ({ model: m.model, protocol: m.protocol })), enabled: k.enabled, state: k.state, failures: k.failures, retry_at: k.retry_at, test: checkedProbe(k.test) };
   }), models: w.models.map(m => {
@@ -44,7 +44,7 @@ export function checkedWorkspace(w: Workspace): Workspace {
     return { provider_id, model, requests, failures, elapsed_ms, known, input_tokens, output_tokens, cache_read, cache_write };
   }) };
 }
-export const healthText: Record<string, string> = { ready: '可调度', disabled: '已停用', cooling: '冷却中', invalid: '认证失效', 'half-open': '等待单次探测' };
+export const healthText: Record<string, string> = { degraded: '已降权', ready: '可调度', disabled: '已停用', cooling: '冷却中', invalid: '认证失效', 'half-open': '等待单次探测' };
 
 export const isValidModelAlias = isValidModelId;
 

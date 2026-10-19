@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -12,9 +13,8 @@ import (
 
 type keyHealth struct {
 	Failures int
-	Invalid  bool
 	Until    time.Time
-	Probing  bool
+	credit   float64
 	Test     *catalog.Probe
 }
 
@@ -49,34 +49,59 @@ func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.pruneHealthLocked(p)
-	start := 0
-	if strategy != "priority" {
-		start = s.cursor[p.ID] % len(keys)
-	}
-	if preferred != "" {
-		for i, k := range keys {
-			if k.ID == preferred && k.Enabled && !tried[k.ID] {
-				start = i
-				break
-			}
-		}
-	}
-	for i := 0; i < len(keys); i++ {
-		k := keys[(start+i)%len(keys)]
+	eligible := []state.ProviderKey{}
+	weights := []float64{}
+	now := time.Now()
+	maximum := 0.0
+	for _, k := range keys {
 		if !k.Enabled || tried[k.ID] || !candidateAllowsKey(allowed, k.ID) {
 			continue
 		}
-		h := s.health[healthID(p, k.ID)]
-		if h != nil {
-			if h.Invalid || h.Until.After(time.Now()) || h.Probing {
-				continue
+		weight := s.keyWeightLocked(p, k.ID, now)
+		eligible = append(eligible, k)
+		weights = append(weights, weight)
+		maximum = max(maximum, weight)
+	}
+	if len(eligible) == 0 {
+		return state.ProviderKey{}, false
+	}
+	for i, k := range eligible {
+		if k.ID == preferred && weights[i] == maximum {
+			return k, true
+		}
+	}
+	if strategy == "priority" {
+		// Deferred Keys remain eligible as fallbacks. Equal penalties preserve
+		// configured priority, including when every Key is degraded.
+		for i, k := range eligible {
+			if weights[i] == maximum {
+				return k, true
 			}
-			if !h.Until.IsZero() {
-				h.Probing = true
+			h := s.health[healthID(p, k.ID)]
+			h.credit += weights[i] / maximum
+			if h.credit >= 1-1e-9 {
+				h.credit -= 1
+				return k, true
 			}
 		}
-		s.cursor[p.ID] = (start + i + 1) % len(keys)
-		return k, true
+	} else {
+		raw, _ := json.Marshal([]any{p.Revision, eligible, weights})
+		scheduleID := "keys\x00" + p.ID
+		schedule := s.routing[scheduleID]
+		if schedule == nil || schedule.signature != string(raw) {
+			schedule = &modelSchedule{signature: string(raw), current: make([]float64, len(eligible))}
+			s.routing[scheduleID] = schedule
+		}
+		best, total := 0, 0.0
+		for i, weight := range weights {
+			total += weight
+			schedule.current[i] += weight
+			if schedule.current[i] > schedule.current[best] {
+				best = i
+			}
+		}
+		schedule.current[best] -= total
+		return eligible[best], true
 	}
 	return state.ProviderKey{}, false
 }
@@ -108,27 +133,20 @@ func (s *Server) finishKey(p state.Provider, k string, status int, after string,
 		h = &keyHealth{}
 		s.health[id] = h
 	}
-	h.Probing = false
 	if success {
 		h.Failures = 0
-		h.Invalid = false
 		h.Until = time.Time{}
+		h.credit = 0
 		return
 	}
 	h.Failures++
-	if status == 401 || status == 403 {
-		h.Invalid = true
-	}
-	policy, err := s.Store.KeyCooldownSettings()
-	if err != nil {
-		policy = state.DefaultKeyCooldownSettings()
-	}
+	policy := s.keyPolicy
 	if !policy.Enabled {
 		return
 	}
 	if status == 429 {
 		h.Until = time.Now().Add(configuredRetryDelay(after, policy.RateLimitSeconds))
-	} else if h.Failures >= policy.FailureThreshold {
+	} else if status == 401 || status == 403 || h.Failures >= policy.FailureThreshold {
 		h.Until = time.Now().Add(time.Duration(policy.CooldownSeconds) * time.Second)
 	}
 }
@@ -142,23 +160,24 @@ func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeySta
 	if h := s.health[healthID(p, k.ID)]; h != nil {
 		out.Failures = h.Failures
 		out.Test = h.Test
-		if h.Invalid {
-			out.State = "invalid"
-		} else if h.Probing {
-			out.State = "half-open"
-		} else if !h.Until.IsZero() {
+		if s.keyWeightLocked(p, k.ID, time.Now()) < 1 {
+			out.State = "degraded"
 			out.RetryAt = h.Until.Unix()
-			if h.Until.After(time.Now()) {
-				out.State = "cooling"
-			} else {
-				out.State = "half-open"
-			}
 		}
 	}
 	if !k.Enabled {
 		out.State = "disabled"
 	}
 	return out
+}
+
+// keyWeightLocked is a scheduling factor, independent of billing multipliers.
+// Call with s.mu held. Expiry has no exclusive probe or request reservation.
+func (s *Server) keyWeightLocked(p state.Provider, key string, now time.Time) float64 {
+	if h := s.health[healthID(p, key)]; h != nil && s.keyPolicy.Enabled && h.Until.After(now) {
+		return float64(s.keyPolicy.WeightPercent) / 100
+	}
+	return 1
 }
 
 // pickURL rotates across a provider's request base URLs for load balancing.

@@ -46,6 +46,7 @@ type Server struct {
 	mu               sync.Mutex
 	active           map[string]int
 	health           map[string]*keyHealth
+	keyPolicy        state.KeyCooldownSettings
 	probeRuns        map[string]*probeRun
 	routing          map[string]*modelSchedule
 	affinity         map[string]routeAffinity
@@ -81,7 +82,12 @@ func NewWithModelCatalog(store *state.Store, log *slog.Logger, catalogClient *mo
 	tr.MaxIdleConns = 32
 	tr.ResponseHeaderTimeout = 30 * time.Second
 	outbound := egress.New(store, tr)
-	return &Server{egress: outbound, Skills: skills.New(store.Dir), modelCatalog: catalogClient, Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: outbound, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
+	policy, err := store.KeyCooldownSettings()
+	if err != nil {
+		// A broken read must not silently enable the default policy.
+		policy = state.KeyCooldownSettings{}
+	}
+	return &Server{keyPolicy: policy, egress: outbound, Skills: skills.New(store.Dir), modelCatalog: catalogClient, Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: outbound, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {

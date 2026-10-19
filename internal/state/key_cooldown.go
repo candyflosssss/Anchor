@@ -7,6 +7,7 @@ import (
 )
 
 type KeyCooldownSettings struct {
+	WeightPercent    int   `json:"weight_percent"`
 	Enabled          bool  `json:"enabled"`
 	FailureThreshold int   `json:"failure_threshold"`
 	CooldownSeconds  int   `json:"cooldown_seconds"`
@@ -14,6 +15,7 @@ type KeyCooldownSettings struct {
 	Revision         int64 `json:"revision"`
 }
 type SaveKeyCooldownSettings struct {
+	WeightPercent    *int  `json:"weight_percent,omitempty"`
 	Enabled          *bool `json:"enabled"`
 	FailureThreshold *int  `json:"failure_threshold"`
 	CooldownSeconds  *int  `json:"cooldown_seconds"`
@@ -22,10 +24,10 @@ type SaveKeyCooldownSettings struct {
 }
 
 func DefaultKeyCooldownSettings() KeyCooldownSettings {
-	return KeyCooldownSettings{Enabled: true, FailureThreshold: 3, CooldownSeconds: 30, RateLimitSeconds: 30, Revision: 1}
+	return KeyCooldownSettings{WeightPercent: 10, Enabled: true, FailureThreshold: 3, CooldownSeconds: 30, RateLimitSeconds: 30, Revision: 1}
 }
 func (in SaveKeyCooldownSettings) Validate() error {
-	if in.Enabled == nil || in.FailureThreshold == nil || *in.FailureThreshold < 1 || *in.FailureThreshold > 100 || in.CooldownSeconds == nil || *in.CooldownSeconds < 1 || *in.CooldownSeconds > 3600 || in.RateLimitSeconds == nil || *in.RateLimitSeconds < 1 || *in.RateLimitSeconds > 3600 || in.ExpectedRevision < 1 || in.ExpectedRevision >= 9007199254740991 {
+	if (in.WeightPercent != nil && (*in.WeightPercent < 1 || *in.WeightPercent > 100)) || in.Enabled == nil || in.FailureThreshold == nil || *in.FailureThreshold < 1 || *in.FailureThreshold > 100 || in.CooldownSeconds == nil || *in.CooldownSeconds < 1 || *in.CooldownSeconds > 3600 || in.RateLimitSeconds == nil || *in.RateLimitSeconds < 1 || *in.RateLimitSeconds > 3600 || in.ExpectedRevision < 1 || in.ExpectedRevision >= 9007199254740991 {
 		return ErrInvalid
 	}
 	return nil
@@ -43,7 +45,7 @@ func readKeyCooldownSettings(q interface{ QueryRow(string, ...any) *sql.Row }) (
 	if json.Unmarshal([]byte(raw), &out) != nil {
 		return KeyCooldownSettings{}, ErrInvalid
 	}
-	in := SaveKeyCooldownSettings{&out.Enabled, &out.FailureThreshold, &out.CooldownSeconds, &out.RateLimitSeconds, min(out.Revision, 9007199254740990)}
+	in := SaveKeyCooldownSettings{WeightPercent: &out.WeightPercent, Enabled: &out.Enabled, FailureThreshold: &out.FailureThreshold, CooldownSeconds: &out.CooldownSeconds, RateLimitSeconds: &out.RateLimitSeconds, ExpectedRevision: min(out.Revision, 9007199254740990)}
 	if out.Revision < 1 || out.Revision > 9007199254740991 || in.Validate() != nil {
 		return KeyCooldownSettings{}, ErrInvalid
 	}
@@ -68,7 +70,10 @@ func (s *Store) SaveKeyCooldownSettings(in SaveKeyCooldownSettings) (KeyCooldown
 	if old.Revision != in.ExpectedRevision {
 		return old, ErrConflict
 	}
-	out := KeyCooldownSettings{*in.Enabled, *in.FailureThreshold, *in.CooldownSeconds, *in.RateLimitSeconds, old.Revision + 1}
+	out := KeyCooldownSettings{WeightPercent: old.WeightPercent, Enabled: *in.Enabled, FailureThreshold: *in.FailureThreshold, CooldownSeconds: *in.CooldownSeconds, RateLimitSeconds: *in.RateLimitSeconds, Revision: old.Revision + 1}
+	if in.WeightPercent != nil {
+		out.WeightPercent = *in.WeightPercent
+	}
 	raw, err := json.Marshal(out)
 	if err != nil {
 		return KeyCooldownSettings{}, err

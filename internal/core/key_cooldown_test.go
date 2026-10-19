@@ -11,79 +11,71 @@ func TestKeyCooldownConfiguredPolicyAndLiveDisable(t *testing.T) {
 	f := setup(t)
 	f.add(t, "p", "http://127.0.0.1:1/v1", "synthetic-key")
 	p, _ := f.store.Provider("p")
-	enabled, threshold, seconds, rate := true, 2, 70, 80
-	in := state.SaveKeyCooldownSettings{Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 1}
+	enabled, threshold, seconds, rate, weight := true, 2, 70, 80, 20
+	in := state.SaveKeyCooldownSettings{WeightPercent: &weight, Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 1}
 	if _, err := f.core.saveKeyCooldownSettings(in); err != nil {
 		t.Fatal(err)
 	}
+	status := func() string { return f.core.keyStatus(p, state.ProviderKey{ID: "default", Enabled: true}).State }
 	f.core.finishKey(p, "default", 500, "", false)
-	if _, ok := f.core.chooseKey(p, nil); !ok {
-		t.Fatal("cooled before threshold")
+	if status() != "ready" {
+		t.Fatal("penalized before threshold")
 	}
 	f.core.finishKey(p, "default", 500, "", false)
-	status := f.core.keyStatus(p, state.ProviderKey{ID: "default", Enabled: true})
-	if status.State != "cooling" || status.RetryAt < time.Now().Add(68*time.Second).Unix() {
-		t.Fatal(status)
+	h := f.core.health[healthID(p, "default")]
+	if status() != "degraded" || time.Until(h.Until) < 68*time.Second {
+		t.Fatal(status(), h)
 	}
-	if _, ok := f.core.chooseKey(p, nil); ok {
-		t.Fatal("cooling key chosen")
+	for i := 0; i < 3; i++ {
+		if _, ok := f.core.chooseKey(p, nil); !ok {
+			t.Fatal("degraded Key excluded")
+		}
 	}
-	f.core.health[healthID(p, "default")].Until = time.Now().Add(-time.Second)
-	if _, ok := f.core.chooseKey(p, nil); !ok {
-		t.Fatal("no half-open probe")
+	if _, err := f.core.saveKeyCooldownSettings(in); err != state.ErrConflict || status() != "degraded" {
+		t.Fatal("conflict changed health", err)
 	}
-	if _, ok := f.core.chooseKey(p, nil); ok {
-		t.Fatal("multiple half-open probes")
+	h.Until = time.Now().Add(-time.Second)
+	for i := 0; i < 3; i++ {
+		if _, ok := f.core.chooseKey(p, nil); !ok {
+			t.Fatal("exclusive recovery probe")
+		}
 	}
-	f.core.finishKey(p, "default", 200, "", true)
-	if status = f.core.keyStatus(p, state.ProviderKey{ID: "default", Enabled: true}); status.State != "ready" || status.Failures != 0 {
-		t.Fatal(status)
+	if status() != "ready" {
+		t.Fatal("expiry did not recover")
 	}
-	f.core.finishKey(p, "default", 429, "", false)
-	status = f.core.keyStatus(p, state.ProviderKey{ID: "default", Enabled: true})
-	if status.RetryAt < time.Now().Add(78*time.Second).Unix() {
-		t.Fatal(status)
+	for _, code := range []int{401, 403, 429} {
+		f.core.finishKey(p, "default", code, "", false)
+		if status() != "degraded" {
+			t.Fatal(code, status())
+		}
+		f.core.finishKey(p, "default", 200, "", true)
+		if status() != "ready" || h.Failures != 0 {
+			t.Fatal("success did not recover")
+		}
 	}
-	// A rejected stale write cannot clear cooling state.
-	if _, err := f.core.saveKeyCooldownSettings(in); err != state.ErrConflict {
-		t.Fatal(err)
-	}
-	if _, ok := f.core.chooseKey(p, nil); ok {
-		t.Fatal("conflict cleared cooldown")
+	f.core.finishKey(p, "default", 429, "12", false)
+	if time.Until(h.Until) < 11*time.Second || time.Until(h.Until) > 12*time.Second {
+		t.Fatal("Retry-After ignored", h)
 	}
 	enabled = false
 	in.ExpectedRevision = 2
 	if _, err := f.core.saveKeyCooldownSettings(in); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := f.core.chooseKey(p, nil); !ok {
-		t.Fatal("disable did not clear cooling")
-	}
-	for _, code := range []int{429, 500, 500, 500} {
+	for _, code := range []int{401, 403, 429, 500, 500, 500} {
 		f.core.finishKey(p, "default", code, "600", false)
-		if _, ok := f.core.chooseKey(p, nil); !ok {
-			t.Fatal("disabled policy cooled key", code)
+		if status() != "ready" {
+			t.Fatal("disabled policy penalized Key", code)
 		}
 	}
+	// The retained policy remains authoritative even if subsequent DB reads fail.
+	f.store.Close()
 	f.core.finishKey(p, "default", 401, "", false)
-	if _, ok := f.core.chooseKey(p, nil); ok {
-		t.Fatal("authentication failure bypassed")
-	}
-	enabled = true
-	in.ExpectedRevision = 3
-	if _, err := f.core.saveKeyCooldownSettings(in); err != nil {
-		t.Fatal(err)
-	}
-	if _, ok := f.core.chooseKey(p, nil); ok {
-		t.Fatal("policy write cleared authentication protection")
-	}
-	// Existing explicit reset remains the recovery entry point.
-	f.core.finishKey(p, "default", 200, "", true)
-	f.core.finishKey(p, "default", 429, "12", false)
-	if status = f.core.keyStatus(p, state.ProviderKey{ID: "default", Enabled: true}); status.RetryAt > time.Now().Add(13*time.Second).Unix() {
-		t.Fatal("Retry-After ignored", status)
+	if status() != "ready" {
+		t.Fatal("failed read reenabled automatic penalties")
 	}
 }
+
 func TestKeyCooldownRetryAfterBounds(t *testing.T) {
 	for _, tc := range []struct {
 		value string

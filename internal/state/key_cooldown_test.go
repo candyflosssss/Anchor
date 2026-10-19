@@ -16,7 +16,7 @@ func TestKeyCooldownDefaultPersistenceAndValidation(t *testing.T) {
 		t.Fatal(out, err)
 	}
 	enabled, threshold, seconds, rate := false, 7, 90, 120
-	in := SaveKeyCooldownSettings{&enabled, &threshold, &seconds, &rate, 1}
+	in := SaveKeyCooldownSettings{Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 1}
 	out, err = s.SaveKeyCooldownSettings(in)
 	if err != nil || out.Enabled || out.FailureThreshold != 7 || out.CooldownSeconds != 90 || out.RateLimitSeconds != 120 || out.Revision != 2 {
 		t.Fatal(out, err)
@@ -25,7 +25,7 @@ func TestKeyCooldownDefaultPersistenceAndValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	in.ExpectedRevision = 2
-	for _, bad := range []SaveKeyCooldownSettings{{}, {nil, &threshold, &seconds, &rate, 2}, {&enabled, nil, &seconds, &rate, 2}, {&enabled, &threshold, nil, &rate, 2}, {&enabled, &threshold, &seconds, nil, 2}} {
+	for _, bad := range []SaveKeyCooldownSettings{{}, {Enabled: nil, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 2}, {Enabled: &enabled, FailureThreshold: nil, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 2}, {Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: nil, RateLimitSeconds: &rate, ExpectedRevision: 2}, {Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: nil, ExpectedRevision: 2}} {
 		if _, err = s.SaveKeyCooldownSettings(bad); !errors.Is(err, ErrInvalid) {
 			t.Fatal(bad, err)
 		}
@@ -60,5 +60,40 @@ func TestKeyCooldownDefaultPersistenceAndValidation(t *testing.T) {
 	got, err := reopened.KeyCooldownSettings()
 	if err != nil || got != out {
 		t.Fatal(got, out, err)
+	}
+}
+
+func TestKeyDownweightSettingsMigrationAndWeight(t *testing.T) {
+	s, err := Open(t.TempDir(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	_, err = s.db.Exec(`INSERT INTO meta(key,value) VALUES('key_cooldown_settings','{"enabled":false,"failure_threshold":4,"cooldown_seconds":40,"rate_limit_seconds":50,"revision":7}')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := s.KeyCooldownSettings()
+	if err != nil || old.WeightPercent != 10 || old.Enabled || old.Revision != 7 {
+		t.Fatal(old, err)
+	}
+	weight := 25
+	in := SaveKeyCooldownSettings{WeightPercent: &weight, Enabled: &old.Enabled, FailureThreshold: &old.FailureThreshold, CooldownSeconds: &old.CooldownSeconds, RateLimitSeconds: &old.RateLimitSeconds, ExpectedRevision: 7}
+	out, err := s.SaveKeyCooldownSettings(in)
+	if err != nil || out.WeightPercent != 25 {
+		t.Fatal(out, err)
+	}
+	in.ExpectedRevision = 8
+	for _, n := range []int{0, 101} {
+		weight = n
+		if _, err = s.SaveKeyCooldownSettings(in); err != ErrInvalid {
+			t.Fatal(n, err)
+		}
+	}
+	// Old clients omit the new field and preserve its stored value.
+	in.WeightPercent = nil
+	out, err = s.SaveKeyCooldownSettings(in)
+	if err != nil || out.WeightPercent != 25 || out.Revision != 9 {
+		t.Fatal(out, err)
 	}
 }

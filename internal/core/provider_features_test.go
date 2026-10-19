@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-func TestPriorityKeysFailoverCooldownAndUsage(t *testing.T) {
+func TestPriorityKeysFailoverDownweightAndUsage(t *testing.T) {
 	f := setup(t)
 	var bad, good atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -44,13 +44,13 @@ func TestPriorityKeysFailoverCooldownAndUsage(t *testing.T) {
 		t.Fatal(bad.Load(), good.Load())
 	}
 	w, err := f.core.workspace("p")
-	if err != nil || len(w.Keys) != 2 || w.Keys[0].State != "invalid" || len(w.Usage) != 1 || w.Usage[0].Requests != 3 || w.Usage[0].Known != 2 {
+	if err != nil || len(w.Keys) != 2 || w.Keys[0].State != "degraded" || len(w.Usage) != 1 || w.Usage[0].Requests != 3 || w.Usage[0].Known != 2 {
 		t.Fatal(w, err)
 	}
 	p, _ := f.store.Provider("p")
 	f.core.finishKey(p, "second", 429, "120", false)
-	if _, ok := f.core.chooseKey(p, nil); ok {
-		t.Fatal("cooling key chosen")
+	if _, ok := f.core.chooseKey(p, nil); !ok {
+		t.Fatal("degraded keys excluded")
 	}
 	f.core.mu.Lock()
 	f.core.health[healthID(p, "second")].Until = time.Now().Add(-time.Second)
@@ -59,8 +59,8 @@ func TestPriorityKeysFailoverCooldownAndUsage(t *testing.T) {
 	if !ok || k.ID != "second" {
 		t.Fatal(k, ok)
 	}
-	if _, ok = f.core.chooseKey(p, nil); ok {
-		t.Fatal("multiple half-open requests")
+	if _, ok = f.core.chooseKey(p, nil); !ok {
+		t.Fatal("exclusive probe blocked a request")
 	}
 	f.core.finishKey(p, k.ID, 200, "", true)
 	if _, ok = f.core.chooseKey(p, nil); !ok {

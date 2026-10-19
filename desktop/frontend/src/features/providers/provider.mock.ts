@@ -34,7 +34,7 @@ function seed(id: string, w: Workspace) {
   if (id === '备用供应商') {
     w.keys = [
       { rate: null, effective_multiplier: null, id: 'backup', protocol: 'chat-completions', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: { revision: w.revision, key_id: 'backup', model: 'backup-model', at: now - 7200, http_status: 200, elapsed_ms: 860, failure: '' } },
-      { rate: null, effective_multiplier: null, id: 'primary', protocol: 'responses', model_protocols: [], enabled: true, state: 'cooling', failures: 3, retry_at: now + 600, test: null },
+      { rate: null, effective_multiplier: null, id: 'primary', protocol: 'responses', model_protocols: [], enabled: true, state: 'degraded', failures: 3, retry_at: now + 600, test: null },
     ];
     w.models = [{ ...mapping('backup-model'), candidate_index: 1 }];
     w.usage = [{ provider_id: id, model: 'coding-main', requests: 42, failures: 1, elapsed_ms: 50400, known: 40, input_tokens: 120000, output_tokens: 30000, cache_read: 20000, cache_write: 0 }];

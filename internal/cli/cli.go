@@ -34,7 +34,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
       [--remote-anchor anchor] [--remote-control-port 17861] [--trust-new-host]
   context bootstrap [--control-port 17861] --show-once  SSH account bootstrap (local only)
   context use NAME | context list | context inspect NAME | context test NAME
-  settings key-cooldown [--enabled=true|false] [--failure-threshold 1..100]
+  settings key-cooldown [--enabled=true|false] [--weight-percent 1..100] [--failure-threshold 1..100]
       [--cooldown-seconds 1..3600] [--rate-limit-seconds 1..3600] [--revision N]
   status                             Query selected context
   stop --approve [--for-restart]      Stop core; optional planned-restart handoff

@@ -35,17 +35,19 @@ func (s *Server) keyCooldownRoutes(mux *http.ServeMux) {
 	})
 }
 func (s *Server) saveKeyCooldownSettings(in state.SaveKeyCooldownSettings) (state.KeyCooldownSettings, error) {
-	// Serialize policy changes with in-flight results. Never clear authentication failures.
+	// Serialize policy changes with in-flight results and retain the last valid policy.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out, err := s.Store.SaveKeyCooldownSettings(in)
 	if err != nil {
 		return out, err
 	}
+	s.keyPolicy = out
+	s.routing = map[string]*modelSchedule{}
 	for _, h := range s.health {
 		h.Failures = 0
 		h.Until = time.Time{}
-		h.Probing = false
+		h.credit = 0
 	}
 	return out, nil
 }
