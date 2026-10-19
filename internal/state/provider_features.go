@@ -106,18 +106,21 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 		return ErrInvalid
 	}
 	switch action {
-	case "delete", "rename", "copy":
-		if action != "delete" {
-			if !ValidProviderID(target) || target == id {
-				return ErrInvalid
-			}
-			var n int
-			if err = tx.QueryRow(`SELECT count(*) FROM providers WHERE id=?`, target).Scan(&n); err != nil {
-				return err
-			}
-			if n != 0 {
-				return ErrConflict
-			}
+	case "delete":
+		if err = pruneProviderSources(tx, id, "", 0); err != nil {
+			return err
+		}
+		_, err = tx.Exec(`DELETE FROM providers WHERE id=?`, id)
+	case "rename", "copy":
+		if !ValidProviderID(target) || target == id {
+			return ErrInvalid
+		}
+		var n int
+		if err = tx.QueryRow(`SELECT count(*) FROM providers WHERE id=?`, target).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			return ErrConflict
 		}
 		rows, e := tx.Query(`SELECT document,revision FROM models`)
 		if e != nil {
@@ -152,12 +155,6 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 		rows.Close()
 		if e != nil {
 			return e
-		}
-		if action == "delete" {
-			if len(changed) > 0 {
-				return ErrReferenced
-			}
-			_, err = tx.Exec(`DELETE FROM providers WHERE id=?`, id)
 		}
 		if action == "rename" {
 			p.ID = target

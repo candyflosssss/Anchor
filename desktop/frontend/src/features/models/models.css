@@ -69,3 +69,16 @@
 .mapping-channel-state p { flex-basis: 100%; margin: 0; line-height: 1.5; }
 .mapping-candidate.availability-unavailable { border-left: 3px solid hsl(var(--destructive) / .5); }
 .mapping-key-status { margin-left: auto; }
+
+/* Unavailable mappings remain accessible after the currently usable content. */
+.unavailable-section { min-width: 0; border-top: 1px solid hsl(var(--border)); margin-top: 12px; padding-top: 10px; }
+.unavailable-section > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; color: hsl(var(--muted-foreground)); font-size: 12px; }
+.unavailable-section > summary::-webkit-details-marker { display: none; }
+.unavailable-section > summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; border-radius: 3px; }
+.unavailable-section > summary > svg { transform: rotate(-90deg); }
+.unavailable-section[open] > summary > svg { transform: rotate(0); }
+.unavailable-section .source-count { margin-left: auto; font-variant-numeric: tabular-nums; }
+.unavailable-section-body { padding-top: 12px; }
+.mapping-rates .unavailable-section { margin-top: 0; }
+.mapping-rates .unavailable-section-body { display: grid; gap: 10px; }
+.model-grid:empty, .candidate-list:empty { display: none; }

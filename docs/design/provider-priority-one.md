@@ -4,7 +4,7 @@
 
 供应商列表展示健康与行内操作，点击进入整页详情（2026-10-11 起取代右侧详情栏）；编辑表单增加协议。详情增加操作栏、密钥卡片（启停、恢复、删除、轮询策略）、模型映射与显式测试、用量表。保留中性配色及窄屏单列。密钥输入在提交/取消时清空；结果未知时先重读。原型与桌面能力明确隔离。
 
-管理操作经 `ProviderAction` → typed client → `POST /control/v1/providers/{id}/action`；读取详情经 `ProviderWorkspace` → GET workspace。操作白名单：delete/copy/rename/key-put/key-delete/key-reset/strategy/test/model-put/model-delete/price-put/price-import。输入固定 DTO，不接受任意 URL、shell 或 SQL。所有操作核对供应商 revision，模型操作另核对模型 revision。删除/改名/清除密钥要求 approved=true。复制默认不含密钥，显式 copy_keys 才复制。改名在一个事务里迁移模型候选和密钥；已在途请求使用原快照。删除被模型引用的供应商、被 Binding 引用的模型返回 referenced；不做隐式级联删除。映射创建显式声明工具/流式能力。
+管理操作经 `ProviderAction` → typed client → `POST /control/v1/providers/{id}/action`；读取详情经 `ProviderWorkspace` → GET workspace。操作白名单：delete/copy/rename/key-put/key-delete/key-reset/strategy/test/model-put/model-delete/price-put/price-import。输入固定 DTO，不接受任意 URL、shell 或 SQL。所有操作核对供应商 revision，模型操作另核对模型 revision。删除/改名/清除密钥要求 approved=true。复制默认不含密钥，显式 copy_keys 才复制。改名在一个事务里迁移模型候选和密钥；已在途请求使用原快照。删除供应商在同一事务清理其模型来源和价格，保留其他供应商的同名模型、顺序及元数据；存续模型 revision 加一，无候选时才删除公开模型。若将移除已启用 Binding 默认模型的最后一个候选，返回 referenced 并整体回滚；不隐式修改 Binding。映射创建显式声明工具/流式能力。
 
 每 Key 具有稳定的用户指定 ID，秘密只入不出；旧 secret 迁移为 default Key。无 Key 的供应商可匿名调用；存在 Key 但全部停用/冷却时不退回匿名。轮流使用或优先首个可用 Key。401/403 阻断 Key，429 根据 Retry-After（默认30秒，上限1小时），连续3次临时故障熔断30秒，半开只放一个请求。状态保存在核心内存，配置 revision 变化或核心重启后重置；显式恢复也可重置。统计持久化，绝不保存提示词、正文或 Key。
 

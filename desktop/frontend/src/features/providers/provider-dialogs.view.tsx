@@ -131,13 +131,12 @@ function CopyBody({ c, run }: { c: ProviderController; run: Run }) {
 
 function DeleteBody({ c, run }: { c: ProviderController; run: Run }) {
   const p = c.selected!; const w = c.features.data!;
-  return <form onSubmit={e => { e.preventDefault(); if (!w.models.length) void run('delete', {}); }}>
+  return <form onSubmit={e => { e.preventDefault(); void run('delete', {}); }}>
     <div className="editor-fields">
-      {w.models.length ? <div className="warning-box">仍有 {w.models.length} 个模型映射到 {p.id}。请先删除这些映射，再删除供应商。
-        <div className="mt-2"><Button type="button" size="sm" variant="outline" onClick={() => { c.closeDialog(); c.setDetailTab('models'); }}>查看模型映射</Button></div></div>
-        : <p>确认删除 <strong className="break-all">{p.id}</strong>？{w.keys.length ? `${w.keys.length} 个 Key 将一并删除且无法恢复。` : ''}</p>}
+      <p>确认删除 <strong className="break-all">{p.id}</strong>？{w.keys.length ? `${w.keys.length} 个 Key 将一并删除且无法恢复。` : ''}</p>
+      {w.models.length > 0 && <div className="warning-box">将同时移除此供应商的 {w.models.length} 个模型来源。其他供应商提供的同名模型会保留，没有剩余来源的模型会删除；若仍是已启用 Agent 的默认模型，需先更换默认模型或停用该 Agent。</div>}
     </div>
-    <Footer c={c}><Button variant="destructive" disabled={c.features.busy || !!w.models.length}>{c.features.busy ? '正在删除…' : '确认删除'}</Button></Footer>
+    <Footer c={c}><Button variant="destructive" disabled={c.features.busy}>{c.features.busy ? '正在删除…' : '确认删除'}</Button></Footer>
   </form>;
 }
 

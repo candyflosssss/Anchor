@@ -28,7 +28,7 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 | --- | --- |
 | offline / read_error | 无法连接或无法读取；数据不可用不等于空列表 |
 | unauthorized | 401/403；授权留在 Go 层，不要求页面填管理令牌 |
-| referenced | 409；供应商仍被模型引用，或待删模型仍被 Binding 引用；先处理引用 |
+| referenced | 409；删除供应商／Key／模型将移除已启用 Binding 默认模型的最后一个候选；先更换默认模型或停用 Binding |
 | conflict | 409；不覆盖新配置，丢弃旧草稿重读后重新编辑 |
 | invalid | 本地参数／核心校验拒绝，不以旧草稿静默覆盖 |
 | unknown | 写入网络中断、5xx 或无法验证回包；可能已生效，须先查询，不自动重放 |
@@ -66,7 +66,7 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 
 Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、连续失败次数、冷却结束时间和最近测试，以及 protocol 与 model_protocols（[{model,protocol}]，始终数组），绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
 
-每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。模型映射修改只增加模型 revision；配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
+每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。删除供应商在同一事务清理其全部模型候选及价格，保留其他供应商的同名模型、顺序和元数据，存续模型 revision 加一；失去全部候选才删除公开模型，已启用 Binding 默认模型引用仍返回 referenced 并整体回滚。停用只保留配置并暂停调度，不删除映射。模型映射修改只增加模型 revision；配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
 
 目录查询可指定启用的已存 Key，不存在的 Key 返回 not_found 且不请求上游；指定停用 Key 返回 no_enabled_keys，不抓取目录或分组倍率。省略时自动查询全部启用的已存 Key 并合并模型，列出同名模型的全部可选 Key。认证使用 Key 默认协议，模型覆盖不影响目录认证。仅无已存 Key 时使用匿名目录，全部 Key 停用时不回退匿名。推理测试可以明确指定停用/冷却 Key；未指定则使用首个启用 Key，无 Key 才匿名。目录查询不更新健康；真实网关结果和显式推理测试更新健康。状态接口 upstream_health=per_key 提示从供应商工作台查看，不能视作总健康结论。
 

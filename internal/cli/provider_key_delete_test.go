@@ -83,9 +83,27 @@ func TestCLIKeyDeletionPreservesOtherModelSources(t *testing.T) {
 	if keys, err := s.ProviderKeys("p"); err != nil || len(keys) != 1 {
 		t.Fatal("stale deletion changed Keys", keys, err)
 	}
+	// Deleting the provider removes all of its sources without touching the
+	// same public alias still provided by another provider.
+	run("", false, "provider", "model-put", "--id", "p", "--revision", "3", "--target", "shared-provider", "--model", "same-upstream", "--source-key", "backup")
+	removeProvider := []string{"provider", "delete", "--id", "p", "--revision", "3"}
+	run("", true, removeProvider...)
+	if err = json.Unmarshal(run("", false, append(removeProvider, "--approve")...), &workspace); err != nil || !workspace.Deleted || len(workspace.Models) != 0 {
+		t.Fatal("provider delete response", workspace, err)
+	}
+	if _, err = s.Provider("p"); !errors.Is(err, state.ErrNotFound) {
+		t.Fatal("provider retained", err)
+	}
+	if _, err = s.Model("shared-keys"); !errors.Is(err, state.ErrNotFound) {
+		t.Fatal("orphan retained", err)
+	}
+	shared, err = s.Model("shared-provider")
+	if err != nil || len(shared.Candidates) != 1 || shared.Candidates[0].ProviderID != "other" {
+		t.Fatal("other source lost", shared, err)
+	}
 }
 
-func TestKeyDeletionHelp(t *testing.T) {
+func TestSourceDeletionHelp(t *testing.T) {
 	var out bytes.Buffer
 	a := App{In: strings.NewReader(""), Out: &out, Err: io.Discard}
 	if err := a.Run(context.Background(), []string{"help"}); err != nil {
@@ -93,5 +111,8 @@ func TestKeyDeletionHelp(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "key-delete removes only this Key's mapping sources; other Keys and providers keep shared models.") {
 		t.Fatal("key deletion side effects missing from help")
+	}
+	if !strings.Contains(out.String(), "delete removes this provider's mapping sources; other providers keep shared models.") {
+		t.Fatal("provider deletion side effects missing from help")
 	}
 }

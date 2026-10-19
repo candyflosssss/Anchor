@@ -29,7 +29,7 @@ export const problemText: Record<ProblemCode, string> = {
   read_error: '未能读取供应商配置。可以重试读取，不会改变已保存配置。',
   conflict: '配置已被其他操作修改。未覆盖新版本；请重新读取后再编辑。',
   unknown: '写入结果未知，可能已经保存。请先重新读取并核对配置与 revision，不要直接重试。',
-  referenced: '仍有模型或 Binding 引用此项目。请先移除引用，再执行删除。',
+  referenced: '删除会移除已启用 Agent 默认模型的最后一个来源。请先更换默认模型或停用该 Agent。',
   invalid: '配置未通过校验。请核对字段后重新提交。',
 };
 export interface ProviderTransport extends AccountTransport {

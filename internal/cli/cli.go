@@ -50,6 +50,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   provider models --id ID --revision N [--key KEY]  Fetch enabled key directories and group rates
   provider workspace --id ID           Keys, health, mappings and usage
   provider delete|rename|copy --id ID --revision N [--target ID] [--approve] [--copy-keys]
+      delete removes this provider's mapping sources; other providers keep shared models.
   provider key-put --id ID --revision N --target KEY [--secret-stdin] [--disabled] [--protocol PROTOCOL]
   provider key-model-protocol --id ID --revision N --target KEY --model MODEL [--protocol PROTOCOL|inherit]
   provider key-delete|key-reset --id ID --revision N --target KEY --approve

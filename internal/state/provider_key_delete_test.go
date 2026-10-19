@@ -138,9 +138,9 @@ func TestDeleteLastKeyRemovesAllKeysCandidate(t *testing.T) {
 	}
 }
 
-func TestDeleteKeyRollsBackWhenLastModelIsEnabledBindingDefault(t *testing.T) {
-	for _, clearDefault := range []bool{false, true} {
-		t.Run(map[bool]string{false: "key-delete", true: "clear-default"}[clearDefault], func(t *testing.T) {
+func TestDeleteSourceRollsBackWhenLastModelIsEnabledBindingDefault(t *testing.T) {
+	for _, action := range []string{"key-delete", "clear-default", "delete"} {
+		t.Run(action, func(t *testing.T) {
 			s := newStore(t)
 			secret := "synthetic"
 			p, err := s.PutProvider(provider("p"), 0, &secret)
@@ -165,12 +165,12 @@ func TestDeleteKeyRollsBackWhenLastModelIsEnabledBindingDefault(t *testing.T) {
 				t.Fatal(err)
 			}
 			remove := func() error {
-				if clearDefault {
+				if action == "clear-default" {
 					empty := ""
 					_, err := s.PutProvider(p, p.Revision, &empty)
 					return err
 				}
-				return s.MutateProvider(p.ID, p.Revision, "key-delete", "default", "", "", false, false)
+				return s.MutateProvider(p.ID, p.Revision, action, "default", "", "", false, false)
 			}
 			if err = remove(); !errors.Is(err, ErrReferenced) {
 				t.Fatal("enabled default not protected", err)

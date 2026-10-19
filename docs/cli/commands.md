@@ -295,7 +295,7 @@ stdout 为 `{provider_id, key_id, revision, http_status, elapsed_ms, models, fai
 
 一次显式目录查询（可能包含路径切换和分页），不修改供应商、revision、模型映射或缓存；**目录成功不证明推理、工具、流式、余额或持续健康**，404/405不代表推理不可用。`model list` 与网关 `GET /v1/models` 返回 Anchor 已存公开映射，不是此上游目录。显式推理测试和映射写入使用下列独立命令，目录查询本身不自动导入。
 
-供应商可用下列 delete 删除；有模型引用时阻止。完整 `put ... --disabled` 仅暂停路由，不删除秘密。
+供应商可用下列 delete 删除，并在同一事务清理它的模型来源，保留其他供应商的同名模型；模型失去全部来源时删除，已启用 Binding 的默认模型保护仍有效。完整 `put ... --disabled` 仅暂停路由，不删除秘密。
 
 协议解析顺序为：选出 Key → 查该 Key 下实际候选模型名的覆盖 → 没有覆盖则用 Key 默认协议。覆盖随供应商改名/复制（copy-keys）保留，删除 Key 时清理；改变 Key 默认协议不会改动已有独立覆盖。旧供应商 protocol 自动复制给其所有既存 Key，后续 provider put 的 protocol 不改已有 Key。请求路径、认证、JSON 和 SSE 转换都使用本次解析结果；协议转换能力边界保持现有文本/函数子集。
 
@@ -326,7 +326,7 @@ anchor usage
 
 | 动作 | 参数、默认值和语义 |
 | --- | --- |
-| delete / rename | `--approve` 必填；删除阻止模型引用，成功删除已存 Key/策略/价格；改名以事务迁移模型候选、Key、价格，模型和供应商 revision 增加，在途请求保留旧快照 |
+| delete / rename | `--approve` 必填；删除自动移除本供应商的模型候选，保留其他供应商同名模型及其顺序／元数据；存续模型 revision 加一，无候选时删除模型，若仍是已启用 Binding 的默认模型则409 referenced并整体回滚。成功删除已存 Key/策略/价格；改名以事务迁移模型候选、Key、价格，模型和供应商 revision 增加，在途请求保留旧快照 |
 | copy | target 必填且不能已存在；默认不复制 Key，`--copy-keys` 才复制秘密、Key 默认协议和模型覆盖；新对象 revision=1、默认停用，复制配置/策略，不复制映射/价格/用量 |
 | key-put | target 必填，最多64个 Key；新 Key 必须有非空 stdin 秘密，已有 Key 省略或空 stdin 保留秘密；默认 enabled，`--disabled` 停用；替换秘密只经 stdin，删除用 key-delete；protocol 省略/空值保留已有 Key 协议，新 Key 默认 responses；可显式选 responses / chat-completions / anthropic |
 | key-model-protocol | target 必填已存 Key，model 为实际模型名（不是公开别名，1..256 UTF-8 字节，无首尾空白/控制/格式字符）；protocol 为上述三协议；省略、空值或 inherit 删除覆盖，恢复动态继承 Key 默认值；不修改模型映射 |
@@ -754,7 +754,7 @@ anchor recover [--id ID]
 | 多轮文本对话测试（当前源码，未发布） | provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve；stdin 为完整消息数组，支持可选原生思考深度 | 共享核心与桌面 ProviderChat；CLI 输出最终 JSON，不单独提供终端交互／流式展示命令，复制和清空为页面生命周期 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
-| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示，此展示不新增 CLI 契约；冷却/熔断为内部机制 |
+| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；冷却/熔断为内部机制 |
 | 平台自动识别与列表余额（desktop.27） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；NewAPI 已配置系统令牌时优先读账户余额，未配置时查默认 Key billing／额度；已随 desktop.27 投放。当前源码 GUI 切页先显示同实例／同配置的会话缓存并刷新，失败保留旧值标注「余额未刷新」，支持单行刷新按钮；仅桌面展示行为，沿用既有 balance-summary，无新增 CLI 契约 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |

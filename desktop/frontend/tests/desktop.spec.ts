@@ -613,10 +613,45 @@ test('model cards collapse providers and Keys with a consistent default layout (
   await expect(card.getByRole('button', { name: '模型设置 shared-one', exact: true })).toBeVisible();
 });
 
+test('unavailable mapping sources are folded last and ordering explicitly uses saved positions (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.Providers;
+    api.Providers = async () => {
+      const result = await read();
+      if (result.data) result.data = result.data.map(p => ({ ...p, enabled: p.id !== '摸鱼AI' }));
+      return result;
+    };
+  });
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '刷新配置', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  await card.locator('.model-sources > summary').click();
+  const visible = card.locator('.model-sources-body > .candidate-list > li');
+  await expect(visible).toHaveCount(2);
+  await expect(visible.first()).toContainText('备用供应商');
+  await expect(visible.first().getByLabel('第 2 位', { exact: true })).toBeVisible();
+  const folded = card.getByLabel('当前不可用的来源', { exact: true });
+  await expect(folded).not.toHaveAttribute('open');
+  await expect(folded.locator('li')).not.toBeVisible();
+  await folded.locator(':scope > summary').click();
+  await expect(folded.locator('li')).toContainText('摸鱼AI');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
+  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
+  await expect(visible).toHaveCount(3);
+  await expect(visible.first()).toContainText('摸鱼AI');
+  await expect(card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true })).toBeEnabled();
+  await card.getByRole('button', { name: '完成顺序调整', exact: true }).click();
+  await expect(visible).toHaveCount(2);
+  await expect(card.getByLabel('当前不可用的来源', { exact: true })).not.toHaveAttribute('open');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
+});
+
 test('model routing previews pointer sorting and automatically saves rules with undo (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await card.locator('.model-sources > summary').click();
+  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   const sources = card.locator('li.mapping-candidate');
   const handle = await card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true }).boundingBox();
   const target = await sources.nth(1).boundingBox();
@@ -640,6 +675,7 @@ test('model routing previews pointer sorting and automatically saves rules with 
   await page.getByRole('button', { name: '供应商', exact: true }).click();
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await card.locator('.model-sources > summary').click();
+  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   await expect(card.locator('li.mapping-candidate').nth(1)).toContainText('摸鱼AI');
 });
 
@@ -647,6 +683,7 @@ test('model routing cancels pointer sorting and supports keyboard ordering (simu
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await card.locator('.model-sources > summary').click();
+  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   const grip = card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true });
   const box = await grip.boundingBox();
   await page.mouse.move(box!.x + 10, box!.y + 10); await page.mouse.down(); await page.mouse.move(box!.x + 10, box!.y + 130, { steps: 6 });
@@ -664,6 +701,7 @@ for (const failure of ['conflict', 'unknown'] as const) test(`model routing ${fa
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await card.locator('.model-sources > summary').click();
+  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   await page.evaluate(value => { window.desktopTest.writeError = value; }, failure);
   await card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }).click();
   await expect(card.getByRole('alert')).toContainText(failure === 'conflict' ? '未覆盖新版本' : '结果未知');
@@ -756,12 +794,20 @@ test('mapping availability follows scoped Keys and provider switches, not provid
   });
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '刷新配置', exact: true }).click();
-  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  const hiddenModels = page.getByLabel('当前不可用的模型', { exact: true });
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true, includeHidden: true });
+  await expect(card).not.toBeVisible();
+  await expect(hiddenModels).not.toHaveAttribute('open');
+  await hiddenModels.locator(':scope > summary').click();
   await expect(card).toContainText('0 / 3 个渠道当前可用');
   await expect(card.locator('.model-unavailable-notice')).toContainText('无有效渠道');
   await card.locator('.model-sources > summary').click();
   await expect(card.locator('.mapping-channel-state').filter({ hasText: '供应商已停用' })).toHaveCount(1);
+  const hiddenSources = card.getByLabel('当前不可用的来源', { exact: true });
+  await expect(card.locator('li.mapping-candidate').first()).not.toBeVisible();
+  await hiddenSources.locator(':scope > summary').click();
   await card.locator('.mapping-keys > summary').first().click();
+  await card.getByLabel('当前不可用的 Key', { exact: true }).first().locator(':scope > summary').click();
   await expect(card.locator('.mapping-key-status').first()).toContainText('Key 已停用');
   await expect(card.locator('.mapping-key-rate').filter({ hasText: 'unrelated' })).toHaveCount(0);
   await page.evaluate(() => {
@@ -775,7 +821,15 @@ test('mapping availability follows scoped Keys and provider switches, not provid
   await page.getByRole('button', { name: '刷新配置', exact: true }).click();
   await expect(card).toContainText('2 / 3 个渠道当前可用');
   await expect(card.locator('.model-unavailable-notice')).toHaveCount(0);
-  await expect(card.locator('.mapping-key-status').first()).toContainText('Key 已启用');
+  await expect(card).toBeVisible();
+  await expect(page.getByLabel('当前不可用的模型', { exact: true })).toHaveCount(0);
+  await card.locator('.model-sources > summary').click();
+  await expect(card.locator('.model-sources-body > .candidate-list > li')).toHaveCount(2);
+  await expect(card.getByLabel('当前不可用的来源', { exact: true })).not.toHaveAttribute('open');
+  await card.locator('.model-sources-body > .candidate-list .mapping-keys > summary').first().click();
+  await expect(card.locator('.model-sources-body > .candidate-list .mapping-key-status').first()).toContainText('Key 已启用');
+  // Reading, folding and restoring availability must not save a new routing order.
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
 });
 

@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/state"
 	"io"
@@ -95,7 +96,7 @@ func TestPriorityManagementActions(t *testing.T) {
 	if status, w := act(catalog.Action{ProviderID: "p", ExpectedRevision: 1, Action: "model-put", Target: "alias", Model: "up", Tools: true, Streaming: true}); status != 200 || len(w.Models) != 1 {
 		t.Fatal(status, w)
 	}
-	if status, _ := act(catalog.Action{ProviderID: "p", ExpectedRevision: 1, Action: "delete", Approved: true}); status != 409 {
+	if status, _ := act(catalog.Action{ProviderID: "p", ExpectedRevision: 2, Action: "delete", Approved: true}); status != 409 {
 		t.Fatal(status)
 	}
 	if status, w := act(catalog.Action{ProviderID: "p", ExpectedRevision: 1, Action: "price-put", Target: "alias", Price: &catalog.Price{InputUSD: 1, OutputUSD: 3}}); status != 200 || w.Revision != 2 || len(w.Prices) != 1 {
@@ -109,6 +110,12 @@ func TestPriorityManagementActions(t *testing.T) {
 	price, err := parsePrice([]byte(`{"vendor":{"models":{"up":{"cost":{"input":0,"output":2.5,"cache_read":0.1}}}}}`), "alias", "vendor", "up")
 	if err != nil || price.InputUSD != 0 || price.CacheWriteUSD != nil || price.CacheReadUSD == nil {
 		t.Fatal(price, err)
+	}
+	if status, deleted := act(catalog.Action{ProviderID: "p", ExpectedRevision: 2, Action: "delete", Approved: true}); status != 200 || !deleted.Deleted || len(deleted.Models) != 0 || len(deleted.Keys) != 0 || len(deleted.Prices) != 0 {
+		t.Fatal(status, deleted)
+	}
+	if _, err = f.store.Model("alias"); !errors.Is(err, state.ErrNotFound) {
+		t.Fatal("orphan retained", err)
 	}
 }
 func TestPriorityProtocolGatewayAndProbe(t *testing.T) {

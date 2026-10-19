@@ -30,7 +30,7 @@ func TestPriorityProviderMutationsAndUsage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = s.MutateProvider("old", 2, "delete", "", "", "", false, false); !errors.Is(err, ErrReferenced) {
+	if err = s.MutateProvider("old", 1, "delete", "", "", "", false, false); !errors.Is(err, ErrConflict) {
 		t.Fatal(err)
 	}
 	if err = s.PutPrice("old", 2, catalog.Price{Model: "alias", InputUSD: 1, OutputUSD: 2}); err != nil {

@@ -53,4 +53,27 @@ describe('model channel availability presentation', () => {
     expect(html).toContain('部分供应商状态读取失败');
     expect(html).not.toContain('还没有模型映射');
   });
+  it('puts unavailable model cards in a closed trailing section', () => {
+    const off = makeSummary(false), on = makeSummary(true);
+    off.workspace!.models[0].id = 'a-off'; on.workspace!.models[0].id = 'z-on';
+    const html = render([off, on]);
+    const section = html.match(/<details[^>]*aria-label="当前不可用的模型"[^>]*>/)?.[0];
+    expect(section).toBeDefined(); expect(section).not.toContain('open');
+    expect(html.indexOf('模型 z-on')).toBeLessThan(html.indexOf('当前不可用的模型'));
+    expect(html.indexOf('当前不可用的模型')).toBeLessThan(html.indexOf('模型 a-off'));
+  });
+  it('shows usable candidates before closed unavailable sources without changing routing indices', () => {
+    const off = makeSummary(false), on = makeSummary(true);
+    off.provider.id = 'off'; on.provider.id = 'on';
+    off.workspace!.models[0] = { ...mapping, candidate_count: 2, candidate_index: 0 };
+    on.workspace!.models[0] = { ...mapping, candidate_count: 2, candidate_index: 1 };
+    const html = render([off, on]);
+    expect(html).toContain('调整来源顺序');
+    const section = html.match(/<details[^>]*aria-label="当前不可用的来源"[^>]*>/)?.[0];
+    expect(section).toBeDefined(); expect(section).not.toContain('open');
+    expect(html.indexOf('第 2 位')).toBeLessThan(html.indexOf('当前不可用的来源'));
+    expect(html.indexOf('当前不可用的来源')).toBeLessThan(html.indexOf('第 1 位'));
+    expect(html).not.toContain('aria-label="下移 on');
+  });
+
 });

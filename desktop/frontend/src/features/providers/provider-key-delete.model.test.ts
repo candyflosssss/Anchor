@@ -52,4 +52,17 @@ describe('Key deletion in the memory prototype', () => {
     const w = await act('p', 'key-delete', { target: 'default', approved: true });
     expect(w.models).toEqual([]);
   });
+  it('deletes a provider and keeps another provider’s same-named models', async () => {
+    const { transport, act } = await setup();
+    await act('p', 'model-put', { target: 'only', model: 'same', key_ids: ['default'] });
+    await act('p', 'model-put', { target: 'shared', model: 'same', key_ids: ['default'], tools: true });
+    await act('other', 'model-put', { target: 'shared', model: 'same', key_ids: ['default'] });
+    await expect(act('p', 'delete', {})).rejects.toMatchObject({ code: 'invalid' });
+    const deleted = await act('p', 'delete', { approved: true });
+    expect(deleted).toMatchObject({ deleted: true, models: [], keys: [], prices: [] });
+    expect((await transport.list(signal)).map(p => p.id)).toEqual(['other']);
+    const other = await transport.workspace('other', signal);
+    expect(other.models[0]).toMatchObject({ id: 'shared', tools: true, candidate_index: 0, candidate_count: 1, revision: 3 });
+  });
+
 });

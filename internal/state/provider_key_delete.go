@@ -24,6 +24,12 @@ func deleteProviderKey(tx *sql.Tx, providerID, keyID string) error {
 	if err = tx.QueryRow(`SELECT count(*) FROM provider_keys WHERE provider_id=?`, providerID).Scan(&remainingKeys); err != nil {
 		return err
 	}
+	return pruneProviderSources(tx, providerID, keyID, remainingKeys)
+}
+
+// An empty keyID removes the entire provider; otherwise only that Key is pruned.
+// Disabled sources are deliberately retained: only deletion changes mappings.
+func pruneProviderSources(tx *sql.Tx, providerID, keyID string, remainingKeys int) error {
 	rows, err := tx.Query(`SELECT document,revision FROM models`)
 	if err != nil {
 		return err
@@ -47,6 +53,10 @@ func deleteProviderKey(tx *sql.Tx, providerID, keyID string) error {
 		for _, c := range m.Candidates {
 			if c.ProviderID != providerID {
 				candidates = append(candidates, c)
+				continue
+			}
+			if keyID == "" {
+				affected = true
 				continue
 			}
 			if len(c.KeyIDs) == 0 {

@@ -205,13 +205,15 @@ export class MockProviderTransport implements ProviderTransport {
       m.key_ids = m.key_ids.filter(id => id !== keyID);
       return m.key_ids.length > 0;
     });
+    this.pruneDeletedMappings(all, affected);
+  }
+  private pruneDeletedMappings(all: Workspace[], affected: Set<string>) {
     for (const id of affected) {
       const remaining = all.flatMap(w => w.models.filter(m => m.id === id));
       remaining.sort((a, b) => a.candidate_index - b.candidate_index).forEach((m, i) => {
         m.revision++; m.candidate_count = remaining.length; m.candidate_index = i;
       });
-      if (!w.models.some(m => m.id === id)) w.prices = w.prices.filter(p => p.model !== id);
-      if (!remaining.length) for (const workspace of all) workspace.prices = workspace.prices.filter(p => p.model !== id);
+      for (const w of all) if (!w.models.some(m => m.id === id)) w.prices = w.prices.filter(p => p.model !== id);
     }
   }
   async action(a: Action, signal: AbortSignal): Promise<Workspace> {
@@ -221,7 +223,14 @@ export class MockProviderTransport implements ProviderTransport {
     if (this.scenario === 'conflict' || p.revision !== a.expected_revision) { this.scenario = 'normal'; throw fixtureError('conflict'); }
     const w = this.detail(p);
     switch (a.action) {
-      case 'delete': if (!a.approved) throw fixtureError('invalid'); if (w.models.length) throw new ProviderProblem('referenced'); this.rows = this.rows.filter(row => row !== p); this.workspaces.delete(p.id); return { ...structuredClone(w), deleted: true };
+      case 'delete': {
+        if (!a.approved) throw fixtureError('invalid');
+        const all = this.rows.map(p => this.detail(p)), affected = new Set(w.models.map(m => m.id));
+        w.models = []; w.keys = []; w.prices = [];
+        this.pruneDeletedMappings(all, affected);
+        this.rows = this.rows.filter(row => row !== p); this.workspaces.delete(p.id); this.accounts.delete(p.id);
+        return { ...structuredClone(w), deleted: true };
+      }
       case 'rename': case 'copy': {
         if (!a.target || this.rows.some(p => p.id === a.target)) throw fixtureError('conflict');
         if (a.action === 'rename') { if (!a.approved) throw fixtureError('invalid'); this.workspaces.delete(p.id); p.id = a.target; p.revision++; w.provider_id = a.target; w.revision = p.revision; this.workspaces.set(p.id, w); }
