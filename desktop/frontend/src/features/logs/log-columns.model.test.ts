@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cacheHitRate, defaultColumns, moveColumn, normalizeColumns, migrateCostColumns, outputTps } from './log-columns.model';
+import { cacheHitRate, defaultColumns, moveColumn, normalizeColumns, outputTps } from './log-columns.model';
 import { requestFixtures } from './log.mock';
 
 describe('log column preferences', () => {
@@ -81,7 +81,12 @@ describe('cache hit rate', () => {
   });
 });
 
-it('expands the old price column once while preserving deliberate v2 hidden columns', () => {
-  expect(normalizeColumns(migrateCostColumns(['time', 'referenceCost', 'model']))).toEqual(['time', 'originalCost', 'supplierMultiplier', 'groupMultiplier', 'referenceCost', 'model']);
-  expect(normalizeColumns(['referenceCost'])).toEqual(['referenceCost']);
+it('merges legacy cost columns at their first position without restoring hidden costs', () => {
+  expect(normalizeColumns(['time', 'referenceCost', 'model'])).toEqual(['time', 'referenceCost', 'model']);
+  expect(normalizeColumns(['time', 'groupMultiplier', 'model', 'originalCost', 'supplierMultiplier', 'referenceCost']))
+    .toEqual(['time', 'referenceCost', 'model']);
+  for (const id of ['originalCost', 'supplierMultiplier', 'groupMultiplier', 'referenceCost']) {
+    expect(normalizeColumns([id])).toEqual(['referenceCost']);
+  }
+  expect(normalizeColumns(['time', 'model'])).toEqual(['time', 'model']);
 });

@@ -16,26 +16,21 @@ export const logColumns = [
   { id: 'acceleration', label: '加速状态', group: '速度与用量', description: '最后候选上游返回的原始档位，已知值才解析 Fast / Ultrafast 并与发送值核对；不是实际速度或计费保证。', width: 175 },
   { id: 'timing', label: '耗时与速度', group: '速度与用量', description: '总耗时、首次有效输出时间、输出区间与总 TPS。总 TPS = 总输出 Token（已含思考，不重复累加）/ 请求总耗时，包含首字前等待、思考、重试和传输，并非纯解码速度。成功结束且总输出和耗时已确认时可计算，不要求流式或首字观测；失败、中断或数据缺失显示未知。输出区间仅供参考，不作为 TPS 分母。', width: 230 },
   { id: 'tokens', label: 'Token 用量', group: '速度与用量', description: '输入、输出、缓存命中、思考与输入输出合计。缓存和思考不重复累加，未报告不补零；多次尝试仅为已知小计。', width: 240 },
-  { id: 'originalCost', label: '原始参考费用', group: '速度与用量', description: '未乘倍率的模型参考费用，按各次尝试的输入、输出与缓存单价计算 USD；悬浮查看乘区明细。', width: 155 },
-  { id: 'supplierMultiplier', label: '供应商倍率', group: '速度与用量', description: '派发时供应商成本倍率快照；重试倍率不同时显示逐次。', width: 115 },
-  { id: 'groupMultiplier', label: '分组倍率', group: '速度与用量', description: '派发时 Key 已观测的分组有效倍率，已包含平台覆盖；未知不补 1。', width: 115 },
-  { id: 'referenceCost', label: '最终参考费用', group: '速度与用量', description: '逐次原始费用 × 供应商成本倍率 × Key 分组有效倍率后求和；悬浮查看乘区、单价与倍率，不代表上游账单。', width: 155 },
+  { id: 'referenceCost', label: '参考费用', group: '速度与用量', description: '同一块显示原始费用、派发时供应商倍率、Key 分组有效倍率和最终参考费用；逐次折算后求和，悬浮查看输入、输出与缓存乘区。未知不补 1，不代表上游账单。', width: 230 },
   { id: 'attempts', label: '尝试次数', group: '结果与诊断', description: '本次根请求实际派发的上游尝试次数，允许为零。', width: 100 },
   { id: 'diagnostics', label: '错误与阶段', group: '结果与诊断', description: '稳定错误码与请求失败 / 结束阶段；未记录错误码时显示“—”。', width: 190 },
 ] as const satisfies readonly ColumnDefinition[];
 export type LogColumnId = typeof logColumns[number]['id'];
 export const columnPresets = {
-  common: { label: '常用', ids: ['time', 'status', 'model', 'provider', 'timing', 'tokens', 'originalCost', 'supplierMultiplier', 'groupMultiplier', 'referenceCost', 'sentTier', 'acceleration'] },
-  performance: { label: '性能', ids: ['time', 'model', 'provider', 'protocol', 'timing', 'tokens', 'originalCost', 'supplierMultiplier', 'groupMultiplier', 'referenceCost', 'sentTier', 'acceleration'] },
+  common: { label: '常用', ids: ['time', 'status', 'model', 'provider', 'timing', 'tokens', 'referenceCost', 'sentTier', 'acceleration'] },
+  performance: { label: '性能', ids: ['time', 'model', 'provider', 'protocol', 'timing', 'tokens', 'referenceCost', 'sentTier', 'acceleration'] },
   debugging: { label: '排障', ids: ['time', 'status', 'requestId', 'provider', 'diagnostics', 'attempts'] },
 } satisfies Record<string, { label: string; ids: LogColumnId[] }>;
 export const defaultColumns: LogColumnId[] = [...columnPresets.common.ids];
-export const columnStorageKey = 'anchor.ui.logs.columns.v2';
-export const legacyColumnStorageKey = 'anchor.ui.logs.columns.v1';
-export function migrateCostColumns(value: unknown): unknown {
-  return Array.isArray(value) ? value.flatMap(id => id === 'referenceCost' ? ['originalCost', 'supplierMultiplier', 'groupMultiplier', 'referenceCost'] : [id]) : value;
-}
+export const columnStorageKey = 'anchor.ui.logs.columns.v3';
+export const legacyColumnStorageKeys = ['anchor.ui.logs.columns.v2', 'anchor.ui.logs.columns.v1'] as const;
 const legacyColumns: Record<string, LogColumnId> = {
+  originalCost: 'referenceCost', supplierMultiplier: 'referenceCost', groupMultiplier: 'referenceCost',
   upstreamModel: 'model', reasoningEffort: 'model', key: 'provider', stream: 'protocol',
   ttft: 'timing', elapsed: 'timing', generationMs: 'timing', tps: 'timing',
   input: 'tokens', output: 'tokens', totalTokens: 'tokens', cacheReadTokens: 'tokens', reasoningTokens: 'tokens',

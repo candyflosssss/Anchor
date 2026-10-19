@@ -19,7 +19,7 @@ function Metric({ label, value, tone, icon: Icon, detail }: { label: string; val
 }
 export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
   switch (id) {
-    case 'originalCost': case 'supplierMultiplier': case 'groupMultiplier': case 'referenceCost': return <CostCell kind={id} cost={row.referenceCost} />;
+    case 'referenceCost': return <CostCell cost={row.referenceCost} />;
     case 'sentTier': return <SentTier row={row} />;
     case 'acceleration': return <Acceleration row={row} />;
     case 'time': return <div className="log-time"><span className="mono">{row.time}</span><small>{row.ageMinutes} 分钟前</small></div>;

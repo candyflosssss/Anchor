@@ -1,5 +1,4 @@
-import { adjustmentValue, costMultiplier, referenceUSD } from './log-reference-cost.model';
-import { CostBreakdown, ReferenceCostDetail } from './log-reference-cost.view';
+import { CostBreakdown, CostSummary, ReferenceCostDetail } from './log-reference-cost.view';
 import { useRef } from 'react';
 import { Copy } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -27,7 +26,7 @@ export function RequestDetail({ row, onClose, onCopy, notice }: { row: RequestLo
           <div><dt>上游返回档位（最后候选）</dt><dd><TierValue tier={tierSnapshot(row.evidence, 'upstream')} /></dd></div>
         </dl></section>
         <section aria-label="尝试时间线"><h3 className="log-section-title">尝试时间线 · {row.attemptCount ?? row.attempts.length}</h3>
-          {row.attempts.length === 0 ? <p>暂无尝试</p> : <ol className="log-timeline">{row.attempts.map(a => <li key={a.number}><span className="log-attempt-dot">{a.number}</span><dl className="log-properties log-attempt-card">{Object.entries({ '供应商':a.provider, Key:a.key, '模型':a.model, '协议':a.protocol, HTTP:a.http ?? '未知', '耗时':`${a.elapsed} ms`, '输入 Token':a.input ?? '未知', '输出 Token':a.output ?? '未知', '原始参考费用': a.referenceUSD == null ? row.referenceCost ? '未知' : '—' : referenceUSD(a.referenceUSD), '供应商倍率': !row.referenceCost ? '—' : a.costAdjustment ? costMultiplier(a.costAdjustment.supplier_multiplier) : '未记录', '分组倍率': !row.referenceCost ? '—' : a.costAdjustment ? costMultiplier(a.costAdjustment.group_multiplier) : '未记录', '最终参考费用': row.referenceCost ? adjustmentValue(a.costAdjustment) : '—', '结果':a.outcome, '错误码':a.code ?? '—', '阶段':a.note }).map(([k,v]) => <div key={k}><dt>{k}</dt><dd className="mono">{v}</dd></div>)}</dl>{a.costAdjustment && <CostBreakdown adjustment={a.costAdjustment} />}</li>)}</ol>}
+          {row.attempts.length === 0 ? <p>暂无尝试</p> : <ol className="log-timeline">{row.attempts.map(a => <li key={a.number}><span className="log-attempt-dot">{a.number}</span><dl className="log-properties log-attempt-card">{Object.entries({ '供应商':a.provider, Key:a.key, '模型':a.model, '协议':a.protocol, HTTP:a.http ?? '未知', '耗时':`${a.elapsed} ms`, '输入 Token':a.input ?? '未知', '输出 Token':a.output ?? '未知', '结果':a.outcome, '错误码':a.code ?? '—', '阶段':a.note }).map(([k,v]) => <div key={k}><dt>{k}</dt><dd className="mono">{v}</dd></div>)}<div><dt>参考费用</dt><dd>{row.referenceCost ? <CostSummary usd={a.referenceUSD} adjustment={a.costAdjustment} /> : <span className="mono">—</span>}</dd></div></dl>{a.costAdjustment && <CostBreakdown adjustment={a.costAdjustment} />}</li>)}</ol>}
           {row.attemptsTruncated && <p role="status">尝试明细已截断</p>}
         </section>
         <section><h3 className="log-section-title">结构诊断</h3><dl className="log-properties">{Object.entries(row.evidence).map(([k,v]) => <div key={k}><dt>{k}</dt><dd>{String(v)}</dd></div>)}</dl></section>

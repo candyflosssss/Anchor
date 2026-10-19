@@ -21,14 +21,19 @@ export function CostBreakdown({ adjustment }: { adjustment: CostAdjustment }) {
     <p className="log-cost-footnote">单价倍率相对同次非缓存输入，最多保留 12 位小数。思考未单独报告且同价时随输出计价；输入已含缓存、输出已含思考，分区不重复计费；供应商与分组倍率作用于每个乘区。仅供参考，不是实际账单。</p>
   </div>;
 }
-export function CostCell({ kind, cost }: { kind: 'originalCost' | 'supplierMultiplier' | 'groupMultiplier' | 'referenceCost'; cost?: ReferenceCost | null }) {
+export function CostSummary({ usd, adjustment: a }: { usd?: string | null; adjustment?: CostAdjustment | null }) {
+  return <span className="log-cost-summary">
+    <span className="log-cost-line"><span>原始费用</span><span className="mono">{usd == null ? '未知' : referenceUSD(usd)}</span></span>
+    <span className="log-cost-line"><span>供应商倍率</span><span className="mono">{a ? costMultiplier(a.supplier_multiplier, a.supplier_mixed) : '未记录'}</span></span>
+    <span className="log-cost-line"><span>分组倍率</span><span className="mono">{a ? costMultiplier(a.group_multiplier, a.group_mixed) : '未记录'}</span></span>
+    <span className="log-cost-line log-cost-final"><span>最终费用</span><span className="mono">{adjustmentValue(a)}</span></span>
+  </span>;
+}
+export function CostCell({ cost }: { cost?: ReferenceCost | null }) {
   if (!cost) return <span className="mono">—</span>;
   const a = cost.adjustment;
-  const value = kind === 'originalCost' ? cost.usd == null ? '未知' : referenceUSD(cost.usd)
-    : kind === 'referenceCost' ? adjustmentValue(a)
-      : !a ? '未记录' : kind === 'supplierMultiplier' ? costMultiplier(a.supplier_multiplier, a.supplier_mixed) : costMultiplier(a.group_multiplier, a.group_mixed);
   return <TooltipProvider delayDuration={200}><Tooltip><TooltipTrigger asChild>
-    <button type="button" className="log-cost-trigger mono" aria-label={`费用乘区明细：${value}`} onClick={event => event.stopPropagation()}>{value}</button>
+    <button type="button" className="log-cost-trigger" aria-label="参考费用，查看乘区明细" onClick={event => event.stopPropagation()}><CostSummary usd={cost.usd} adjustment={a} /></button>
   </TooltipTrigger><TooltipContent className="log-cost-tooltip" side="bottom" collisionPadding={16}>
     <p className="font-medium">参考费用乘区 · USD</p><p>原始参考费用：{cost.usd == null ? `未知 · ${referenceCostReason(cost.reason)}` : referenceUSD(cost.usd)}</p>
     {a ? <CostBreakdown adjustment={a} /> : <p>历史记录未保存倍率与乘区，不按当前配置补算。</p>}

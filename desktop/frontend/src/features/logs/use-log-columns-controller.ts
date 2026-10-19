@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { columnPresets, columnStorageKey, legacyColumnStorageKey, migrateCostColumns, defaultColumns, logColumns, moveColumn, normalizeColumns, type LogColumnId } from './log-columns.model';
+import { columnPresets, columnStorageKey, legacyColumnStorageKeys, defaultColumns, logColumns, moveColumn, normalizeColumns, type LogColumnId } from './log-columns.model';
 
 function readColumns(): LogColumnId[] {
   try {
-    const current = localStorage.getItem(columnStorageKey);
-    return normalizeColumns(current == null ? migrateCostColumns(JSON.parse(localStorage.getItem(legacyColumnStorageKey) ?? 'null')) : JSON.parse(current));
+    const saved = [columnStorageKey, ...legacyColumnStorageKeys].map(key => localStorage.getItem(key)).find(value => value !== null);
+    return normalizeColumns(JSON.parse(saved ?? 'null'));
   }
   catch { return [...defaultColumns]; }
 }

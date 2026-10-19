@@ -74,7 +74,7 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   await openLogs(page);
   const list = page.getByRole('region', { name: '请求日志列表' });
   await expect(list.getByRole('row')).toHaveCount(3);
-  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '原始参考费用', '供应商倍率', '分组倍率', '最终参考费用', '发送档位', '加速状态', '详情']);
+  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '参考费用', '发送档位', '加速状态', '详情']);
   const success = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
   const timing = success.getByRole('cell').nth(4), tokens = success.getByRole('cell').nth(5);
   for (const label of ['总耗时', '首字', '输出', '总TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
@@ -689,12 +689,16 @@ test('collapsed trends keep errors and empty states out of the log list until ex
   }
 });
 
-test('reference cost columns expose captured charging buckets on hover and keyboard focus', async ({ page }) => {
+test('reference cost block exposes captured charging buckets on hover and keyboard focus', async ({ page }) => {
   await openLogs(page);
   const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
   const list = page.getByRole('region', { name: '请求日志列表' });
-  for (const heading of ['原始参考费用', '供应商倍率', '分组倍率', '最终参考费用']) await expect(list.getByRole('columnheader', { name: heading, exact: true })).toBeVisible();
-  const trigger = row.getByRole('button', { name: '费用乘区明细：$0.000492', exact: true });
+  await expect(list.getByRole('columnheader', { name: '参考费用', exact: true })).toBeVisible();
+  for (const heading of ['原始参考费用', '供应商倍率', '分组倍率', '最终参考费用']) await expect(list.getByRole('columnheader', { name: heading, exact: true })).toHaveCount(0);
+  const trigger = row.getByRole('button', { name: '参考费用，查看乘区明细', exact: true });
+  await expect(trigger.locator('.log-cost-line')).toHaveText(['原始费用$0.00123', '供应商倍率×0.5', '分组倍率×0.8', '最终费用$0.000492']);
+  await trigger.evaluate(element => element.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  if (capture) await trigger.screenshot({ path: resolve(capture, 'logs-cost-block.png') });
   await trigger.hover();
   const tip = page.getByRole('tooltip');
   await expect(tip).toBeVisible();
@@ -712,12 +716,38 @@ test('reference cost columns expose captured charging buckets on hover and keybo
   await page.keyboard.press('Escape');
   await row.getByRole('button', { name: '查看请求 fixture_success' }).click();
   const detail = page.getByRole('dialog');
-  await expect(detail.getByLabel('尝试时间线')).toContainText('最终参考费用');
+  await expect(detail.getByLabel('尝试时间线').locator('.log-cost-summary')).toHaveCount(1);
+  await expect(detail.getByLabel('尝试时间线').locator('.log-cost-line')).toHaveText(['原始费用$0.00123', '供应商倍率×0.5', '分组倍率×0.8', '最终费用$0.000492']);
   await expect(detail.getByLabel('尝试时间线')).toContainText('×0.5');
   await detail.getByRole('button', { name: '关闭请求详情', exact: true }).click();
   await page.getByRole('button', { name: '查看请求 fixture_failed', exact: true }).click();
   const unpriced = page.getByRole('dialog').getByLabel('尝试时间线');
-  for (const label of ['原始参考费用', '供应商倍率', '分组倍率', '最终参考费用']) {
-    await expect(unpriced.locator('dl > div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('—');
-  }
+  await expect(unpriced.locator('dl > div').filter({ has: page.getByText('参考费用', { exact: true }) }).locator('dd')).toHaveText('—');
+  await expect(unpriced.locator('.log-cost-summary')).toHaveCount(0);
 });
+
+for (const [version, ids] of [
+  ['v1', ['time', 'referenceCost', 'model']],
+  ['v2', ['time', 'groupMultiplier', 'model', 'originalCost', 'supplierMultiplier', 'referenceCost']],
+] as const) {
+  test(`reference cost column preferences merge ${version} costs and preserve v3 hiding on reload`, async ({ page }) => {
+    await page.addInitScript(({ version, ids }) => localStorage.setItem(`anchor.ui.logs.columns.${version}`, JSON.stringify(ids)), { version, ids });
+    await openLogs(page);
+    const list = page.getByRole('region', { name: '请求日志列表' });
+    await expect(list.getByRole('columnheader')).toHaveText(['时间', '参考费用', '模型', '详情']);
+    await page.getByRole('button', { name: /显示内容/ }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('checkbox', { name: /^参考费用/ })).toHaveCount(1);
+    await dialog.getByRole('checkbox', { name: /^参考费用/ }).uncheck();
+    await dialog.getByRole('button', { name: '完成', exact: true }).click();
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('anchor.ui.logs.columns.v3')!))).toEqual(['time', 'model']);
+    await page.reload(); await page.getByRole('button', { name: '日志', exact: true }).click();
+    await expect(list.getByRole('columnheader')).toHaveText(['时间', '模型', '详情']);
+    await page.getByRole('button', { name: /显示内容/ }).click();
+    await dialog.getByRole('checkbox', { name: /^参考费用/ }).check();
+    await dialog.getByRole('button', { name: '完成', exact: true }).click();
+    await expect(list.getByRole('columnheader')).toHaveText(['时间', '模型', '参考费用', '详情']);
+    const row = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
+    await expect(row.locator('.log-cost-line')).toHaveCount(4);
+  });
+}
