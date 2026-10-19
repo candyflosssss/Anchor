@@ -179,6 +179,7 @@ type Adapter struct {
 	calls        int
 	bytes        int
 	publicStatus object
+	tokenUsage   object
 	keyBilling   object
 	htmlResponse bool
 }
@@ -228,6 +229,7 @@ func (a *Adapter) query(ctx context.Context, q Query, resolveKey bool) Result {
 	a.bytes = 0
 	a.publicStatus = nil
 	a.keyBilling = nil
+	a.tokenUsage = nil
 	var err error
 	// An unconfigured catalog can recognize sub2api using one key-only probe.
 	// Other platforms still need an explicit platform/account configuration.

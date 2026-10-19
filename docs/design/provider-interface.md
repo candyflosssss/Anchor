@@ -111,7 +111,7 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 | 内部操作 | sub2api | NewAPI | 原版 OneAPI |
 | --- | --- | --- | --- |
 | models | 既有目录读取器，所选推理 Key | 同左 | 同左 |
-| balance | 用户 `GET /api/v1/user/profile`；无用户授权时 Key `GET /v1/usage`，仅明确钱包 balance 可用 | 优先用户 `GET /api/user/self`；无用户授权时 Key `GET /v1/dashboard/billing/subscription` + `/v1/dashboard/billing/usage` | 用户 `GET /api/user/self` |
+| balance | 用户 `GET /api/v1/user/profile`；无用户授权时 Key `GET /v1/usage`，仅明确钱包 balance 可用 | 优先用户 `GET /api/user/self`；无用户授权时 Key `GET /api/usage/token/` 的可选 user_quota，其次旧 billing，最后可用的只读 Key 额度 | 用户 `GET /api/user/self` |
 | key-quota | Key `GET /v1/usage` | Key `GET /api/usage/token/`，兼容其布尔 `code:true` 成功封装 | 用户 `GET /api/token/{remote_key_id}` |
 | usage-records account | 用户 `GET /api/v1/usage?page=&page_size=` | 用户 `GET /api/log/self?type=2&p=&page_size=` | 用户 `GET /api/log/self?type=2&p=`，内部把页号转换成从0开始 |
 | usage-records key | 同上，加 api_key_id 筛选 | Key `GET /api/log/token`，只提供近期批次 | unsupported_key_filter，不使用可能重名的 token_name 筛选 |
@@ -121,7 +121,7 @@ round-robin 在核心按权重1/multiplier执行平滑加权轮询，默认倍�
 
 ### 数据口径与能力缺口
 
-`Amount` 保留 JSON 数字字面值与单位，sub2api 为 USD，NewAPI/OneAPI 的账户与 Key 原始额度为 quota；NewAPI billing 使用公开显示单位 USD/CNY/quota，无法确认则 site_unit，不按常见 quota_per_unit 假设换算。`Allowance` 显式区分 account/key/billing（站点决定账户或 Key 范围），remaining、used、limit、unlimited 和窗口缺失均可为 null。sub2api 订阅 remaining 或 Key cap 不能当账户钱包余额；unrestricted 表示 Key 本身不受额度上限限制，不表示账户余额无限。原版 OneAPI 旧 billing 接口受站点开关影响其范围／单位，兼容层不依赖它。
+`Amount` 保留高精度 JSON 数字与明确单位。sub2api 为 USD；OneAPI 的账户与 Key 原始额度为 quota。NewAPI 账户与 Key 的原始 quota 按公开 `/api/status` 的 quota_per_unit 及 quota_display_type 换算：USD 为 quota / quota_per_unit，CNY 再乘站点 usd_exchange_rate；TOKENS、未知显示类型或换算参数缺失／无效时保留 quota，不猜测倍率或汇率。NewAPI billing 已由站点换算，仅确认 USD/CNY/quota 单位，无法确认则 site_unit，不二次换算。GUI 展示统一四舍五入两位小数，用十进制字符串运算避免大额度及1.005等边界的浮点误差；底层与CLI保持精度。`Allowance` 显式区分 account/key/billing（站点决定账户或 Key 范围），remaining、used、limit、unlimited 和窗口缺失均可为 null。sub2api 订阅 remaining 或 Key cap 不能当账户钱包余额；unrestricted 表示 Key 本身不受额度上限限制，不表示账户余额无限。原版 OneAPI 旧 billing 接口受站点开关影响其范围／单位，兼容层不依赖它。
 
 账单只保留消费记录：sub2api `actual_cost` 为 charged_amount，`total_cost` 为 base_amount；NewAPI/OneAPI `quota` 为此次请求结算的内部额度。NewAPI 若返回 billing_source 则保留 wallet/subscription，并保留 wallet_quota_deducted、subscription_consumed 等数值，不能把订阅消耗当作钱包扣款。token 输入、输出、缓存读／写、5分钟／1小时写入独立返回，缺失保留 null。原版 OneAPI 的 prompt_tokens 在部分非文本计费路径可能承载其他含义，统一标记 `platform_fields_unverified`，不保证实际模型 token。NewAPI 日志 id 可被重新编号，`id_stable=false`，request_id 仅在站点返回时提供。
 
@@ -141,6 +141,7 @@ sub2api 所选推理 Key 的倍率查询（remote_key_id=0）优先使用 `/v1/s
 
 - [sub2api ab80abc](https://github.com/Wei-Shaw/sub2api/tree/ab80abc6d1f929a6864c8804fd077b509d21fda2)：gateway usage、用户 routes、usage handler、DTO、API Key handler。
 - [NewAPI 633b4c5](https://github.com/QuantumNous/new-api/tree/633b4c5b190dc1af99a2814391354d86948e7943)：token/log/pricing controller、API router、公开日志计费信息及 text_quota 的工具附加费／缓存字段。
+- 2026-10-19 再核对 [NewAPI 官方认证文档](https://docs2.newapi.pro/en/docs/api/management/auth)、[用户信息](https://docs2.newapi.pro/en/docs/api/management/user-management/user-self-get)、[令牌用量](https://docs2.newapi.pro/en/docs/api/management/token-management/usage-token-get)，以及当日最新 [NewAPI 058c823](https://github.com/QuantumNous/new-api/tree/058c8231b68c51ee02abee15befcd720fee9f4a2) 的 controller/token.go（可选 user_quota）、billing.go、misc.go（站点换算参数）和 middleware/auth.go（只读认证）。分支／旧站未提供 user_quota 时沿用上述兼容路径。
 - [原版 OneAPI 8df4a26](https://github.com/songquanpeng/one-api/tree/8df4a2670b98266bd287c698243fff327d9748cf)：user/token/log/billing controller 与 log model；不将各分叉能力当成原版保证。
 
 使用隔离 SQLite 与模拟 HTTP 站点验证认证、版本、请求路径、分页、金额精度、字段缺失、上游失败、体积限制和脱敏，以及 CLI／客户端完整调用链。没有使用真实站点令牌，没有调用付费推理，没有完成原生桌面接入或发行验证。
@@ -159,7 +160,7 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 `detect-platform` 强制重新探测，只返回观察结果，不持久化平台或递增 revision。未配置／auto 的其他查询先探测：公开 `/api/status` 以版本、quota_per_unit 和 NewAPI／OneAPI 特有字段区分；公开 `/api/v1/settings/public` 以 sub2api settings 字段识别。公开探测不发送凭据；必要时用所选推理 Key 检查 `/v1/usage` 与 `/api/usage/token/` 的结构。域名、站点名称或推理协议不作为识别依据，无法确认则 platform_unknown；网络、超时、限流和响应预算失败立即停止。沿用部署前缀、禁止重定向，全部探测与查询共享8次请求／2 MiB／8秒上限。
 
-`balance-summary` 供列表自动读取；NewAPI 已保存用户授权时优先使用系统访问令牌查 `/api/user/self`，返回 scope=account，与详情 `balance` 一致。账户认证、权限或接口失败直接报告，不退回 Key 数值；没有启用推理 Key 也可用明确配置的平台和系统访问令牌查询账户。其余路径使用推理 Key。sub2api unrestricted 的明确 balance 返回 account 钱包；受限 Key 返回 key 额度及周期窗口。NewAPI 优先使用 Key 查询 `/v1/dashboard/billing/subscription` 与 `/v1/dashboard/billing/usage`，剩余值为 `hard_limit_usd - total_usage/100`，精确十进制运算；范围由私有站点开关决定，因此 scope=billing。公开 `/api/status` 的 quota_display_type 仅用于确认 USD/CNY/TOKENS 单位；不能确认则 site_unit，不凭字段名假设 USD。无限额 Key 的100000000占位值需核对 Key 后返回 Key 无限额，不能显示为钱包。billing 缺失或格式不兼容时回退 Key 原始 quota；认证、权限、限流、网络和服务错误直接报告。原版 OneAPI 缺少默认 Key 的明确钱包接口，返回 auth_required。NewAPI `balance` 优先使用已有用户授权查账户钱包；无用户授权时沿用 Key billing；其他平台 balance 的账户钱包语义不变。用户授权可在详情配置。NewAPI 在该站后台「个人设置／安全设置 → 系统访问令牌」生成独立用户授权，与推理 API Key 分开；GUI 显示获取步骤。支持 scoped token 的上游版本，账户余额读取需 profile:read，自动核对 Key 分组还需 api_key:read、api_key:reveal；用户 ID 按站点要求填写。不同部署版本名称和权限配置以该站为准。缺失值保持 null，失败不伪造0。
+`balance-summary` 供列表自动读取；NewAPI 已保存用户授权时优先使用系统访问令牌查 `/api/user/self`，返回 scope=account，与详情 `balance` 一致。账户认证、权限或接口失败直接报告，不退回 Key 数值；没有启用推理 Key 也可用明确配置的平台和系统访问令牌查询账户。其余路径使用推理 Key。sub2api unrestricted 的明确 balance 返回 account 钱包；受限 Key 返回 key 额度及周期窗口。NewAPI 先读取只读 `/api/usage/token/`：仅当站点在 Key 允许查询用户额度时返回有效 user_quota，才标为 account，其账户字段不会继承 Key 的 unlimited_quota。若未返回账户字段，尝试 `/v1/dashboard/billing/subscription` 与 `/v1/dashboard/billing/usage`，剩余值为 `hard_limit_usd - total_usage/100`，精确十进制运算；范围由私有站点开关决定，因此 scope=billing。公开显示类型确认单位，未知为 site_unit；无限额100000000占位值仍须核对 Key，不当作钱包。billing 缺失、格式不兼容或拒绝认证／权限时，可回退本次已成功读取的 Key 额度（scope=key）；已耗尽／过期 Key 在只读接口仍获准查询时可显示额度，禁用／IP限制仍由站点执行。限流、网络及服务错误不降级吞掉；显式系统访问令牌失败不回退 Key。NewAPI balance 与 balance-summary 共用以上策略，key-quota 只返回 Key 范围。auto 探测复用 token 响应，所有请求仍共享8次／2 MiB预算。其他平台 balance 的账户钱包语义不变。用户授权可在详情配置。NewAPI 在该站后台「个人设置／安全设置 → 系统访问令牌」生成独立用户授权，与推理 API Key 分开；GUI 显示获取步骤。支持 scoped token 的上游版本，账户余额读取需 profile:read，自动核对 Key 分组还需 api_key:read、api_key:reveal；用户 ID 按站点要求填写。不同部署版本名称和权限配置以该站为准。缺失值保持 null，失败不伪造0。
 
 桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。
 

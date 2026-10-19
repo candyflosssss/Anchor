@@ -19,6 +19,13 @@ func runFixture(t *testing.T, platform string, q Query, auth bool, responses map
 			t.Error("lost prefix or wrong verb", r.URL.Path)
 		}
 		path := strings.TrimPrefix(r.URL.Path, "/proxy")
+		if path == "/api/status" {
+			if r.Header.Get("Authorization") != "" || r.Header.Get("New-Api-User") != "" {
+				t.Error("credential in public metadata query")
+			}
+			w.WriteHeader(404)
+			return
+		}
 		token := "model-key-fixture"
 		if path != "/v1/usage" && path != "/api/usage/token/" && path != "/api/log/token" {
 			token = "user-token-fixture"

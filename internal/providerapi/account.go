@@ -8,7 +8,7 @@ import (
 func (a *Adapter) GetBalance(ctx context.Context) (*Allowance, error) {
 	out := allowance("account")
 	if a.Config.Platform == "newapi" && a.Config.UserToken == "" {
-		return a.getNewAPIBilling(ctx)
+		return a.getNewAPIBalance(ctx)
 	}
 	if a.Config.Platform == "sub2api" && a.Config.UserToken == "" {
 		if err := a.key(); err != nil {
@@ -48,6 +48,9 @@ func (a *Adapter) GetBalance(ctx context.Context) (*Allowance, error) {
 	if a.Config.Platform != "sub2api" {
 		out.Used = amount(m, "used_quota", unit)
 	}
+	if a.Config.Platform == "newapi" {
+		return out, a.normalizeNewAPIQuota(ctx, out)
+	}
 	return out, nil
 }
 
@@ -67,18 +70,15 @@ func (a *Adapter) GetKeyQuota(ctx context.Context, id int64) (*Allowance, error)
 		if err := a.key(); err != nil {
 			return nil, err
 		}
-		raw, err := a.get(ctx, "/api/usage/token/", false, nil)
+		m, err := a.getNewAPITokenUsage(ctx)
 		if err != nil {
 			return nil, err
 		}
-		m := data(raw)
-		out.Remaining = amount(m, "total_available", "quota")
-		out.Used = amount(m, "total_used", "quota")
-		out.Limit = amount(m, "total_granted", "quota")
-		out.Unlimited = boolean(m, "unlimited_quota")
-		if out.Remaining == nil {
-			return nil, failure("invalid_response")
+		out, err = newAPIKeyQuota(m)
+		if err != nil {
+			return nil, err
 		}
+		return out, a.normalizeNewAPIQuota(ctx, out)
 	case "oneapi":
 		// Legacy billing can expose either account or key figures with a site-defined
 		// unit. Require the explicit token endpoint rather than mislabeling it.

@@ -29,6 +29,7 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 		t.Fatal(e)
 	}
 	billingEnabled := false
+	walletEnabled := false
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/api/status":
@@ -57,6 +58,10 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 		case "/api/usage/token/":
 			if r.Header.Get("Authorization") != "Bearer cli-model-fixture" {
 				t.Error("incorrect inference key")
+			}
+			if walletEnabled {
+				io.WriteString(w, `{"code":true,"data":{"total_available":25,"total_used":5,"total_granted":30,"unlimited_quota":true,"user_quota":{"total_available":6172839,"total_used":500000}}}`)
+				return
 			}
 			io.WriteString(w, `{"code":true,"data":{"total_available":25,"total_used":5,"total_granted":30,"unlimited_quota":false}}`)
 		case "/api/token/":
@@ -94,7 +99,7 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 		t.Fatal(gotAuto)
 	}
 	summary := run("", false, "provider", "balance-summary", "--id", "p", "--revision", "1")
-	if !strings.Contains(summary, `"scope":"key"`) || !strings.Contains(summary, `"value":25`) {
+	if !strings.Contains(summary, `"scope":"key"`) || !strings.Contains(summary, `"value":0.00005`) || !strings.Contains(summary, `"unit":"USD"`) {
 		t.Fatal(summary)
 	}
 	billingEnabled = true
@@ -104,6 +109,14 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 			t.Fatal(got)
 		}
 	}
+	walletEnabled = true
+	for _, op := range []string{"balance", "balance-summary"} {
+		got := run("", false, "provider", op, "--id", "p", "--revision", "1")
+		if !strings.Contains(got, `"scope":"account"`) || !strings.Contains(got, `"value":12.345678`) || !strings.Contains(got, `"unit":"USD"`) {
+			t.Fatal(got)
+		}
+	}
+	walletEnabled = false
 	run("", true, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-token-stdin", "--clear-user-token")
 	run("\n", true, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-token-stdin")
 	got := run("cli-user-fixture\n", false, "provider", "platform-put", "--id", "p", "--revision", "1", "--platform", "newapi", "--user-id", "9", "--user-token-stdin")
@@ -113,12 +126,12 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	run("", false, "provider", "platform", "--id", "p")
 	for _, op := range []string{"balance", "balance-summary"} {
 		got = run("", false, "provider", op, "--id", "p", "--revision", "2")
-		if !strings.Contains(got, `"scope":"account"`) || !strings.Contains(got, `"value":345`) || !strings.Contains(got, `"unit":"quota"`) {
+		if !strings.Contains(got, `"scope":"account"`) || !strings.Contains(got, `"value":0.00069`) || !strings.Contains(got, `"unit":"USD"`) {
 			t.Fatal(got)
 		}
 	}
 	got = run("", false, "provider", "key-quota", "--id", "p", "--revision", "2")
-	if !strings.Contains(got, `"value":25`) {
+	if !strings.Contains(got, `"value":0.00005`) || !strings.Contains(got, `"unit":"USD"`) {
 		t.Fatal(got)
 	}
 	got = run("", false, "provider", "usage-records", "--id", "p", "--revision", "2", "--scope", "key")
@@ -143,5 +156,17 @@ func TestPlatformCLIWorkflowAndCredentials(t *testing.T) {
 	got = run("", false, "provider", "platform-put", "--id", "p", "--revision", "3")
 	if !strings.Contains(got, `"platform":"auto"`) {
 		t.Fatal(got)
+	}
+}
+
+func TestHelpDocumentsProviderBalances(t *testing.T) {
+	var out bytes.Buffer
+	if err := (App{Out: &out, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, hint := range []string{"read-only token usage", "quota_per_unit", "user authorization failures are preserved"} {
+		if !strings.Contains(out.String(), hint) {
+			t.Fatal("balance help missing", hint)
+		}
 	}
 }

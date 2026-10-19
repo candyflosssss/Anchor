@@ -20,6 +20,13 @@ func TestPlatformQueryManagementBoundariesAndSnapshot(t *testing.T) {
 	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
+		if r.URL.Path == "/proxy/api/status" {
+			if r.Header.Get("Authorization") != "" {
+				t.Error("credential sent to public endpoint")
+			}
+			w.WriteHeader(404)
+			return
+		}
 		if r.URL.Path != "/proxy/api/usage/token/" || r.Header.Get("Authorization") != "Bearer model-fixture" {
 			t.Error("incorrect target or key", r.URL.Path)
 		}
@@ -70,7 +77,7 @@ func TestPlatformQueryManagementBoundariesAndSnapshot(t *testing.T) {
 	}
 	busy, e := f.core.QueryProvider(context.Background(), q)
 	f.core.release("p")
-	if e != nil || busy.Failure != "busy" || calls.Load() != 1 {
+	if e != nil || busy.Failure != "busy" || calls.Load() != 2 {
 		t.Fatal(busy, e)
 	}
 	after, _ := f.store.Provider("p")

@@ -40,6 +40,8 @@ func TestNewAPIBillingBalancesWithInferenceKey(t *testing.T) {
 						t.Error("wrong API key")
 					}
 					switch path {
+					case "/api/usage/token/":
+						w.WriteHeader(404)
 					case "/v1/dashboard/billing/subscription":
 						fmt.Fprintf(w, `{"object":"billing_subscription","hard_limit_usd":%s}`, tc.total)
 					case "/v1/dashboard/billing/usage":
@@ -55,7 +57,7 @@ func TestNewAPIBillingBalancesWithInferenceKey(t *testing.T) {
 				if v.Failure != "" || v.Balance == nil || v.Balance.Scope != "billing" || v.Balance.Remaining.Value.String() != tc.remaining || v.Balance.Remaining.Unit != tc.unit || v.Balance.Unlimited != nil {
 					t.Fatalf("%+v balance=%+v", v, v.Balance)
 				}
-				if !reflect.DeepEqual(paths, []string{"/v1/dashboard/billing/subscription", "/v1/dashboard/billing/usage", "/api/status"}) {
+				if !reflect.DeepEqual(paths, []string{"/api/usage/token/", "/v1/dashboard/billing/subscription", "/v1/dashboard/billing/usage", "/api/status"}) {
 					t.Fatal(paths)
 				}
 			})
@@ -70,14 +72,21 @@ func TestNewAPIBillingFallbackAndFailures(t *testing.T) {
 		fallback   bool
 	}{
 		{404, "", "", true}, {405, "", "", true}, {200, "<html>login</html>", "", true},
-		{401, "", "authentication", false}, {403, "", "permission_denied", false},
+		{401, "", "", true}, {403, "", "", true},
 		{429, "", "rate_limited", false}, {500, "", "http_error", false},
-		{200, `{"error":{"message":"rejected"}}`, "upstream_rejected", false},
+		{200, `{"error":{"message":"rejected"}}`, "", true},
 	} {
 		t.Run(fmt.Sprintf("%d/%s", tc.status, tc.body), func(t *testing.T) {
 			calls := 0
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls++
+				if r.URL.Path == "/api/status" {
+					if r.Header.Get("Authorization") != "" {
+						t.Error("credential in metadata request")
+					}
+					w.WriteHeader(404)
+					return
+				}
 				if r.Header.Get("Authorization") != "Bearer test-key" {
 					t.Error("wrong credential")
 				}
@@ -95,10 +104,10 @@ func TestNewAPIBillingFallbackAndFailures(t *testing.T) {
 				t.Fatal(v)
 			}
 			if tc.fallback {
-				if calls != 2 || v.Balance.Scope != "key" || v.Balance.Remaining.Value.String() != "42" {
+				if calls != 3 || v.Balance.Scope != "key" || v.Balance.Remaining.Value.String() != "42" {
 					t.Fatal(v, calls)
 				}
-			} else if calls != 1 || v.Balance != nil {
+			} else if calls != 2 || v.Balance != nil {
 				t.Fatal(v, calls)
 			}
 		})
@@ -112,6 +121,8 @@ func TestNewAPIBillingUnlimitedPlaceholder(t *testing.T) {
 				fmt.Fprint(w, `{"hard_limit_usd":100000000}`)
 			} else if r.URL.Path == "/api/usage/token/" {
 				fmt.Fprint(w, `{"code":true,"data":{"total_available":0,"total_granted":0,"total_used":0,"unlimited_quota":true}}`)
+			} else if r.URL.Path == "/api/status" {
+				w.WriteHeader(404)
 			} else {
 				t.Error("unexpected path", r.URL.Path)
 			}
@@ -147,6 +158,8 @@ func TestNewAPIBillingMalformedUsageAndOptionalMetadata(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				switch r.URL.Path {
+				case "/api/usage/token/":
+					w.WriteHeader(404)
 				case "/v1/dashboard/billing/subscription":
 					fmt.Fprintf(w, `{"hard_limit_usd":%s}`, tc.total)
 				case "/v1/dashboard/billing/usage":

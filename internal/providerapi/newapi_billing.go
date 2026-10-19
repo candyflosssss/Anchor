@@ -66,16 +66,8 @@ func (a *Adapter) getNewAPIBilling(ctx context.Context) (*Allowance, error) {
 	remaining := new(big.Rat).Sub(limitValue, usedValue)
 
 	unit := "site_unit"
-	if a.publicStatus == nil {
-		status := a.status
-		raw, e := a.getWithAuth(ctx, "/api/status", false, true, nil)
-		if e == nil {
-			a.publicStatus = data(raw)
-		} else if !billingUnavailable(e) && !publicStatusDenied(e) {
-			return nil, e
-		} else {
-			a.status = status
-		}
+	if err := a.newAPIStatus(ctx); err != nil {
+		return nil, err
 	}
 	switch text(a.publicStatus, "quota_display_type") {
 	case "USD":
@@ -92,8 +84,8 @@ func (a *Adapter) getNewAPIBilling(ctx context.Context) (*Allowance, error) {
 	return out, nil
 }
 
-// Only missing/incompatible endpoints permit a summary to fall back to key
-// quota. Authentication, permission, limits, network and server errors survive.
+// Identify missing/incompatible endpoints separately from authorization and
+// operational failures when choosing a compatible query or optional metadata.
 func billingUnavailable(err error) bool {
 	var f *Failure
 	return errors.As(err, &f) && (f.Code == "unsupported" || f.Code == "invalid_response")
@@ -123,8 +115,9 @@ func billingDecimal(n json.Number) (*big.Rat, error) {
 }
 
 func billingNumber(v *big.Rat) json.Number {
-	// Inputs are bounded decimals with at most 128 mantissa characters and a
-	// 128 exponent. Division by 100 stays exact within 258 decimal places.
+	// Preserve bounded decimal precision during billing arithmetic and quota
+	// conversion. Nonterminating site divisors are rounded at 258 places;
+	// the display alone rounds to two places.
 	s := strings.TrimRight(strings.TrimRight(v.FloatString(258), "0"), ".")
 	if s == "-0" {
 		s = "0"

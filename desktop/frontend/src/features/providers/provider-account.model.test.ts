@@ -10,12 +10,12 @@ describe('account contract and precision', () => {
   it('uses shared public settings, decimal strings, unknown fields and a separate unlimited key', () => {
     expect(checkedAccountSettings({ ...fixture.settings, user_token: 'synthetic-token' } as typeof fixture.settings, 'demo')).toEqual(fixture.settings);
     const v = checkedAccountObservation(fixture.balance, balanceQuery);
-    expect(amountText(v.allowance!.remaining)).toBe('12.34567890123456789 USD');
+    expect(amountText(v.allowance!.remaining)).toBe('12.35 USD');
     expect(amountText(v.allowance!.used)).toBe('未知');
     const q = checkedAccountObservation(fixture.quota, { ...balanceQuery, operation: 'key-quota' });
     expect(q.allowance!.unlimited).toBe(true);
     expect(q.allowance!.remaining).toBeNull();
-    expect(amountText({ value: '9007199254740993123', unit: 'quota' })).toBe('9007199254740993123 quota（原始额度）');
+    expect(amountText({ value: '9007199254740993123', unit: 'quota' })).toBe('9007199254740993123.00 quota（原始额度）');
   });
   it('accepts automatic settings and scoped default-key summaries', () => {
     expect(checkedAccountSettings({ ...fixture.settings, platform: 'auto' }, 'demo').platform).toBe('auto');
@@ -24,10 +24,19 @@ describe('account contract and precision', () => {
     expect(checkedAccountObservation(fixture.key_summary, q).allowance!.scope).toBe('key');
     expect(() => checkedAccountObservation({ ...fixture.key_summary, allowance: { ...fixture.key_summary.allowance, scope: 'subscription' } }, q)).toThrow('read_error');
   });
+  it('formats amounts with two decimals without rounding the stored observation', () => {
+    for (const [value, expected] of [
+      ['1.005', '1.01'], ['-1.005', '-1.01'], ['9.999', '10.00'],
+      ['0', '0.00'], ['-0.004', '0.00'], ['1e-7', '0.00'],
+      ['1.2345e2', '123.45'], ['5e-3', '0.01'], ['5e-4', '0.00'],
+      ['9007199254740993123.455', '9007199254740993123.46'],
+    ]) expect(amountText({ value, unit: 'USD' })).toBe(`${expected} USD`);
+    expect(checkedAccountObservation(fixture.balance, balanceQuery).allowance!.remaining!.value).toBe('12.34567890123456789');
+  });
   it('accepts NewAPI billing for balances and summaries, preserving unknown currencies', () => {
     expect(checkedAccountObservation(fixture.billing, balanceQuery)).toEqual(fixture.billing);
     expect(checkedAccountObservation(fixture.billing_summary, { ...balanceQuery, operation: 'balance-summary' })).toEqual(fixture.billing_summary);
-    expect(amountText({ value: '7.3', unit: 'CNY' })).toBe('7.3 CNY');
+    expect(amountText({ value: '7.3', unit: 'CNY' })).toBe('7.30 CNY');
     expect(amountText({ value: '7.3', unit: 'site_unit' })).toContain('币种未确认');
     expect(allowanceScopeText('billing')).toBe('站点余额');
     expect(() => checkedAccountObservation({ ...fixture.billing, platform: 'sub2api' }, balanceQuery)).toThrow('read_error');

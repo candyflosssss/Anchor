@@ -35,9 +35,25 @@ export function checkedAccountObservation(v: AccountObservation, q: AccountQuery
   return { provider_id: v.provider_id, revision: v.revision, platform: v.platform, operation: v.operation, key_id: v.key_id, remote_key_id: v.remote_key_id,
     observed_at: v.observed_at, http_status: v.http_status, failure: v.failure, allowance: v.allowance === null ? null : allowance(v.allowance, q.operation === 'key-quota' ? ['key'] : v.platform === 'newapi' ? ['account', 'key', 'billing'] : q.operation === 'balance-summary' ? ['account', 'key'] : ['account']) };
 }
+// Round the decimal string itself so large quotas and decimal ties do not lose
+// precision through JavaScript's binary floating-point representation.
+function amountDecimal(value: string): string {
+  const match = /^(-?)(\d+)(?:\.(\d+))?(?:[eE]([+-]?\d+))?$/.exec(value);
+  if (!match) return value;
+  const [, sign, whole, fraction = '', exponent = '0'] = match;
+  const shift = Number(exponent);
+  if (shift < -1024) return '0.00';
+  if (!Number.isSafeInteger(shift) || shift > 1024) return value;
+  const digits = whole + fraction;
+  const end = whole.length + shift + 2;
+  let cents = BigInt(end <= 0 ? '0' : digits.slice(0, end).padEnd(end, '0'));
+  if (end >= 0 && Number(digits[end] ?? '0') >= 5) cents += 1n;
+  const rounded = cents.toString().padStart(3, '0');
+  return `${sign && cents !== 0n ? '-' : ''}${rounded.slice(0, -2)}.${rounded.slice(-2)}`;
+}
 export function amountText(v: AccountAmount | null): string {
   const units: Record<string, string> = { USD: 'USD', CNY: 'CNY', quota: 'quota（原始额度）', site_unit: '站点计费单位（币种未确认）' };
-  return v === null ? '未知' : `${v.value} ${units[v.unit]}`;
+  return v === null ? '未知' : `${amountDecimal(v.value)} ${units[v.unit]}`;
 }
 export function allowanceScopeText(scope: string): string {
   return ({ account: '账户余额', key: 'Key 额度', billing: '站点余额' } as Record<string, string>)[scope] ?? '未知范围';

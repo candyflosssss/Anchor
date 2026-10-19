@@ -38,7 +38,7 @@ test('supplier list shows scoped balances, detects platform and refreshes with d
   await page.getByRole('button', { name: '供应商', exact: true }).click();
   const wallet = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'wallet', exact: true }) });
   const quota = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'quota', exact: true }) });
-  await expect(wallet).toContainText('12.34567890123456789 USD');
+  await expect(wallet).toContainText('12.35 USD');
   await expect(wallet).toContainText('sub2api · 账户余额');
   await expect(quota).toContainText('NewAPI · Key 额度');
   await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: 'fourth', exact: true }) })).toContainText('USD');
@@ -47,12 +47,12 @@ test('supplier list shows scoped balances, detects platform and refreshes with d
   expect(counters.queries.every(q => q.key_id === '' && q.remote_key_id === 0 && q.operation === 'balance-summary')).toBe(true);
   await page.evaluate(() => { window.balanceTest.failure = 'auth_required'; });
   await page.getByRole('button', { name: '刷新供应商列表' }).click();
-  await expect(wallet).toContainText('余额未刷新'); await expect(wallet).toContainText('12.34567890123456789 USD');
+  await expect(wallet).toContainText('余额未刷新'); await expect(wallet).toContainText('12.35 USD');
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(0);
   const beforeRetry = await page.evaluate(() => window.balanceTest.queries.length);
   await page.evaluate(() => { window.balanceTest.failure = ''; window.balanceTest.value = '23'; });
   await wallet.getByRole('button', { name: '刷新 wallet 的余额', exact: true }).click();
-  await expect(wallet).toContainText('23 USD'); await expect(wallet).not.toContainText('余额未刷新');
+  await expect(wallet).toContainText('23.00 USD'); await expect(wallet).not.toContainText('余额未刷新');
   expect(await page.evaluate(() => window.balanceTest.queries.length)).toBe(beforeRetry + 1);
   await wallet.getByRole('button', { name: 'wallet', exact: true }).click();
   await page.getByRole('tab', { name: '账户与余额' }).click();
@@ -68,9 +68,9 @@ test('late results from an old revision cannot replace refreshed balances', asyn
   await page.evaluate(() => { window.balanceTest.slow = false; window.balanceTest.value = '222'; window.balanceTest.revision = 2; });
   await page.getByRole('button', { name: '刷新供应商列表' }).click();
   const wallet = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'wallet', exact: true }) });
-  await expect(wallet).toContainText('222 USD');
+  await expect(wallet).toContainText('222.00 USD');
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(0);
-  await expect(wallet).toContainText('222 USD'); await expect(wallet).not.toContainText('111');
+  await expect(wallet).toContainText('222.00 USD'); await expect(wallet).not.toContainText('111');
 });
 
 test('automatically identified OneAPI uses the supplied remote Key ID', async ({ page }) => {
@@ -86,7 +86,7 @@ test('automatically identified OneAPI uses the supplied remote Key ID', async ({
   await page.getByRole('button', { name: '刷新额度', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.balanceTest.queries.at(-1)?.remote_key_id)).toBe(42);
   const quota = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: 'Key 额度', exact: true }) });
-  await expect(quota).toContainText('12.34567890123456789 USD');
+  await expect(quota).toContainText('12.35 USD');
 });
 
 
@@ -97,22 +97,22 @@ test('navigation shows cached balances while revalidating, including after setti
   await page.getByRole('button', { name: '概览', exact: true }).click();
   await page.evaluate(() => { window.balanceTest.hold = true; window.balanceTest.value = '222'; });
   await page.getByRole('button', { name: '供应商', exact: true }).click();
-  await expect(wallet).toContainText('12.34567890123456789 USD');
+  await expect(wallet).toContainText('12.35 USD');
   await expect(wallet.getByRole('button', { name: '刷新 wallet 的余额', exact: true })).toBeDisabled();
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(2);
   await expect(wallet).not.toContainText('查询中');
   await page.evaluate(() => { window.balanceTest.hold = false; window.dispatchEvent(new Event('release-balance-queries')); });
-  await expect(wallet).toContainText('222 USD');
+  await expect(wallet).toContainText('222.00 USD');
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(0);
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
   await page.evaluate(() => { window.balanceTest.hold = true; window.balanceTest.value = '333'; });
   await page.getByRole('button', { name: '供应商', exact: true }).click();
-  await expect(wallet).toContainText('222 USD');
+  await expect(wallet).toContainText('222.00 USD');
   await expect(wallet.getByRole('button', { name: '刷新 wallet 的余额', exact: true })).toBeDisabled();
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(2);
   await expect(wallet).not.toContainText('查询中');
   await page.evaluate(() => { window.balanceTest.hold = false; window.dispatchEvent(new Event('release-balance-queries')); });
-  await expect(wallet).toContainText('333 USD');
+  await expect(wallet).toContainText('333.00 USD');
 });
 
 test('transport failures keep cached balances and a manual retry shares the bounded refresh queue', async ({ page }) => {
@@ -122,12 +122,12 @@ test('transport failures keep cached balances and a manual retry shares the boun
   await page.evaluate(() => { window.balanceTest.failure = 'transport'; });
   await wallet.getByRole('button', { name: '刷新 wallet 的余额', exact: true }).click();
   await expect(wallet).toContainText('余额未刷新');
-  await expect(wallet).toContainText('12.34567890123456789 USD');
+  await expect(wallet).toContainText('12.35 USD');
   await page.getByRole('button', { name: '概览', exact: true }).click();
   await page.evaluate(() => { window.balanceTest.failure = ''; window.balanceTest.value = '444'; window.balanceTest.slow = true; });
   await page.getByRole('button', { name: '供应商', exact: true }).click();
   await expect(wallet).toContainText('余额未刷新');
-  await expect(wallet).toContainText('444 USD');
+  await expect(wallet).toContainText('444.00 USD');
   await expect(wallet).not.toContainText('余额未刷新');
   // The other two providers are still queued/running when this row finishes.
   await wallet.getByRole('button', { name: '刷新 wallet 的余额', exact: true }).click();
@@ -167,17 +167,17 @@ test('cancelled queries cannot overwrite the cache after the same instance page 
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
   await page.evaluate(() => { window.balanceTest.hold = false; window.balanceTest.value = '222'; });
   await page.getByRole('button', { name: '供应商', exact: true }).click();
-  await expect(wallet).toContainText('222 USD');
+  await expect(wallet).toContainText('222.00 USD');
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(1);
   await page.evaluate(() => { window.dispatchEvent(new Event('release-balance-queries')); });
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(0);
-  await expect(wallet).toContainText('222 USD');
+  await expect(wallet).toContainText('222.00 USD');
   await page.getByRole('button', { name: '概览', exact: true }).click();
   await page.evaluate(() => { window.balanceTest.hold = true; window.balanceTest.value = '333'; });
   await page.getByRole('button', { name: '供应商', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(2);
-  await expect(wallet).toContainText('222 USD');
-  await expect(wallet).not.toContainText('111 USD');
+  await expect(wallet).toContainText('222.00 USD');
+  await expect(wallet).not.toContainText('111.00 USD');
   await page.evaluate(() => { window.balanceTest.hold = false; window.dispatchEvent(new Event('release-balance-queries')); });
-  await expect(wallet).toContainText('333 USD');
+  await expect(wallet).toContainText('333.00 USD');
 });

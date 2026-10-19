@@ -44,7 +44,7 @@ describe('provider billing balance display', () => {
   it('shows an authorized NewAPI summary as an account wallet', () => {
     const observation = checkedAccountObservation(fixture.newapi_account_summary, query);
     const html = renderToStaticMarkup(createElement(ProviderBalanceCell, { value: { observation } }));
-    expect(html).toContain('345 quota（原始额度）');
+    expect(html).toContain('345.00 quota（原始额度）');
     expect(html).toContain('账户余额');
     expect(html).not.toContain('Key 额度');
     expect(html).not.toContain('站点余额');

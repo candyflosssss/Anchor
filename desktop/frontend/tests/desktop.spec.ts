@@ -355,14 +355,14 @@ test('account page configures authorization and keeps wallet and key quota indep
   await page.getByRole('button', { name: '刷新余额', exact: true }).click();
   const wallet = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: '余额', exact: true }) });
   const quota = page.locator('.detail-card').filter({ has: page.getByRole('heading', { name: 'Key 额度', exact: true }) });
-  await expect(wallet.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toBeVisible();
+  await expect(wallet.getByText('9007199254740993123.00 quota（原始额度）', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '刷新额度', exact: true }).click();
-  await expect(quota.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toBeVisible();
-  await expect(wallet.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toBeVisible();
+  await expect(quota.getByText('9007199254740993123.00 quota（原始额度）', { exact: true })).toBeVisible();
+  await expect(wallet.getByText('9007199254740993123.00 quota（原始额度）', { exact: true })).toBeVisible();
   await page.evaluate(() => { window.accountTest.failure = 'authentication'; });
   await page.getByRole('button', { name: '刷新余额', exact: true }).click();
   await expect(wallet.getByRole('alert')).toContainText('平台拒绝授权');
-  await expect(wallet.getByText('9007199254740993123 quota（原始额度）', { exact: true })).toHaveCount(0);
+  await expect(wallet.getByText('9007199254740993123.00 quota（原始额度）', { exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain('synthetic-account-private-token');
   expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
 });

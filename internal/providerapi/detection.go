@@ -52,6 +52,7 @@ func (a *Adapter) DetectPlatform(ctx context.Context) (string, error) {
 		{"/api/usage/token/", false, func(raw object) string {
 			m := data(raw)
 			if number(m, "total_available") != nil && number(m, "total_used") != nil && number(m, "total_granted") != nil {
+				a.tokenUsage = m
 				return "newapi"
 			}
 			return ""
@@ -92,8 +93,9 @@ func (a *Adapter) DetectPlatform(ctx context.Context) (string, error) {
 }
 
 // GetBalanceSummary prefers an explicitly configured NewAPI account token.
-// Without it, the selected inference key exposes site-controlled billing or a
-// key cap. Account authorization failures must not fall back to key figures.
+// Without it, the selected inference key can expose a permitted wallet,
+// site-controlled billing or a key cap. Account authorization failures must
+// not fall back to key figures.
 func (a *Adapter) GetBalanceSummary(ctx context.Context) (*Allowance, error) {
 	if a.Config.Platform == "newapi" && a.Config.UserToken != "" {
 		return a.GetBalance(ctx)
@@ -117,11 +119,7 @@ func (a *Adapter) GetBalanceSummary(ctx context.Context) (*Allowance, error) {
 		}
 		return sub2KeyQuota(m)
 	case "newapi":
-		out, err := a.getNewAPIBilling(ctx)
-		if billingUnavailable(err) {
-			return a.GetKeyQuota(ctx, 0)
-		}
-		return out, err
+		return a.getNewAPIBalance(ctx)
 	case "oneapi":
 		return nil, failure("auth_required")
 	default:

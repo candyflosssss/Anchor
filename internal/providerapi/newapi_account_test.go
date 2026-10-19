@@ -50,9 +50,9 @@ func TestNewAPIAccountSummaryUsesSavedSystemToken(t *testing.T) {
 					if v.Platform != "newapi" || v.Failure != "" || v.Balance == nil || v.Balance.Scope != "account" || v.Balance.Remaining == nil || v.Balance.Remaining.Value.String() != "9007199254740993123" || v.Balance.Remaining.Unit != "quota" {
 						t.Fatalf("result=%+v balance=%+v", v, v.Balance)
 					}
-					wantPaths := []string{"/prefix/api/user/self"}
+					wantPaths := []string{"/prefix/api/user/self", "/prefix/api/status"}
 					if platform == "auto" {
-						wantPaths = append([]string{"/prefix/api/status"}, wantPaths...)
+						wantPaths = []string{"/prefix/api/status", "/prefix/api/user/self"}
 					}
 					if !reflect.DeepEqual(paths, wantPaths) {
 						t.Fatal(paths)
@@ -81,6 +81,10 @@ func TestNewAPIAccountSummaryPreservesFailures(t *testing.T) {
 			calls := 0
 			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				calls++
+				if r.URL.Path == "/api/status" {
+					w.WriteHeader(404)
+					return
+				}
 				if r.URL.Path != "/api/user/self" || r.Header.Get("Authorization") != "Bearer system-token-fixture" {
 					t.Error("account failure fell back to a key query", r.URL.Path)
 				}
@@ -90,7 +94,11 @@ func TestNewAPIAccountSummaryPreservesFailures(t *testing.T) {
 			defer up.Close()
 			a := Adapter{HTTP: up.Client(), BaseURL: up.URL, Key: "inference-fixture", Config: Config{Platform: "newapi", UserToken: "system-token-fixture"}}
 			v := a.Query(context.Background(), Query{ProviderID: "p", ExpectedRevision: 1, Operation: "balance-summary"})
-			if v.Failure != tc.fail || calls != 1 {
+			wantCalls := 1
+			if tc.fail == "" {
+				wantCalls = 2
+			}
+			if v.Failure != tc.fail || calls != wantCalls {
 				t.Fatalf("result=%+v calls=%d", v, calls)
 			}
 			if tc.fail != "" && v.Balance != nil {

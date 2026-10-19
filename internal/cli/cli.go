@@ -44,7 +44,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   provider balance-summary --id ID --revision N [--key KEY]
   provider balance|key-quota|effective-rate --id ID --revision N [--key KEY] [--remote-key-id N]
       NewAPI balance / balance-summary prefer a saved system access token for account balance.
-      Without one, they use API-key billing (site scope); user authorization failures are preserved.
+      Without one, read-only token usage can expose a permitted wallet; otherwise billing or Key quota.
+      NewAPI raw quota uses site quota_per_unit and display currency; user authorization failures are preserved.
   provider usage-records --id ID --revision N [--key KEY] [--remote-key-id N]
       [--scope account|key] [--page N] [--page-size N]
   provider models --id ID --revision N [--key KEY]  Fetch enabled key directories and group rates
