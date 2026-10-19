@@ -73,7 +73,15 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 			return GatewayBinding{}, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
 		}
 	}
-	return GatewayBinding{Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
+	var retries *int
+	if b.AdapterID == "codex" {
+		retrySettings, err := m.Store.CodexSettings()
+		if err != nil {
+			return GatewayBinding{}, err
+		}
+		retries = &retrySettings.Retries
+	}
+	return GatewayBinding{CodexRetries: retries, Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
 }
 func (m *Manager) Add(b state.Binding) (state.Binding, error) {
 	m.mu.Lock()

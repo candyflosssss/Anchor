@@ -236,6 +236,11 @@ func retainExtraFields(current, desired Value) Value {
 func (m *Manager) SyncMappings() ([]Result, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	return m.syncMappings("")
+}
+
+// Caller holds m.mu; adapter limits changes to the requested agent family.
+func (m *Manager) syncMappings(adapter string) ([]Result, error) {
 	out := []Result{}
 	if !m.ready || m.stopping {
 		return out, nil
@@ -245,7 +250,7 @@ func (m *Manager) SyncMappings() ([]Result, error) {
 		return out, err
 	}
 	for _, b := range bindings {
-		if !b.Enabled {
+		if !b.Enabled || (adapter != "" && b.AdapterID != adapter) {
 			continue
 		}
 		j, err := m.Engine.load(b.ID)

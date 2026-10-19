@@ -60,6 +60,7 @@ func publicBinding(b state.Binding) state.Binding {
 }
 
 func (s *Server) agentRoutes(mux *http.ServeMux) {
+	s.codexSettingsRoutes(mux)
 	mux.HandleFunc("GET /control/v1/agents/workspace", func(w http.ResponseWriter, r *http.Request) {
 		env, e := s.localAgentEnvironment()
 		if e != nil {

@@ -1,3 +1,4 @@
+import codexSettingsFixture from '../../contract/codex-settings.json' with { type: 'json' };
 import modelCatalogFixture from '../../contract/model-catalog.json' with { type: 'json' };
 import contextPricingFixture from '../../contract/context-pricing.json' with { type: 'json' };
 import modelSettingsFixture from '../../contract/model-settings.json' with { type: 'json' };
@@ -11,7 +12,7 @@ declare global { interface Window { desktopTest: { directories: number; starts: 
 declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
 async function host(page: Page, rateMappings = false) {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows, update, account, modelSettings, rateMappings }) => {
+  await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, rateMappings }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     window.accountTest = { saves: 0, queries: 0, failure: '' };
@@ -24,7 +25,15 @@ async function host(page: Page, rateMappings = false) {
     window.routingTest = { calls: [] };
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const modelStates: Record<string, ModelSettingsState> = {};
+    let codexState = structuredClone(codexSettings);
     const api: DesktopBridge = {
+      CodexSettings: async () => ({ contract, data: codexState, problem: null }),
+      SaveCodexSettings: async input => {
+        counters.saves++;
+        if (counters.writeError) return { contract, data: null, problem: { code: counters.writeError } };
+        codexState = { settings: { retries: input.retries!, revision: codexState.settings.revision + 1 }, needs_sync: [] };
+        return { contract, data: codexState, problem: null };
+      },
       ProxyWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ManageProxy: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
  Connections: async () => ({ contract, data: [], problem: null }),
@@ -78,7 +87,7 @@ async function host(page: Page, rateMappings = false) {
       SaveModelSettings: async input => {
         const old = modelStates[input.model_id] ?? { ...modelSettings, revision: routingState[input.model_id]?.revision ?? 1 };
         if (old.revision !== input.expected_revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
-        const saved = { ...old, model_id: input.model_id, revision: old.revision + 1, display_name: input.display_name, configuration: input.configuration, channel_retries: input.channel_retries ?? old.channel_retries };
+        const saved = { ...old, model_id: input.model_id, revision: old.revision + 1, display_name: input.display_name, configuration: input.configuration };
         modelStates[input.model_id] = saved;
         if (routingState[input.model_id]) routingState[input.model_id].revision = saved.revision;
         counters.saves++;
@@ -134,7 +143,7 @@ async function host(page: Page, rateMappings = false) {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, rateMappings });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, codexSettings: codexSettingsFixture, rateMappings });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -934,38 +943,37 @@ test('model settings exposes long context prices and requires acknowledgement wi
 });
 
 
-test('mapping retry count defaults, validates, persists zero and locks on conflict (simulated host)', async ({ page }) => {
+test('unified Codex retries default to five, save zero and lock on conflict (simulated host)', async ({ page }) => {
   await host(page, true);
-  await page.getByRole('button', { name: '模型映射', exact: true }).click();
-  const open = async () => {
-    await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
-  };
-  await open();
-  const dialog = page.getByRole('dialog'), retries = dialog.getByLabel('同一渠道重试次数');
-  const save = dialog.getByRole('button', { name: '保存模型设置', exact: true });
-  await expect(retries).toHaveValue('3');
-  for (const invalid of ['11', '-1', '1.5', '']) {
-    await retries.fill(invalid);
-    await expect(save).toBeDisabled();
-    await expect(dialog.getByRole('alert')).toContainText('0–10 的整数');
-  }
-  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  const retries = page.getByLabel('Codex 重试次数');
+  await expect(retries).toHaveValue('5');
   await retries.fill('0');
-  await save.dblclick();
-  await expect(dialog.getByRole('status')).toContainText('模型设置已保存');
-  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
-  await dialog.getByRole('button', { name: '关闭编辑面板', exact: true }).click();
-  await open(); await expect(retries).toHaveValue('0');
-  await retries.fill('2');
+  await page.getByRole('button', { name: '保存 Codex 设置', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '请重启 Codex' })).toBeVisible();
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
+  await expect(page.getByLabel('同一渠道重试次数')).toHaveCount(0);
+  await page.getByRole('button', { name: '关闭', exact: true }).click();
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await expect(retries).toHaveValue('0');
   await page.evaluate(() => { window.desktopTest.writeError = 'conflict'; });
-  await save.click();
-  await expect(dialog.getByRole('alert')).toContainText('配置已被其他操作修改');
-  await expect(retries).toBeDisabled(); await expect(save).toBeDisabled();
+  await retries.fill('2');
+  await page.getByRole('button', { name: '保存 Codex 设置', exact: true }).click();
+  await expect(retries).toBeDisabled();
+  await expect(page.getByRole('alert')).toContainText('重新读取');
   await page.evaluate(() => { window.desktopTest.writeError = null; });
-  await dialog.getByRole('button', { name: '重新读取设置', exact: true }).click();
-  await expect(retries).toHaveValue('0'); await expect(retries).toBeEnabled();
+  await page.getByRole('button', { name: '重新读取 Codex 设置', exact: true }).click();
+  await expect(retries).toHaveValue('0');
+  await expect(retries).toBeEnabled();
+  await retries.fill('11');
+  await expect(page.getByRole('button', { name: '保存 Codex 设置', exact: true })).toBeDisabled();
+  await retries.fill('8');
+  await page.evaluate(() => { window.desktopTest.writeError = 'unknown'; });
+  await page.getByRole('button', { name: '保存 Codex 设置', exact: true }).click();
+  await expect(retries).toBeDisabled();
+  await expect(page.getByRole('alert')).toContainText('保存结果未知');
 });
-
 
 test('model settings opens on a compact general form with a fixed footer in light, dark and small windows (simulated host)', async ({ page }, testInfo) => {
   await host(page, true);
@@ -973,8 +981,8 @@ test('model settings opens on a compact general form with a fixed footer in ligh
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   const dialog = page.getByRole('dialog'), save = dialog.getByRole('button', { name: '保存模型设置', exact: true });
   await expect(dialog.getByRole('button', { name: '常规设置', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(dialog.getByLabel('同一渠道重试次数')).toBeVisible();
-  await expect(dialog.getByLabel('同一渠道重试次数')).toHaveValue('3');
+  await expect(dialog.getByLabel('显示名称')).toBeVisible();
+  await expect(dialog.getByLabel('同一渠道重试次数')).toHaveCount(0);
   for (const title of ['模型能力', '思考设置', '高级设置', '目录与参考价格']) {
     await expect(dialog.locator('details').filter({ has: page.locator('summary').filter({ hasText: title }) })).not.toHaveAttribute('open');
   }
@@ -985,7 +993,7 @@ test('model settings opens on a compact general form with a fixed footer in ligh
     for (const theme of ['light', 'dark']) {
       await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
       await expect(save).toBeInViewport();
-      await expect(dialog.getByLabel('同一渠道重试次数')).toBeInViewport();
+      await expect(dialog.getByLabel('显示名称')).toBeInViewport();
       expect(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
       const bounds = await dialog.boundingBox();
       expect(bounds!.y).toBeGreaterThanOrEqual(0);
@@ -1010,7 +1018,7 @@ test('model settings opens on a compact general form with a fixed footer in ligh
   await expect(dialog.getByRole('button', { name: '速度与分身', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(dialog.getByLabel('分身来源渠道')).toBeVisible();
   await dialog.getByRole('button', { name: '常规设置', exact: true }).click();
-  await expect(dialog.getByLabel('同一渠道重试次数')).toHaveValue('3');
+  await expect(dialog.getByLabel('显示名称')).toBeVisible();
   await dialog.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });

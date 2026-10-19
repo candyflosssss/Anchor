@@ -12,6 +12,7 @@ import (
 )
 
 type GatewayBinding struct {
+	CodexRetries     *int
 	BaseURL          string
 	Model            string
 	DataDir          string
@@ -141,7 +142,7 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 	}
 	after := []any{g.Model, provider, "disabled", map[string]any{
 		"name": "Anchor (" + b.ID + ")", "base_url": g.BaseURL, "wire_api": "responses", "supports_websockets": false,
-		"request_max_retries": 0, "stream_max_retries": 0,
+		"request_max_retries": codexRetries(g), "stream_max_retries": codexRetries(g),
 		"auth": map[string]any{"command": b.Executable, "args": []string{"--data-dir", g.DataDir, "agent", "token", b.ID}, "timeout_ms": 5000, "refresh_interval_ms": 300000},
 	}}
 	if catalogPath != "" {
@@ -184,6 +185,11 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 	if m["model"] != g.Model || m["model_provider"] != provider || !ok || table["base_url"] != g.BaseURL {
 		return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "codex.routing")
 	}
+	for _, field := range []string{"request_max_retries", "stream_max_retries"} {
+		if !equal(Value{Exists: true, Data: table[field]}, Value{Exists: true, Data: int64(codexRetries(g))}) {
+			return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "codex.retries")
+		}
+	}
 	if len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
 		path := filepath.Join(b.ConfigRoot, catalogName(b.ID))
 		if m["model_catalog_json"] != path {
@@ -221,4 +227,11 @@ func ValidateTarget(b *state.Binding) error {
 		return errors.New("anchor executable must be an existing stable binary")
 	}
 	return nil
+}
+
+func codexRetries(g GatewayBinding) int {
+	if g.CodexRetries != nil {
+		return *g.CodexRetries
+	}
+	return state.DefaultCodexRetries
 }

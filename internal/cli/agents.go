@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,9 +17,48 @@ import (
 
 func (a App) agents(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("agent requires discover/enroll/add/list/inspect/plan/apply/sync/restore/enable/disable/set-models")
+		return errors.New("agent requires discover/enroll/add/list/inspect/plan/apply/sync/restore/enable/disable/set-models/codex-settings")
 	}
 	switch args[0] {
+	case "codex-settings":
+		f := a.flags("agent codex-settings")
+		retries := f.Int("retries", -1, "unified Codex request/stream retries, 0..10 (default 5)")
+		revision := f.Int64("revision", 0, "expected settings revision (required when saving)")
+		if err := parse(f, args[1:]); err != nil {
+			return err
+		}
+		writing := false
+		f.Visit(func(flag *flag.Flag) {
+			if flag.Name == "retries" {
+				writing = true
+			}
+		})
+		if !writing {
+			if *revision != 0 {
+				return errors.New("--revision requires --retries")
+			}
+			v, err := c.CodexSettings(ctx)
+			if err != nil {
+				return err
+			}
+			return a.output(v)
+		}
+		in := state.SaveCodexSettings{Retries: retries, ExpectedRevision: *revision}
+		if err := in.Validate(); err != nil {
+			return errors.New("--retries must be 0..10 and --revision is required")
+		}
+		v, err := c.SaveCodexSettings(ctx, in)
+		if err != nil {
+			return err
+		}
+		if err := a.output(v); err != nil {
+			return err
+		}
+		if len(v.NeedsSync) > 0 {
+			return errors.New("settings saved; some Codex targets need agent sync; restart Codex after syncing")
+		}
+		return nil
+
 	case "discover":
 		if len(args) != 1 {
 			return errors.New("agent discover takes no arguments")

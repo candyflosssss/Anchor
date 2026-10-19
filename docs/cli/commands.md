@@ -344,11 +344,11 @@ anchor usage
 
 配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403 暂停该 Key；429 使用 Retry-After（默认30秒、最小1秒、最大1小时）；连续3次失败冷却30秒，随后单次半开探测；成功恢复。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
-**网关默认同渠道重试（desktop.47 宿主／核心已发布，公开 alpha.6 CLI 不含）**：同一渠道指供应商 + Key + 候选上游模型。HTTP 502/503/504 或尚未取得连接的失败，首次请求后默认额外重试3次（最多4次尝试），按250ms/500ms/1s退避（之后上限1秒）；可在模型映射的 `channel_retries` 配置0–10次，0禁用额外重试。保留所选 Key 和原请求，仍按供应商多地址轮询取址。全部尝试与退避共享 `provider add/put --timeout`（默认120秒），不因重试延长预算；预算耗尽返回504 `upstream_timeout`，客户端取消立即停止。重试耗尽后再切换其他可用 Key／候选，全部不可用／失败返回503 `no_available_candidate`。
+当前网关每个供应商／Key／候选模型仅尝试一次，可安全失败时切换其他Key或候选。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
 
-401/403/429 不在同一 Key 重试，沿用切换与冷却；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康按实际尝试计数，在重试组结束后统一生效；失败3次的熔断不提前截断本组配置的重试，半开探测名额覆盖整组。`anchor logs detail REQUEST_ID` 可查看每次尝试，根请求仍只算一次。此策略默认生效，可通过 `model settings --id ID --file FILE` 的 `channel_retries` 调整；不改变 `provider test/chat` 或管理写操作，已安装核心需升级后生效。
+401/403/429沿用Key切换与冷却；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康、日志与用量按实际渠道尝试更新，半开探测预约覆盖单次尝试。此处不改变 provider test 固定目标与管理写入不自动重试的规则。
 
-usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含同渠道重试、换 Key 重试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
+usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含其他 Key／候选尝试、Codex 再次请求产生的上游尝试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
 
 GUI 在供应商详情的三个页签提供同等操作。数据库启动自动从 schema2 升至3并迁移旧 secret 为 default Key，再升至4将供应商旧协议复制给全部既存 Key；安装前正常停止旧核心，升级后旧二进制不能再打开该数据库，无数据库降级入口。
 
@@ -507,11 +507,11 @@ anchor model settings --id ID
 anchor model settings --id ID --file FILE
 ```
 
-前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、channel_retries、configuration、reference、defaults_status、context_policy。读取会从已保存参考快照，或按所有候选上游精确 ID 自动匹配 models.dev（最多等待 8 秒）补充未设置值，作为草稿返回；不写库、不增加 revision、不同步 Agent，手工值保持不变。`defaults_status` 为 saved（保存响应/旧核心）、reference（使用已保存快照）、matched（新自动匹配）、unmatched（未找到唯一一致的条目）、unavailable（目录失败/超时/陈旧）或 incompatible（目录值与手工配置不兼容）。未匹配或失败仍返回现有配置，可重新读取重试或手工指定来源。速度变体可补基础能力，但不自动附加标准价格快照。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
+前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、configuration、reference、defaults_status、context_policy。读取会从已保存参考快照，或按所有候选上游精确 ID 自动匹配 models.dev（最多等待 8 秒）补充未设置值，作为草稿返回；不写库、不增加 revision、不同步 Agent，手工值保持不变。`defaults_status` 为 saved（保存响应/旧核心）、reference（使用已保存快照）、matched（新自动匹配）、unmatched（未找到唯一一致的条目）、unavailable（目录失败/超时/陈旧）或 incompatible（目录值与手工配置不兼容）。未匹配或失败仍返回现有配置，可重新读取重试或手工指定来源。速度变体可补基础能力，但不自动附加标准价格快照。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
 
-写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、可选 `channel_retries`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
+写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
 
-`channel_retries` 已随 desktop.47 宿主／核心发布，并用于本机同版 CLI；公开 alpha.6 不含该字段。`channel_retries` 为该公开模型映射的**同一渠道额外重试次数**，整数0–10，旧映射／未保存值默认3，读取始终返回有效数值；0禁用额外重试（仍允许切换其他 Key／候选）。此字段在写入时省略或设为 null 保留既有值，不随 configuration 替换／参考模型导入清空。3表示含首次最多4次上游尝试；每个供应商 + Key + 上游模型分别使用该上限。保存后只影响后续网关请求，正在处理的请求保持原快照，无需同步或重启 Agent。非法类型／范围返回 invalid，不增加 revision；旧 revision 返回 conflict，不自动重放写入。`model put --file` 的 `settings.channel_retries` 也支持相同范围，完整替换 settings 时未设置该字段则恢复默认3；普通省略整个 settings 的映射更新保留已有设置。
+当前网关每个供应商／Key／候选模型仅尝试一次，可安全失败时切换其他Key或候选。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
 
 `reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照，同时补齐未声明的上下文、限制、能力及思考范围）。补值保留显式设置，目录输入/输出与手工上下文或默认输出预算冲突时跳过相应限制；未知默认思考值不猜测。clear 只清除已保存快照，不禁用后续读取的自动建议。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
 
@@ -522,18 +522,17 @@ anchor model settings --id ID --file FILE
 ```sh
 anchor model settings --id public > current-settings.json
 jq '(.defaults_status == "matched" and .reference != null) as $matched
-    | {model_id, expected_revision: .revision, display_name, channel_retries, configuration,
+    | {model_id, expected_revision: .revision, display_name, configuration,
        reference_action: (if $matched then "set" else "keep" end),
        reference_provider_id: (if $matched then .reference.models[0].provider_id else "" end),
        reference_model_id: (if $matched then .reference.models[0].id else "" end)}' current-settings.json > model-settings.json
 anchor model settings --id public --file model-settings.json
 ```
 
-修改重试次数（例如关闭重试），在上述生成的文件上修改顶层字段后保存；不是全局或供应商设置：
+Codex重试次数统一通过 `agent codex-settings` 修改，不再写入模型设置文件：
 
 ```sh
-jq '.channel_retries = 0' model-settings.json > no-retries.json
-anchor model settings --id public --file no-retries.json
+anchor agent codex-settings --retries 0 --revision 1
 ```
 
 如需显式采用核心建议窗口（例如已保存大窗口需要调小），在上述生成的写入文件上应用建议并收敛现有预算：
@@ -665,6 +664,18 @@ anchor agent disable ID --revision N
 - `model put` 不会自动刷新已写入的 Codex 目录；网关 all-compatible 授权按每次请求的当前模型/供应商配置判断，而 Codex 目录是接管时快照。新增模型/改元数据后可用 `agent sync ID --revision N`，或 `restore` → `plan` → `apply`（或正常停服再启动），再重启远端 Codex app-server。更新目录不等于让已有会话立即切换。
 - 当前没有 Binding 删除、改路径或改适配器版本入口；默认模型与授权范围用下面的 set-models 显式修改。
 
+### `agent codex-settings`
+
+```sh
+anchor agent codex-settings
+# 使用上一步读取的 settings.revision；这里假设尚未保存（revision=1）
+anchor agent codex-settings --retries 5 --revision 1
+```
+
+无参数只读当前核心的统一Codex重试设置，返回 `settings`（`retries`、`revision`）和 `needs_sync`（待处理Binding ID数组）。默认5次，允许0–10整数，0关闭；次数不含首次请求。写入必须同时给出 `--retries` 和当前 `--revision`，过期版本返回conflict；未提供revision不会写入。保存统一控制Codex provider的 `request_max_retries` 和 `stream_max_retries`，两项分别受该次数限制，不是整个对话的总请求预算。
+
+保存后安全同步已启用且已接管的Codex，不修改其他Agent或未接管目标。部分同步失败仍返回已保存设置和非空 `needs_sync`，CLI输出结果后以非零退出；前往Agent页检查后显式同步并重启Codex。配置被外部修改时不会自动覆盖；之后接管的目标使用新值。管理写入结果未知时先重读，不自动重试。旧模型 `channel_retries` 不再生效，模型设置JSON需删除该字段。详细边界见 [Codex统一重试](../design/codex-retries.md)。
+
 ### `agent set-models`
 
 ```text
@@ -733,6 +744,7 @@ anchor recover [--id ID]
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
+| 供应商一站式添加（当前源码未打包） | provider add --secret-stdin → provider models --id ID --revision N → provider model-put | GUI 在新增表单可选填 Key，保存后在同一弹窗获取、快速／全部导入模型；留空不自动查询。目录失败保留已保存配置，可重试或修改 Key；沿用已有 CLI 步骤，无新增命令或契约变化 |
 | 供应商充值倍率及Key缓存相对倍率 | provider add/put --cost-multiplier、provider models/effective-rate/workspace | 当前源码已实现；默认1，自动缓存分组值，schema8；未打包发行 |
 | 平台账户／Key额度、请求账单和当前分组倍率 | provider platform/platform-put、balance/key-quota、usage-records/effective-rate | desktop.21 已发布核心接口；类型化客户端与源码 CLI 可用，alpha.6 CLI 不含；desktop.22 桌面已接入平台配置／余额／Key 额度，当前源码账户／模型映射页已接分组倍率，账单页面未接入；原版 OneAPI 能力缺口如上表 |
 | 上游模型目录查询 | provider models --id ID --revision N；桌面供应商详情 | 目录本身只读；provider model-put 保存映射，provider test 显式推理 |
@@ -755,6 +767,7 @@ anchor recover [--id ID]
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
+| Codex统一重试 | agent codex-settings [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
 | 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；desktop.16 dev 已投放且真实下载通过，原生安装未验收，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
 

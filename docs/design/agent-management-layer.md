@@ -406,3 +406,7 @@ maxTokens 在 DSH 同时设定模型输出能力和单次请求默认上限，�
 - Enroll 仍同时支持新登记与按当前 revision 更新。在线更新已应用／无 previous 的 conflict 时，不先 Recover 再 Apply，而是在保存新策略后用新 Binding 和最新 GatewayBinding 执行 Reapply；不依赖旧默认仍可用，也不在文件中发布中间恢复态。Codex all-compatible → all-mapped 及旧 single → 自动模型名单可在保留原有字段所有权的前提下更新；Reapply 仍拒绝丢弃旧字段／目录所有权。
 - 成功更新递增 revision，保留绑定 ID／凭据／operation／原始恢复内容，现有映射不改。新目标、已恢复目标及未完成写入仍遵循原登记／条件恢复流程，不将损坏或未完成 journal 当作批准。
 - 策略保存与文件应用不是跨资源事务。应用失败返回错误，策略可能已更新；保留 recovery_pending，不将 prepared 写入误报为普通失败。客户端只读回当前状态后由用户决定下一步，不自动重复调用。后台映射同步和启动流程仍保守，不覆盖第三方修改。
+
+## Codex统一重试（2026-10-19 当前源码）
+
+Codex托管provider的请求与流重试由核心统一设置决定，默认5次，设置页与CLI均可修改；保存后安全同步，重启Codex生效。取消模型映射同渠道额外重试，旧值忽略；其他Agent策略不变。契约、迁移和冲突边界见 [Codex统一重试](codex-retries.md)。

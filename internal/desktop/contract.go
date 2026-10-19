@@ -381,3 +381,12 @@ type ProxyWorkspaceResult struct {
 	Data     *ProxyWorkspace `json:"data"`
 	Problem  *Problem        `json:"problem"`
 }
+
+type CodexSettings = state.CodexSettings
+type SaveCodexSettings = state.SaveCodexSettings
+type CodexSettingsState = managed.CodexSettingsState
+type CodexSettingsResult struct {
+	Contract string              `json:"contract"`
+	Data     *CodexSettingsState `json:"data"`
+	Problem  *Problem            `json:"problem"`
+}

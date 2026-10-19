@@ -101,8 +101,8 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 - 全局并发上限 16；单供应商并发可配置 1..64；网关请求体上限 32 MiB（包含内嵌图片与完整历史），管理写入上限仍为 128 KiB；超限返回 HTTP 413 `request_too_large` 并提示 32 MiB 上限。此上限按字节计，不是模型 token 上下文限制；Chat/Anthropic 转换后的 Responses 请求也受同一上限保护。
 - 单次候选的总超时默认 120 秒，可配置 1..3600 秒；上游响应头等待上限 30 秒，下游每次写入等待上限 15 秒。
 - priority 策略（旧模型默认）按用户声明顺序调用；供应商页面新模型默认 round-robin，按候选相对倍率倒数平滑加权轮询；禁用、Key 不可用或并发已满的候选跳过；所有候选不可用时失败，绝不选择未配置默认模型。
-- 同渠道（供应商 + Key + 候选上游模型）首次遇到 HTTP 502/503/504 或未取得连接的失败时，默认额外重试3次（含首次最多4次），退避250ms/500ms/1s（之后上限1秒）；公开模型的 settings.channel_retries 可独立配置0–10次，未设置默认3，显式0禁用额外重试。仍使用所选 Key 和原请求，各次重新按供应商地址轮询取址。重试与退避共用该渠道的供应商 timeout，不逐次刷新预算；预算耗尽返回504，客户端取消立即停止。复用 `model settings --file` 顶层 channel_retries 保存，省略／null保留；读取返回有效值，保存对后续请求生效，活动请求保持模型配置快照。不修改供应商测试或管理写入的重试规则。
-- 同渠道重试耗尽后再尝试该供应商其他可用 Key 或后续候选，全部不可用／失败返回503 `no_available_candidate`。401/403/429 不在原 Key 重试，直接尝试其他可用 Key／候选；认证失败阻断 Key，429 按 Retry-After 冷却。每次实际尝试单独记入日志与用量；重试组结束后按尝试顺序更新健康，连续3次失败熔断30秒，不提前截断本组配置的重试，半开名额保留至整组完成。
+- 每个供应商 + Key + 候选上游模型在单个网关请求内仅尝试一次；取消同渠道额外重试与退避，旧 settings.channel_retries 读取时忽略。Codex 原生请求／流重试由核心统一设置控制，默认5，见 [Codex统一重试](codex-retries.md)。
+- 可安全转移的连接前失败及401/403/429/502/503/504尝试其他可用Key或候选；全部失败返回503 no_available_candidate。认证失败阻断Key，429按Retry-After冷却。每次尝试单独记录日志、用量与健康状态，半开预约在尝试结束时释放。已输出或执行状态不明时不重放。
 - DNS/连接拒绝/TLS 等未取得连接的失败允许切换；建立连接后结果未知的超时/传输错误、重定向、无效成功响应不自动切换。显式 HTTP 失败也不能保证上游没有执行或计费。
 - 下游已提交任何响应后不重放；断开 / 取消传播到上游。流式失败可能只留下不完整事件序列，客户端应核对终止事件，不以 HTTP 200 判断模型任务完成。
 - 不跟随上游重定向；不透传管理 / 网关令牌；上游仅收到供应商密钥。不把任意上游错误正文、认证头或 Location 返回给客户端。
@@ -157,7 +157,7 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 
 ### Codex v1 边界与证据
 
-当前写入根级 model/model_provider/web_search=disabled、可选 model_catalog_json 和独立 model_providers.anchor_<binding> 表，采用 Responses HTTP、关闭 provider WebSocket 与自动重试。认证配置依官方 command-backed auth 契约：command/args、timeout_ms、refresh_interval_ms，helper stdout 是原始 token。官方依据：<https://developers.openai.com/codex/config-advanced>。
+当前写入根级 model/model_provider/web_search=disabled、可选 model_catalog_json 和独立 model_providers.anchor_<binding> 表，采用 Responses HTTP、关闭 provider WebSocket；请求与流重试采用统一次数（默认5）。认证配置依官方 command-backed auth 契约：command/args、timeout_ms、refresh_interval_ms，helper stdout 是原始 token。官方依据：<https://developers.openai.com/codex/config-advanced>。
 
 仅全局 CODEX_HOME；用户选择的 profile 与显式 WebSocket 配置拒绝，未探测安装版本、系统策略、环境/命令行/项目覆盖，inspect 始终区分 configuration_only 与实际连接 unknown。Anchor 用操作者导入的、与精确 Codex 版本匹配的完整元数据生成 `anchor_ID.models.json`：复制指令/上下文/工具/reasoning，slug 改为公开别名、展示名可覆盖，visibility=list/supported_in_api=true、upgrade=null、prefer_websockets/use_responses_lite=false。不猜能力、不自动下载、不自动探测版本；操作者必须核对模板和真实供应商能力。自定义目录替代而非合并 Codex 自带目录。single 且无元数据的旧方式仍要求 Codex 自行识别别名；不更改登录状态、审批或沙箱策略。
 

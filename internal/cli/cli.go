@@ -25,10 +25,8 @@ const help = `Anchor — headless model gateway (development milestone)
 Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
   init [--control-address 127.0.0.1:17861] [--gateway-address 127.0.0.1:17860]
   serve                              Run the local foreground core
-      Inference: default 3 same-channel retries (4 attempts) for 502/503/504 or pre-connection failures.
-      Model settings channel_retries: 0..10 extra attempts (0 disables; omitted/null preserves).
-      Backoff 250ms/500ms/1s (capped at 1s) shares the provider timeout; no replay after output or unknown execution.
-      401/403/429 switch keys/candidates instead; management writes are not retried.
+      Inference: one attempt per channel with safe key/candidate failover; no replay after output or unknown execution.
+      Codex owns request/stream retries (default 5); management writes are not retried.
   restart --approve [--timeout 30s]   Restart local core, or explicit --context SSH target; preserve configuration
       Local safety pins: [--expected-instance ID] [--control-port N] (not with --context).
   context add NAME --local           Authenticate and bind a local instance
@@ -99,6 +97,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   agent add --id ID --adapter codex|claude|dsh|dsh-desktop --config-root ABS_DIR --model MODEL --approve
             [--model-scope all-compatible|all-mapped|single] [--anchor-executable ABS_PATH]
                                             Register; apply explicitly or on next serve
+  agent codex-settings [--retries 0..10 --revision N]  Unified retries; restart Codex after saving
   agent list | agent inspect ID | agent plan ID
   agent apply ID --revision N --fingerprint SHA256
   agent sync|restore|enable|disable ID --revision N
@@ -690,7 +689,7 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 	if args[0] == "settings" {
 		f := a.flags("model settings")
 		id := f.String("id", "", "public model ID (Chinese supported)")
-		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); channel_retries=0..10, omitted/null keeps existing; file omitted previews price-aware models.dev defaults and context_policy (no write)")
+		file := f.String("file", "", "SaveModelSettings JSON file (max 1 MiB); file omitted previews price-aware models.dev defaults and context_policy (no write)")
 		if err := parse(f, args[1:]); err != nil {
 			return err
 		}

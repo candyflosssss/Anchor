@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/model-settings.json';
 import contextModel from '../../../../contract/context-pricing.json';
 import type { ModelCatalog, ModelConfiguration } from '../../desktop/contract.generated';
-import { parseChannelRetries, applyContextWindow, crossesPriceBand, checkedConfiguration, checkedModelSettings, settingsReadDraft, createModelSettingsService, importConfiguration } from './model-settings.model';
+import { applyContextWindow, crossesPriceBand, checkedConfiguration, checkedModelSettings, settingsReadDraft, createModelSettingsService, importConfiguration } from './model-settings.model';
 import { DesktopProblem } from '../../desktop/transport';
 import { CONTRACT } from '../../desktop/contract.generated';
 const config = () => checkedConfiguration(structuredClone(fixture.configuration));
@@ -127,30 +127,5 @@ describe('price-aware context defaults', () => {
   it('accepts legacy missing advice without inventing a tier and rejects malformed advice', () => {
     expect(checkedModelSettings({ ...fixture, context_policy: undefined }, 'mapped').context_policy).toBeNull();
     expect(() => checkedModelSettings({ ...fixture, context_policy: { model_context: 128000, recommended_context: 272000, price_threshold: 272000 } }, 'mapped')).toThrow();
-  });
-});
-
-
-describe('mapping channel retries contract', () => {
-  it('accepts 0 through 10 and rejects malformed or unsupported responses', () => {
-    for (const n of [0, 1, 3, 10]) {
-      expect(checkedModelSettings({ ...fixture, channel_retries: n }, 'mapped').channel_retries).toBe(n);
-      expect(parseChannelRetries(String(n))).toBe(n);
-    }
-    for (const n of [-1, 11, 1.5, '3', null, true]) expect(() => checkedModelSettings({ ...fixture, channel_retries: n }, 'mapped')).toThrow();
-    expect(() => checkedModelSettings({ ...fixture, channel_retries: undefined }, 'mapped')).toThrow('unsupported');
-    for (const input of ['', '-1', '11', '1.5', 'abc', ' ']) expect(parseChannelRetries(input)).toBeNull();
-  });
-  it('sends explicit zero exactly once, validates before writing and detects a silently ignored limit', async () => {
-    const save = vi.fn(async () => ({ contract: CONTRACT, data: { ...fixture, channel_retries: 0 }, problem: null }));
-    const service = createModelSettingsService(() => ({ SaveModelSettings: save, ModelSettings: vi.fn() }));
-    const input = { model_id: 'mapped', expected_revision: 1, display_name: '', configuration: config(), reference_action: 'keep', reference_provider_id: '', reference_model_id: '', channel_retries: 0 };
-    expect((await service.save(input, new AbortController().signal)).channel_retries).toBe(0);
-    expect(save).toHaveBeenCalledTimes(1); expect(save.mock.calls[0]).toEqual([input]);
-    for (const invalid of [-1, 11, 0.5, NaN]) await expect(service.save({ ...input, channel_retries: invalid }, new AbortController().signal)).rejects.toMatchObject({ code: 'invalid' });
-    expect(save).toHaveBeenCalledTimes(1);
-    save.mockResolvedValue({ contract: CONTRACT, data: fixture, problem: null });
-    await expect(service.save(input, new AbortController().signal)).rejects.toMatchObject({ code: 'unknown' });
-    expect(save).toHaveBeenCalledTimes(2);
   });
 });

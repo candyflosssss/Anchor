@@ -162,7 +162,7 @@ func TestWeightedCandidatesSkipUnavailableAndFailOver(t *testing.T) {
 	}
 	r := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hi"}`)
 	raw := text(t, r)
-	if r.StatusCode != 200 || failed.Load() != 4 || good.Load() != 1 {
+	if r.StatusCode != 200 || failed.Load() != 1 || good.Load() != 1 {
 		t.Fatal(r.StatusCode, raw, failed.Load(), good.Load())
 	}
 	p, _ := f.store.Provider("a")

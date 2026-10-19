@@ -260,7 +260,7 @@ func TestFallbackOnlyBeforeDownstreamOutput(t *testing.T) {
 	f.add(t, "b", b.URL, "")
 	f.model(t, state.Candidate{ProviderID: "a", Model: "one"}, state.Candidate{ProviderID: "b", Model: "two"})
 	r := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hi"}`)
-	if r.StatusCode != 200 || strings.Contains(text(t, r), "secret") || primary.Load() != 4 || backup.Load() != 1 {
+	if r.StatusCode != 200 || strings.Contains(text(t, r), "secret") || primary.Load() != 1 || backup.Load() != 1 {
 		t.Fatal("fallback failed")
 	}
 }

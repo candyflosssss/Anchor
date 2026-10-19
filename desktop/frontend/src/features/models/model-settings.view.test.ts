@@ -10,13 +10,13 @@ const controller = vi.hoisted(() => ({ value: {} }));
 vi.mock('./use-model-settings', () => ({ useModelSettings: () => controller.value }));
 import { ModelSettingsDialog } from './model-settings.view';
 function render(overrides = {}) {
-  controller.value = { state: checkedModelSettings(fixture, 'mapped'), retryCount: '3', retryValidation: '', error: '', notice: '', busy: false, needsRead: false, providers: [], models: [], provider: '', model: '', ...overrides };
+  controller.value = { state: checkedModelSettings(fixture, 'mapped'), error: '', notice: '', busy: false, needsRead: false, providers: [], models: [], provider: '', model: '', ...overrides };
   return renderToStaticMarkup(createElement(ModelSettingsDialog, { id: 'mapped', active: true, close: vi.fn(), saved: vi.fn() }));
 }
 describe('mapping model settings form', () => {
   it('shows limits, supported efforts, defaults and candidate review notice', () => {
     const html = render();
-    expect(html).toContain('同一渠道重试次数'); expect(html).toContain('0 表示不重试'); expect(html).toContain('max="10"');
+    expect(html).not.toContain('重试次数');
     expect(html).toContain('272000'); expect(html).toContain('最大输出'); expect(html).toContain('默认思考等级');
     expect(html).toContain('2 个上游候选'); expect(html).toContain('补充未设置的默认值'); expect(html).toContain('用目录值替换草稿');
     expect(html).toContain('不自动改写请求'); expect(html).toContain('未关联参考来源');
@@ -37,11 +37,6 @@ describe('mapping model settings form', () => {
     expect(html).not.toContain('role="status"');
     expect(html).toContain('已补全 · 待保存');
     expect(html).toMatch(/<details[^>]*model-settings-catalog[^>]*>.*已自动从 models.dev/);
-  });
-  it('shows explicit zero and blocks invalid retry drafts', () => {
-    expect(render({ retryCount: '0' })).toContain('value="0"');
-    const html = render({ retryCount: '11', retryValidation: '重试次数须为 0–10 的整数。' });
-    expect(html).toContain('aria-invalid="true"'); expect(html).toMatch(/<button[^>]*disabled[^>]*>保存模型设置/);
   });
   it('disables repeated submission of an already saved draft', () => {
     expect(render({ unchanged: true })).toMatch(/<button[^>]*disabled[^>]*>保存模型设置/);

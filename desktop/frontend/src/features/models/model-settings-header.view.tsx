@@ -6,7 +6,7 @@ export function ModelSettingsHeader({ alias, page, busy, switchPage }: {
 }) {
   return <div className="model-settings-heading">
     <header><DialogTitle>模型设置</DialogTitle><p className="model-settings-alias mono">{alias}</p>
-      <DialogDescription className="sr-only">配置模型重试、上下文、能力与速度。切换分类前请保存，未保存的修改会丢弃。</DialogDescription>
+      <DialogDescription className="sr-only">配置模型上下文、能力与速度。切换分类前请保存，未保存的修改会丢弃。</DialogDescription>
     </header>
     {switchPage && <nav className="model-settings-tabs" aria-label="模型设置分类">
       <Button variant="ghost" aria-current={page === 'general' ? 'page' : undefined} disabled={busy} onClick={page === 'general' ? undefined : switchPage}>常规设置</Button>

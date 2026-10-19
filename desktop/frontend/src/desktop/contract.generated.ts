@@ -2,6 +2,23 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed", "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe", "skill_unsafe", "skill_changed", "skill_limit", "skill_link_unavailable"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface CodexSettings {
+  retries: number;
+  revision: number;
+}
+export interface SaveCodexSettings {
+  retries: number | null;
+  expected_revision: number;
+}
+export interface CodexSettingsState {
+  settings: CodexSettings;
+  needs_sync: string[];
+}
+export interface CodexSettingsResult {
+  contract: string;
+  data: CodexSettingsState | null;
+  problem: Problem | null;
+}
 export interface ProxyProfile {
   id: string;
   name: string;
@@ -203,7 +220,6 @@ export interface ModelSettingsQuery {
   model_id: string;
 }
 export interface ModelSettingsState {
-  channel_retries: number | null;
   context_policy: ContextPolicy | null;
   defaults_status: string;
   model_id: string;
@@ -214,7 +230,6 @@ export interface ModelSettingsState {
   reference: ModelCatalog | null;
 }
 export interface SaveModelSettings {
-  channel_retries?: number | null;
   model_id: string;
   expected_revision: number;
   display_name: string;
@@ -979,6 +994,7 @@ export interface LogSettingsResult {
 export interface DesktopBridge {
   AgentWorkspace(): Promise<AgentWorkspaceResult>;
   CheckUpdate(input1: string): Promise<UpdateResult>;
+  CodexSettings(): Promise<CodexSettingsResult>;
   ConfigureLogs(input1: Settings): Promise<LogSettingsResult>;
   ConfigureModelRouting(input1: ModelRouting): Promise<ModelRoutingResult>;
   ConnectSSH(input1: SSHConnectionInput): Promise<SessionResult>;
@@ -1010,6 +1026,7 @@ export interface DesktopBridge {
   Providers(): Promise<ProvidersResult>;
   ProxyWorkspace(): Promise<ProxyWorkspaceResult>;
   RestartCore(input1: ConfirmStop): Promise<SessionResult>;
+  SaveCodexSettings(input1: SaveCodexSettings): Promise<CodexSettingsResult>;
   SaveModelSettings(input1: SaveModelSettings): Promise<ModelSettingsResult>;
   SaveProvider(input1: SaveProvider): Promise<SaveResult>;
   SaveProviderAccount(input1: SaveAccountSettings): Promise<AccountSettingsResult>;

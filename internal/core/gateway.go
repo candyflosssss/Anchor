@@ -260,7 +260,6 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	status := 0
 	success := false
 	attempted := false
-	retrySame := false
 	sentTier := "not_sent"
 	after := ""
 	usage := protocol.Usage{}
@@ -284,7 +283,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		t.row.Code = ""
 	}
 	defer func() {
-		*attemptResult = forwardAttemptResult{attempted: attempted, success: success, retrySame: retrySame, status: status, after: after}
+		*attemptResult = forwardAttemptResult{attempted: attempted, success: success, status: status, after: after}
 		if !attempted {
 			return
 		}
@@ -399,7 +398,6 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		}
 		if !connected.Load() && ctx.Err() == nil {
 			code = "upstream_connect"
-			retrySame = true
 			return true
 		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -420,7 +418,6 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	if status != 200 {
 		switch status {
 		case 401, 403, 429, 502, 503, 504:
-			retrySame = status == 502 || status == 503 || status == 504
 			code = "upstream_unavailable"
 			if status == 429 {
 				code = "rate_limited"
