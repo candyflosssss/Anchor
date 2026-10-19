@@ -8,7 +8,7 @@ import { isValidModelAlias, checkedWorkspace, type Action, type Workspace } from
 import catalogFixture from '../../../../contract/provider-models.json';
 import fixture from '../../../../contract/providers.json';
 import { checkedProvider } from '../../desktop/transport';
-import { ProviderProblem, type Provider, type ProviderTransport, type DiscoverProviderModels, type ProviderModels, type SaveProvider } from './provider.model';
+import { newDraft, validateDraft, ProviderProblem, type Provider, type ProviderTransport, type DiscoverProviderModels, type ProviderModels, type SaveProvider } from './provider.model';
 export const scenarios = {
   normal: '正常列表', empty: '空数据', offline: '实例离线', unauthorized: '授权不可用',
   read_error: '读取错误', conflict: '保存冲突', unknown: '写入结果未知',
@@ -317,8 +317,10 @@ export class MockProviderTransport implements ProviderTransport {
     if ((input.expected_revision === 0 && current) || (input.expected_revision > 0 && current?.revision !== input.expected_revision)) throw fixtureError('conflict');
     if (!input.provider.base_urls.length || input.provider.base_urls.length > 16) throw fixtureError('invalid');
     if (input.provider.protocol && !['responses', 'chat-completions', 'anthropic'].includes(input.provider.protocol)) throw fixtureError('invalid');
+    const initialKeys = input.initial_keys ?? [];
+    if (initialKeys.length && (input.expected_revision !== 0 || Object.keys(validateDraft({ ...newDraft(input.provider), secret: input.secret ?? '', initialKeys })).length)) throw fixtureError('invalid');
     const saved: Provider = { ...input.provider, protocol: input.provider.protocol || current?.protocol || 'responses', base_urls: [...input.provider.base_urls], revision: input.expected_revision + 1,
-      has_secret: input.secret === null ? current?.has_secret ?? false : !!input.secret };
+      has_secret: !!initialKeys.length || (input.secret === null ? current?.has_secret ?? false : !!input.secret) };
     if (current) {
       const w = this.detail(current);
       if (input.secret !== null) {
@@ -332,6 +334,12 @@ export class MockProviderTransport implements ProviderTransport {
         if (key) key.protocol = input.provider.protocol;
       }
       saved.has_secret = w.keys.length > 0;
+    }
+    if (!current && initialKeys.length) {
+      const w = this.detail(saved);
+      w.keys = [...(input.secret ? [{ id: 'default', protocol: saved.protocol! }] : []), ...initialKeys].map(key => ({
+        id: key.id, protocol: key.protocol, enabled: true, model_protocols: [], state: 'ready', failures: 0, retry_at: 0, test: null, rate: null, effective_multiplier: null,
+      }));
     }
     this.rows = current ? this.rows.map(p => p.id === saved.id ? saved : p) : [...this.rows, saved].sort((a, b) => a.id.localeCompare(b.id, 'zh-CN'));
     if (this.scenario === 'unknown') { this.scenario = 'normal'; throw fixtureError('unknown'); }

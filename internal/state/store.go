@@ -351,16 +351,17 @@ func (s *Store) Revoke(id string) error {
 	return nil
 }
 func (s *Store) Providers() ([]Provider, error) {
-	rows, err := s.db.Query(`SELECT document,secret,revision FROM providers ORDER BY id`)
+	rows, err := s.db.Query(`SELECT document,EXISTS(SELECT 1 FROM provider_keys k WHERE k.provider_id=providers.id),revision FROM providers ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := []Provider{}
 	for rows.Next() {
-		var b, secret string
+		var b string
+		var hasSecret bool
 		var rev int64
-		if err := rows.Scan(&b, &secret, &rev); err != nil {
+		if err := rows.Scan(&b, &hasSecret, &rev); err != nil {
 			return nil, err
 		}
 		var p Provider
@@ -369,7 +370,7 @@ func (s *Store) Providers() ([]Provider, error) {
 		}
 		p.Normalize()
 		p.Revision = rev
-		p.HasSecret = secret != ""
+		p.HasSecret = hasSecret
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -377,7 +378,8 @@ func (s *Store) Providers() ([]Provider, error) {
 func (s *Store) Provider(id string) (Provider, error) {
 	var b, secret string
 	var rev int64
-	err := s.db.QueryRow(`SELECT document,secret,revision FROM providers WHERE id=?`, id).Scan(&b, &secret, &rev)
+	var hasSecret bool
+	err := s.db.QueryRow(`SELECT document,secret,revision,EXISTS(SELECT 1 FROM provider_keys k WHERE k.provider_id=providers.id) FROM providers WHERE id=?`, id).Scan(&b, &secret, &rev, &hasSecret)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Provider{}, ErrNotFound
 	}
@@ -390,7 +392,7 @@ func (s *Store) Provider(id string) (Provider, error) {
 	}
 	p.Normalize()
 	p.Secret = secret
-	p.HasSecret = secret != ""
+	p.HasSecret = hasSecret
 	p.Revision = rev
 	return p, nil
 }
@@ -398,6 +400,15 @@ func (s *Store) Provider(id string) (Provider, error) {
 // PutProvider uses optimistic concurrency; expected=0 means create only.
 // nil secret preserves an existing credential; an explicit empty secret removes it.
 func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provider, error) {
+	return s.PutProviderWithKeys(p, expected, secret, nil)
+}
+
+// PutProviderWithKeys creates named Keys in the same transaction as the provider.
+// Non-empty initialKeys are create-only; updates retain the existing Key rules.
+func (s *Store) PutProviderWithKeys(p Provider, expected int64, secret *string, initialKeys []InitialProviderKey) (Provider, error) {
+	if err := ValidateInitialProviderKeys(initialKeys, expected, secret); err != nil {
+		return Provider{}, err
+	}
 	if secret != nil {
 		p.Secret = *secret
 	}
@@ -495,6 +506,11 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 	}
 	if updateDefaultProtocol {
 		if _, err = tx.Exec(`UPDATE provider_keys SET protocol=? WHERE provider_id=? AND id='default'`, p.Protocol, p.ID); err != nil {
+			return Provider{}, err
+		}
+	}
+	for _, key := range initialKeys {
+		if _, err = tx.Exec(`INSERT INTO provider_keys(provider_id,id,secret,enabled,protocol) VALUES(?,?,?,1,?)`, p.ID, key.ID, key.Secret, key.Protocol); err != nil {
 			return Provider{}, err
 		}
 	}

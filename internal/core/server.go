@@ -288,9 +288,10 @@ func (s *Server) Control() http.Handler {
 			return
 		}
 		var in struct {
-			Provider         state.Provider `json:"provider"`
-			ExpectedRevision int64          `json:"expected_revision"`
-			Secret           *string        `json:"secret,omitempty"`
+			Provider         state.Provider             `json:"provider"`
+			ExpectedRevision int64                      `json:"expected_revision"`
+			Secret           *string                    `json:"secret,omitempty"`
+			InitialKeys      []state.InitialProviderKey `json:"initial_keys,omitempty"`
 		}
 		if !decode(w, r, &in) {
 			return
@@ -311,7 +312,7 @@ func (s *Server) Control() http.Handler {
 				return
 			}
 		}
-		p, err := s.Store.PutProvider(in.Provider, in.ExpectedRevision, in.Secret)
+		p, err := s.Store.PutProviderWithKeys(in.Provider, in.ExpectedRevision, in.Secret, in.InitialKeys)
 		if err != nil {
 			apiError(w, err)
 			return

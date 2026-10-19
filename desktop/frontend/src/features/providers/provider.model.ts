@@ -1,9 +1,10 @@
 import { isValidId } from '../../lib/identifier';
 import type { AccountTransport } from './provider-account.model';
-import type { Provider as DesktopProvider, SaveProvider, DiscoverProviderModels, ProviderModels } from "../../desktop/contract.generated";
+import type { Provider as DesktopProvider, SaveProvider, InitialProviderKey, DiscoverProviderModels, ProviderModels } from "../../desktop/contract.generated";
 export type { SaveProvider, DiscoverProviderModels, ProviderModels };
 export type Provider = DesktopProvider;
 export const MAX_PROVIDER_URLS = 16;
+export const MAX_PROVIDER_KEYS = 64;
 export const protocolName: Record<string, string> = { responses: "Responses", "chat-completions": "Chat Completions", anthropic: "Anthropic Messages" };
 export const isValidProtocol = (value: string) => Object.hasOwn(protocolName, value);
 export type SecretMode = 'keep' | 'replace' | 'clear';
@@ -19,8 +20,9 @@ export interface ProviderDraft {
   secretMode: SecretMode;
   secret: string;
   confirmClear: boolean;
+  initialKeys: InitialProviderKey[];
 }
-export type FieldErrors = Partial<Record<'id' | 'homepage_url' | 'protocol' | 'base_urls' | 'timeout' | 'concurrent' | 'costMultiplier' | 'secret' | `base_url_${number}`, string>>;
+export type FieldErrors = Partial<Record<'id' | 'homepage_url' | 'protocol' | 'base_urls' | 'timeout' | 'concurrent' | 'costMultiplier' | 'secret' | 'initialKeys' | `initial_key_${number}_${'id' | 'secret' | 'protocol'}` | `base_url_${number}`, string>>;
 export type ProblemCode = 'offline' | 'unauthorized' | 'read_error' | 'conflict' | 'unknown' | 'invalid' | 'referenced';
 export class ProviderProblem extends Error {
   constructor(readonly code: ProblemCode) { super(code); }
@@ -49,7 +51,7 @@ export function newDraft(provider?: Provider): ProviderDraft {
     protocol: provider ? provider.protocol ?? '' : 'responses',
     timeout: String(provider?.timeout_seconds ?? 120), concurrent: String(provider?.max_concurrent ?? 4),
     costMultiplier: String(provider?.cost_multiplier ?? 1),
-    secretMode: 'keep', secret: '', confirmClear: false,
+    secretMode: 'keep', secret: '', confirmClear: false, initialKeys: [],
   };
 }
 export function validateDraft(draft: ProviderDraft): FieldErrors {
@@ -80,6 +82,16 @@ export function validateDraft(draft: ProviderDraft): FieldErrors {
   const secret = draft.secret.trim();
   if ((draft.secretMode === 'replace' || !!secret) && (!secret || /[\r\n]/.test(secret) || new TextEncoder().encode(secret).length > 8192)) errors.secret = `${draft.secretMode === 'replace' ? '替换密钥' : 'API Key '}须非空、无内部换行，且不超过 8192 字节。`;
   if (draft.secretMode === 'clear' && !draft.confirmClear) errors.secret = '请确认清除密钥的影响。';
+  if (draft.initialKeys.length >= MAX_PROVIDER_KEYS) errors.initialKeys = `最多填写 ${MAX_PROVIDER_KEYS} 个 Key（含默认 Key）。`;
+  const keyIDs = new Set(['default']);
+  draft.initialKeys.forEach((key, i) => {
+    const id = key.id.trim(), secret = key.secret.trim();
+    if (!isValidId(id)) errors[`initial_key_${i}_id`] = '请输入有效的 Key 名称。';
+    else if (keyIDs.has(id)) errors[`initial_key_${i}_id`] = 'Key 名称重复（default 为默认 Key）。';
+    keyIDs.add(id);
+    if (!isValidProtocol(key.protocol)) errors[`initial_key_${i}_protocol`] = '请选择有效的请求渠道。';
+    if (!secret || /[\r\n]/.test(secret) || new TextEncoder().encode(secret).length > 8192) errors[`initial_key_${i}_secret`] = '请填写 API Key，无内部换行且不超过 8192 字节。';
+  });
   return errors;
 }
 export function requestURLError(raw: string): string | undefined {
@@ -101,8 +113,21 @@ export function toSave(draft: ProviderDraft, source?: Provider): SaveProvider {
       cost_multiplier: +draft.costMultiplier, timeout_seconds: +draft.timeout, max_concurrent: +draft.concurrent,
       revision: expected_revision, has_secret: source?.has_secret ?? false },
     expected_revision,
+    ...(!source && draft.initialKeys.length ? { initial_keys: draft.initialKeys.map(key => ({ id: key.id.trim(), protocol: key.protocol, secret: key.secret.trim() })) } : {}),
     secret: !source ? draft.secret.trim() || null : draft.secretMode === 'keep' ? null : draft.secretMode === 'clear' ? '' : draft.secret.trim(),
   };
+}
+export function clearDraftSecrets(draft: ProviderDraft): ProviderDraft {
+  return { ...draft, secret: '', initialKeys: draft.initialKeys.map(key => ({ ...key, secret: '' })) };
+}
+export function clearSaveSecrets(input: SaveProvider): void {
+  input.secret = null;
+  for (const key of input.initial_keys ?? []) key.secret = '';
+}
+export function nextInitialKey(draft: ProviderDraft): InitialProviderKey {
+  let number = 2;
+  while (draft.initialKeys.some(key => key.id.trim() === `key-${number}`)) number++;
+  return { id: `key-${number}`, protocol: draft.protocol || 'responses', secret: '' };
 }
 export function isDirty(draft: ProviderDraft, source?: Provider): boolean {
   return JSON.stringify(draft) !== JSON.stringify(newDraft(source));

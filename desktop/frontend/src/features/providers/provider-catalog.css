@@ -66,3 +66,8 @@
 .provider-setup-dialog .editor-problem { margin: 0; }
 .provider-setup-state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 96px; color: hsl(var(--muted-foreground)); font-size: 13px; }
 .provider-setup-state svg { width: 16px; height: 16px; }
+
+.initial-key-fields { display: grid; gap: 12px; padding-top: 12px; border-top: 1px solid hsl(var(--border)); }
+.initial-key-fields .section-label { justify-content: space-between; }
+.initial-key-options { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+@media (max-width: 600px) { .initial-key-options { grid-template-columns: minmax(0, 1fr); } }

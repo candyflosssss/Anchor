@@ -30,10 +30,17 @@ type Provider struct {
 	Revision       int64    `json:"revision"`
 	HasSecret      bool     `json:"has_secret"`
 }
+type InitialProviderKey struct {
+	ID       string `json:"id"`
+	Protocol string `json:"protocol"`
+	Secret   string `json:"secret"`
+}
+
 type SaveProvider struct {
-	Provider         Provider `json:"provider"`
-	ExpectedRevision int64    `json:"expected_revision"`
-	Secret           *string  `json:"secret"`
+	Provider         Provider             `json:"provider"`
+	ExpectedRevision int64                `json:"expected_revision"`
+	Secret           *string              `json:"secret"`
+	InitialKeys      []InitialProviderKey `json:"initial_keys,omitempty"`
 }
 type SessionInfo struct {
 	ProfileName string `json:"profile_name"`

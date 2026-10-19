@@ -696,3 +696,12 @@ Model 仅在新建或渠道实际改变时发送可选 `protocol`，避免修改
 供应商请求渠道编辑、Key 失败自动降权／设置、日志费用分项与倍率快照、列表／余额修复等已提交功能纳入干净源码 `e22f8d9b92cd3858bc192b6c3e1f0ea0df7aa250` 的 `.53` 两平台生产包；仍遵循功能 Model／hook Controller／View与类型化桥接。尚未提交的系统代理选择增量不随本版发布。
 
 六附件与默认 dev 源真实下载校验通过，本机 CLI／核心／GUI 由 `.52` 保留交接升级，schema9→9，配置／凭据／托管文件／恢复基线原样保留。未进行原生窗口、系统安装器／apply、真实 SSH 或付费请求验收；完整范围与实际结果见[桌面发行说明](../release/desktop.md#请求渠道编辑-53已发布-dev本机已升级)。历史未发布说明只描述当时状态。
+
+
+### 新增供应商多 Key 与请求地址（2026-10-20，当前源码未发布）
+
+新增／编辑弹窗沿用请求地址列表，可增删多个 HTTPS 域名或 IP 地址（含端口），HTTP 仍只允许数值回环测试地址；编辑不会改动 Key。新增弹窗增加「添加 Key」，每行独立名称、请求渠道与密码输入，可删除多余行；保留默认 Key 可选、单地址／单 Key 的简洁默认。多行内容在弹窗内滚动，底部操作固定，小屏 Key 字段单列排布。
+
+Model 管理多 Key 草稿、重复名／协议／秘密／地址校验、请求转换和秘密清理；hook Controller 只发起一次 SaveProvider，成功后使用返回 revision 查询全部启用 Key 的目录，不串行重放 key-put。核心通过 create-only initial_keys 在同一事务创建供应商、默认 Key 和命名 Key；任一失败不留下半成品。已存供应商编辑保留现有 Key 管理入口，不把创建草稿作为更新回传。提交即清空所有秘密，取消／卸载丢弃草稿，未知结果先重读、不自动重试。共享样例为 desktop/contract/provider-create.json；语义及旧核心兼容限制见[供应商接口](provider-interface.md#1-读写与数据)。
+
+CLI 已有 provider add|put 多地址及 provider key-put 多 Key 操作；本轮桌面原子创建的批量入口没有新增 CLI 参数，等价 CLI 步骤与非原子边界见[指令大全](../cli/commands.md)。隔离 Go 核心／桥接、前端单测及模拟 Wails 浏览器分别验证，非 Linux／Windows 原生窗口验收；本轮未打包。

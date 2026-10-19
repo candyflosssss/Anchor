@@ -1,0 +1,20 @@
+{
+  "provider": {
+    "id": "multi-key-create",
+    "homepage_url": "",
+    "base_urls": ["https://api.example.invalid/v1", "https://192.0.2.10:8443/v1"],
+    "protocol": "responses",
+    "enabled": true,
+    "timeout_seconds": 120,
+    "max_concurrent": 4,
+    "cost_multiplier": 1,
+    "revision": 0,
+    "has_secret": false
+  },
+  "expected_revision": 0,
+  "secret": "synthetic-create-default",
+  "initial_keys": [
+    {"id": "backup", "protocol": "anthropic", "secret": "synthetic-create-backup"},
+    {"id": "备用", "protocol": "chat-completions", "secret": "synthetic-create-secondary"}
+  ]
+}

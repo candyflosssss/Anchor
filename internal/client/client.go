@@ -132,11 +132,19 @@ func (c *Client) Models(ctx context.Context) ([]state.Model, error) {
 	return v, e
 }
 func (c *Client) PutProvider(ctx context.Context, p state.Provider, revision int64, secret *string) (state.Provider, error) {
+	return c.PutProviderWithKeys(ctx, p, revision, secret, nil)
+}
+
+func (c *Client) PutProviderWithKeys(ctx context.Context, p state.Provider, revision int64, secret *string, keys []state.InitialProviderKey) (state.Provider, error) {
 	if !state.ValidProviderID(p.ID) {
 		return state.Provider{}, errors.New("invalid provider ID")
 	}
 	var v state.Provider
-	e := c.call(ctx, "PUT", "/control/v1/providers/"+p.ID, map[string]any{"provider": p, "expected_revision": revision, "secret": secret}, &v)
+	input := map[string]any{"provider": p, "expected_revision": revision, "secret": secret}
+	if len(keys) > 0 {
+		input["initial_keys"] = keys
+	}
+	e := c.call(ctx, "PUT", "/control/v1/providers/"+p.ID, input, &v)
 	return v, e
 }
 

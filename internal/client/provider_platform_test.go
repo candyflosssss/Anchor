@@ -17,6 +17,15 @@ func TestPlatformTypedClientRoundTrip(t *testing.T) {
 	c, _, _, _ := connection(t)
 	ctx := context.Background()
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// NewAPI balance reads public display metadata without user authorization.
+		// This fixture intentionally omits conversion metadata to retain raw quota.
+		if r.URL.Path == "/api/status" {
+			if r.Header.Get("Authorization") != "" || r.Header.Get("New-Api-User") != "" {
+				t.Error("public status leaked user authorization")
+			}
+			io.WriteString(w, `{"success":true,"data":{}}`)
+			return
+		}
 		if r.URL.Path != "/api/user/self" || r.Header.Get("Authorization") != "Bearer dashboard-fixture" || r.Header.Get("New-Api-User") != "9" {
 			t.Error("wrong user authorization")
 		}

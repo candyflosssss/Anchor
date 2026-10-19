@@ -1,7 +1,7 @@
 import { useProviderAccount } from './use-provider-account';
 import { useProviderFeatures } from './use-provider-features';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
+import { clearDraftSecrets, clearSaveSecrets, newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
 import type { Scenario } from './provider.mock';
 import type { DetailTab, ProviderDialog } from './provider-summary.model';
 import type { ProviderEnvironment } from '../../desktop/environment';
@@ -78,6 +78,7 @@ export function useProviderController(environment: ProviderEnvironment) {
       ...(key === 'secretMode' ? { secret: '', confirmClear: false } : {}) } });
     setErrors(old => {
       const next = { ...old }; delete next[key as keyof FieldErrors];
+      if (key === 'initialKeys') for (const name of Object.keys(next)) if (name.startsWith('initial_key_')) delete next[name as keyof FieldErrors];
       if (key === 'base_urls') for (const name of Object.keys(next)) if (name.startsWith('base_url_')) delete next[name as keyof FieldErrors];
       return next;
     });
@@ -98,11 +99,11 @@ export function useProviderController(environment: ProviderEnvironment) {
     const epoch = generation.current;
     // Snapshot only for the transport call; erase the secret from the visible form immediately.
     const input = toSave(draft, source);
-    const setup = !toggling && (editor?.setup || (!source && !!input.secret));
-    setEditor(old => old && { ...old, draft: { ...old.draft, secret: '' } });
+    const setup = !toggling && (editor?.setup || (!source && (!!input.secret || !!input.initial_keys?.length)));
+    setEditor(old => old && { ...old, draft: clearDraftSecrets(old.draft) });
     try {
       const saved = await transport.save(input, abort.signal);
-      input.secret = null;
+      clearSaveSecrets(input);
       if (abort.signal.aborted || epoch !== generation.current) return;
       clearModels();
       // Update existing rows in place so saving or toggling never changes their position.
@@ -125,7 +126,7 @@ export function useProviderController(environment: ProviderEnvironment) {
       // Conflict/unknown require an explicit read; never automatically replay a write.
       if (code === 'unknown') setEditor(null);
     } finally {
-      input.secret = null;
+      clearSaveSecrets(input);
       if (epoch === generation.current) { locked.current = false; setBusy(false); }
     }
   }

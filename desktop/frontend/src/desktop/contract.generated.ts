@@ -602,10 +602,16 @@ export interface Provider {
   revision: number;
   has_secret: boolean;
 }
+export interface InitialProviderKey {
+  id: string;
+  protocol: string;
+  secret: string;
+}
 export interface SaveProvider {
   provider: Provider;
   expected_revision: number;
   secret: string | null;
+  initial_keys?: InitialProviderKey[];
 }
 export interface SessionInfo {
   profile_name: string;

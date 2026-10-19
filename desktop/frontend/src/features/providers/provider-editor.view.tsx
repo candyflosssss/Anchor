@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Switch } from '../../components/ui/switch';
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog';
+import { ProviderInitialKeys } from './provider-initial-keys.view';
 import { ProviderCatalogView } from './provider-catalog.view';
 import type { ProviderController } from './use-provider-controller';
 import { protocolName, MAX_PROVIDER_URLS, type FieldErrors } from './provider.model';
@@ -64,13 +65,14 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
             </select>
             <p id="protocol-scope" className="field-hint">更改后用于匿名请求和默认 Key；其他 Key 及模型单独设置的协议保持不变。</p>
           </Field>
-          <section className="credential-section"><div className="section-label"><KeyRound size={15} /><h3>默认 API 密钥</h3><span>{source?.has_secret ? '已配置' : '可选'}</span></div>
+          <section className="credential-section"><div className="section-label"><KeyRound size={15} /><h3>{source ? '默认 API 密钥' : 'API Keys'}</h3><span>{source?.has_secret ? '已有 Key' : '可选'}</span></div>
             {source && <div className="secret-options" role="group" aria-label="密钥操作">{([['keep', '保留现有'], ['replace', '替换密钥'], ['clear', '清除默认密钥']] as const).map(([value, title]) => <button type="button" key={value} className={draft.secretMode === value ? 'selected' : ''} aria-pressed={draft.secretMode === value} onClick={() => { setShowSecret(false); c.changeDraft('secretMode', value); }}>{title}</button>)}</div>}
             {(!source || draft.secretMode === 'replace') && <Field name="secret" title={source ? '新的 API 密钥' : 'API Key（可选）'} errors={c.errors}>
               <div className="secret-input"><Input {...errorProps('secret')} type={showSecret ? 'text' : 'password'} value={draft.secret} onChange={event => c.changeDraft('secret', event.target.value)} placeholder={source ? '新的 API Key' : 'API Key'} autoComplete="new-password" spellCheck={false} />
                 <button type="button" aria-label={showSecret ? '隐藏新密钥' : '显示新密钥'} onClick={() => setShowSecret(value => !value)}>{showSecret ? <EyeOff size={16} /> : <Eye size={16} />}</button></div>
             </Field>}
             {source && draft.secretMode === 'clear' && <div className="warning-box"><p>清除默认密钥会同步移除它对应的模型来源；其他 Key 的同名模型保留，没有剩余来源的模型映射一并删除。若模型仍是已启用 Agent 的默认模型，需先更换默认模型或停用该 Agent。</p><label className="check-label"><input id="secret" aria-describedby="secret-hint" aria-invalid={!!c.errors.secret} type="checkbox" checked={draft.confirmClear} onChange={event => c.changeDraft('confirmClear', event.target.checked)} />我确认清除 {source.id} 的密钥</label><p id="secret-hint" className="field-error" role="alert">{c.errors.secret}</p></div>}
+            {!source && <ProviderInitialKeys draft={draft} errors={c.errors} onChange={keys => c.changeDraft('initialKeys', keys)} />}
           </section>
           <Field name="costMultiplier" title="供应商倍率" errors={c.errors}>
             <Input {...errorProps('costMultiplier')} type="number" min="0.000001" max="1000" step="any" value={draft.costMultiplier} onChange={event => c.changeDraft('costMultiplier', event.target.value)} />
@@ -82,7 +84,7 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
           <label className="enabled-field"><span><strong>启用此供应商</strong></span><Switch aria-label="启用此供应商" checked={draft.enabled} onCheckedChange={value => c.changeDraft('enabled', value)} /></label>
         </fieldset>
         {c.problem && <div className="editor-problem" role="alert"><p>{c.problemMessage}</p>{c.problem === 'conflict' && <Button type="button" variant="outline" onClick={() => void c.reloadFromEditor()}>丢弃草稿并重新读取</Button>}</div>}
-        <footer className="editor-footer"><div className="flex gap-2"><Button variant="outline" type="button" disabled={c.busy} onClick={() => c.closeEditor()}>{c.editor.setup ? '完成' : '取消'}</Button><Button type="submit" disabled={c.busy || c.problem === 'conflict'}>{c.busy ? '正在保存…' : c.editor.setup ? '保存并获取模型' : source ? '保存配置' : draft.secret.trim() ? '添加并获取模型' : '添加供应商'}</Button></div></footer>
+        <footer className="editor-footer"><div className="flex gap-2"><Button variant="outline" type="button" disabled={c.busy} onClick={() => c.closeEditor()}>{c.editor.setup ? '完成' : '取消'}</Button><Button type="submit" disabled={c.busy || c.problem === 'conflict'}>{c.busy ? '正在保存…' : c.editor.setup ? '保存并获取模型' : source ? '保存配置' : (draft.secret.trim() || draft.initialKeys.length) ? '添加并获取模型' : '添加供应商'}</Button></div></footer>
       </form>}
     </DialogContent>
   </Dialog>;

@@ -107,6 +107,14 @@ func (b *Bridge) SaveProvider(in SaveProvider) SaveResult {
 		r.Problem = &Problem{"invalid"}
 		return r
 	}
+	keys := make([]state.InitialProviderKey, len(in.InitialKeys))
+	for i, key := range in.InitialKeys {
+		keys[i] = state.InitialProviderKey{ID: key.ID, Protocol: key.Protocol, Secret: key.Secret}
+	}
+	if state.ValidateInitialProviderKeys(keys, in.ExpectedRevision, in.Secret) != nil {
+		r.Problem = &Problem{"invalid"}
+		return r
+	}
 	p := state.Provider{Protocol: in.Provider.Protocol, CostMultiplier: in.Provider.CostMultiplier, ID: in.Provider.ID, HomepageURL: in.Provider.HomepageURL, BaseURLs: append([]string(nil), in.Provider.BaseURLs...), Enabled: in.Provider.Enabled, TimeoutSeconds: in.Provider.TimeoutSeconds, MaxConcurrent: in.Provider.MaxConcurrent}
 	if err := p.Validate(); err != nil {
 		r.Problem = &Problem{"invalid"}
@@ -128,7 +136,7 @@ func (b *Bridge) SaveProvider(in SaveProvider) SaveResult {
 		return r
 	}
 	defer cl.Close()
-	saved, err := cl.PutProvider(ctx, p, in.ExpectedRevision, in.Secret)
+	saved, err := cl.PutProviderWithKeys(ctx, p, in.ExpectedRevision, in.Secret, keys)
 	if err != nil {
 		r.Problem = problem(err, true)
 		return r

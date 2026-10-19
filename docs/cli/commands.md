@@ -85,7 +85,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `provider balance` / `key-quota` | 分别读取远端账户余额、Key 额度 | 核心在线；平台已配置、当前 revision；按平台提供授权 |
 | `provider usage-records` / `effective-rate` | 读取远端逐请求账单／当前分组倍率 | 核心在线；当前 revision；部分平台需用户授权和站点 Key ID |
 | `provider models` | 手动读取已存供应商的上游模型目录 | 核心在线；供应商 ID 与当前 revision |
-| `provider add` | 新增供应商 | 所选 Context 的核心在线 |
+| `provider add` | 新增供应商、多请求地址 | 所选 Context 的核心在线；多 Key 用 key-put 逐次添加，尚无 CLI 原子批量创建入口 |
 | `provider put` | 条件更新供应商 | 核心在线；当前 revision |
 | `provider workspace` | 查询 Key 状态、映射、用量与价格 | 核心在线；已存供应商 |
 | `provider delete` / `rename` / `copy` | 删除、改名、复制供应商 | 核心在线；当前 revision；删除/改名须 approve |
@@ -260,7 +260,9 @@ anchor provider put --id ID --base-url URL [--base-url URL ...] [--homepage-url 
 | `--revision` | `0` | add 必须为 0；put 必填当前值且 ≥1，通过 list 获取 |
 | `--secret-stdin` | `false` | 从 stdin 读取密钥，最多 8192 字节，去除首尾空白；内部换行无效 |
 
-更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商，省略 `--homepage-url` 会清除主页，`--base-url` 列表整体替换。供应商倍率也是例外：省略 `--cost-multiplier` 保留既有值，新建默认1。密钥是例外：put 未提供 `--secret-stdin` 保留 default Key，提供并读到空值会清除 default Key，并按下方 key-delete 规则清理对应模型来源；其他命名 Key 保留。has_secret 表示至少存在一个已存 Key，不等于全部启用。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
+更新为**完整配置替换**，不是字段合并：省略的普通字段回到表中默认值，例如未提供 `--disabled` 会启用供应商，省略 `--homepage-url` 会清除主页，`--base-url` 列表整体替换。供应商倍率也是例外：省略 `--cost-multiplier` 保留既有值，新建默认1。密钥是例外：put 未提供 `--secret-stdin` 保留 default Key，提供并读到空值会清除 default Key，并按下方 key-delete 规则清理对应模型来源；其他命名 Key 保留。has_secret 表示至少存在一个已存 Key，不等于全部启用；当前源码修复 list／单项读取仅统计 default 的偏差，只有命名 Key 时也返回 true。成功保存 revision 加一；重复创建或旧 revision 冲突失败。失败不输出密钥。
+
+桌面新增表单可用 create-only initial_keys 在一次事务内创建多个 Key；CLI 等价配置步骤仍为 `provider add`（重复 `--base-url` 可填写多个域名／IP）→ 每次用最新 revision 执行 `provider key-put --secret-stdin`。CLI 这些步骤不是整体原子操作，后续 Key 失败不会回滚已成功配置；未新增批量秘密输入参数，避免冒充已支持。编辑地址用现有 `provider put --base-url ... --revision N`，不传秘密即保留全部 Key。
 
 安全输入示例（变量须由用户安全提供；URL 为占位值）：
 
