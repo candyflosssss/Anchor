@@ -74,7 +74,7 @@ export function validateDraft(draft: ProviderDraft): FieldErrors {
   const cost = Number(draft.costMultiplier);
   if (!draft.costMultiplier.trim() || !Number.isFinite(cost) || cost < 0.000001 || cost > 1000) errors.costMultiplier = '请输入 0.000001–1000 的倍率。';
   const secret = draft.secret.trim();
-  if (draft.secretMode === 'replace' && (!secret || /[\r\n]/.test(secret) || new TextEncoder().encode(secret).length > 8192)) errors.secret = '替换密钥须非空、无内部换行，且不超过 8192 字节。';
+  if ((draft.secretMode === 'replace' || !!secret) && (!secret || /[\r\n]/.test(secret) || new TextEncoder().encode(secret).length > 8192)) errors.secret = `${draft.secretMode === 'replace' ? '替换密钥' : 'API Key '}须非空、无内部换行，且不超过 8192 字节。`;
   if (draft.secretMode === 'clear' && !draft.confirmClear) errors.secret = '请确认清除密钥的影响。';
   return errors;
 }
@@ -97,7 +97,7 @@ export function toSave(draft: ProviderDraft, source?: Provider): SaveProvider {
       cost_multiplier: +draft.costMultiplier, timeout_seconds: +draft.timeout, max_concurrent: +draft.concurrent,
       revision: expected_revision, has_secret: source?.has_secret ?? false },
     expected_revision,
-    secret: !source || draft.secretMode === 'keep' ? null : draft.secretMode === 'clear' ? '' : draft.secret.trim(),
+    secret: !source ? draft.secret.trim() || null : draft.secretMode === 'keep' ? null : draft.secretMode === 'clear' ? '' : draft.secret.trim(),
   };
 }
 export function isDirty(draft: ProviderDraft, source?: Provider): boolean {

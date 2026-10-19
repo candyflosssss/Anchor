@@ -9,7 +9,7 @@ import './provider-catalog.css';
 
 const pageSize = 8;
 
-export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController; w: Workspace; disabled: boolean }) {
+export function ProviderCatalogView({ c, w, disabled, setup = false }: { c: ProviderController; w: Workspace; disabled: boolean; setup?: boolean }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
   const [page, setPage] = useState(0);
@@ -79,7 +79,7 @@ export function ProviderCatalogView({ c, w, disabled }: { c: ProviderController;
                 </select> : <span className="cell-hint">无需 Key 协议配置</span>}
               </div>;
             }) : <span className="cell-hint">暂无 Key 信息</span>}</div>
-            <div className="catalog-model-action">{mapped.has(id) ? <span className="catalog-mapped"><Check aria-hidden="true" />已映射</span> : <><Button size="sm" variant="outline" disabled={disabled || c.features.needsRead || !importPlan.ready.includes(id)} aria-label={`快速导入 ${id}`} onClick={() => void c.features.importModels([id])}><Plus />快速导入</Button><Button size="sm" variant="ghost" disabled={disabled || c.features.needsRead} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}>自定义</Button>{importPlan.manual.includes(id) && <span className="cell-hint">需自定义别名</span>}</>}</div>
+            <div className="catalog-model-action">{mapped.has(id) ? <span className="catalog-mapped"><Check aria-hidden="true" />已映射</span> : <><Button size="sm" variant="outline" disabled={disabled || c.features.needsRead || !importPlan.ready.includes(id)} aria-label={`快速导入 ${id}`} onClick={() => void c.features.importModels([id])}><Plus />快速导入</Button>{!setup && <Button size="sm" variant="ghost" disabled={disabled || c.features.needsRead} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}>自定义</Button>}{importPlan.manual.includes(id) && <span className="cell-hint">需自定义别名</span>}</>}</div>
           </li>;
         })}</ul>
       </div> : <div className="catalog-empty"><Search aria-hidden="true" /><strong>没有匹配的模型</strong><p>试试其他名称，或清除筛选条件。</p><Button variant="outline" size="sm" onClick={() => { setQuery(''); setFilter('all'); setPage(0); }}>清除目录筛选</Button></div>}

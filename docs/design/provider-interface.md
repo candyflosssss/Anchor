@@ -1,6 +1,6 @@
 # 供应商桌面接口语义
 
-- 更新：2026-10-13；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
+- 更新：2026-10-19；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
 - 状态：真实 Go 桥接、桌面传输和共享契约已实现；隔离核心读写已测试，**不等于 Wails 原生窗口或安装验收通过**。
 - 桌面 DTO 权威：`internal/desktop/contract.go`；TypeScript 由 `go run ./cmd/desktop-contract` 生成，漂移由 Go 测试检查。核心业务规则仍归 `internal/state` / `internal/core`，不复制到宿主。
 - 受限方法、窗口／核心生命周期与构建边界见[桌面运行契约](desktop-runtime.md)。
@@ -17,7 +17,7 @@ Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_
 
 - 返回 revision 范围 1..Number.MAX_SAFE_INTEGER；请求 expected_revision 为 0..MAX_SAFE_INTEGER-1，且与输入 provider.revision 一致，防止更新后超出 JS 安全整数范围。
 - 超时单位为秒，1..3600；并发为 1..64。前端即时校验只帮助填写，核心仍做最终业务校验。
-- 新增供应商不填 Key，创建时固定发送 secret=null；Key 在详情中添加。编辑时 secret=null 保留 default Key、空字符串清除 default Key、非空替换 default Key；命名 Key 不受影响；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空表单，失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
+- 新增供应商可选填写 Key：留空发送 secret=null，非空随供应商原子保存为 default Key；填写后保存成功使用返回的 revision 显式查询目录，并在同一弹窗快速／全部导入模型。目录失败保留已保存供应商，可重试查询或修改配置／Key；不重放创建请求。自定义别名仍在详情中处理。编辑时 secret=null 保留 default Key、空字符串清除 default Key、非空替换 default Key；命名 Key 不受影响；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空表单，失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
 - 保存成功返回新 revision，不表示供应商连通性已经验证。
 
 ## 2. 查询、写入与错误

@@ -43,7 +43,7 @@ test('new provider validates fields, handles Chinese ID and never persists secre
   await page.getByLabel('API 根地址', { exact: true }).fill('https://new.example.com/v1');
   await page.getByRole('button', { name: '添加请求地址' }).click();
   await page.getByLabel('API 根地址 2', { exact: true }).fill('https://new2.example.com/v1');
-  await expect(dialog.getByText('默认 API 密钥')).toHaveCount(0);
+  await expect(dialog.getByLabel('API Key（可选）')).toBeVisible();
   await expect(dialog.getByText('初始 Key 默认协议')).toHaveCount(0);
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).dblclick();
   await expect(dialog).toBeHidden();
@@ -143,7 +143,7 @@ test('unknown write locks mutations until explicit reread; no success toast', as
   await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByRole('alert')).toContainText('写入结果未知');
   await expect(page.getByRole('button', { name: '添加供应商', exact: true })).toBeDisabled();
-  await expect(page.getByRole('status')).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: '摸鱼AI 的配置已保存' })).toHaveCount(0);
   await page.getByRole('button', { name: '重新读取配置', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();

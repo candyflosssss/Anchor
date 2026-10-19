@@ -17,7 +17,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
-  const [editor, setEditor] = useState<{ source?: Provider; draft: ProviderDraft } | null>(null);
+  const [editor, setEditor] = useState<{ source?: Provider; draft: ProviderDraft; setup?: boolean; models?: boolean } | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [busy, setBusy] = useState(false);
   const [toggle, setToggle] = useState<Provider | null>(null);
@@ -84,7 +84,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     });
   }
   function closeEditor() {
-    if (locked.current) return;
+    if (locked.current || features.isBusy() || account.isBusy()) return;
     // Cancel / close / Escape always discard the draft directly, without a second prompt.
     setEditor(null); setErrors({});
   }
@@ -99,17 +99,24 @@ export function useProviderController(environment: ProviderEnvironment) {
     const epoch = generation.current;
     // Snapshot only for the transport call; erase the secret from the visible form immediately.
     const input = toSave(draft, source);
+    const setup = !toggling && (editor?.setup || (!source && !!input.secret));
     setEditor(old => old && { ...old, draft: { ...old.draft, secret: '' } });
     try {
       const saved = await transport.save(input, abort.signal);
+      input.secret = null;
       if (abort.signal.aborted || epoch !== generation.current) return;
       clearModels();
       setProviders(old => [...old.filter(p => p.id !== saved.id), saved]);
       if (!source) { setSelectedId(saved.id); setDetailTab('overview'); setDialog(null); }
-      setEditor(null); setToggle(null);
+      setEditor(setup ? { source: saved, draft: newDraft(saved), setup: true, models: true } : null); setToggle(null);
       // Reconcile newly created providers with the authoritative list automatically.
       if (!source) await load(saved.id);
       if (abort.signal.aborted || epoch !== generation.current) return;
+      if (setup) {
+        setDetailTab('models');
+        await fetchModels(saved);
+        return;
+      }
       setNotice(`${mock ? '演示：' : ''}${saved.id} 的配置已${toggling ? saved.enabled ? '启用' : '停用' : '保存'}（revision ${saved.revision}）。未测试上游连通性。`);
     } catch (error) {
       if (abort.signal.aborted || epoch !== generation.current) return;
@@ -123,8 +130,11 @@ export function useProviderController(environment: ProviderEnvironment) {
     }
   }
   async function discoverModels() {
-    if (!selected || blocked || locked.current || (features.isBusy() || account.isBusy()) || editor || toggle) return;
-    const target = { provider_id: selected.id, expected_revision: selected.revision, key_id: '' };
+    if (!selected || blocked || locked.current || (features.isBusy() || account.isBusy()) || (editor && !editor.models) || toggle) return;
+    await fetchModels(selected);
+  }
+  async function fetchModels(provider: Provider) {
+    const target = { provider_id: provider.id, expected_revision: provider.revision, key_id: '' };
     clearModels(); locked.current = true; setModelsBusy(true);
     const abort = new AbortController(); catalogQuery.current = abort;
     const epoch = catalogEpoch.current;
@@ -141,6 +151,11 @@ export function useProviderController(environment: ProviderEnvironment) {
     } finally {
       if (epoch === catalogEpoch.current) { catalogQuery.current = null; locked.current = false; setModelsBusy(false); }
     }
+  }
+  function editSetup() {
+    if (!selected || locked.current || features.isBusy() || account.isBusy()) return;
+    setProblem(null); setErrors({});
+    setEditor({ source: selected, draft: newDraft(selected), setup: true });
   }
   async function reloadFromEditor() {
     // Deliberate, labeled discard action: user has already been told their draft is lost.
@@ -177,7 +192,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     mock, providers, visible, selected, selectedId, phase, problem, problemMessage: problem ? problemText[problem] : '',
     notice, search, setSearch, filter, setFilter, editor, errors, busy: busy || modelsBusy || features.busy || account.busy, blocked: blocked || features.busy || account.busy, toggle, scenario,
     models: models?.provider_id === selected?.id ? models : null,
-    modelsProblem, modelsBusy, discoverModels,
+    modelsProblem, modelsBusy, discoverModels, editSetup,
     detailTab, setDetailTab, dialog, openProvider,
     openDialog: (next: ProviderDialog) => { if (!(features.isBusy() || account.isBusy()) && !locked.current) setDialog(next); },
     closeDialog: () => { if (!(features.isBusy() || account.isBusy())) { setDialog(null); setQuickId(null); } },

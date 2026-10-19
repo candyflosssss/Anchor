@@ -17,6 +17,8 @@ describe('draft conversion aligned to current provider DTO', () => {
   });
   it('maps create / replace / clear / keep without masked placeholders', () => {
     expect(toSave(valid()).expected_revision).toBe(0);
+    expect(toSave(valid()).secret).toBeNull();
+    expect(toSave({ ...valid(), secret: '  synthetic-create-key  ' }).secret).toBe('synthetic-create-key');
     expect(toSave({ ...newDraft(source), secretMode: 'replace', secret: '  test-only  ' }, source).secret).toBe('test-only');
     expect(toSave({ ...newDraft(source), secretMode: 'clear', confirmClear: true }, source).secret).toBe('');
     expect(toSave(newDraft(source), source).secret).toBeNull();
@@ -46,9 +48,9 @@ describe('immediate field feedback, not replacement backend validation', () => {
     expect(validateDraft({ ...valid(), homepage_url: 'http://www.example.com' }).homepage_url).toBeUndefined();
     expect(validateDraft({ ...valid(), homepage_url: 'ftp://example.com' }).homepage_url).toBeDefined();
   });
-  it('creates providers without a key and without a provider protocol', () => {
-    const saved = toSave({ ...valid(), secretMode: 'replace', secret: 'ignored' });
-    expect(saved.secret).toBeNull(); expect(saved.provider).not.toHaveProperty('protocol');
+  it('creates providers with an optional Key and without a provider protocol', () => {
+    const saved = toSave({ ...valid(), secretMode: 'replace', secret: 'synthetic-create-key' });
+    expect(saved.secret).toBe('synthetic-create-key'); expect(saved.provider).not.toHaveProperty('protocol');
     expect(saved.provider.base_urls).toEqual(['https://api.example.com/v1']);
   });
   it('checks timeout and concurrency limits including blank and decimals', () => {
@@ -99,6 +101,15 @@ describe('mock is isolated, revision-aware and never retains secrets', () => {
   });
 });
 
+
+describe('optional creation Key', () => {
+  it('validates entered Keys even without the edit-only replace mode', () => {
+    expect(validateDraft({ ...valid(), secret: 'synthetic-create-key' })).toEqual({});
+    expect(validateDraft({ ...valid(), secret: 'first\nsecond' }).secret).toBeDefined();
+    expect(validateDraft({ ...valid(), secret: 'x'.repeat(8193) }).secret).toBeDefined();
+    expect(validateDraft({ ...valid(), secret: '密'.repeat(2731) }).secret).toBeDefined();
+  });
+});
 
 describe('provider recharge cost factor', () => {
   it('defaults to 1 and saves a 1:2 recharge as 0.5', () => {

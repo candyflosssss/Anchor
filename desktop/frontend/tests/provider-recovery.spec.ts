@@ -33,7 +33,7 @@ test('reread resolves an unknown Key reset without a provider revision bump', as
   await page.getByRole('button', { name: '恢复 Key primary', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: '确认变更', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('写入结果未知');
-  await page.getByRole('button', { name: '重新读取', exact: true }).click();
+  await page.getByRole('alert').getByRole('button', { name: '重新读取', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByLabel('Key 调度策略')).toBeEnabled();
   await expect(page.getByRole('button', { name: '恢复 Key primary', exact: true })).toHaveCount(0);
@@ -54,7 +54,7 @@ test('reread checks an unknown saved strategy and the next write uses the latest
   await openKeys(page, 'unknown');
   await page.getByLabel('Key 调度策略').selectOption('priority');
   await expect(page.getByRole('alert')).toContainText('写入结果未知');
-  await page.getByRole('button', { name: '重新读取', exact: true }).click();
+  await page.getByRole('alert').getByRole('button', { name: '重新读取', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByLabel('Key 调度策略')).toBeEnabled();
   await expect(page.getByLabel('Key 调度策略')).toHaveValue('priority');
@@ -86,7 +86,7 @@ test('a failed detail reread retains the write lock and another reread can recov
   await page.getByLabel('Key 调度策略').selectOption('priority');
   await expect(page.getByLabel('Key 调度策略')).toHaveValue('round-robin');
   await expect(page.getByRole('alert')).toContainText('读取详情失败');
-  await page.getByRole('button', { name: '重新读取', exact: true }).click();
+  await page.getByRole('alert').getByRole('button', { name: '重新读取', exact: true }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByLabel('Key 调度策略')).toBeEnabled();
   await page.getByLabel('Key 调度策略').selectOption('priority');

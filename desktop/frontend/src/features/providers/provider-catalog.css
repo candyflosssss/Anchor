@@ -57,3 +57,6 @@
 
 .catalog-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .catalog-import-status { margin-top: 12px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+
+.dialog-content.provider-setup-dialog { width: min(1040px, calc(100vw - 32px)); }
+.provider-setup-dialog .editor-fields { min-width: 0; }
