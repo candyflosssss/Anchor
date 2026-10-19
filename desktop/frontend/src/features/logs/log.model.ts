@@ -1,3 +1,5 @@
+import type { ReferenceCost } from '../../desktop/contract.generated';
+import { referenceUSD } from './log-reference-cost.model';
 import { accelerationSummary, tierSnapshot } from './log-service-tier.model';
 import type { Query } from '../../desktop/contract.generated';
 export type LogDimension = 'agent' | 'binding' | 'project' | 'session';
@@ -5,10 +7,12 @@ export const dimensionLabels: Record<LogDimension, string> = { agent: 'Agent', b
 export type LogStatus = 'succeeded' | 'failed' | 'cancelled' | 'interrupted' | 'pending';
 export type LogSource = 'proxy' | 'probe';
 export interface LogAttempt {
+  referenceUSD?: string | null;
   number: number; provider: string; key: string; model: string; protocol: string;
   http: number | null; input?: number | null; output?: number | null; elapsed: number; outcome: string; code?: string; note: string;
 }
 export interface RequestLog {
+  referenceCost?: ReferenceCost | null;
   agent?: string; binding?: string; project?: string; session?: string;
   id: string; ageMinutes: number; time: string; status: LogStatus; source: LogSource;
   model: string; upstreamModel?: string; attemptCount?: number; attemptsTruncated?: boolean; protocol: string; elapsed: number | null; http: number | null;
@@ -43,7 +47,7 @@ export function filterRequests(rows: RequestLog[], filters: LogFilters): Request
 export function safeSummary(row: RequestLog): string {
   return ['Anchor 日志', `request_id: ${row.id}`, `结果: ${statusLabels[row.status]} · ${row.summary}`,
     ...(Object.keys(dimensionLabels) as LogDimension[]).map(key => `${dimensionLabels[key]}: ${row[key] || '未识别'}`),
-    `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
+    `参考费用: ${row.referenceCost && row.referenceCost.usd == null ? '未知' : referenceUSD(row.referenceCost?.usd)}`, `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
     `请求档位: ${serviceTierLabel(row.evidence.requested_service_tier, true)} · 原始值 ${tierSnapshot(row.evidence, 'requested').raw}`,
     `发送档位（最后候选）: ${tierSnapshot(row.evidence, 'sent').raw}`,
     `加速状态（上游报告）: ${accelerationSummary(row.evidence).label} · ${accelerationSummary(row.evidence).tier.label}`,

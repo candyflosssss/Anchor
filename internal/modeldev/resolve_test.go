@@ -101,3 +101,31 @@ func TestResolveDownloadedCatalogDefaults(t *testing.T) {
 		t.Logf("%s: context=%d output=%d", id, *m.Limits.Context, *m.Limits.Output)
 	}
 }
+
+func TestResolveCachedDoesNotFetchAndPreservesSnapshot(t *testing.T) {
+	calls := 0
+	c := NewWithTransport(resolveTransport(func(*http.Request) (*http.Response, error) {
+		calls++
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"p":{"models":{"m":{"cost":{"input":1,"output":2}}}}}`)), Header: make(http.Header)}, nil
+	}))
+	defer c.Close()
+	if _, err := c.ResolveCached("m"); !errors.Is(err, ErrUnavailable) || calls != 0 {
+		t.Fatal(err, calls)
+	}
+	if _, err := c.Resolve(t.Context(), "m"); err != nil {
+		t.Fatal(err)
+	}
+	m, err := c.ResolveCached("m")
+	if err != nil {
+		t.Fatal(err)
+	}
+	*m.Models[0].Pricing.Rates.Input = "99"
+	again, err := c.ResolveCached("m")
+	if err != nil || calls != 1 || *again.Models[0].Pricing.Rates.Input != "1" {
+		t.Fatal(again, err, calls)
+	}
+	c.now = func() time.Time { return time.Now().Add(2 * CacheTTL) }
+	if _, err := c.ResolveCached("m"); !errors.Is(err, ErrUnavailable) || calls != 1 {
+		t.Fatal("cached lookup fetched expired catalog", err, calls)
+	}
+}

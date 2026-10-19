@@ -17,6 +17,7 @@ type requestTrace struct {
 	row          logbook.Request
 	start        time.Time
 	unknownUsage bool
+	unknownCost  bool
 	written      int64
 	writeFailed  bool
 }
@@ -129,11 +130,12 @@ func (w *logResponseWriter) logFailure(code string) {
 	w.trace.row.Status = "failed"
 	w.trace.row.Code = code
 }
-func observeRequest(r *http.Request, model string, stream bool, raw map[string]json.RawMessage, revision int64) {
+func (s *Server) observeRequest(r *http.Request, model string, stream bool, raw map[string]json.RawMessage, mapping state.Model) {
 	if t := trace(r); t != nil {
 		t.row.Model = model
 		t.row.Stream = &stream
-		t.row.Revision = revision
+		t.row.Revision = mapping.Revision
+		t.row.ReferenceCost = s.logReference(mapping)
 		t.row.ReasoningObserved = raw["reasoning"] == nil
 		if reasoning, ok := raw["reasoning"]; ok {
 			var fields map[string]json.RawMessage
@@ -206,6 +208,7 @@ func (t *requestTrace) addAttempt(a logbook.Attempt, u protocol.Usage) {
 	if t == nil {
 		return
 	}
+	t.priceAttempt(&a, u)
 	t.row.AttemptCount++
 	if len(t.row.Attempts) < 64 {
 		t.row.Attempts = append(t.row.Attempts, a)

@@ -123,6 +123,7 @@ type Price = catalog.Price
 type Estimate = catalog.Estimate
 
 // Logging DTOs use the canonical body-free core contract.
+type LogReferenceCost = logbook.ReferenceCost
 type LogMetrics = logbook.Metrics
 type LogAttempt = logbook.Attempt
 type RequestLog = logbook.Request

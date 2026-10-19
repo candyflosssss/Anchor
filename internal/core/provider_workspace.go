@@ -342,6 +342,7 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	callerCtx := ctx
 	stream := notify != nil
 	row := logbook.Request{ID: id, StartedAtMS: start.UnixMilli(), Status: "pending", Source: "probe", ReasoningObserved: true, Stream: &stream, UpstreamModel: model, Model: model, Protocol: p.Protocol, Provider: p.ID, Key: key.ID, Revision: p.Revision, Delivery: "none", Stage: "route", Attempts: []logbook.Attempt{}, Evidence: map[string]string{"sent_service_tier": "not_sent", "fast_triggered": "unknown"}}
+	row.ReferenceCost = s.cachedLogReference(model)
 	if reasoningEffort != "" {
 		row.ReasoningEffort = &reasoningEffort
 	}
@@ -392,6 +393,10 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 				a.Output = &u.Output
 				row.Input = &u.Input
 				row.Output = &u.Output
+			}
+			if row.ReferenceCost != nil {
+				row.ReferenceCost.USD, row.ReferenceCost.Reason = estimateLogAttempt(row.ReferenceCost, u)
+				a.ReferenceUSD = row.ReferenceCost.USD
 			}
 			row.Attempts = []logbook.Attempt{a}
 			if u.CacheReadKnown {

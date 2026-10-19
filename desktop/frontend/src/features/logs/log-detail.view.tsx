@@ -1,3 +1,5 @@
+import { referenceUSD } from './log-reference-cost.model';
+import { ReferenceCostDetail } from './log-reference-cost.view';
 import { useRef } from 'react';
 import { Copy } from 'lucide-react';
 import { Button } from '../../components/ui/button';
@@ -15,6 +17,7 @@ export function RequestDetail({ row, onClose, onCopy, notice }: { row: RequestLo
     {row && <><SheetHeader><SheetTitle>请求详情</SheetTitle><div className="flex justify-between gap-2 text-sm"><span>{statusLabels[row.status]} · {sourceLabels[row.source]}</span><Button variant="outline" size="sm" onClick={() => onCopy(row)}><Copy size={13} />复制</Button></div></SheetHeader>
       <div className="log-detail-body">{notice && <p role="status">{notice}</p>}
         <section><h3 className="log-section-title">请求</h3><dl className="log-properties">{logColumns.map(col => <div key={col.id}><dt>{col.label}</dt><dd><ColumnValue id={col.id} row={row} /></dd></div>)}</dl></section>
+        {row.referenceCost && <ReferenceCostDetail cost={row.referenceCost} />}
         <section aria-label="请求归属"><h3 className="log-section-title">请求归属</h3><dl className="log-properties">
           {(Object.keys(dimensionLabels) as LogDimension[]).map(key => <div key={key}><dt>{dimensionLabels[key]}</dt><dd className="mono">{row[key] || '未识别'}</dd></div>)}
         </dl></section>
@@ -24,7 +27,7 @@ export function RequestDetail({ row, onClose, onCopy, notice }: { row: RequestLo
           <div><dt>上游返回档位（最后候选）</dt><dd><TierValue tier={tierSnapshot(row.evidence, 'upstream')} /></dd></div>
         </dl></section>
         <section aria-label="尝试时间线"><h3 className="log-section-title">尝试时间线 · {row.attemptCount ?? row.attempts.length}</h3>
-          {row.attempts.length === 0 ? <p>暂无尝试</p> : <ol className="log-timeline">{row.attempts.map(a => <li key={a.number}><span className="log-attempt-dot">{a.number}</span><dl className="log-properties log-attempt-card">{Object.entries({ '供应商':a.provider, Key:a.key, '模型':a.model, '协议':a.protocol, HTTP:a.http ?? '未知', '耗时':`${a.elapsed} ms`, '输入 Token':a.input ?? '未知', '输出 Token':a.output ?? '未知', '结果':a.outcome, '错误码':a.code ?? '—', '阶段':a.note }).map(([k,v]) => <div key={k}><dt>{k}</dt><dd className="mono">{v}</dd></div>)}</dl></li>)}</ol>}
+          {row.attempts.length === 0 ? <p>暂无尝试</p> : <ol className="log-timeline">{row.attempts.map(a => <li key={a.number}><span className="log-attempt-dot">{a.number}</span><dl className="log-properties log-attempt-card">{Object.entries({ '供应商':a.provider, Key:a.key, '模型':a.model, '协议':a.protocol, HTTP:a.http ?? '未知', '耗时':`${a.elapsed} ms`, '输入 Token':a.input ?? '未知', '输出 Token':a.output ?? '未知', '参考费用': a.referenceUSD == null ? row.referenceCost ? '未知' : '—' : referenceUSD(a.referenceUSD), '结果':a.outcome, '错误码':a.code ?? '—', '阶段':a.note }).map(([k,v]) => <div key={k}><dt>{k}</dt><dd className="mono">{v}</dd></div>)}</dl></li>)}</ol>}
           {row.attemptsTruncated && <p role="status">尝试明细已截断</p>}
         </section>
         <section><h3 className="log-section-title">结构诊断</h3><dl className="log-properties">{Object.entries(row.evidence).map(([k,v]) => <div key={k}><dt>{k}</dt><dd>{String(v)}</dd></div>)}</dl></section>

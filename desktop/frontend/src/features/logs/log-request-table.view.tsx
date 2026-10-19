@@ -1,3 +1,4 @@
+import { referenceUSD } from './log-reference-cost.model';
 import { ArrowDownToLine, ArrowUpFromLine, BrainCircuit, ChevronRight, Clock3, Database, Gauge, Timer, type LucideIcon } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
@@ -18,6 +19,7 @@ function Metric({ label, value, tone, icon: Icon, detail }: { label: string; val
 }
 export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
   switch (id) {
+    case 'referenceCost': return <span className="mono">{row.referenceCost ? row.referenceCost.usd == null ? '未知' : referenceUSD(row.referenceCost.usd) : '—'}</span>;
     case 'sentTier': return <SentTier row={row} />;
     case 'acceleration': return <Acceleration row={row} />;
     case 'time': return <div className="log-time"><span className="mono">{row.time}</span><small>{row.ageMinutes} 分钟前</small></div>;

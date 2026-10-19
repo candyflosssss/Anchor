@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-18
+- 最近核对：2026-10-19
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
@@ -94,7 +94,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `provider price-put` / `price-import` | 保存单价 / models.dev 预览 | 核心在线；当前 revision；导入不自动保存 |
 | `logs stats` | 请求趋势全范围聚合（用量／TPS／错误率／缓存／耗时） | 所选 Context 核心在线且支持 stats 接口；desktop.42 宿主／核心已发布，命令使用兼容源码 CLI，alpha.6 不含 |
 | `logs suggestions` | 日志筛选／搜索候选值与出现次数 | 所选 Context 核心在线；当前源码新增，需兼容 CLI／核心，未发布 |
-| `logs list` | 结构化日志分页/筛选 | 所选 Context 核心在线，支持日志接口 |
+| `logs list` | 结构化日志分页/筛选及逐请求参考费用 | 所选 Context 核心在线，支持日志接口 |
 | `logs detail REQUEST_ID` | 完整安全请求详情 | 对应记录仍在保留期 |
 | `logs follow` | 每 2 秒输出日志页快照 | 核心在线；可重复更新记录 |
 | `logs export` | 流式 JSONL 导出 | 核心在线；最多 200,000 条/2 分钟 |
@@ -855,6 +855,10 @@ values 的 requests 包括 pending/cancelled；completed=succeeded+failed+interr
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts 及其他 evidence 大字段，仅保留下述五项档位证据，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 
+2026-10-19 当前源码（未打包发布）：`logs list/detail/follow/export` 的请求记录新增可选 `reference_cost`，包含 `usd`（可空十进制字符串）、`currency=USD`、`basis=text_tokens`、未能计算时的 `reason`，以及价格来源、参考模型、目录版本、获取时间、陈旧标识和完整 `pricing` 快照。`detail/export` 的每次尝试新增可选 `reference_usd`。按每次尝试分别处理缓存、思考和长上下文分档，再合计根请求；任一次用量或所需单价不完整时总价为 null，明确免费为字符串零。无参考价格及旧日志不添加快照，不以当前价格回填历史。
+
+优先使用请求时模型映射保存的参考快照；没有快照时，仅使用核心内已缓存、仍有效且所有候选精确匹配同一参考模型的目录。推理测试按实际上游模型匹配同一缓存。请求日志计价不获取或刷新网络目录；冷缓存、未知／歧义模型以及未显式选择参考价的加速映射不猜价。参考费用只估算文本 Token，不包含平台倍率、加速附加费或实际账单。命令和参数不变，须升级实际处理请求的核心才会采集新字段；`logs stats` 本轮不新增费用汇总。
+
 2026-10-16 增量（已随 desktop.41 dev 宿主／核心发布；独立公开 alpha.6 CLI 不含此增量）：代理及推理测试的 `logs list` / `logs follow` 在已有 `evidence` 字典中保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`。`logs detail REQUEST_ID` 与 `logs export` 仍返回完整安全证据，还包括入站 `requested_service_tier` / `requested_service_tier_raw` 与固定映射策略。派发字段取协议转换后的实际请求体，未派发为 `not_sent`、无档位参数为 `unspecified`；上游未报告时返回档位缺省。`*_raw` 为 JSON 标量文本，保留未知短名称、空字符串、null、布尔和数字，不把任意值强行解析成档位。字符串最多 128 UTF-8 字节、序列化后最多 256 字节，抑制对象／数组、控制字符与可识别凭据，不保存请求／响应正文。
 
 规范化 `priority/fast` 代表 Fast、`ultrafast` 代表 Ultrafast、`default` 代表 Standard；其余保留已知 auto/flex/scale 或固定 `unknown`。`fast_triggered` 是字符串三态：上游明确报告 priority/fast/ultrafast 为 `true`、default/flex/scale 为 `false`，缺失／auto／未知为 `unknown`；只表示报告档位，不保证实际速度、计费或与请求完全匹配。SSE 以最后报告为准，切换候选清除旧快照；这些字段不是逐尝试历史。不改变请求或跨协议能力，不回填旧历史，无数据库迁移；命令参数与退出码不变，旧客户端可忽略新增 evidence 项。
@@ -905,7 +909,7 @@ anchor catalog estimate --provider PROVIDER_ID --model MODEL_ID \
   --cache-read-tokens 0 --cache-write-tokens 0 --reasoning-tokens 0
 ```
 
-这是能力默认值和日志参考价的共享基础。目前已提供核心、CLI、桌面桥接与前端 Model 方法；映射表单显式导入与模型参考快照已接入当前源码（§6）；日志逐请求比价及逐请求价格快照尚未接入。仅估算文本 token，不推断音视频、图像专用费、请求费、路由倍率、折扣或平台账单。详见[模型参考目录契约](../design/model-catalog.md)。
+这是能力默认值和日志参考价的共享基础。目前已提供核心、CLI、桌面桥接与前端 Model 方法；映射表单显式导入与模型参考快照已接入当前源码（§6）；2026-10-19 当前源码已接入日志逐请求参考费用与价格快照（§12，未打包发布）。仅估算文本 token，不推断音视频、图像专用费、请求费、路由倍率、折扣或平台账单。详见[模型参考目录契约](../design/model-catalog.md)。
 
 
 ## 14. Skill 中心库

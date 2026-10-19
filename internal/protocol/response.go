@@ -9,10 +9,10 @@ import (
 )
 
 type Usage struct {
-	Known                                bool
-	Input, Output, CacheRead, CacheWrite int64
-	CacheReadKnown, ReasoningKnown       bool
-	Reasoning                            int64
+	Known                                           bool
+	Input, Output, CacheRead, CacheWrite            int64
+	CacheReadKnown, CacheWriteKnown, ReasoningKnown bool
+	Reasoning                                       int64
 }
 
 func ReadUsage(m Object, p string) Usage {
@@ -29,10 +29,11 @@ func ReadUsage(m Object, p string) Usage {
 	if !hasIn || !hasOut {
 		return Usage{}
 	}
-	r := Usage{Known: hasIn && hasOut, Input: num(u[input]), Output: num(u[output])}
+	r := Usage{Known: hasIn && hasOut, Input: num(u[input]), Output: num(u[output]), CacheWriteKnown: p != "anthropic"}
 	if p == "anthropic" {
 		r.CacheRead = num(u["cache_read_input_tokens"])
 		r.CacheWrite = num(u["cache_creation_input_tokens"])
+		r.CacheWriteKnown = validToken(u["cache_creation_input_tokens"])
 		r.Input += r.CacheRead + r.CacheWrite
 	} else if p == "chat-completions" {
 		r.CacheRead = num(obj(u["prompt_tokens_details"])["cached_tokens"])

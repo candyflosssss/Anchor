@@ -862,6 +862,19 @@ export interface LogStatsResult {
   data: Stats | null;
   problem: Problem | null;
 }
+export interface ReferenceCost {
+  usd: string | null;
+  currency: string;
+  basis: string;
+  reason: string;
+  source: string;
+  provider_id: string;
+  model_id: string;
+  catalog_version: string;
+  fetched_at: number;
+  stale: boolean;
+  pricing: CatalogPricing | null;
+}
 export interface Metrics {
   output_generation_ms: number | null;
   non_reasoning_output_tokens: number | null;
@@ -875,6 +888,7 @@ export interface Metrics {
   reasoning_tokens: number | null;
 }
 export interface Attempt {
+  reference_usd?: string | null;
   number: number;
   provider: string;
   key: string;
@@ -889,6 +903,7 @@ export interface Attempt {
   output: number | null;
 }
 export interface Request {
+  reference_cost?: ReferenceCost | null;
   agent?: string;
   binding?: string;
   project?: string;

@@ -4,6 +4,8 @@ package logbook
 import (
 	"errors"
 	"time"
+
+	"github.com/candyflosssss/Anchor/internal/modeldev"
 )
 
 var ErrInvalid = errors.New("invalid log operation")
@@ -24,21 +26,39 @@ type Metrics struct {
 	CacheReadTokens          *int64 `json:"cache_read_tokens"`
 	ReasoningTokens          *int64 `json:"reasoning_tokens"`
 }
+
+// ReferenceCost captures the reference used by this request, never a bill.
+// USD is absent unless every dispatched attempt has a complete estimate.
+type ReferenceCost struct {
+	USD            *string                  `json:"usd"`
+	Currency       string                   `json:"currency"`
+	Basis          string                   `json:"basis"`
+	Reason         string                   `json:"reason"`
+	Source         string                   `json:"source"`
+	ProviderID     string                   `json:"provider_id"`
+	ModelID        string                   `json:"model_id"`
+	CatalogVersion string                   `json:"catalog_version"`
+	FetchedAt      int64                    `json:"fetched_at"`
+	Stale          bool                     `json:"stale"`
+	Pricing        *modeldev.CatalogPricing `json:"pricing"`
+}
 type Attempt struct {
-	Number    int    `json:"number"`
-	Provider  string `json:"provider"`
-	Key       string `json:"key"`
-	Model     string `json:"model"`
-	Protocol  string `json:"protocol"`
-	HTTP      *int   `json:"http"`
-	ElapsedMS int64  `json:"elapsed_ms"`
-	Outcome   string `json:"outcome"`
-	Code      string `json:"code"`
-	Stage     string `json:"stage"`
-	Input     *int64 `json:"input"`
-	Output    *int64 `json:"output"`
+	ReferenceUSD *string `json:"reference_usd,omitempty"`
+	Number       int     `json:"number"`
+	Provider     string  `json:"provider"`
+	Key          string  `json:"key"`
+	Model        string  `json:"model"`
+	Protocol     string  `json:"protocol"`
+	HTTP         *int    `json:"http"`
+	ElapsedMS    int64   `json:"elapsed_ms"`
+	Outcome      string  `json:"outcome"`
+	Code         string  `json:"code"`
+	Stage        string  `json:"stage"`
+	Input        *int64  `json:"input"`
+	Output       *int64  `json:"output"`
 }
 type Request struct {
+	ReferenceCost *ReferenceCost `json:"reference_cost,omitempty"`
 	// Agent and Binding come from authenticated enrollment, never caller labels.
 	Agent   string `json:"agent,omitempty"`
 	Binding string `json:"binding,omitempty"`

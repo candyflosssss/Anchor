@@ -12,6 +12,9 @@ it('shares canonical log fields and preserves missing versus zero', () => {
   const success = requestLog(fixture.page.requests[1] as Request);
   expect(success.metrics?.cacheReadTokens).toBe(0);
   expect(success.reasoningEffort).toBe('high');
+  expect(success.referenceCost?.usd).toBe('0.00123');
+  expect(success.attempts[0].referenceUSD).toBe('0.00123');
+  expect(failed.referenceCost).toBeUndefined();
   expect(outputTps(success)).toBeCloseTo(57.1429, 3);
   expect(outputTps(failed)).toBeNull();
 });

@@ -152,7 +152,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			t.row.Evidence["mapping_service_tier"] = model.ServiceTier
 		}
 	}
-	observeRequest(r, modelID, stream, request, model.Revision)
+	s.observeRequest(r, modelID, stream, request, model)
 	if s.logs != nil {
 		if t := trace(r); t != nil {
 			s.logs.Request(t.row)

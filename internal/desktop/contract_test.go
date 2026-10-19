@@ -162,6 +162,10 @@ func TestSharedLogContract(t *testing.T) {
 	if failed.Evidence["sent_service_tier"] != "unspecified" || failed.Evidence["upstream_service_tier_raw"] != `"priority"` || ok.Evidence["sent_service_tier_raw"] != `"ultrafast"` || ok.Evidence["upstream_service_tier_raw"] != `"ultrafast"` || ok.Evidence["fast_triggered"] != "true" {
 		t.Fatal("raw tier/acceleration contract drift")
 	}
+
+	if failed.ReferenceCost != nil || ok.ReferenceCost == nil || ok.ReferenceCost.USD == nil || *ok.ReferenceCost.USD != "0.00123" || len(ok.Attempts) != 1 || ok.Attempts[0].ReferenceUSD == nil || *ok.Attempts[0].ReferenceUSD != "0.00123" {
+		t.Fatal("reference cost null/decimal contract drift")
+	}
 	encoded, _ := json.Marshal(failed)
 	var keys map[string]any
 	json.Unmarshal(encoded, &keys)

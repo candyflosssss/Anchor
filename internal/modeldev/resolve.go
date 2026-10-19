@@ -15,6 +15,22 @@ func (c *Client) Resolve(ctx context.Context, id string) (ModelCatalog, error) {
 	if stale {
 		return ModelCatalog{}, ErrUnavailable
 	}
+	return resolveSnapshot(s, id)
+}
+
+// ResolveCached never fetches or waits for a catalog refresh on the proxy path.
+func (c *Client) ResolveCached(id string) (ModelCatalog, error) {
+	c.mu.Lock()
+	s := c.snapshot
+	usable := s != nil && !c.failed && c.now().Sub(s.fetched) < CacheTTL
+	c.mu.Unlock()
+	if !usable {
+		return ModelCatalog{}, ErrUnavailable
+	}
+	return resolveSnapshot(s, id)
+}
+
+func resolveSnapshot(s *snapshot, id string) (ModelCatalog, error) {
 	var matches, qualified, canonical []CatalogModel
 	for pid, p := range s.data {
 		for mid, m := range p.Models {

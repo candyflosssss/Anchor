@@ -141,9 +141,36 @@
             "code": "",
             "stage": "respond",
             "input": 12,
-            "output": 120
+            "output": 120,
+            "reference_usd": "0.00123"
           }
-        ]
+        ],
+        "reference_cost": {
+          "usd": "0.00123",
+          "currency": "USD",
+          "basis": "text_tokens",
+          "reason": "",
+          "source": "models.dev",
+          "provider_id": "fixture",
+          "model_id": "fixture-model",
+          "catalog_version": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "fetched_at": 1791849600,
+          "stale": false,
+          "pricing": {
+            "currency": "USD",
+            "unit": "per_million_tokens",
+            "rates": {
+              "input": "2.5",
+              "output": "10",
+              "cache_read": "0.25",
+              "cache_write": "3",
+              "reasoning": null,
+              "input_audio": null,
+              "output_audio": null
+            },
+            "tiers": []
+          }
+        }
       }
     ],
     "events": [],
