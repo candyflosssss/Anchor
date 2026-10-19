@@ -266,3 +266,13 @@
 .log-groups th button { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-align: left; color: hsl(var(--primary)); text-decoration: underline; text-underline-offset: 3px; }
 .log-groups th button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
 .log-group-status { font-size: 12px; color: hsl(var(--muted-foreground)); padding-top: 12px; }
+
+/* User-requested data tooltip: actual captured prices, not explanatory chrome. */
+.log-cost-trigger { border-bottom: 1px dotted hsl(var(--muted-foreground)); text-align: left; white-space: normal; overflow-wrap: anywhere; }
+.log-cost-trigger:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 4px; border-radius: 2px; }
+.log-cost-tooltip { width: min(620px, calc(100vw - 32px)); max-height: min(650px, calc(100vh - 48px)); overflow: auto; background: hsl(var(--popover)); color: hsl(var(--popover-foreground)); border: 1px solid hsl(var(--border)); box-shadow: 0 8px 24px #0002; padding: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.log-cost-breakdown { font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.log-cost-parts { display: grid; gap: 6px; margin: 10px 0; }
+.log-cost-part { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; padding: 6px 0; border-top: 1px solid hsl(var(--border)); }
+.log-cost-footnote { color: hsl(var(--muted-foreground)); }
+@media (max-width: 480px) { .log-cost-part { grid-template-columns: 1fr; } }

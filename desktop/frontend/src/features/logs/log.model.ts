@@ -1,5 +1,5 @@
-import type { ReferenceCost } from '../../desktop/contract.generated';
-import { referenceUSD } from './log-reference-cost.model';
+import type { CostAdjustment, ReferenceCost } from '../../desktop/contract.generated';
+import { adjustmentValue, costMultiplier, referenceUSD } from './log-reference-cost.model';
 import { accelerationSummary, tierSnapshot } from './log-service-tier.model';
 import type { Query } from '../../desktop/contract.generated';
 export type LogDimension = 'agent' | 'binding' | 'project' | 'session';
@@ -7,6 +7,7 @@ export const dimensionLabels: Record<LogDimension, string> = { agent: 'Agent', b
 export type LogStatus = 'succeeded' | 'failed' | 'cancelled' | 'interrupted' | 'pending';
 export type LogSource = 'proxy' | 'probe';
 export interface LogAttempt {
+  costAdjustment?: CostAdjustment | null;
   referenceUSD?: string | null;
   number: number; provider: string; key: string; model: string; protocol: string;
   http: number | null; input?: number | null; output?: number | null; elapsed: number; outcome: string; code?: string; note: string;
@@ -45,9 +46,12 @@ export function filterRequests(rows: RequestLog[], filters: LogFilters): Request
     && [row.id, row.model, row.provider, row.key, row.code ?? '', row.agent ?? '', row.binding ?? '', row.project ?? '', row.session ?? '', ...row.attempts.map(attempt => `${attempt.provider} ${attempt.model} ${attempt.key}`)].join(' ').toLowerCase().includes(query));
 }
 export function safeSummary(row: RequestLog): string {
+  const a = row.referenceCost?.adjustment;
+  const supplier = !row.referenceCost ? '—' : !a ? '未记录' : costMultiplier(a.supplier_multiplier, a.supplier_mixed);
+  const group = !row.referenceCost ? '—' : !a ? '未记录' : costMultiplier(a.group_multiplier, a.group_mixed);
   return ['Anchor 日志', `request_id: ${row.id}`, `结果: ${statusLabels[row.status]} · ${row.summary}`,
     ...(Object.keys(dimensionLabels) as LogDimension[]).map(key => `${dimensionLabels[key]}: ${row[key] || '未识别'}`),
-    `参考费用: ${row.referenceCost && row.referenceCost.usd == null ? '未知' : referenceUSD(row.referenceCost?.usd)}`, `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
+    `原始参考费用: ${row.referenceCost && row.referenceCost.usd == null ? '未知' : referenceUSD(row.referenceCost?.usd)}`, `供应商倍率: ${supplier}`, `分组倍率: ${group}`, `最终参考费用: ${row.referenceCost ? adjustmentValue(row.referenceCost.adjustment) : '—'}`, `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
     `请求档位: ${serviceTierLabel(row.evidence.requested_service_tier, true)} · 原始值 ${tierSnapshot(row.evidence, 'requested').raw}`,
     `发送档位（最后候选）: ${tierSnapshot(row.evidence, 'sent').raw}`,
     `加速状态（上游报告）: ${accelerationSummary(row.evidence).label} · ${accelerationSummary(row.evidence).tier.label}`,

@@ -74,7 +74,7 @@ test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard fo
   await openLogs(page);
   const list = page.getByRole('region', { name: '请求日志列表' });
   await expect(list.getByRole('row')).toHaveCount(3);
-  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '发送档位', '加速状态', '详情']);
+  await expect(list.getByRole('columnheader')).toHaveText(['时间', '结果与交付', '模型', '供应商 / Key', '耗时与速度', 'Token 用量', '原始参考费用', '供应商倍率', '分组倍率', '最终参考费用', '发送档位', '加速状态', '详情']);
   const success = list.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
   const timing = success.getByRole('cell').nth(4), tokens = success.getByRole('cell').nth(5);
   for (const label of ['总耗时', '首字', '输出', '总TPS']) await expect(timing.getByText(label, { exact: true })).toBeVisible();
@@ -686,5 +686,38 @@ test('collapsed trends keep errors and empty states out of the log list until ex
     await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toBeVisible();
     await toggle.click();
     await expect(trends.getByRole('status')).toHaveText(error ? '趋势读取失败' : '所选范围内暂无请求');
+  }
+});
+
+test('reference cost columns expose captured charging buckets on hover and keyboard focus', async ({ page }) => {
+  await openLogs(page);
+  const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: '查看请求 fixture_success' }) });
+  const list = page.getByRole('region', { name: '请求日志列表' });
+  for (const heading of ['原始参考费用', '供应商倍率', '分组倍率', '最终参考费用']) await expect(list.getByRole('columnheader', { name: heading, exact: true })).toBeVisible();
+  const trigger = row.getByRole('button', { name: '费用乘区明细：$0.000492', exact: true });
+  await trigger.hover();
+  const tip = page.getByRole('tooltip');
+  await expect(tip).toBeVisible();
+  for (const text of ['非缓存输入', '缓存读取', '缓存写入', '普通输出', '思考输出', '×0.5', '×0.8', 'USD / 百万 Token', '单价倍率', '$0.000492', '2026-10-19T00:00:00Z']) await expect(tip).toContainText(text);
+  await page.mouse.move(1, 1); await trigger.focus(); await expect(tip).toBeVisible();
+  await trigger.click(); await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.keyboard.press('Escape'); await expect(tip).toBeHidden(); await expect(trigger).toBeFocused();
+  await page.getByRole('button', { name: '深色', exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await trigger.scrollIntoViewIfNeeded();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await trigger.focus(); await expect(tip).toBeVisible();
+  const bounds = await tip.boundingBox();
+  expect(bounds).not.toBeNull(); expect(bounds!.x).toBeGreaterThanOrEqual(0); expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(391);
+  await page.keyboard.press('Escape');
+  await row.getByRole('button', { name: '查看请求 fixture_success' }).click();
+  const detail = page.getByRole('dialog');
+  await expect(detail.getByLabel('尝试时间线')).toContainText('最终参考费用');
+  await expect(detail.getByLabel('尝试时间线')).toContainText('×0.5');
+  await detail.getByRole('button', { name: '关闭请求详情', exact: true }).click();
+  await page.getByRole('button', { name: '查看请求 fixture_failed', exact: true }).click();
+  const unpriced = page.getByRole('dialog').getByLabel('尝试时间线');
+  for (const label of ['原始参考费用', '供应商倍率', '分组倍率', '最终参考费用']) {
+    await expect(unpriced.locator('dl > div').filter({ has: page.getByText(label, { exact: true }) }).locator('dd')).toHaveText('—');
   }
 });

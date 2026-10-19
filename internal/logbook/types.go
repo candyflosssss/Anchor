@@ -30,6 +30,7 @@ type Metrics struct {
 // ReferenceCost captures the reference used by this request, never a bill.
 // USD is absent unless every dispatched attempt has a complete estimate.
 type ReferenceCost struct {
+	Adjustment     *CostAdjustment          `json:"adjustment,omitempty"`
 	USD            *string                  `json:"usd"`
 	Currency       string                   `json:"currency"`
 	Basis          string                   `json:"basis"`
@@ -43,19 +44,20 @@ type ReferenceCost struct {
 	Pricing        *modeldev.CatalogPricing `json:"pricing"`
 }
 type Attempt struct {
-	ReferenceUSD *string `json:"reference_usd,omitempty"`
-	Number       int     `json:"number"`
-	Provider     string  `json:"provider"`
-	Key          string  `json:"key"`
-	Model        string  `json:"model"`
-	Protocol     string  `json:"protocol"`
-	HTTP         *int    `json:"http"`
-	ElapsedMS    int64   `json:"elapsed_ms"`
-	Outcome      string  `json:"outcome"`
-	Code         string  `json:"code"`
-	Stage        string  `json:"stage"`
-	Input        *int64  `json:"input"`
-	Output       *int64  `json:"output"`
+	CostAdjustment *CostAdjustment `json:"cost_adjustment,omitempty"`
+	ReferenceUSD   *string         `json:"reference_usd,omitempty"`
+	Number         int             `json:"number"`
+	Provider       string          `json:"provider"`
+	Key            string          `json:"key"`
+	Model          string          `json:"model"`
+	Protocol       string          `json:"protocol"`
+	HTTP           *int            `json:"http"`
+	ElapsedMS      int64           `json:"elapsed_ms"`
+	Outcome        string          `json:"outcome"`
+	Code           string          `json:"code"`
+	Stage          string          `json:"stage"`
+	Input          *int64          `json:"input"`
+	Output         *int64          `json:"output"`
 }
 type Request struct {
 	ReferenceCost *ReferenceCost `json:"reference_cost,omitempty"`

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cacheHitRate, defaultColumns, moveColumn, normalizeColumns, outputTps } from './log-columns.model';
+import { cacheHitRate, defaultColumns, moveColumn, normalizeColumns, migrateCostColumns, outputTps } from './log-columns.model';
 import { requestFixtures } from './log.mock';
 
 describe('log column preferences', () => {
@@ -79,4 +79,9 @@ describe('cache hit rate', () => {
     for (const attemptCount of [0, 2, 65]) expect(cacheHitRate({ ...row, attemptCount })).toBeNull();
     expect(cacheHitRate({ ...row, attemptCount: undefined, attempts: [] })).toBeNull();
   });
+});
+
+it('expands the old price column once while preserving deliberate v2 hidden columns', () => {
+  expect(normalizeColumns(migrateCostColumns(['time', 'referenceCost', 'model']))).toEqual(['time', 'originalCost', 'supplierMultiplier', 'groupMultiplier', 'referenceCost', 'model']);
+  expect(normalizeColumns(['referenceCost'])).toEqual(['referenceCost']);
 });

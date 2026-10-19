@@ -145,6 +145,14 @@ func (s *Store) Request(r Request) bool {
 		r.Attempts = []Attempt{}
 	}
 	raw, err := json.Marshal(r)
+	// Rich reference breakdowns may exceed the per-record budget on many retries.
+	// Preserve root totals and explicitly truncate attempt detail, never drop the
+	// entire request merely because its captured pricing snapshots grew.
+	for err == nil && len(raw) > MaxRequestSize && len(r.Attempts) > 0 && r.ReferenceCost != nil && r.ReferenceCost.Adjustment != nil {
+		r.Attempts = r.Attempts[:len(r.Attempts)-1]
+		r.AttemptsTruncated = true
+		raw, err = json.Marshal(r)
+	}
 	if err != nil || len(raw) > MaxRequestSize {
 		s.dropped.Add(1)
 		return false

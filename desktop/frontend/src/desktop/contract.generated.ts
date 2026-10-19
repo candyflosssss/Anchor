@@ -863,6 +863,7 @@ export interface LogStatsResult {
   problem: Problem | null;
 }
 export interface ReferenceCost {
+  adjustment?: CostAdjustment | null;
   usd: string | null;
   currency: string;
   basis: string;
@@ -874,6 +875,30 @@ export interface ReferenceCost {
   fetched_at: number;
   stale: boolean;
   pricing: CatalogPricing | null;
+}
+export interface CostAdjustment {
+  usd: string | null;
+  reason: string;
+  supplier_multiplier: string | null;
+  group_multiplier: string | null;
+  supplier_mixed?: boolean;
+  group_mixed?: boolean;
+  group: string;
+  group_name: string;
+  basis: string;
+  observed_at: string;
+  failure: string;
+  parts: CostPart[];
+}
+export interface CostPart {
+  kind: string;
+  tokens: number | null;
+  rate: string | null;
+  rate_multiplier: string | null;
+  includes_reasoning?: boolean;
+  mixed_rate?: boolean;
+  usd: string | null;
+  final_usd: string | null;
 }
 export interface Metrics {
   output_generation_ms: number | null;
@@ -888,6 +913,7 @@ export interface Metrics {
   reasoning_tokens: number | null;
 }
 export interface Attempt {
+  cost_adjustment?: CostAdjustment | null;
   reference_usd?: string | null;
   number: number;
   provider: string;

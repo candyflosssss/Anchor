@@ -126,7 +126,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   update apply --approve             Replace local CLI; core must be stopped
   version
 Normal output is JSON; logs export is JSONL, logs follow emits repeated JSON pages, agent token is raw secret.
-Logs include optional reference_cost snapshots and per-attempt reference_usd; missing prices are omitted, incomplete usage has null cost.
+Logs include optional reference_cost: usd is original; adjustment stores supplier/group multipliers, final usd and token parts.
+Attempts retain reference_usd and cost_adjustment snapshots. Missing prices are omitted; unknown usage/rates stay null.
 Logs include safe raw service-tier evidence; fast_triggered is true/false/unknown from upstream reports, not measured speed.
 Diagnostics and service logs go to stderr.
 Agent failures distinguish revision conflicts, external configuration edits, unsafe configuration, unavailable default models and invalid catalogs; unclassified failures remain agent_operation_failed.

@@ -291,3 +291,26 @@ func TestRetentionFailureIsVisible(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPricedAttemptsFitRecordBudgetWithoutLosingTotals(t *testing.T) {
+	s := openTest(t)
+	r := row("priced_retries")
+	total := "123.45"
+	r.ReferenceCost = &ReferenceCost{USD: &total, Adjustment: &CostAdjustment{USD: &total}}
+	r.AttemptCount = 64
+	for i := range 64 {
+		parts := []CostPart{}
+		for range 5 {
+			parts = append(parts, CostPart{Kind: strings.Repeat("x", 64), Rate: &total, USD: &total, FinalUSD: &total})
+		}
+		r.Attempts = append(r.Attempts, Attempt{Number: i + 1, CostAdjustment: &CostAdjustment{USD: &total, Parts: parts}})
+	}
+	if !s.Request(r) {
+		t.Fatal("priced request dropped")
+	}
+	flushTest(t, s)
+	got, err := s.Detail(t.Context(), r.ID)
+	if err != nil || !got.AttemptsTruncated || len(got.Attempts) == 0 || len(got.Attempts) >= 64 || got.AttemptCount != 64 || got.ReferenceCost.Adjustment.USD == nil || *got.ReferenceCost.Adjustment.USD != total {
+		t.Fatal(got, err)
+	}
+}

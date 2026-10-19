@@ -166,6 +166,10 @@ func TestSharedLogContract(t *testing.T) {
 	if failed.ReferenceCost != nil || ok.ReferenceCost == nil || ok.ReferenceCost.USD == nil || *ok.ReferenceCost.USD != "0.00123" || len(ok.Attempts) != 1 || ok.Attempts[0].ReferenceUSD == nil || *ok.Attempts[0].ReferenceUSD != "0.00123" {
 		t.Fatal("reference cost null/decimal contract drift")
 	}
+	if ok.ReferenceCost.Adjustment == nil || ok.ReferenceCost.Adjustment.USD == nil || *ok.ReferenceCost.Adjustment.USD != "0.000492" || len(ok.ReferenceCost.Adjustment.Parts) != 5 || ok.Attempts[0].CostAdjustment == nil {
+		t.Fatal("reference factors/parts contract drift")
+	}
+
 	encoded, _ := json.Marshal(failed)
 	var keys map[string]any
 	json.Unmarshal(encoded, &keys)

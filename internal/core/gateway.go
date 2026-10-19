@@ -256,6 +256,7 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string, attemptCtx context.Context, attemptResult *forwardAttemptResult) (retry bool) {
 	// Resolve after key selection: the upstream model override wins over this key's default.
 	p.Protocol = key.EffectiveProtocol(c.Model)
+	costFactors := logCostFactors(p, key)
 	started := time.Now()
 	status := 0
 	success := false
@@ -315,7 +316,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		if !success && code == "" {
 			code = "upstream_failed"
 		}
-		a := logbook.Attempt{Number: 1, Provider: p.ID, Key: key.ID, Model: c.Model, Protocol: p.Protocol, HTTP: upstreamHTTP, ElapsedMS: time.Since(started).Milliseconds(), Outcome: outcome, Code: code, Stage: stage}
+		a := logbook.Attempt{CostAdjustment: costFactors, Number: 1, Provider: p.ID, Key: key.ID, Model: c.Model, Protocol: p.Protocol, HTTP: upstreamHTTP, ElapsedMS: time.Since(started).Milliseconds(), Outcome: outcome, Code: code, Stage: stage}
 		if usage.Known {
 			in, out := usage.Input, usage.Output
 			a.Input = &in

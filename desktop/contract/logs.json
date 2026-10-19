@@ -142,7 +142,60 @@
             "stage": "respond",
             "input": 12,
             "output": 120,
-            "reference_usd": "0.00123"
+            "reference_usd": "0.00123",
+            "cost_adjustment": {
+              "usd": "0.000492",
+              "reason": "",
+              "supplier_multiplier": "0.5",
+              "group_multiplier": "0.8",
+              "group": "vip",
+              "group_name": "VIP",
+              "basis": "key_billing",
+              "observed_at": "2026-10-19T00:00:00Z",
+              "failure": "",
+              "parts": [
+                {
+                  "kind": "input",
+                  "tokens": 12,
+                  "rate": "2.5",
+                  "rate_multiplier": "1",
+                  "usd": "0.00003",
+                  "final_usd": "0.000012"
+                },
+                {
+                  "kind": "cache_read",
+                  "tokens": 0,
+                  "rate": "0.25",
+                  "rate_multiplier": "0.1",
+                  "usd": "0",
+                  "final_usd": "0"
+                },
+                {
+                  "kind": "cache_write",
+                  "tokens": 0,
+                  "rate": "3",
+                  "rate_multiplier": "1.2",
+                  "usd": "0",
+                  "final_usd": "0"
+                },
+                {
+                  "kind": "output",
+                  "tokens": 100,
+                  "rate": "10",
+                  "rate_multiplier": "4",
+                  "usd": "0.001",
+                  "final_usd": "0.0004"
+                },
+                {
+                  "kind": "reasoning",
+                  "tokens": 20,
+                  "rate": "10",
+                  "rate_multiplier": "4",
+                  "usd": "0.0002",
+                  "final_usd": "0.00008"
+                }
+              ]
+            }
           }
         ],
         "reference_cost": {
@@ -169,6 +222,59 @@
               "output_audio": null
             },
             "tiers": []
+          },
+          "adjustment": {
+            "usd": "0.000492",
+            "reason": "",
+            "supplier_multiplier": "0.5",
+            "group_multiplier": "0.8",
+            "group": "vip",
+            "group_name": "VIP",
+            "basis": "key_billing",
+            "observed_at": "2026-10-19T00:00:00Z",
+            "failure": "",
+            "parts": [
+              {
+                "kind": "input",
+                "tokens": 12,
+                "rate": "2.5",
+                "rate_multiplier": "1",
+                "usd": "0.00003",
+                "final_usd": "0.000012"
+              },
+              {
+                "kind": "cache_read",
+                "tokens": 0,
+                "rate": "0.25",
+                "rate_multiplier": "0.1",
+                "usd": "0",
+                "final_usd": "0"
+              },
+              {
+                "kind": "cache_write",
+                "tokens": 0,
+                "rate": "3",
+                "rate_multiplier": "1.2",
+                "usd": "0",
+                "final_usd": "0"
+              },
+              {
+                "kind": "output",
+                "tokens": 100,
+                "rate": "10",
+                "rate_multiplier": "4",
+                "usd": "0.001",
+                "final_usd": "0.0004"
+              },
+              {
+                "kind": "reasoning",
+                "tokens": 20,
+                "rate": "10",
+                "rate_multiplier": "4",
+                "usd": "0.0002",
+                "final_usd": "0.00008"
+              }
+            ]
           }
         }
       }

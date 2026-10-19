@@ -15,3 +15,10 @@ it('copies the captured reference cost and accepts historical logs without it', 
   expect(safeSummary(requestLog(fixture.page.requests[1] as Request))).toContain('参考费用: $0.00123');
   expect(safeSummary(requestLog(fixture.page.requests[0] as Request))).toContain('参考费用: —');
 });
+
+it('keeps snapshot factors and category amounts in copy output and attempt mapping', () => {
+  const row = requestLog(fixture.page.requests[1] as Request);
+  expect(row.attempts[0].costAdjustment).toEqual(row.referenceCost?.adjustment);
+  const summary = safeSummary(row);
+  for (const text of ['原始参考费用: $0.00123', '供应商倍率: ×0.5', '分组倍率: ×0.8', '最终参考费用: $0.000492']) expect(summary).toContain(text);
+});

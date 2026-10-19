@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/protocol"
@@ -106,8 +107,18 @@ func TestRequestReferenceCostStoredAndExportedWithSnapshot(t *testing.T) {
 			}))
 			defer up.Close()
 			f.add(t, "p", up.URL, "synthetic-no-log-secret")
+			provider, _ := f.store.Provider("p")
+			provider.CostMultiplier = .5
+			provider, err := f.store.PutProvider(provider, provider.Revision, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			multiplier := .8
+			if err := f.store.CacheKeyRate("p", provider.Revision, "default", catalog.KeyRateCache{Multiplier: &multiplier, Group: "vip", Basis: "key_billing"}); err != nil {
+				t.Fatal(err)
+			}
 			snapshot := logPriceSnapshot(t, "vision-reasoner")
-			_, err := f.store.PutModel(state.Model{ID: "public", Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "actual-model"}}, Settings: &state.ModelSettings{Reference: &snapshot}}, 0)
+			_, err = f.store.PutModel(state.Model{ID: "public", Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "actual-model"}}, Settings: &state.ModelSettings{Reference: &snapshot}}, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -117,6 +128,11 @@ func TestRequestReferenceCostStoredAndExportedWithSnapshot(t *testing.T) {
 				t.Fatal(resp.StatusCode)
 			}
 			if err = f.core.logs.Flush(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			// Replacing both pricing and factors must not reprice history.
+			provider.CostMultiplier = 2
+			if _, err = f.store.PutProvider(provider, provider.Revision, nil); err != nil {
 				t.Fatal(err)
 			}
 			// Replacing the mapping does not change a persisted historical estimate.
@@ -133,8 +149,11 @@ func TestRequestReferenceCostStoredAndExportedWithSnapshot(t *testing.T) {
 			if err != nil || row.ReferenceCost == nil || row.ReferenceCost.USD == nil || *row.ReferenceCost.USD != "0.002600000000000000" || len(row.Attempts) != 1 || row.Attempts[0].ReferenceUSD == nil || row.ReferenceCost.CatalogVersion != snapshot.Version {
 				t.Fatalf("row=%+v err=%v", row, err)
 			}
+			if row.ReferenceCost.Adjustment == nil || row.ReferenceCost.Adjustment.USD == nil || *row.ReferenceCost.Adjustment.USD != "0.00104" || row.Attempts[0].CostAdjustment == nil || *row.Attempts[0].CostAdjustment.SupplierMultiplier != "0.5" {
+				t.Fatal("adjustment snapshot lost", row.ReferenceCost)
+			}
 			page, err := cl.Logs(t.Context(), logbook.Query{})
-			if err != nil || len(page.Requests) != 1 || page.Requests[0].ReferenceCost == nil || len(page.Requests[0].Attempts) != 0 {
+			if err != nil || len(page.Requests) != 1 || page.Requests[0].ReferenceCost == nil || page.Requests[0].ReferenceCost.Adjustment == nil || len(page.Requests[0].ReferenceCost.Adjustment.Parts) != 5 || len(page.Requests[0].Attempts) != 0 {
 				t.Fatal(page, err)
 			}
 			var exported bytes.Buffer
@@ -176,10 +195,101 @@ func TestProbeReferenceCostUsesOnlyCachedCatalog(t *testing.T) {
 	if err != nil || len(page.Requests) != 1 || page.Requests[0].ReferenceCost == nil || page.Requests[0].ReferenceCost.USD == nil || *page.Requests[0].ReferenceCost.USD != "0.0026" {
 		t.Fatal(page, err)
 	}
+	// A probe without cached model prices must omit factors as well.
+	if _, err := f.core.probe(t.Context(), p, "default", "no-reference-model"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.core.logs.Flush(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	page, err = f.core.logs.List(t.Context(), logbook.Query{Source: "probe"})
+	if err != nil || len(page.Requests) != 2 {
+		t.Fatal(page, err)
+	}
+	for _, r := range page.Requests {
+		if r.Model == "no-reference-model" && (r.ReferenceCost != nil || len(r.Attempts) != 1 || r.Attempts[0].CostAdjustment != nil) {
+			t.Fatal("unpriced probe invented factors", r)
+		}
+	}
 	if f.core.logReference(state.Model{ServiceTier: "priority", Candidates: []state.Candidate{{Model: "vision-reasoner"}}}) != nil {
 		t.Fatal("inferred standard price for speed variant")
 	}
 	if f.core.logReference(state.Model{Candidates: []state.Candidate{{Model: "vision-reasoner"}, {Model: "text-only"}}}) != nil {
 		t.Fatal("mixed reference identities")
+	}
+}
+
+func TestLogCostAdjustmentSnapshotsAndRetryTotals(t *testing.T) {
+	snapshot := logPriceSnapshot(t, "vision-reasoner")
+	u := protocol.Usage{Known: true, Input: 1000, Output: 100, CacheRead: 400, CacheWrite: 100, Reasoning: 30, CacheReadKnown: true, CacheWriteKnown: true, ReasoningKnown: true}
+	group := .8
+	p := state.Provider{CostMultiplier: .5}
+	key := state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &group, Group: "vip", GroupName: "VIP", Basis: "key_billing", ObservedAt: "2026-10-19T00:00:00Z", Failure: "network"}}
+	factors := logCostFactors(p, key)
+	group = 3 // capture before dispatch, not completion
+	tr := &requestTrace{row: logbook.Request{ReferenceCost: referenceCost(&snapshot)}}
+	tr.addAttempt(logbook.Attempt{CostAdjustment: factors}, u)
+	a := tr.row.ReferenceCost.Adjustment
+	if a == nil || a.USD == nil || *a.USD != "0.00106" || a.GroupMultiplier == nil || *a.GroupMultiplier != "0.8" || a.Failure != "network" || a.ObservedAt == "" {
+		t.Fatalf("bad snapshot: %+v", a)
+	}
+	want := []struct {
+		tokens            int64
+		raw, final, ratio string
+	}{{500, "0.00125", "0.0005", "1"}, {400, "0.0001", "0.00004", "0.1"}, {100, "0.0003", "0.00012", "1.2"}, {70, "0.0007", "0.00028", "4"}, {30, "0.0003", "0.00012", "4"}}
+	for i, w := range want {
+		part := a.Parts[i]
+		if part.Tokens == nil || *part.Tokens != w.tokens || part.USD == nil || *part.USD != w.raw || part.FinalUSD == nil || *part.FinalUSD != w.final || part.RateMultiplier == nil || *part.RateMultiplier != w.ratio {
+			t.Fatalf("part %d: %+v", i, part)
+		}
+	}
+	// A different retry uses its own factors; never apply the last key to root.
+	tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{CostMultiplier: 1}, key)}, u)
+	a = tr.row.ReferenceCost.Adjustment
+	if a.USD == nil || *a.USD != "0.00901" || !a.SupplierMixed || !a.GroupMixed || a.SupplierMultiplier != nil || a.GroupMultiplier != nil || *a.Parts[0].FinalUSD != "0.00425" {
+		t.Fatalf("bad retry total: %+v", a)
+	}
+	tr.addAttempt(logbook.Attempt{}, u)
+	tr.addAttempt(logbook.Attempt{CostAdjustment: factors}, u)
+	if a.USD != nil || a.Reason != "missing_multiplier" || tr.row.ReferenceCost.USD == nil {
+		t.Fatal("unknown group must not erase original cost or be replaced by one", a)
+	}
+}
+
+func TestLogCostAdjustmentUnknownZeroAndTiers(t *testing.T) {
+	snapshot := logPriceSnapshot(t, "vision-reasoner")
+	u := protocol.Usage{Known: true, Input: 100, Output: 10, CacheReadKnown: true, CacheWriteKnown: true}
+	zero := 0.0
+	tr := &requestTrace{row: logbook.Request{ReferenceCost: referenceCost(&snapshot)}}
+	tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &zero}})}, u)
+	a := tr.row.ReferenceCost.Adjustment
+	if a.USD == nil || *a.USD != "0" || *a.SupplierMultiplier != "1" || a.Parts[4].Tokens != nil || !a.Parts[3].IncludesReasoning {
+		t.Fatalf("zero/legacy/inclusive output: %+v", a)
+	}
+	tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &zero}})}, protocol.Usage{})
+	if a.USD != nil || a.Reason != "missing_usage" {
+		t.Fatal("zero factor cannot invent missing usage", a)
+	}
+	tr = &requestTrace{row: logbook.Request{ReferenceCost: referenceCost(&snapshot)}}
+	one := 1.0
+	for _, input := range []int64{200000, 250001} {
+		u.Input = input
+		tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &one}})}, u)
+	}
+	a = tr.row.ReferenceCost.Adjustment
+	if a.USD == nil || *a.USD != "1.750255" || !a.Parts[0].MixedRate || a.Parts[0].Rate != nil {
+		t.Fatalf("tiers: %+v", a)
+	}
+	// Totals continue after bounded attempt history is exhausted.
+	for range 64 {
+		tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &one}})}, u)
+	}
+	if tr.row.AttemptCount != 66 || !tr.row.AttemptsTruncated || len(tr.row.Attempts) != 64 || *a.USD != "81.760175" {
+		t.Fatal("truncated attempts lost totals", tr.row.AttemptCount, *a.USD)
+	}
+	noPrice := &requestTrace{}
+	noPrice.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{})}, u)
+	if noPrice.row.Attempts[0].CostAdjustment != nil {
+		t.Fatal("no model price should skip cost")
 	}
 }

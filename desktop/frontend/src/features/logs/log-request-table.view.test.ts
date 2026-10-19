@@ -4,6 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { logColumns, columnPresets } from './log-columns.model';
 import { ColumnValue } from './log-request-table.view';
 import { requestFixtures } from './log.mock';
+import fixture from '../../../../contract/logs.json';
+import { requestLog } from './log.service';
+import type { Request } from '../../desktop/contract.generated';
 import type { RequestLog } from './log.model';
 
 const row: RequestLog = {
@@ -88,15 +91,26 @@ describe('grouped request log values', () => {
   });
   it('shows reference cost, free cost, incomplete usage and absent prices distinctly', () => {
     const price = { usd: '0.000001230000000000' } as NonNullable<RequestLog['referenceCost']>;
-    expect(render('referenceCost', { ...row, referenceCost: price })).toContain('$0.00000123');
-    expect(render('referenceCost', { ...row, referenceCost: { ...price, usd: '0' } })).toContain('$0');
-    expect(render('referenceCost', { ...row, referenceCost: { ...price, usd: null } })).toContain('未知');
-    expect(render('referenceCost', { ...row, referenceCost: undefined })).toContain('—');
+    expect(render('originalCost', { ...row, referenceCost: price })).toContain('$0.00000123');
+    expect(render('originalCost', { ...row, referenceCost: { ...price, usd: '0' } })).toContain('$0');
+    expect(render('originalCost', { ...row, referenceCost: { ...price, usd: null } })).toContain('未知');
+    expect(render('originalCost', { ...row, referenceCost: undefined })).toContain('—');
   });
   it('exposes compact block presets with no duplicate columns', () => {
-    expect(logColumns).toHaveLength(15);
-    expect(columnPresets.common.ids).toHaveLength(9);
+    expect(logColumns).toHaveLength(18);
+    expect(columnPresets.common.ids).toHaveLength(12);
     for (const preset of Object.values(columnPresets)) expect(new Set(preset.ids).size).toBe(preset.ids.length);
     for (const column of logColumns) expect(render(column.id)).not.toBe('');
   });
+});
+
+it('separates raw, supplier, group and final values without repricing history', () => {
+  const priced = requestLog(fixture.page.requests[1] as Request);
+  expect(render('originalCost', priced)).toContain('$0.00123');
+  expect(render('supplierMultiplier', priced)).toContain('×0.5');
+  expect(render('groupMultiplier', priced)).toContain('×0.8');
+  expect(render('referenceCost', priced)).toContain('$0.000492');
+  expect(render('referenceCost', { ...priced, referenceCost: { ...priced.referenceCost!, adjustment: undefined } })).toContain('未记录');
+  expect(render('groupMultiplier', { ...priced, referenceCost: { ...priced.referenceCost!, adjustment: { ...priced.referenceCost!.adjustment!, group_multiplier: null } } })).toContain('未知');
+  expect(render('supplierMultiplier', { ...priced, referenceCost: { ...priced.referenceCost!, adjustment: { ...priced.referenceCost!.adjustment!, supplier_mixed: true, supplier_multiplier: null } } })).toContain('逐次');
 });

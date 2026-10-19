@@ -22,7 +22,7 @@ export function requestLog(row: Request): RequestLog {
       outputIntervalComplete: legacyText || row.metrics.output_interval_complete === true,
       timeToFirstOutputMs: row.metrics.time_to_first_output_ms ?? row.metrics.time_to_first_text_ms, timeToFirstTextMs: row.metrics.time_to_first_text_ms, generationMs: row.metrics.generation_ms, outputTextTokens: row.metrics.output_text_tokens,
       textIntervalComplete: row.metrics.text_interval_complete, cacheReadTokens: row.metrics.cache_read_tokens, reasoningTokens: row.metrics.reasoning_tokens },
-    attempts: row.attempts.map(a => ({ referenceUSD: a.reference_usd, number: a.number, provider: a.provider, key: a.key, model: a.model, protocol: a.protocol, http: a.http, elapsed: a.elapsed_ms,
+    attempts: row.attempts.map(a => ({ costAdjustment: a.cost_adjustment, referenceUSD: a.reference_usd, number: a.number, provider: a.provider, key: a.key, model: a.model, protocol: a.protocol, http: a.http, elapsed: a.elapsed_ms,
       input: a.input, output: a.output, outcome: a.outcome, code: a.code || undefined, note: a.stage })), evidence: row.evidence ?? {} };
 }
 export function systemLog(row: Event): SystemLog {

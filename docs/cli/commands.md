@@ -861,9 +861,9 @@ values 的 requests 包括 pending/cancelled；completed=succeeded+failed+interr
 
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts 及其他 evidence 大字段，仅保留下述五项档位证据，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。
 
-2026-10-19 当前源码（未打包发布）：`logs list/detail/follow/export` 的请求记录新增可选 `reference_cost`，包含 `usd`（可空十进制字符串）、`currency=USD`、`basis=text_tokens`、未能计算时的 `reason`，以及价格来源、参考模型、目录版本、获取时间、陈旧标识和完整 `pricing` 快照。`detail/export` 的每次尝试新增可选 `reference_usd`。按每次尝试分别处理缓存、思考和长上下文分档，再合计根请求；任一次用量或所需单价不完整时总价为 null，明确免费为字符串零。无参考价格及旧日志不添加快照，不以当前价格回填历史。
+2026-10-19 当前源码（未打包发布）：`logs list/detail/follow/export` 的请求记录新增可选 `reference_cost`，包含 `usd`（可空十进制字符串）、`currency=USD`、`basis=text_tokens`、未能计算时的 `reason`，以及价格来源、参考模型、目录版本、获取时间、陈旧标识和完整 `pricing` 快照。`detail/export` 的每次尝试新增可选 `reference_usd`。按每次尝试分别处理缓存、思考和长上下文分档，再合计根请求；任一次用量或所需单价不完整时总价为 null，明确免费为字符串零。无参考价格及旧日志不添加快照，不以当前价格回填历史。 后续源码保留上述 `usd` 为原始费用，增加 `reference_cost.adjustment`（最终 `usd/reason`、`supplier_multiplier/group_multiplier`、分组来源/观测时间/刷新失败快照、`supplier_mixed/group_mixed`、五类 `parts`）。每次尝试另有 `cost_adjustment`，根最终额按逐次原始额 × 供应商成本倍率 × Key 分组有效倍率求和，不将最后一次倍率套用全部请求。分组未知或用量不全最终为 null；倍率 0 不补未知用量。列表含乘区汇总，详情/导出含逐次快照；超出单条预算可能截断 attempts（有标记），总额保留。未记录的新项不回填。字段详见[日志设计](../design/logging.md)。桌面列选择与悬浮是纯展示，无需新增 CLI。
 
-优先使用请求时模型映射保存的参考快照；没有快照时，仅使用核心内已缓存、仍有效且所有候选精确匹配同一参考模型的目录。推理测试按实际上游模型匹配同一缓存。请求日志计价不获取或刷新网络目录；冷缓存、未知／歧义模型以及未显式选择参考价的加速映射不猜价。参考费用只估算文本 Token，不包含平台倍率、加速附加费或实际账单。命令和参数不变，须升级实际处理请求的核心才会采集新字段；`logs stats` 本轮不新增费用汇总。
+优先使用请求时模型映射保存的参考快照；没有快照时，仅使用核心内已缓存、仍有效且所有候选精确匹配同一参考模型的目录。推理测试按实际上游模型匹配同一缓存。请求日志计价不获取或刷新网络目录；冷缓存、未知／歧义模型以及未显式选择参考价的加速映射不猜价。原始费用只估算文本 Token，最终费用另应用已记录的供应商/分组倍率；不包含未记录的平台附加系数、加速附加费，也不代表实际账单。命令和参数不变，须升级实际处理请求的核心才会采集新字段；`logs stats` 本轮不新增费用汇总。
 
 2026-10-16 增量（已随 desktop.41 dev 宿主／核心发布；独立公开 alpha.6 CLI 不含此增量）：代理及推理测试的 `logs list` / `logs follow` 在已有 `evidence` 字典中保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`。`logs detail REQUEST_ID` 与 `logs export` 仍返回完整安全证据，还包括入站 `requested_service_tier` / `requested_service_tier_raw` 与固定映射策略。派发字段取协议转换后的实际请求体，未派发为 `not_sent`、无档位参数为 `unspecified`；上游未报告时返回档位缺省。`*_raw` 为 JSON 标量文本，保留未知短名称、空字符串、null、布尔和数字，不把任意值强行解析成档位。字符串最多 128 UTF-8 字节、序列化后最多 256 字节，抑制对象／数组、控制字符与可识别凭据，不保存请求／响应正文。
 

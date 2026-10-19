@@ -87,18 +87,18 @@ func TestLogReferenceCostCLI(t *testing.T) {
 			break
 		}
 	}
-	if row.ReferenceCost == nil || row.ReferenceCost.USD == nil || *row.ReferenceCost.USD != "0.002240000000000000" {
+	if row.ReferenceCost == nil || row.ReferenceCost.Adjustment == nil || row.ReferenceCost.Adjustment.USD != nil || row.ReferenceCost.Adjustment.Reason != "missing_multiplier" || len(row.ReferenceCost.Adjustment.Parts) != 5 || row.ReferenceCost.USD == nil || *row.ReferenceCost.USD != "0.002240000000000000" {
 		t.Fatal(row)
 	}
 	for _, args := range [][]string{{"logs", "detail", row.ID}, {"logs", "export"}} {
 		raw := run(args...)
 		var detail logbook.Request
-		if err = json.Unmarshal([]byte(raw), &detail); err != nil || detail.ReferenceCost == nil || detail.ReferenceCost.USD == nil || len(detail.Attempts) != 1 || detail.Attempts[0].ReferenceUSD == nil || strings.Contains(raw, secret) {
+		if err = json.Unmarshal([]byte(raw), &detail); err != nil || detail.ReferenceCost == nil || detail.ReferenceCost.USD == nil || len(detail.Attempts) != 1 || detail.Attempts[0].CostAdjustment == nil || detail.Attempts[0].CostAdjustment.SupplierMultiplier == nil || *detail.Attempts[0].CostAdjustment.SupplierMultiplier != "1" || detail.Attempts[0].ReferenceUSD == nil || strings.Contains(raw, secret) {
 			t.Fatal(raw, err)
 		}
 	}
 	var help bytes.Buffer
-	if err := (App{Out: &help, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil || !strings.Contains(help.String(), "reference_cost") {
+	if err := (App{Out: &help, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil || !strings.Contains(help.String(), "reference_cost") || !strings.Contains(help.String(), "cost_adjustment") {
 		t.Fatal(help.String(), err)
 	}
 }

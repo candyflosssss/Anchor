@@ -343,6 +343,7 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	stream := notify != nil
 	row := logbook.Request{ID: id, StartedAtMS: start.UnixMilli(), Status: "pending", Source: "probe", ReasoningObserved: true, Stream: &stream, UpstreamModel: model, Model: model, Protocol: p.Protocol, Provider: p.ID, Key: key.ID, Revision: p.Revision, Delivery: "none", Stage: "route", Attempts: []logbook.Attempt{}, Evidence: map[string]string{"sent_service_tier": "not_sent", "fast_triggered": "unknown"}}
 	row.ReferenceCost = s.cachedLogReference(model)
+	costFactors := logCostFactors(p, key)
 	if reasoningEffort != "" {
 		row.ReasoningEffort = &reasoningEffort
 	}
@@ -384,7 +385,7 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 		out.ElapsedMS = time.Since(start).Milliseconds()
 		if attempted {
 			row.AttemptCount = 1
-			a := logbook.Attempt{Number: 1, Provider: p.ID, Key: key.ID, Model: model, Protocol: p.Protocol, HTTP: actualHTTP, ElapsedMS: out.ElapsedMS, Outcome: "failed", Code: out.Failure, Stage: stage}
+			a := logbook.Attempt{CostAdjustment: costFactors, Number: 1, Provider: p.ID, Key: key.ID, Model: model, Protocol: p.Protocol, HTTP: actualHTTP, ElapsedMS: out.ElapsedMS, Outcome: "failed", Code: out.Failure, Stage: stage}
 			if out.Failure == "" {
 				a.Outcome = "succeeded"
 			}
@@ -394,9 +395,10 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 				row.Input = &u.Input
 				row.Output = &u.Output
 			}
+			t := requestTrace{row: row}
+			t.priceAttempt(&a, u)
 			if row.ReferenceCost != nil {
-				row.ReferenceCost.USD, row.ReferenceCost.Reason = estimateLogAttempt(row.ReferenceCost, u)
-				a.ReferenceUSD = row.ReferenceCost.USD
+				row.ReferenceCost.USD = a.ReferenceUSD // preserve single-probe decimal representation
 			}
 			row.Attempts = []logbook.Attempt{a}
 			if u.CacheReadKnown {
