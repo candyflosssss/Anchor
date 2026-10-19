@@ -134,7 +134,7 @@ test('conflict does not override latest values or silently retry', async ({ page
   await page.getByRole('button', { name: '丢弃草稿并重新读取' }).click();
   await expect(page.getByRole('dialog')).toBeHidden(); await edit(page);
   await expect(page.getByLabel('请求超时（秒）')).toHaveValue('180');
-  await expect(page.getByRole('dialog')).toContainText('当前 revision 4');
+  await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('编辑 摸鱼AI · 演示');
 });
 test('unknown write locks mutations until explicit reread; no success toast', async ({ page }) => {
   await ready(page); await scenario(page, 'unknown'); await edit(page);

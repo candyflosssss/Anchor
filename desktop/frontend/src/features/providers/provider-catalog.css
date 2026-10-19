@@ -58,5 +58,11 @@
 .catalog-toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .catalog-import-status { margin-top: 12px; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
 
-.dialog-content.provider-setup-dialog { width: min(1040px, calc(100vw - 32px)); }
-.provider-setup-dialog .editor-fields { min-width: 0; }
+.provider-editor-dialog .editor-header { padding-block: 20px; }
+.dialog-content.provider-setup-dialog { width: min(1040px, calc(100vw - 32px)); display: flex; flex-direction: column; overflow: hidden; }
+.provider-setup-dialog .editor-header, .provider-setup-dialog .editor-footer { flex-shrink: 0; }
+.provider-setup-dialog .editor-fields { min-height: 0; overflow-y: auto; padding-bottom: 20px; }
+.provider-setup-dialog .model-directory { margin-top: 0; border: 0; border-radius: 0; padding: 0; }
+.provider-setup-dialog .editor-problem { margin: 0; }
+.provider-setup-state { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 96px; color: hsl(var(--muted-foreground)); font-size: 13px; }
+.provider-setup-state svg { width: 16px; height: 16px; }

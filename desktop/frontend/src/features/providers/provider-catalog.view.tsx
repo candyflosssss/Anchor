@@ -47,7 +47,7 @@ export function ProviderCatalogView({ c, w, disabled, setup = false }: { c: Prov
     {models?.failure && <p className="catalog-feedback" role="alert">{catalogFailureText[models.failure]}</p>}
     {models && <details className="catalog-diagnostics">
       <summary><ChevronDown aria-hidden="true" />Key 查询详情<span>{models.keys.length} 个 Key{models.partial ? ' · 部分失败' : ''}</span></summary>
-      <p className="cell-hint">revision {models.revision}</p>
+      {!setup && <p className="cell-hint">revision {models.revision}</p>}
       <ul className="catalog-key-summary" aria-label="Key 查询结果">{models.keys.map(k => <li key={k.id}>
         <strong>Key {k.id}{!k.enabled && '（已停用）'}</strong><span>{rateLabel(k.id)}</span>
         <span className="cell-hint">{k.failure ? catalogFailureText[k.failure] : `${models.entries.filter(e => e.key_ids.includes(k.id)).length} 个模型`} · HTTP {k.http_status || '—'}</span>
@@ -82,10 +82,10 @@ export function ProviderCatalogView({ c, w, disabled, setup = false }: { c: Prov
             <div className="catalog-model-action">{mapped.has(id) ? <span className="catalog-mapped"><Check aria-hidden="true" />已映射</span> : <><Button size="sm" variant="outline" disabled={disabled || c.features.needsRead || !importPlan.ready.includes(id)} aria-label={`快速导入 ${id}`} onClick={() => void c.features.importModels([id])}><Plus />快速导入</Button>{!setup && <Button size="sm" variant="ghost" disabled={disabled || c.features.needsRead} aria-label={`导入 ${id}`} onClick={() => c.openDialog({ kind: 'mapping', upstream: id })}>自定义</Button>}{importPlan.manual.includes(id) && <span className="cell-hint">需自定义别名</span>}</>}</div>
           </li>;
         })}</ul>
-      </div> : <div className="catalog-empty"><Search aria-hidden="true" /><strong>没有匹配的模型</strong><p>试试其他名称，或清除筛选条件。</p><Button variant="outline" size="sm" onClick={() => { setQuery(''); setFilter('all'); setPage(0); }}>清除目录筛选</Button></div>}
+      </div> : <div className="catalog-empty"><Search aria-hidden="true" /><strong>没有匹配的模型</strong>{!setup && <p>试试其他名称，或清除筛选条件。</p>}<Button variant="outline" size="sm" onClick={() => { setQuery(''); setFilter('all'); setPage(0); }}>清除目录筛选</Button></div>}
       <div className="catalog-pagination"><span aria-live="polite">{filtered.length ? `${currentPage * pageSize + 1}–${Math.min((currentPage + 1) * pageSize, filtered.length)} / ${filtered.length} 个模型` : '0 个模型'}<span className="catalog-total"> · 目录共 {ids.length} 个</span></span>
         {pages > 1 && <div><Button variant="ghost" size="icon" aria-label="模型目录上一页" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}><ChevronLeft /></Button><span>{currentPage + 1} / {pages}</span><Button variant="ghost" size="icon" aria-label="模型目录下一页" disabled={currentPage === pages - 1} onClick={() => setPage(currentPage + 1)}><ChevronRight /></Button></div>}
       </div>
-    </> : <div className="catalog-empty"><Layers aria-hidden="true" /><strong>{c.modelsBusy ? '正在读取上游模型' : models ? models.failure ? '暂时无法获取模型目录' : '上游返回空目录。' : '获取可用模型，开始配置'}</strong><p>{models?.failure ? '请根据上方提示检查 Key 或连接后重试。' : '获取目录后，可查看各 Key 的模型、分组倍率与请求协议。'}</p></div>}
+    </> : <div className="catalog-empty"><Layers aria-hidden="true" /><strong>{c.modelsBusy ? '正在读取上游模型' : models ? models.failure ? '获取失败' : '暂无模型' : setup ? '暂无模型' : '获取可用模型，开始配置'}</strong>{!setup && <p>{models?.failure ? '请根据上方提示检查 Key 或连接后重试。' : '获取目录后，可查看各 Key 的模型、分组倍率与请求协议。'}</p>}</div>}
   </section>;
 }
