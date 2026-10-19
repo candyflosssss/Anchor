@@ -1,12 +1,24 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-18。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.50](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.50)，北京时间 2026-10-17 23:52:30 发布；非 latest 的 prerelease，两平台包与 flat 清单同版投放。
-- 本版为最近功能统一集成包，包含内置 mihomo／代理设置、供应商与Key代理继承／直连／覆盖、映射重试、本机与远程核心重启、Agent统一更新、Skill库、日志折叠及对话推理；范围与构建轮验证见[下节](#最近功能统一集成包-50已发布-dev本机已升级)。不含旧工作区余额缓存／刷新改动。
-- 构建：沿用干净隔离提交 `b456835e41a8595e96577d07827cfc10f3345603` 的既有同版安装包，不重构建。**核心将 state.db schema8 迁移到 schema9；升级前备份，核心与桌面须配套，旧核心不能打开新库，不支持数据库降级。**
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff；desktop.34 及更早版首次仍须备份、停止旧核心并退出界面，再人工安装新版。升级有停机窗口，不承诺会话自动重连，SSH 远端另行升级。
-- 本次在线验证：六附件大小／SHA256 digest、tag revision、对应提交源码逐文件内容／构建输入摘要、Anchor与mihomo的Go vendor、元数据ZIP CRC均通过。隔离构建源码CLI从默认GitHub dev源以 `.47` 为当前版真实发现并下载 `.50` Linux包，大小／SHA256通过；Windows远端附件digest一致。保持非latest，原有无stable/latest状态不变。安装器未签名，未运行安装／apply、原生窗口、真实SSH或付费上游验收。
-- 当前本机安装：本机 CLI／核心／GUI 已于2026-10-18 00:02从 `.47` 配套升级为 `.50`。CLI 从同版发布的干净提交 `b456835` 对应源码及 vendor 离线构建，桌面复用已发布 Linux 包的相同 ELF；运行二进制哈希均已核对。备份 `/home/mosaki/.config/anchor/backups/pre-desktop50-20261018-000208`（目录0700、文件0600）；通过 restart_handoff 正常保留交接，恢复原有受限 transient user units，Restart=no，无新增持久服务或自启动。core／gateway／agent_management ready，schema8→9，SQLite quick_check／foreign_key_check通过。实例身份、既有配置表与绑定凭据、托管文件及其缺失状态和原始恢复基线保持，Codex／DSH维持 applied；不借升级重新接管。鉴权后的 proxy list 通过，内置 mihomo v1.19.32 可用，尚无代理配置、未启动节点。此为用户目录升级，不是 apt／NSIS／应用内 apply 或原生窗口可见性验收；未请求真实上游，SSH远端未更新，新库不支持降级。
+- 更新：2026-10-19。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.52](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.52)，发布于 `2026-10-19T15:13:21+08:00`；GitHub prerelease，非 latest，Windows AMD64／Ubuntu24.04 AMD64 安装包和 flat 更新清单同版投放。
+- 本版包含 `.50` 之后截至 `2024e3fcea40443cf0ea76fa372e189382f3b3e7` 的全部已提交功能：余额先显示缓存再后台刷新、供应商创建时配置 Key／模型、删除 Key／供应商清理映射及折叠不可用来源、Codex 统一重试、日志参考费用与缺失趋势归零、模型设置精简，以及 `.51` 的 Windows 自选安装路径。此前积累的余额源码改动已纳入。
+- 构建：干净隔离源码 `2024e3fcea40443cf0ea76fa372e189382f3b3e7`，SOURCE.json dirty=false；双平台生产编译、Go／TS 桥接契约比对、包哈希、提交源码逐文件／输入摘要、Anchor／mihomo Go vendor 及元数据 ZIP CRC 均通过。原 BUILD.json 的未执行原生／安装验收状态保留。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面须配套；desktop.34 及更早版首次迁移须先备份、正常停服并退出界面再手动安装。升级有停机窗口，SSH远端单独升级，无数据库降级。
+- 在线验证：六附件大小／SHA256 digest 及 tag revision 一致；隔离本轮源码 CLI 从默认 dev 源以 `.50` 为当前版本真实发现并下载 `.52` Linux 包，大小和 SHA256 通过；Windows 远端 digest 与本地一致。
+- 当前本机：CLI／核心／GUI 已于 `2026-10-19T15:16:09.590733+08:00` 从 `.50` 配套升级到 `.52`。CLI 从发布源码与 vendor 离线构建，GUI 与 deb 内 ELF 一致，运行中两进程哈希核对通过。备份 `/home/mosaki/.config/anchor/backups/pre-desktop52-20261019-151558`（目录0700／文件0600）；保留交接后恢复原受限 transient user units，Restart=no。core／gateway／agent_management ready，schema9→9，SQLite quick_check／foreign_key_check 通过；实例身份、配置表、绑定凭据、托管目录和原始恢复基线保留，Codex／DSH applied。仅既有托管 Codex 的请求／流中断重试按新版默认从0迁移为5，现有 Codex／app-server 需重启后生效。
+- 本轮未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收；本机为用户目录原子替换升级。安装器未签名，进程存活不代替窗口交互验收。完整产物见[下节](#统一更新-52已发布-dev本机已升级)。
+
+## 统一更新 .52（已发布 dev，本机已升级）
+
+构建输入摘要：`7d6382ca6dfaa9ffc8920bb12aac62563ece7e01ce0ee3974bb7f8245f1a7740`。`.51` 本地安装器功能已并入本版；`.51` 本身未单独发布。所有功能源码截至构建提交 `2024e3fcea40443cf0ea76fa372e189382f3b3e7`，后续发布说明提交不改变包的源码 revision。
+
+| 平台 | 安装包 | 字节数 | SHA256 |
+| --- | --- | ---: | --- |
+| Windows AMD64 | `Anchor-Desktop-0.1.0-dev.desktop.52-windows-amd64-setup.exe` | 31043109 | `2bcf485cece37bd034aca3cb072983eac091f5c1afb2c0ad82bbaa21a4b13101` |
+| Ubuntu24.04 AMD64 | `anchor-desktop_0.1.0-dev.desktop.52_amd64.deb` | 29026308 | `5e7e86ac9441591f30704401fd1c45587ef247057ac568805c2c445245406b00` |
+
+源码包包含对应提交的 Anchor 文件、Go vendor、锁定的两平台 mihomo payload 和未修改的 mihomo v1.19.32 对应源码／vendor；许可／构建元数据及 SHA256SUMS 同版投放。线上发布、下载和本机升级结果单独记录，未改写构建时的验收声明。功能测试沿用各提交实际记录：余额19项单测、8项模拟桥接浏览器回归及 typecheck／lint通过；本轮不重复全量／race／原生双平台验收。
 
 ## 自选盘符与安装路径 .51（仅本地打包，未发布）
 

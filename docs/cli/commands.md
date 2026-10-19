@@ -4,10 +4,10 @@
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
-- `restart --approve [--timeout 30s]` 与桌面「重启核心／恢复本机核心」已随 desktop.47 宿主／核心发布，本机 CLI 同版升级；desktop.46 与公开 alpha.6 不含这些入口。在线重启要求已有核心支持 `restart_handoff`，离线恢复不新建状态目录。显式 `--context NAME` 的 SSH 重启与远程菜单入口是后续源码增量，尚未打包发布；desktop.47 不含远程入口，远程 CLI 也须升级到支持身份/端口核验的版本。
+- `restart --approve [--timeout 30s]` 与桌面「重启核心／恢复本机核心」已随 desktop.47 宿主／核心发布，本机 CLI 同版升级；desktop.46 与公开 alpha.6 不含这些入口。在线重启要求已有核心支持 `restart_handoff`，离线恢复不新建状态目录。显式 `--context NAME` 的 SSH 重启与远程菜单已随 desktop.50 发布，并包含在 desktop.52；desktop.47 不含远程入口，远程 CLI 仍须单独升级到支持身份/端口核验的版本。
 - `stop --approve --for-restart` 已在当前 CLI 源码实现，`restart_handoff` 已随 desktop.35 宿主／核心发布到 dev 渠道；**desktop.34 及公开 alpha.6 CLI 不含本次修复**。独立 CLI 须从兼容源码构建，客户端与核心须同步升级。
 - 本轮新增 `stop --approve`、核心 starting/stopping 状态与结构化客户端错误仅在当前源码 / desktop-dev 中，**不包含于已公开 alpha.6**；旧核心需显式正常退出并升级，不会自动替换。
-- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.47 已发布到默认 GitHub 源的 dev 渠道**，并已完成本机 CLI／核心／GUI 同版升级。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
+- 本机 `update` 命令在当前 CLI 源码中；桌面在线更新入口从 desktop.9 提供，**desktop.52 已发布到默认 GitHub 源的 dev 渠道**，并已完成本机 CLI／核心／GUI 同版升级。alpha.6 CLI / desktop.8 不含入口；CLI 未配置时默认 alpha，desktop.18 首次未配置时按安装版本选择渠道，已有渠道保持不变。
 - 新增 `provider models --id ID --revision N`：当前源码 / desktop.10 小步；旧 alpha.6 / desktop.9 核心不支持，需正常停服后升级。
 - 第一优先工作台适用于当前源码 / desktop.11：多 Key、管理操作、显式测试、三协议、用量与价格；旧核心须正常停服后升级，schema3 数据库不兼容旧程序。当前源码新增 Key / 实际模型协议继承，自动迁移到 schema4，旧程序不能打开；已随 desktop.16 dev 打包发布；安装包能力以各发行记录为准，升级须同步客户端与核心。
 - 跨供应商共享公开模型、候选倍率与调度策略已随 desktop.19 dev 交付；`provider model-put` 参数见下文。倍率为手动配置，不自动读取站点分组价格。
@@ -22,7 +22,9 @@
 
 2026-10-17 源码增量：新增 Skill 中心库／来源差异／固定版本软链接管理，已随 desktop.46 宿主／核心发布；独立 alpha.6 CLI 不含，见 §14。
 
-2026-10-17 代理源码增量：新增 Windows/Linux AMD64 内置 mihomo、代理设置与供应商/Key 覆盖，尚未打包发布，见 §15；状态自动升级至 schema9，旧核心不能打开升级后的状态库。
+2026-10-17 代理源码增量：新增 Windows/Linux AMD64 内置 mihomo、代理设置与供应商/Key 覆盖，已随 desktop.50 发布，并包含在 desktop.52，见 §15；状态自动升级至 schema9，旧核心不能打开升级后的状态库。
+
+2026-10-19 交付核对：desktop.52 已统一发布截至 `2024e3f` 的功能，本机 CLI／核心／GUI 同版升级；包含 `agent codex-settings`、Key／供应商删除后的模型清理、日志参考费用及余额列表缓存。独立公开 CLI 仍为 alpha.6；桌面安装包不提供通用CLI，本机CLI从同版发布源码及vendor离线构建。本次仅同步交付状态，无新增命令或参数。详见[桌面发行说明](../release/desktop.md#统一更新-52已发布-dev本机已升级)。
 
 ## 1. 调用与公共约定
 
