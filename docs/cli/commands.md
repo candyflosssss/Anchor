@@ -251,7 +251,7 @@ anchor provider put --id ID --base-url URL [--base-url URL ...] [--homepage-url 
 | `--id` | 必填 | 供应商 ID，支持中文，例如 `摸鱼AI`；1..128 个 Unicode 码点，完整规则见公共约定 |
 | `--base-url` | 必填，可重复 | 请求地址，1..16 个且不可重复（忽略末尾 `/`）；多个地址按请求轮询做负载均衡，模型目录与测试使用第一个。每个都是 API 根地址，可含 `/v1` 前缀，不含 `/responses`、`/chat/completions` 或 `/messages`；HTTPS，仅数值回环测试地址允许 HTTP；禁止 userinfo/query/fragment |
 | `--homepage-url` | 空 | 供应商主页，仅用于展示，不参与请求；HTTP(S)，禁止 userinfo |
-| `--protocol` | 空 | `responses` / `chat-completions` / `anthropic`；仅用于新建 default Key 的初始协议及无 Key 时的匿名协议，不批量改已有 Key；空值保留已存值，新供应商按 `responses` |
+| `--protocol` | 空 | `responses` / `chat-completions` / `anthropic`；显式提供时原子更新供应商匿名协议与 default Key 默认协议，不影响命名 Key、模型独立覆盖或 Key 启用状态；省略／空值保留两者，新供应商按 `responses` |
 | `--timeout` | `120` | 单候选总超时，秒，1..3600；仍受上游响应头 30 秒等待上限限制 |
 | `--cost-multiplier` | 新建 `1`；编辑省略保留 | 供应商充值成本倍率，有限数 `0.000001..1000`；1:2充值填0.5；输出 `cost_multiplier`。0仅作旧客户端省略值 |
 | `--max-concurrent` | `4` | 单供应商并发 1..64；网关全局另有限制 16 |
@@ -299,7 +299,7 @@ stdout 为 `{provider_id, key_id, revision, http_status, elapsed_ms, models, fai
 
 供应商可用下列 delete 删除，并在同一事务清理它的模型来源，保留其他供应商的同名模型；模型失去全部来源时删除，已启用 Binding 的默认模型保护仍有效。完整 `put ... --disabled` 仅暂停路由，不删除秘密。
 
-协议解析顺序为：选出 Key → 查该 Key 下实际候选模型名的覆盖 → 没有覆盖则用 Key 默认协议。覆盖随供应商改名/复制（copy-keys）保留，删除 Key 时清理；改变 Key 默认协议不会改动已有独立覆盖。旧供应商 protocol 自动复制给其所有既存 Key，后续 provider put 的 protocol 不改已有 Key。请求路径、认证、JSON 和 SSE 转换都使用本次解析结果；协议转换能力边界保持现有文本/函数子集。
+协议解析顺序为：选出 Key → 查该 Key 下实际候选模型名的覆盖 → 没有覆盖则用 Key 默认协议。覆盖随供应商改名/复制（copy-keys）保留，删除 Key 时清理；改变 Key 默认协议不会改动已有独立覆盖。旧供应商 protocol 的数据库迁移仍复制给其所有既存 Key。2026-10-19 当前源码中，`provider put --protocol ...` 显式修改供应商协议时，同一事务更新已有 default Key 的默认协议，不需要重新输入密钥，不影响其他命名 Key、Key 启用状态及模型独立覆盖；省略 `--protocol` 保留原有协议。此前版本显式修改供应商协议也不改已有 Key；需同步升级客户端／核心，本轮未打包发布。请求路径、认证、JSON 和 SSE 转换都使用本次解析结果；协议转换能力边界保持现有文本/函数子集。
 
 ### 第一优先工作台（desktop.11）
 

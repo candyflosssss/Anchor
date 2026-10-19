@@ -51,9 +51,9 @@ func TestKeyProtocolsAndModelInheritance(t *testing.T) {
 	if keys[0].EffectiveProtocol("actual/model") != "anthropic" || len(keys[0].ModelProtocols) != 0 {
 		t.Fatal(keys)
 	}
-	// Legacy provider edits and credential replacement never overwrite existing key settings.
+	// Omitted provider protocols and credential replacement preserve existing Key settings.
 	p, _ = s.Provider("p")
-	p.Protocol = "chat-completions"
+	p.Protocol = ""
 	if _, err := s.PutProvider(p, p.Revision, &secret); err != nil {
 		t.Fatal(err)
 	}

@@ -13,7 +13,8 @@
       "max_concurrent": 4,
       "revision": 3,
       "has_secret": true,
-      "cost_multiplier": 1
+      "cost_multiplier": 1,
+      "protocol": "responses"
     },
     {
       "id": "备用供应商",
@@ -26,7 +27,8 @@
       "max_concurrent": 2,
       "revision": 1,
       "has_secret": true,
-      "cost_multiplier": 1
+      "cost_multiplier": 1,
+      "protocol": "anthropic"
     },
     {
       "id": "本地调试",
@@ -39,7 +41,8 @@
       "max_concurrent": 1,
       "revision": 2,
       "has_secret": false,
-      "cost_multiplier": 1
+      "cost_multiplier": 1,
+      "protocol": "chat-completions"
     }
   ],
   "empty": [],

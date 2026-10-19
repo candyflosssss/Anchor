@@ -5,10 +5,12 @@ export type { SaveProvider, DiscoverProviderModels, ProviderModels };
 export type Provider = DesktopProvider;
 export const MAX_PROVIDER_URLS = 16;
 export const protocolName: Record<string, string> = { responses: "Responses", "chat-completions": "Chat Completions", anthropic: "Anthropic Messages" };
+export const isValidProtocol = (value: string) => Object.hasOwn(protocolName, value);
 export type SecretMode = 'keep' | 'replace' | 'clear';
 export interface ProviderDraft {
   id: string;
   homepage_url: string;
+  protocol: string;
   base_urls: string[];
   enabled: boolean;
   timeout: string;
@@ -18,7 +20,7 @@ export interface ProviderDraft {
   secret: string;
   confirmClear: boolean;
 }
-export type FieldErrors = Partial<Record<'id' | 'homepage_url' | 'base_urls' | 'timeout' | 'concurrent' | 'costMultiplier' | 'secret' | `base_url_${number}`, string>>;
+export type FieldErrors = Partial<Record<'id' | 'homepage_url' | 'protocol' | 'base_urls' | 'timeout' | 'concurrent' | 'costMultiplier' | 'secret' | `base_url_${number}`, string>>;
 export type ProblemCode = 'offline' | 'unauthorized' | 'read_error' | 'conflict' | 'unknown' | 'invalid' | 'referenced';
 export class ProviderProblem extends Error {
   constructor(readonly code: ProblemCode) { super(code); }
@@ -44,6 +46,7 @@ export interface ProviderTransport extends AccountTransport {
 export function newDraft(provider?: Provider): ProviderDraft {
   return {
     id: provider?.id ?? '', homepage_url: provider?.homepage_url ?? '', base_urls: provider?.base_urls.length ? [...provider.base_urls] : [''], enabled: provider?.enabled ?? true,
+    protocol: provider ? provider.protocol ?? '' : 'responses',
     timeout: String(provider?.timeout_seconds ?? 120), concurrent: String(provider?.max_concurrent ?? 4),
     costMultiplier: String(provider?.cost_multiplier ?? 1),
     secretMode: 'keep', secret: '', confirmClear: false,
@@ -52,6 +55,7 @@ export function newDraft(provider?: Provider): ProviderDraft {
 export function validateDraft(draft: ProviderDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!isValidId(draft.id)) errors.id = '1–128 个中文／字母／数字或 ._-，以字母或数字开头。';
+  if (draft.protocol !== '' && !isValidProtocol(draft.protocol)) errors.protocol = '请选择有效的请求渠道。';
   const urls = draft.base_urls.map(u => u.trim());
   if (!urls.length || urls.length > MAX_PROVIDER_URLS) errors.base_urls = `请填写 1–${MAX_PROVIDER_URLS} 个请求地址。`;
   const seen = new Set<string>();
@@ -93,7 +97,7 @@ export function toSave(draft: ProviderDraft, source?: Provider): SaveProvider {
   const expected_revision = source?.revision ?? 0;
   if (!Number.isSafeInteger(expected_revision) || expected_revision < 0) throw new ProviderProblem('invalid');
   return {
-    provider: { id: draft.id, homepage_url: draft.homepage_url.trim(), base_urls: draft.base_urls.map(u => u.trim()), enabled: draft.enabled,
+    provider: { ...(draft.protocol && draft.protocol !== source?.protocol ? { protocol: draft.protocol } : {}), id: draft.id, homepage_url: draft.homepage_url.trim(), base_urls: draft.base_urls.map(u => u.trim()), enabled: draft.enabled,
       cost_multiplier: +draft.costMultiplier, timeout_seconds: +draft.timeout, max_concurrent: +draft.concurrent,
       revision: expected_revision, has_secret: source?.has_secret ?? false },
     expected_revision,

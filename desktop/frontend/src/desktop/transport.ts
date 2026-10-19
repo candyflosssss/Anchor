@@ -3,7 +3,7 @@ import { checkedProgress } from '../features/providers/provider-test.model';
 import { checkedAccountSettings, checkedAccountObservation, checkedAccountRate, type SaveAccountSettings, type AccountQuery } from '../features/providers/provider-account.model';
 import { checkedWorkspace } from '../features/providers/provider-features.model';
 import { CONTRACT, PROBLEM_CODES, type DesktopBridge, type ProblemCode, type Provider as DesktopProvider, type SessionInfo } from './contract.generated';
-import { ProviderProblem, checkedCatalog, type DiscoverProviderModels, type ProviderModels, type Provider, type ProviderTransport, type SaveProvider } from '../features/providers/provider.model';
+import { isValidProtocol, ProviderProblem, checkedCatalog, type DiscoverProviderModels, type ProviderModels, type Provider, type ProviderTransport, type SaveProvider } from '../features/providers/provider.model';
 
 declare global { interface Window { go?: { desktop?: { Bridge?: DesktopBridge } } } }
 export class DesktopProblem extends Error { constructor(readonly code: ProblemCode) { super(code); } }
@@ -30,13 +30,14 @@ export async function call<T>(operation: () => Promise<{ contract: string; data:
 export function checkedProvider(p: DesktopProvider): Provider {
   if (!p || typeof p.id !== 'string' || typeof p.homepage_url !== 'string' || !Array.isArray(p.base_urls) || p.base_urls.length < 1 || p.base_urls.length > 16 ||
     p.base_urls.some(u => typeof u !== 'string' || !u) ||
+    (p.protocol !== undefined && !isValidProtocol(p.protocol)) ||
     !Number.isFinite(p.cost_multiplier) || p.cost_multiplier < 0.000001 || p.cost_multiplier > 1000 ||
     typeof p.enabled !== 'boolean' || typeof p.has_secret !== 'boolean' ||
     !Number.isSafeInteger(p.revision) || p.revision < 1 ||
     !Number.isInteger(p.timeout_seconds) || p.timeout_seconds < 1 || p.timeout_seconds > 3600 ||
     !Number.isInteger(p.max_concurrent) || p.max_concurrent < 1 || p.max_concurrent > 64) throw new ProviderProblem('read_error');
   // Pick only public DTO fields; unexpected response properties never reach state.
-  return { cost_multiplier: p.cost_multiplier, id: p.id, homepage_url: p.homepage_url, base_urls: [...p.base_urls], enabled: p.enabled,
+  return { ...(p.protocol !== undefined ? { protocol: p.protocol } : {}), cost_multiplier: p.cost_multiplier, id: p.id, homepage_url: p.homepage_url, base_urls: [...p.base_urls], enabled: p.enabled,
     has_secret: p.has_secret, revision: p.revision, timeout_seconds: p.timeout_seconds, max_concurrent: p.max_concurrent };
 }
 function providerError(error: unknown, writing: boolean): never {

@@ -13,7 +13,11 @@
 | `discover(input, signal)` / `Bridge.DiscoverProviderModels(input)` | `client.DiscoverProviderModels` → POST `/control/v1/providers/{id}/discover-models`；显式读取上游目录，不改配置 |
 | `save(input, signal)` / `Bridge.SaveProvider(input)` | `client.PutProvider` → PUT 指定 ID；revision=0 创建，>0 条件更新；普通字段完整替换 |
 
-Provider 字段固定为 `id`, `homepage_url`, `base_urls`, `enabled`, `timeout_seconds`, `max_concurrent`, `revision`, `has_secret`。`homepage_url` 可空，仅展示；`base_urls` 为 1..16 个不重复请求地址，网关按请求轮询，目录与测试使用第一个。供应商不再在 DTO 暴露 protocol，协议由 Key 与模型决定；核心内部保留供应商 protocol 仅用于新 default Key 初始化与匿名请求，桌面保存时空值保留已存值、新建按 `responses`。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。协议接受 `responses`、`chat-completions`、`anthropic`，未知协议拒绝。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
+Provider 公开字段为 `id`, `homepage_url`, `base_urls`, `protocol`, `enabled`, `timeout_seconds`, `max_concurrent`, `cost_multiplier`, `revision`, `has_secret`。`homepage_url` 可空，仅展示；`base_urls` 为 1..16 个不重复请求地址，网关按请求轮询，目录与测试使用第一个。`cost_multiplier` 为供应商充值成本倍率。`protocol` 接受 `responses`、`chat-completions`、`anthropic`，未知协议拒绝；当前宿主返回已存协议，作为 `anchor-desktop-v1` 的可选字段增量，旧宿主未提供时前端保留未知状态，不将它默认为 Responses。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
+
+- 新增／编辑弹窗的「请求渠道」选择对应 `protocol`，详情概况回显。新建默认 `responses`；编辑仅在选择变化时显式发送该字段，旧宿主缺字段时显示「保留现有渠道」。
+- 保存显式非空 `protocol` 时，核心在同一 revision 条件事务中更新供应商匿名请求协议与已有 default Key 的默认协议，无需重新输入密钥，不影响其他命名 Key、default Key 启用／健康状态或模型独立协议覆盖。省略／空字符串保留供应商和已有 Key 各自的值；新建 default Key 仍按供应商协议初始化。普通编辑不重复发送未改变的渠道，避免覆盖单独设置过的 default Key。
+- 本行为为 2026-10-19 当前源码增量，未打包发布；旧核心不会同步修改已有 default Key，须同步升级宿主／CLI 与核心。数据库 schema 不变，不自动重写现存 Key；CLI 复用既有 `provider add|put --protocol`，见[指令大全](../cli/commands.md)。
 
 - 返回 revision 范围 1..Number.MAX_SAFE_INTEGER；请求 expected_revision 为 0..MAX_SAFE_INTEGER-1，且与输入 provider.revision 一致，防止更新后超出 JS 安全整数范围。
 - 超时单位为秒，1..3600；并发为 1..64。前端即时校验只帮助填写，核心仍做最终业务校验。

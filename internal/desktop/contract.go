@@ -19,6 +19,7 @@ type Problem struct {
 	Code string `json:"code"`
 }
 type Provider struct {
+	Protocol       string   `json:"protocol,omitempty"`
 	CostMultiplier float64  `json:"cost_multiplier"`
 	ID             string   `json:"id"`
 	HomepageURL    string   `json:"homepage_url"`

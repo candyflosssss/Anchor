@@ -118,8 +118,8 @@ type Provider struct {
 	// BaseURL mirrors BaseURLs[0] for older readers; BaseURLs is authoritative.
 	BaseURL  string   `json:"base_url"`
 	BaseURLs []string `json:"base_urls,omitempty"`
-	// Protocol is legacy/internal: it only initializes a new default Key and
-	// anonymous requests. Empty means "keep the stored value" on writes.
+	// Protocol selects anonymous requests and, when explicitly supplied on writes,
+	// the default Key. Empty preserves existing provider and Key protocols.
 	Protocol       string `json:"protocol,omitempty"`
 	Enabled        bool   `json:"enabled"`
 	TimeoutSeconds int    `json:"timeout_seconds"`

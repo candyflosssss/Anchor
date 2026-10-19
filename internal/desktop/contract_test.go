@@ -45,7 +45,7 @@ func TestSharedProviderContractFixtures(t *testing.T) {
 		encoded, _ := json.Marshal(dto)
 		var fields map[string]any
 		_ = json.Unmarshal(encoded, &fields)
-		if len(fields) != 9 {
+		if len(fields) != 10 {
 			t.Fatal("unexpected provider fields")
 		}
 		if _, ok := fields["secret"]; ok {
@@ -73,7 +73,7 @@ func TestProviderDTORejectsUnsafeValues(t *testing.T) {
 			t.Fatal("unsafe revision accepted")
 		}
 	}
-	if _, ok := provider(state.Provider{Revision: 1, Protocol: "unsupported"}); ok {
+	if _, ok := provider(state.Provider{Revision: 1, BaseURLs: []string{"https://example.invalid/v1"}, Protocol: "unsupported"}); ok {
 		t.Fatal("protocol accepted")
 	}
 }

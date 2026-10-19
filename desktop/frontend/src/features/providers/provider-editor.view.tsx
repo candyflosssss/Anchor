@@ -6,7 +6,7 @@ import { Switch } from '../../components/ui/switch';
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog';
 import { ProviderCatalogView } from './provider-catalog.view';
 import type { ProviderController } from './use-provider-controller';
-import { MAX_PROVIDER_URLS, type FieldErrors } from './provider.model';
+import { protocolName, MAX_PROVIDER_URLS, type FieldErrors } from './provider.model';
 function Field({ name, title, errors, children }: { name: keyof FieldErrors; title: string; errors: FieldErrors; children: ReactNode }) {
   return <div className="field"><label htmlFor={name}>{title}</label>{children}
     {errors[name] && <p id={`${name}-hint`} className="field-error">{errors[name]}</p>}
@@ -57,6 +57,13 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
             {draft.base_urls.length < MAX_PROVIDER_URLS && <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => c.changeDraft('base_urls', [...draft.base_urls, ''])}><Plus size={14} />添加请求地址</Button>}
             {c.errors.base_urls && <p id="base_urls-hint" className="field-error">{c.errors.base_urls}</p>}
           </div>
+          <Field name="protocol" title="请求渠道" errors={c.errors}>
+            <select {...errorProps('protocol')} aria-describedby={c.errors.protocol ? 'protocol-hint protocol-scope' : 'protocol-scope'} className="select-field" value={draft.protocol} onChange={event => c.changeDraft('protocol', event.target.value)}>
+              {source && !source.protocol && <option value="">保留现有渠道</option>}
+              {Object.entries(protocolName).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <p id="protocol-scope" className="field-hint">更改后用于匿名请求和默认 Key；其他 Key 及模型单独设置的协议保持不变。</p>
+          </Field>
           <section className="credential-section"><div className="section-label"><KeyRound size={15} /><h3>默认 API 密钥</h3><span>{source?.has_secret ? '已配置' : '可选'}</span></div>
             {source && <div className="secret-options" role="group" aria-label="密钥操作">{([['keep', '保留现有'], ['replace', '替换密钥'], ['clear', '清除默认密钥']] as const).map(([value, title]) => <button type="button" key={value} className={draft.secretMode === value ? 'selected' : ''} aria-pressed={draft.secretMode === value} onClick={() => { setShowSecret(false); c.changeDraft('secretMode', value); }}>{title}</button>)}</div>}
             {(!source || draft.secretMode === 'replace') && <Field name="secret" title={source ? '新的 API 密钥' : 'API Key（可选）'} errors={c.errors}>

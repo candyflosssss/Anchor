@@ -137,13 +137,13 @@ async function host(page: Page, rateMappings = false) {
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
         return { contract, data: { provider_id: provider.id, key_id: input.key_id || 'anonymous', revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '', partial: false, entries: [{ id: 'demo-model', key_ids: [input.key_id || 'anonymous'] }], keys: [{ id: input.key_id || 'anonymous', enabled: true, protocol: 'responses', http_status: 200, failure: '', group: '', group_name: '', multiplier: null, rate_basis: '', rate_failure: 'platform_required' }] }, problem: null };
       },
-      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ rate: rateCache[JSON.stringify([input.provider_id, 'default'])] ?? null, effective_multiplier: rateCache[JSON.stringify([input.provider_id, 'default'])]?.multiplier != null ? providers.find(p => p.id === input.provider_id)!.cost_multiplier * rateCache[JSON.stringify([input.provider_id, 'default'])].multiplier! : null, id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
+      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ rate: rateCache[JSON.stringify([input.provider_id, 'default'])] ?? null, effective_multiplier: rateCache[JSON.stringify([input.provider_id, 'default'])]?.multiplier != null ? providers.find(p => p.id === input.provider_id)!.cost_multiplier * rateCache[JSON.stringify([input.provider_id, 'default'])].multiplier! : null, id: 'default', protocol: providers.find(p => p.id === input.provider_id)?.protocol ?? 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
         counters.saves++;
         if (counters.writeError) return { contract, data: null, problem: { code: counters.writeError } };
-        const saved = { ...input.provider, revision: input.expected_revision + 1, has_secret: input.secret === null ? input.provider.has_secret : !!input.secret };
+        const saved = { ...input.provider, protocol: input.provider.protocol ?? providers.find(p => p.id === input.provider.id)?.protocol ?? 'responses', revision: input.expected_revision + 1, has_secret: input.secret === null ? input.provider.has_secret : !!input.secret };
         providers = [...providers.filter(p => p.id !== saved.id), saved];
         return { contract, data: saved, problem: null };
       },
@@ -1141,4 +1141,23 @@ test('Key cooldown settings persist, validate and lock uncertain writes (simulat
   await expect(toggle).not.toBeChecked();
   await expect(threshold).toHaveValue('2');
   await expect(weight).toHaveValue('20');
+});
+
+
+test('desktop request channel edit crosses the typed Wails boundary and reads back', async ({ page }) => {
+  await host(page, true);
+  await page.getByRole('button', { name: '编辑 摸鱼AI', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('请求渠道', { exact: true })).toHaveValue('responses');
+  await dialog.getByLabel('请求渠道', { exact: true }).selectOption('anthropic');
+  await dialog.getByRole('button', { name: '保存配置', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(1);
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const detail = page.getByLabel('摸鱼AI 的详情');
+  await expect(detail).toContainText('Anthropic Messages');
+  await detail.getByRole('tab', { name: /^Key/ }).click();
+  await expect(detail.getByRole('row').filter({ has: page.getByRole('cell', { name: 'default', exact: true }) })).toContainText('Anthropic Messages');
+  await detail.getByRole('button', { name: '编辑配置', exact: true }).click();
+  await expect(page.getByRole('dialog').getByLabel('请求渠道', { exact: true })).toHaveValue('anthropic');
 });

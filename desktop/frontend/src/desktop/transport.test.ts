@@ -148,3 +148,9 @@ describe('core restart boundary', () => {
     expect(restart).toHaveBeenCalledTimes(1);
   });
 });
+
+it('accepts missing legacy provider protocols and rejects unknown protocols', () => {
+  const legacy: Provider = { ...publicRow }; delete legacy.protocol;
+  expect(checkedProvider(legacy)).toEqual(legacy);
+  for (const protocol of ['unknown', 'toString', '__proto__']) expect(() => checkedProvider({ ...publicRow, protocol })).toThrow('read_error');
+});

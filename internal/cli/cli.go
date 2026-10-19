@@ -642,7 +642,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	var bases repeated
 	f.Var(&bases, "base-url", "request API base including optional /v1, not /responses; repeat for round-robin load balancing (max 16)")
 	homepage := f.String("homepage-url", "", "optional provider homepage, display only")
-	protocol := f.String("protocol", "", "default protocol for a newly created default Key; empty keeps the stored value or uses responses")
+	protocol := f.String("protocol", "", "request protocol for anonymous requests and the default Key; omitted keeps existing protocols (new: responses)")
 	timeout := f.Int("timeout", 120, "total request timeout in seconds")
 	max := f.Int("max-concurrent", 4, "provider concurrency")
 	cost := f.Float64("cost-multiplier", 0, "provider recharge cost factor 0.000001..1000; omitted preserves existing or defaults to 1")

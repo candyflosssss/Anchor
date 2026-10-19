@@ -591,6 +591,7 @@ export interface Problem {
   code: ProblemCode;
 }
 export interface Provider {
+  protocol?: string;
   cost_multiplier: number;
   id: string;
   homepage_url: string;

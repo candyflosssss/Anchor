@@ -143,7 +143,7 @@ export class MockProviderTransport implements ProviderTransport {
   private detail(p: Provider): Workspace {
     let w = this.workspaces.get(p.id);
     if (!w) {
-      w = checkedWorkspace({ ...structuredClone(workspaceFixture), provider_id: p.id, revision: p.revision, keys: p.has_secret ? structuredClone(workspaceFixture.keys) : [] });
+      w = checkedWorkspace({ ...structuredClone(workspaceFixture), provider_id: p.id, revision: p.revision, keys: p.has_secret ? structuredClone(workspaceFixture.keys).map(k => ({ ...k, protocol: p.protocol || k.protocol })) : [] });
       if (!this.seeded.has(p.id)) { this.seeded.add(p.id); seed(p.id, w); }
       this.workspaces.set(p.id, w);
     }
@@ -316,7 +316,8 @@ export class MockProviderTransport implements ProviderTransport {
     }
     if ((input.expected_revision === 0 && current) || (input.expected_revision > 0 && current?.revision !== input.expected_revision)) throw fixtureError('conflict');
     if (!input.provider.base_urls.length || input.provider.base_urls.length > 16) throw fixtureError('invalid');
-    const saved: Provider = { ...input.provider, base_urls: [...input.provider.base_urls], revision: input.expected_revision + 1,
+    if (input.provider.protocol && !['responses', 'chat-completions', 'anthropic'].includes(input.provider.protocol)) throw fixtureError('invalid');
+    const saved: Provider = { ...input.provider, protocol: input.provider.protocol || current?.protocol || 'responses', base_urls: [...input.provider.base_urls], revision: input.expected_revision + 1,
       has_secret: input.secret === null ? current?.has_secret ?? false : !!input.secret };
     if (current) {
       const w = this.detail(current);
@@ -324,7 +325,11 @@ export class MockProviderTransport implements ProviderTransport {
         const k = w.keys.find(k => k.id === 'default');
         if (!input.secret) { if (k) this.deleteKey(w, 'default'); }
         else if (k) { k.enabled = true; k.state = 'ready'; }
-        else w.keys.push({ rate: null, effective_multiplier: null, id: 'default', protocol: 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
+        else w.keys.push({ rate: null, effective_multiplier: null, id: 'default', protocol: saved.protocol!, model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null });
+      }
+      if (input.provider.protocol) {
+        const key = w.keys.find(k => k.id === 'default');
+        if (key) key.protocol = input.provider.protocol;
       }
       saved.has_secret = w.keys.length > 0;
     }

@@ -1,3 +1,4 @@
+import { actionFor } from './provider-features.model';
 import { describe, expect, it } from 'vitest';
 import { isDirty, newDraft, toSave, validateDraft, type Provider } from './provider.model';
 import { MockProviderTransport } from './provider.mock';
@@ -48,9 +49,9 @@ describe('immediate field feedback, not replacement backend validation', () => {
     expect(validateDraft({ ...valid(), homepage_url: 'http://www.example.com' }).homepage_url).toBeUndefined();
     expect(validateDraft({ ...valid(), homepage_url: 'ftp://example.com' }).homepage_url).toBeDefined();
   });
-  it('creates providers with an optional Key and without a provider protocol', () => {
+  it('creates providers with an optional Key and the chosen request protocol', () => {
     const saved = toSave({ ...valid(), secretMode: 'replace', secret: 'synthetic-create-key' });
-    expect(saved.secret).toBe('synthetic-create-key'); expect(saved.provider).not.toHaveProperty('protocol');
+    expect(saved.secret).toBe('synthetic-create-key'); expect(saved.provider.protocol).toBe('responses');
     expect(saved.provider.base_urls).toEqual(['https://api.example.com/v1']);
   });
   it('checks timeout and concurrency limits including blank and decimals', () => {
@@ -121,5 +122,35 @@ describe('provider recharge cost factor', () => {
   });
   it.each(['', '0', '-1', 'NaN', 'Infinity', '1001', '0.0000001'])('rejects invalid factor %s', costMultiplier => {
     expect(validateDraft({ ...valid(), costMultiplier }).costMultiplier).toBeDefined();
+  });
+});
+
+describe('provider request protocol editing', () => {
+  it('sends an explicit protocol only for creation or a changed selection', () => {
+    const p = { ...source, protocol: 'anthropic' };
+    expect(newDraft(p).protocol).toBe('anthropic');
+    expect(toSave(newDraft(p), p).provider).not.toHaveProperty('protocol');
+    expect(toSave({ ...newDraft(p), protocol: 'chat-completions' }, p).provider.protocol).toBe('chat-completions');
+    expect(newDraft(source).protocol).toBe('');
+    expect(toSave(newDraft(source), source).provider).not.toHaveProperty('protocol');
+  });
+  it.each(['unknown', 'toString', '__proto__'])('rejects unsupported request protocol %s', protocol => {
+    expect(validateDraft({ ...valid(), protocol }).protocol).toBeDefined();
+  });
+  it('persists changed protocols in the prototype and preserves named Keys and model overrides', async () => {
+    const transport = new MockProviderTransport();
+    let p = (await transport.list(signal()))[0];
+    let w = await transport.action(actionFor(p, 'key-put', { target: 'named', secret: 'synthetic-protocol', protocol: 'responses', enabled: true }), signal());
+    await transport.action(actionFor({ ...p, revision: w.revision }, 'key-model-protocol', { target: 'default', model: 'override-model', protocol: 'chat-completions' }), signal());
+    p = (await transport.list(signal())).find(row => row.id === p.id)!;
+    p = await transport.save(toSave({ ...newDraft(p), protocol: 'anthropic' }, p), signal());
+    w = await transport.workspace(p.id, signal());
+    expect(p.protocol).toBe('anthropic');
+    expect(w.keys.find(k => k.id === 'default')).toMatchObject({ protocol: 'anthropic', model_protocols: [{ model: 'override-model', protocol: 'chat-completions' }] });
+    expect(w.keys.find(k => k.id === 'named')?.protocol).toBe('responses');
+    await transport.action(actionFor(p, 'key-put', { target: 'default', protocol: 'responses', enabled: true }), signal());
+    p = (await transport.list(signal())).find(row => row.id === p.id)!;
+    await transport.save(toSave({ ...newDraft(p), timeout: '240' }, p), signal());
+    expect((await transport.workspace(p.id, signal())).keys.find(k => k.id === 'default')?.protocol).toBe('responses');
   });
 });

@@ -428,8 +428,9 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 		}
 	}
 	p.Normalize()
+	updateDefaultProtocol := p.Protocol != ""
 	if p.Protocol == "" {
-		// Provider-level protocol is no longer user-facing; keep the stored legacy value.
+		// Omitted protocols preserve both the provider default and existing Key protocols.
 		var old Provider
 		if oldDocument != "" && json.Unmarshal([]byte(oldDocument), &old) == nil && ValidProtocol(old.Protocol) {
 			p.Protocol = old.Protocol
@@ -489,6 +490,11 @@ func (s *Store) PutProvider(p Provider, expected int64, secret *string) (Provide
 			_, err = tx.Exec(`INSERT INTO provider_keys(provider_id,id,secret,enabled,protocol) VALUES(?,'default',?,1,?) ON CONFLICT(provider_id,id) DO UPDATE SET secret=excluded.secret,enabled=1`, p.ID, *secret, p.Protocol)
 		}
 		if err != nil {
+			return Provider{}, err
+		}
+	}
+	if updateDefaultProtocol {
+		if _, err = tx.Exec(`UPDATE provider_keys SET protocol=? WHERE provider_id=? AND id='default'`, p.Protocol, p.ID); err != nil {
 			return Provider{}, err
 		}
 	}
