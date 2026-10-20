@@ -80,11 +80,11 @@ func (s *Server) logRoutes(m *http.ServeMux) {
 			logError(w, err)
 			return
 		}
-		// List documents retain only compact service-tier evidence; detail/export retain all diagnostics.
+		// Retain compact service-tier and recovery evidence; detail/export retain all diagnostics.
 		for i := range p.Requests {
 			p.Requests[i].Attempts = []logbook.Attempt{}
 			evidence := map[string]string{}
-			for _, name := range []string{"sent_service_tier", "sent_service_tier_raw", "fast_triggered", "upstream_service_tier", "upstream_service_tier_raw"} {
+			for _, name := range []string{"sent_service_tier", "sent_service_tier_raw", "fast_triggered", "upstream_service_tier", "upstream_service_tier_raw", "encrypted_context_recovery", "encrypted_context_reason", "encrypted_context_removed_reasoning", "encrypted_context_retry_count"} {
 				if value, ok := p.Requests[i].Evidence[name]; ok {
 					evidence[name] = value
 				}

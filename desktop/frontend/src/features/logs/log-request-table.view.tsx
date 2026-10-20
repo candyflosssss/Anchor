@@ -3,7 +3,7 @@ import { ArrowDownToLine, ArrowUpFromLine, BrainCircuit, ChevronRight, Clock3, D
 import { Button } from '../../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { cacheHitRate, outputTps, type LogColumnId } from './log-columns.model';
-import { sourceLabels, statusLabels, type RequestLog } from './log.model';
+import { encryptedContextRecoveryLabel, sourceLabels, statusLabels, type RequestLog } from './log.model';
 import { Acceleration, SentTier } from './log-service-tier.view';
 import type { LogController } from './use-log-controller';
 import type { LogColumnsController } from './use-log-columns-controller';
@@ -28,6 +28,7 @@ export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
       {row.code && <span className="mono log-block-primary text-destructive text-[10px]">{row.code}</span>}
       <dl className="log-meta-list"><Metric label="生成" value={row.generationStatus ?? '未知'} /><Metric label="交付" value={row.delivery} /></dl>
       {(row.attemptCount ?? row.attempts.length) > 1 && <small className="log-subtext">{row.attemptCount ?? row.attempts.length} 次尝试</small>}
+      {encryptedContextRecoveryLabel(row) && <small className="log-subtext">{encryptedContextRecoveryLabel(row)}</small>}
     </div>;
     case 'model': return <div className="log-info-block"><span className="mono font-medium log-block-primary">{row.model}</span><dl className="log-meta-list">
       <Metric label="实际" value={row.upstreamModel ?? row.attempts.at(-1)?.model ?? '未知'} />

@@ -253,7 +253,7 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 }
-func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string, attemptCtx context.Context, attemptResult *forwardAttemptResult) (retry bool) {
+func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity, base string, allowRecovery bool, attemptCtx context.Context, attemptResult *forwardAttemptResult) (retry bool) {
 	// Resolve after key selection: the upstream model override wins over this key's default.
 	p.Protocol = key.EffectiveProtocol(c.Model)
 	costFactors := logCostFactors(p, key)
@@ -267,6 +267,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	observation := protocol.Observation{}
 	var upstreamHTTP *int
 	code := ""
+	var recovery *encryptedContextRecovery
 	setLogStage(r, "request_convert")
 	if t := trace(r); t != nil {
 		if _, exists := t.row.Evidence["model_revision"]; !exists {
@@ -284,7 +285,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		t.row.Code = ""
 	}
 	defer func() {
-		*attemptResult = forwardAttemptResult{attempted: attempted, success: success, status: status, after: after}
+		*attemptResult = forwardAttemptResult{attempted: attempted, success: success, status: status, after: after, opaque: recovery}
 		if !attempted {
 			return
 		}
@@ -351,7 +352,6 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		fail(w, 400, "unsupported_conversion", "candidate protocol cannot represent a request field or content")
 		return false
 	}
-	base := s.pickURL(p)
 	target := strings.TrimRight(base, "/") + protocol.Endpoint(p.Protocol)
 	ctx, cancel := context.WithCancel(attemptCtx)
 	defer cancel()
@@ -417,6 +417,16 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	after = resp.Header.Get("Retry-After")
 	setLogStage(r, "upstream_response")
 	if status != 200 {
+		if allowRecovery && (status == 400 || status == 422) {
+			data, readErr := io.ReadAll(io.LimitReader(resp.Body, encryptedContextPrefixLimit+1))
+			if readErr == nil && len(data) <= encryptedContextPrefixLimit {
+				recovery = recoverEncryptedContext(request, encryptedContextError(data))
+				if recovery != nil {
+					code = "encrypted_context_rejected"
+					return true
+				}
+			}
+		}
 		switch status {
 		case 401, 403, 429, 502, 503, 504:
 			code = "upstream_unavailable"
@@ -451,6 +461,16 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		to = "responses"
 	}
 	if stream {
+		if allowRecovery {
+			setLogStage(r, "stream_start")
+			reader, reason := primeEncryptedContextStream(ctx, resp.Body, encryptedContextPrimeTimeout)
+			recovery = recoverEncryptedContext(request, reason)
+			if recovery != nil {
+				code = "encrypted_context_rejected"
+				return true
+			}
+			resp.Body = &inferenceBody{Reader: reader, Closer: resp.Body}
+		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Accel-Buffering", "no")
@@ -473,6 +493,13 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		return false
 	}
 	m, decodeErr := protocol.Decode(data)
+	if allowRecovery && decodeErr == nil {
+		recovery = recoverEncryptedContext(request, encryptedContextError(data))
+		if recovery != nil {
+			code = "encrypted_context_rejected"
+			return true
+		}
+	}
 	if decodeErr == nil {
 		observation.ServiceTier = protocol.ReadServiceTier(m, p.Protocol)
 		observation.ServiceTierRaw = protocol.ReadRawServiceTier(data, p.Protocol, key.Secret)

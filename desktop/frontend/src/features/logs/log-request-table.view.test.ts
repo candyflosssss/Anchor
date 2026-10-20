@@ -16,6 +16,17 @@ const row: RequestLog = {
 };
 const render = (id: Parameters<typeof ColumnValue>[0]['id'], value = row) => renderToStaticMarkup(createElement(ColumnValue, { id, row: value }));
 describe('grouped request log values', () => {
+  it('marks encrypted context cleanup using the recorded retry result, independently of final status', () => {
+    const recovered = { ...row, status: 'succeeded' as const, evidence: { encrypted_context_recovery: 'succeeded', encrypted_context_removed_reasoning: '2' } };
+    expect(render('status', recovered)).toContain('已清理加密上下文 · 恢复成功');
+    expect(render('status', { ...recovered, evidence: { encrypted_context_recovery: 'failed' } })).toContain('已清理加密上下文 · 重试失败');
+    expect(render('status', { ...recovered, status: 'cancelled', evidence: { encrypted_context_recovery: 'cancelled' } })).toContain('重试已取消');
+    const pending = { ...recovered, evidence: { encrypted_context_recovery: 'pending' } };
+    expect(render('status', { ...pending, status: 'pending' })).toContain('正在重试');
+    expect(render('status', { ...pending, status: 'interrupted' })).toContain('结果未确认');
+    expect(render('status', { ...recovered, evidence: {} })).not.toContain('已清理加密上下文');
+    expect(render('status', { ...recovered, evidence: { encrypted_context_recovery: 'unrecognized-value' } })).not.toContain('恢复成功');
+  });
   it('shows total TPS from total output including reasoning over total request time', () => {
     const html = render('timing');
     for (const value of ['总耗时', '首字', '输出', '总TPS', '2,100 ms', '500 ms', '1,200 ms', '142.9 t/s']) expect(html).toContain(value);

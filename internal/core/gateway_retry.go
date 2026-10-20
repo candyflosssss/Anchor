@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -14,6 +15,7 @@ type forwardAttemptResult struct {
 	success   bool
 	status    int
 	after     string
+	opaque    *encryptedContextRecovery
 }
 
 func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string) bool {
@@ -26,7 +28,43 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 		}
 		s.finishKey(p, key.ID, result.status, result.after, result.success)
 	}()
-	// Codex owns retries. Each provider/key/model is attempted once per request;
-	// the outer routing loop still permits safe key/candidate failover.
-	return s.forwardAttempt(w, r, request, public, c, p, key, stream, routeModel, affinity, ctx, &result)
+	// Ordinary retries belong to the caller. A definite rejection of historical
+	// reasoning permits one changed request, before any downstream output.
+	base := s.pickURL(p)
+	allowRecovery := key.EffectiveProtocol(c.Model) == "responses" && r.Context().Value(protocolKey{}) == nil && hasEncryptedReasoning(request)
+	if t := trace(r); t != nil && t.encryptedContextRetried {
+		allowRecovery = false
+	}
+	retry := s.forwardAttempt(w, r, request, public, c, p, key, stream, routeModel, affinity, base, allowRecovery, ctx, &result)
+	if result.opaque == nil {
+		return retry
+	}
+	if ctx.Err() != nil {
+		if r.Context().Err() == nil {
+			fail(w, 504, "upstream_timeout", "upstream timed out before encrypted context recovery")
+		}
+		return false
+	}
+	recovery := result.opaque
+	if t := trace(r); t != nil {
+		t.encryptedContextRetried = true
+		t.row.Evidence["encrypted_context_recovery"] = "pending"
+		t.row.Evidence["encrypted_context_reason"] = recovery.reason
+		t.row.Evidence["encrypted_context_removed_reasoning"] = strconv.Itoa(recovery.removed)
+		t.row.Evidence["encrypted_context_retry_count"] = "1"
+		if s.logs != nil {
+			s.logs.Request(t.row)
+		}
+	}
+	retry = s.forwardAttempt(w, r, recovery.request, public, c, p, key, stream, routeModel, affinity, base, false, ctx, &result)
+	if t := trace(r); t != nil {
+		outcome := "failed"
+		if result.success {
+			outcome = "succeeded"
+		} else if r.Context().Err() != nil {
+			outcome = "cancelled"
+		}
+		t.row.Evidence["encrypted_context_recovery"] = outcome
+	}
+	return retry
 }

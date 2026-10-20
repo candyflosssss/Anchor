@@ -61,7 +61,7 @@
 - 安全边界：原始字符串最多 128 UTF-8 字节、序列化后最多 256 字节；对象、数组、控制字符、可识别凭据片段及当前可用的认证秘密不进入原值字段。被抑制的值保留 `unknown` 标签而不保存原值，不保存请求／响应正文。规范化标签只允许 `auto/default/priority/fast/ultrafast/flex/scale`；其余为 `unknown`。
 - `fast_triggered` 为字符串 `true/false/unknown`：上游明确报告 `priority/fast/ultrafast` 为 true，`default/flex/scale` 为 false，缺失、auto 或其他值为 unknown。它只代表**上游报告的档位**，不证明实际速度、计费或完全符合请求。界面另外比较派发与返回档位：Ultrafast → Fast 标“仅确认 Fast”，请求加速但返回非 Fast 标“未按请求加速”；未知不误判成失败或未加速。
 - SSE 后续报告覆盖先前报告（含未知或被抑制值）；切换候选清空前一候选的派发／返回快照。失败／中断时保留已观测报告，不与请求成功混为一谈；非 200、错误内容类型或无法解码等提前退出路径不额外读取正文取证，仍为未知。字段描述最后候选，不新增逐尝试档位历史。
-- 列表与 `follow` 仅保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`，仍省略 attempts 及其他 evidence。详情、复制与 JSONL 导出保留完整安全证据；历史不补写，旧日志已知标签可继续标注，但不从模型名、固定策略或速度反推原值。
+- 列表与 `follow` 的档位信息仅保留五项紧凑证据（恢复标记另见下文）：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`，仍省略 attempts 及其他 evidence。详情、复制与 JSONL 导出保留完整安全证据；历史不补写，旧日志已知标签可继续标注，但不从模型名、固定策略或速度反推原值。
 
 桌面增加“发送档位”“加速状态”显示块：原始 JSON 值为主，青色闪电标 Fast、紫色火箭标 Ultrafast，辅以文字和确认／不匹配状态。`auto`、`flex`、`scale` 单独显示，不算已确认 Fast。核心运行日志 `model request` 只输出安全规范化的请求／派发／返回档位与 fast_triggered，不输出任意原值。本改动仅观测，不改写请求、不启用服务档位、不改变跨协议转换支持范围。
 
@@ -197,3 +197,20 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 桌面 Go DTO 与生成的 TypeScript 类型同源；共享样例 `desktop/contract/log-dimensions.json` 同时用于存储与前端验证。分类选择属于 hook Controller，Model 构造与验证类型化查询，View 仅展示分类表和发出筛选动作；新维度在全局过滤状态中保存，点击组后列表／曲线／导出保持一致。默认不分类；旧核心缺少字段时不伪装成有效分组，显式选择新分类失败提示核心版本，不回退 Mock。CLI 同步支持 `logs stats --group-by` 和相关筛选，具体命令见[最新指令大全](../cli/commands.md)。
 
 归属筛选／分组基础能力已随 desktop.44 宿主／核心发布到默认 dev 在线源，并完成本机 CLI／核心／GUI 同版用户目录升级；desktop.44 仍仅接受显式项目／会话标签。上述 Codex 原生归属与稀疏曲线增量已从干净提交打包为 desktop.45，并于2026-10-16 19:09完成本机 CLI／核心／GUI 升级；两平台包及哈希、本机核心／网关就绪、六档统计／四维分类／候选／导出验证通过。同版现已于北京时间 2026-10-16 20:03:09 发布到默认 GitHub dev 在线源，两平台安装包、清单及源码／元数据／校验附件齐全；Linux 默认源真实下载与大小／SHA256校验通过，Windows 附件 digest 与本地一致。在线投放未重启本机，SSH 远端未更新；旧日志不补归属。原生归属复用隔离 Codex 与本地模拟上游验证，未请求真实付费推理；原生窗口／系统安装器未验收。详见[desktop.45 dev 发行记录](../release/desktop.md#当前在线-dev-版-45)。
+
+### 历史加密推理恢复（2026-10-20，当前源码，未发布）
+
+原生 Responses 对历史加密推理明确拒绝且尚未交付响应时，核心清理请求 input 的全部 reasoning 条目并在同一供应商／Key／模型／选定基址重试一次；所有候选共用一次清理预算。清理仅作用于转发副本，保留普通消息、工具调用／结果、压缩历史与加密任务；可能损失隐藏推理连续性。流开头检查仅暂存生命周期事件，最多 64 KiB／2 秒；任何输出／推理／工具事件或窗口结束后不再清理重放。详细触发与限制见[实施说明](implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。
+
+同一根请求的 evidence 标记：
+
+| 字段 | 口径 |
+| --- | --- |
+| `encrypted_context_recovery` | `pending` 已开始清理重试；`succeeded` 该恢复尝试成功；`failed` 该恢复尝试失败；`cancelled` 客户端取消。独立于后续候选可能成功的根请求状态；异常退出留下 pending 时只表示结果未确认 |
+| `encrypted_context_reason` | 触发原因固定为 `invalid_encrypted_content`、`encrypted_content_unverifiable` 或 `encrypted_content_caller_mismatch`，不保存原始错误 |
+| `encrypted_context_removed_reasoning` | 本次删除的推理条目十进制数量，包括同一请求中的非加密 reasoning 条目 |
+| `encrypted_context_retry_count` | 固定字符串 `1`，与全部渠道 attempt_count 分开 |
+
+上述四项加入列表／follow 的紧凑 evidence 白名单，详情／复制／JSONL 导出保留完整标记。此前“五项档位证据”限制扩展为五项档位加四项恢复证据，其他大诊断仍只在详情／导出。桌面状态列和复用的详情列显示「已清理加密上下文 · 恢复成功／重试失败／重试已取消／正在重试／结果未确认」，只按已记录枚举展示；旧日志或未知值不猜已清理。
+
+两个实际派发保存为独立 attempt：首次拒绝 `code=encrypted_context_rejected`、`outcome=retry`，第二次保存真实结果。缺失第一次 usage 时根 Token／费用保持未知，不能把最后成功尝试冒充全部消耗；Key 健康按该渠道的最终恢复结果更新。无清理发生则不添加标记。仅保存固定原因、计数与结果，不记录密文、推理 ID、请求／响应正文、工具参数或错误原文，历史日志不回填。既有 evidence 字典契约与 CLI／桥接入口不变，无数据库迁移。

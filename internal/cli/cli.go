@@ -25,7 +25,7 @@ const help = `Anchor — headless model gateway (development milestone)
 Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
   init [--control-address 127.0.0.1:17861] [--gateway-address 127.0.0.1:17860]
   serve                              Run the local foreground core
-      Inference: one attempt per channel with safe key/candidate failover; no replay after output or unknown execution.
+      Inference: one ordinary attempt per channel with safe key/candidate failover; no replay after output or unknown execution.
       Codex owns request/stream retries (default 5); management writes are not retried.
   restart --approve [--timeout 30s]   Restart local core, or explicit --context SSH target; preserve configuration
       Local safety pins: [--expected-instance ID] [--control-port N] (not with --context).
@@ -132,6 +132,7 @@ Normal output is JSON; logs export is JSONL, logs follow emits repeated JSON pag
 Logs include optional reference_cost: usd is original; adjustment stores supplier/group multipliers, final usd and token parts.
 Attempts retain reference_usd and cost_adjustment snapshots. Missing prices are omitted; unknown usage/rates stay null.
 Logs include safe raw service-tier evidence; fast_triggered is true/false/unknown from upstream reports, not measured speed.
+Logs mark encrypted-context cleanup, removed reasoning count and recovery outcome; native Responses may retry once before output after a definite encrypted-content rejection.
 Diagnostics and service logs go to stderr.
 Agent failures distinguish revision conflicts, external configuration edits, unsafe configuration, unavailable default models and invalid catalogs; unclassified failures remain agent_operation_failed.
 Model deletion protects enabled Binding defaults; disabled Bindings do not block deletion.

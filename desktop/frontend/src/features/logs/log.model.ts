@@ -36,6 +36,16 @@ export function identityQuery(filters: LogFilters): Pick<Query, LogDimension> {
 }
 export const statusLabels: Record<LogStatus, string> = { succeeded: '成功', failed: '失败', cancelled: '已取消', interrupted: '已中断', pending: '进行中' };
 export const sourceLabels: Record<LogSource, string> = { proxy: '代理请求', probe: '推理测试' };
+export function encryptedContextRecoveryLabel(row: RequestLog): string | null {
+  const outcome = row.evidence.encrypted_context_recovery;
+  switch (outcome) {
+    case 'succeeded': return '已清理加密上下文 · 恢复成功';
+    case 'failed': return '已清理加密上下文 · 重试失败';
+    case 'cancelled': return '已清理加密上下文 · 重试已取消';
+    case 'pending': return `已清理加密上下文 · ${row.status === 'pending' ? '正在重试' : '结果未确认'}`;
+    default: return null;
+  }
+}
 export function filterRequests(rows: RequestLog[], filters: LogFilters): RequestLog[] {
   const query = filters.query.trim().toLowerCase();
   return rows.filter(row => row.ageMinutes <= Number(filters.window)

@@ -14,12 +14,13 @@ import (
 
 type requestLogKey struct{}
 type requestTrace struct {
-	row          logbook.Request
-	start        time.Time
-	unknownUsage bool
-	unknownCost  bool
-	written      int64
-	writeFailed  bool
+	row                     logbook.Request
+	start                   time.Time
+	unknownUsage            bool
+	unknownCost             bool
+	written                 int64
+	writeFailed             bool
+	encryptedContextRetried bool
 }
 
 func trace(r *http.Request) *requestTrace {
