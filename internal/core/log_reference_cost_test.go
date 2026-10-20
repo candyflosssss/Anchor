@@ -226,7 +226,7 @@ func TestLogCostAdjustmentSnapshotsAndRetryTotals(t *testing.T) {
 	u := protocol.Usage{Known: true, Input: 1000, Output: 100, CacheRead: 400, CacheWrite: 100, Reasoning: 30, CacheReadKnown: true, CacheWriteKnown: true, ReasoningKnown: true}
 	group := .8
 	p := state.Provider{CostMultiplier: .5}
-	key := state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &group, Group: "vip", GroupName: "VIP", Basis: "key_billing", ObservedAt: "2026-10-19T00:00:00Z", Failure: "network"}}
+	key := state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &group, Group: "vip", GroupName: "VIP", Basis: "key_billing", ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Failure: "network"}}
 	factors := logCostFactors(p, key)
 	group = 3 // capture before dispatch, not completion
 	tr := &requestTrace{row: logbook.Request{ReferenceCost: referenceCost(&snapshot)}}
@@ -263,12 +263,12 @@ func TestLogCostAdjustmentUnknownZeroAndTiers(t *testing.T) {
 	u := protocol.Usage{Known: true, Input: 100, Output: 10, CacheReadKnown: true, CacheWriteKnown: true}
 	zero := 0.0
 	tr := &requestTrace{row: logbook.Request{ReferenceCost: referenceCost(&snapshot)}}
-	tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &zero}})}, u)
+	tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &zero, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano)}})}, u)
 	a := tr.row.ReferenceCost.Adjustment
 	if a.USD == nil || *a.USD != "0" || *a.SupplierMultiplier != "1" || a.Parts[4].Tokens != nil || !a.Parts[3].IncludesReasoning {
 		t.Fatalf("zero/legacy/inclusive output: %+v", a)
 	}
-	tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &zero}})}, protocol.Usage{})
+	tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &zero, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano)}})}, protocol.Usage{})
 	if a.USD != nil || a.Reason != "missing_usage" {
 		t.Fatal("zero factor cannot invent missing usage", a)
 	}
@@ -276,7 +276,7 @@ func TestLogCostAdjustmentUnknownZeroAndTiers(t *testing.T) {
 	one := 1.0
 	for _, input := range []int64{200000, 250001} {
 		u.Input = input
-		tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &one}})}, u)
+		tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &one, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano)}})}, u)
 	}
 	a = tr.row.ReferenceCost.Adjustment
 	if a.USD == nil || *a.USD != "1.750255" || !a.Parts[0].MixedRate || a.Parts[0].Rate != nil {
@@ -284,7 +284,7 @@ func TestLogCostAdjustmentUnknownZeroAndTiers(t *testing.T) {
 	}
 	// Totals continue after bounded attempt history is exhausted.
 	for range 64 {
-		tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &one}})}, u)
+		tr.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{Rate: &catalog.KeyRateCache{Multiplier: &one, ObservedAt: time.Now().UTC().Format(time.RFC3339Nano)}})}, u)
 	}
 	if tr.row.AttemptCount != 66 || !tr.row.AttemptsTruncated || len(tr.row.Attempts) != 64 || *a.USD != "81.760175" {
 		t.Fatal("truncated attempts lost totals", tr.row.AttemptCount, *a.USD)

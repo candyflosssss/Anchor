@@ -13,7 +13,7 @@ import (
 // EffectiveKeyMultiplier deliberately ignores the legacy candidate/model factor.
 // That field is reserved for future use; unknown group rates stay unknown.
 func (p Provider) EffectiveKeyMultiplier(k ProviderKey) *float64 {
-	if k.Rate == nil || k.Rate.Multiplier == nil {
+	if !k.Rate.UsableAt(time.Now()) {
 		return nil
 	}
 	cost := p.CostMultiplier

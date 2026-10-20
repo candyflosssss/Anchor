@@ -10,6 +10,7 @@ func (s *Server) syncAgentMappings(w http.ResponseWriter) {
 	// Recheck shared reference data after mapping changes, including removals
 	// caused by provider/Key deletion. This never delays a committed mutation.
 	s.modelCatalog.RefreshSoon()
+	s.keyRateRefresh.notify()
 	results, err := s.Agents.SyncMappings()
 	partial := err != nil
 	for _, result := range results {

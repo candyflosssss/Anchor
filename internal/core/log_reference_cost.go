@@ -104,7 +104,7 @@ func logCostFactors(p state.Provider, key state.ProviderKey) *logbook.CostAdjust
 	if key.Rate != nil {
 		r := key.Rate
 		out.Group, out.GroupName, out.Basis, out.ObservedAt, out.Failure = r.Group, r.GroupName, r.Basis, r.ObservedAt, r.Failure
-		if r.Multiplier != nil {
+		if r.UsableAt(time.Now()) {
 			out.GroupMultiplier = logMultiplier(*r.Multiplier)
 		}
 	}

@@ -37,6 +37,7 @@ func (s *Server) providerPlatformRoutes(mux *http.ServeMux) {
 			apiError(w, err)
 			return
 		}
+		s.keyRateRefresh.notify()
 		writeJSON(w, 200, out)
 	})
 	mux.HandleFunc("POST /control/v1/providers/{id}/query", func(w http.ResponseWriter, r *http.Request) {

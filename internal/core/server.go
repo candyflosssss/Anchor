@@ -44,6 +44,7 @@ type Server struct {
 	upstream         *http.Client
 	egress           *egress.Manager
 	modelCatalog     *modeldev.Client
+	keyRateRefresh   *keyRateRefresh
 	mu               sync.Mutex
 	active           map[string]int
 	health           map[string]*keyHealth
@@ -88,11 +89,12 @@ func NewWithModelCatalog(store *state.Store, log *slog.Logger, catalogClient *mo
 		// A broken read must not silently enable the default policy.
 		policy = state.KeyCooldownSettings{}
 	}
-	return &Server{keyPolicy: policy, egress: outbound, Skills: skills.New(store.Dir), modelCatalog: catalogClient, Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: outbound, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
+	return &Server{keyPolicy: policy, egress: outbound, Skills: skills.New(store.Dir), modelCatalog: catalogClient, keyRateRefresh: newKeyRateRefresh(), Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: outbound, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
 		s.stopping.Store(true)
+		s.keyRateRefresh.close()
 		s.mu.Lock()
 		runs := make([]*probeRun, 0, len(s.probeRuns))
 		for _, run := range s.probeRuns {
@@ -462,6 +464,7 @@ func (s *Server) Run(ctx context.Context) error {
 	go func() { errs <- control.Serve(cl) }()
 	go func() { errs <- gateway.Serve(gl) }()
 	s.modelCatalog.StartRefresh()
+	s.keyRateRefresh.start(s)
 	managedResults, managedErr := s.Agents.Start()
 	if managedErr != nil {
 		s.Log.Warn("agent startup reconciliation unavailable")
