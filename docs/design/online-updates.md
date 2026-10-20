@@ -143,6 +143,8 @@ CLI 自身 `update upgrade --approve` 同样准备新程序、一次交接、核
 
 SSH 更新只作用于显式选择的既有 POSIX/Linux 被控机：桌面 `CheckRemoteUpdate(instance_id)` 返回 UpdateResult；`InstallRemoteUpdate({instance_id,version,approved})` 冻结上一轮检查的版本和完整 SHA256，只提交一次，清除候选，成功 phase=applied、available=false、current_version=实际新版。其余 UpdateInfo 结构不变。本机 `CheckUpdate/DownloadUpdate/InstallUpdate` 仍始终作用本机。所有前端接口均无 URL／路径／shell 参数。
 
+2026-10-20 当前源码修正 SSH 更新失败提示（尚未打包）：`remote_anchor_unsupported` 明确要求先升级被控机 CLI 到 desktop.57 或更高版本；SSH 认证、主机密钥、设备身份等错误各自呈现，不当作更新源网络故障。检查结果未知与安装结果未知分别处理。更新发现与下载由被控机执行，使用远端更新配置及 SSH 非交互环境；本机设置的代理不会自动传递到远端。通用失败提示无法独立证明远端 GitHub 访问失败，须先核对实际错误类型。
+
 连接层复用已认证 SSH 密码或密钥连接，调用被控机自己的 `update check` 和 `update upgrade --approve`，两者携带 instance/control-port，后者额外固定 version/SHA256；更新来源和平台由被控机决定。接收有界、严格 JSON，成功后经管理通道复核 instance/version/PID/ready。不重授权、不调用普通 stop、不更新主控机、不重复未知变更。旧远端 CLI 不支持新参数时显示 remote_anchor_unsupported，需一次手工引导；当前 shell 发现是 POSIX，Windows SSH 被控机不在范围。SSH 断开、错误响应或最终身份／版本不符均报告 unknown，不能宣称未执行或已回滚，用户重新检查。远端系统安装目录不可写不影响旁路更新，但账号必须有用户数据目录写入权限。
 
 打包脚本为每平台额外生成唯一命名的 desktop runtime 与 CLI binary，并可生成 update-desktop/update-cli 两份清单。desktop.57 已把四个运行程序和两份清单与安装包／源码／许可元数据一并上传同版 Release，共 11 项附件；后续发布沿用该集合，不再假设旧的固定六附件数量。真实 SSH 升级与双平台原生窗口仍未在本轮验收。

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { UpdateInfo } from '../../desktop/contract.generated';
 import { updates } from './update.model';
-import { message } from './use-update-controller';
+import { remoteUpdateMessage } from './remote-update-errors.model';
 
 export function useRemoteUpdateController(instance: string, onActivity: (busy: boolean) => void) {
   const [info, setInfo] = useState<UpdateInfo | null>(null);
@@ -13,11 +13,11 @@ export function useRemoteUpdateController(instance: string, onActivity: (busy: b
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const busy = operation !== '';
   useEffect(() => { onActivity(busy); return () => onActivity(false); }, [busy, onActivity]);
-  async function run(name: string, action: () => Promise<UpdateInfo>) {
+  async function run(name: 'checking' | 'installing', action: () => Promise<UpdateInfo>) {
     if (latch.current) return;
     latch.current = true; setOperation(name); setError('');
     try { const result = await action(); if (alive.current) setInfo(result); }
-    catch (e) { if (alive.current) { setError(message(e)); setInfo(null); } }
+    catch (e) { if (alive.current) { setError(remoteUpdateMessage(e, name)); setInfo(null); } }
     finally { latch.current = false; if (alive.current) { setOperation(''); setConfirm(false); } }
   }
   return { info, busy, error, operation, confirm, setConfirm,
