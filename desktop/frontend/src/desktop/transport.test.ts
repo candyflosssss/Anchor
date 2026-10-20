@@ -29,6 +29,7 @@ function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
     ExitDesktop: vi.fn(async () => ({ contract: CONTRACT, data: { accepted: true }, problem: null })),
     RestartCore: async () => ({ contract: CONTRACT, data: null, problem: { code: 'unsupported' } }),
     StopCore: vi.fn(async () => ({ contract: CONTRACT, data: { accepted: true }, problem: null })),
+    CheckRemoteUpdate: vi.fn(), InstallRemoteUpdate: vi.fn(),
     UpdateStatus: vi.fn(), CheckUpdate: vi.fn(), DownloadUpdate: vi.fn(), InstallUpdate: vi.fn(),
     ...overrides,
   };

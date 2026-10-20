@@ -107,7 +107,7 @@ func (s *Service) githubFeed(ctx context.Context, c Config) (Manifest, error) {
 		if _, err := s.validate(m, c); err != nil {
 			return Manifest{}, err
 		}
-		for _, a := range m.Artifacts {
+		for _, a := range allArtifacts(m.Artifacts) {
 			if a.URL != base+a.File {
 				return Manifest{}, ErrInvalid
 			}

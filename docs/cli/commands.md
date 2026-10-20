@@ -68,6 +68,9 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `update configure` | 配置本机更新渠道与源 | 无需初始化；源不能含凭据 |
 | `update check` | 查询兼容的新版本 | 无需核心在线；默认 CLI，桌面必须提供实际版本 |
 | `update download` | 下载并校验更新包 | 无需核心在线；仅接受更高版本 |
+| `update upgrade --approve` | 下载并准备新版 CLI，自动交接并验证核心 | 本机已初始化；一次短暂切换，无自动降级 |
+| `update desktop --approve` | Linux／Windows 命令更新桌面与核心 | 新版需 runtime 附件，旧桌面需先引导升级 |
+| `--context NAME update check/upgrade` | 检查／更新指定 SSH 被控机 | SSH 账号权限；upgrade 需 --approve，远端需支持新命令 |
 | `update apply --approve` | 原位更新本机 CLI，保留上一版 | 已下载、核心已退出、用户可写安装路径；不自动重启 |
 | `init` | 初始化本机状态 | 本机；核心不应占用该状态目录 |
 | `serve` | 前台运行核心 | 本机已初始化 |
@@ -781,14 +784,14 @@ anchor recover [--id ID]
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
 | Codex统一重试 | agent codex-settings [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
-| 在线升级 | update config/configure/check/download/apply；桌面设置页 | CLI 原位更新保留 .previous；桌面在线下载并确认正常停服后交接系统安装器。不是静默升级，无系统服务／数据库回滚；desktop.16 dev 已投放且真实下载通过，原生安装未验收，见 [在线更新](../design/online-updates.md) |
+| 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；本轮源码未打包／未发布，无数据库回滚，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 
 发行许可为 [AGPL-3.0-only](../license.md)，允许商用并保留相应源码义务；已公开的 `0.1.0-alpha.3` 只含 Linux AMD64，远程安装已实际验证。当前公开版本和 Windows / Linux 附件以仓库 README 与[安装说明](../release/install.md)为准；stop、update 与第一优先供应商命令已在当前 CLI 源码中；对应桌面能力已随 desktop.16 dev 发布，不反写 alpha.6 CLI 的能力。
 
-## 11. 本机在线更新
+## 11. 本机与 SSH 在线更新
 
 桌面首次未配置更新渠道时按安装版本选择（dev 包为 dev），已有配置保持不变；CLI 的未配置默认渠道仍为 alpha。通过 `anchor update configure --channel dev` 可显式选择桌面开发更新。
 
@@ -799,16 +802,25 @@ anchor [--data-dir DIR] update configure [--channel stable|alpha|beta|rc|dev]
 anchor [--data-dir DIR] update check|download [--channel CHANNEL] [--manifest HTTPS_URL]
                                       [--product cli|desktop] [--current-version VERSION]
 anchor [--data-dir DIR] update apply --approve
+anchor [--data-dir DIR] update upgrade|desktop --approve [--channel CHANNEL] [--manifest HTTPS_URL]
+                                      [--expected-instance ID] [--control-port N]
+                                      [--expected-version VERSION --expected-sha256 HASH]
+anchor [--data-dir DIR] [--context SSH_NAME] update check
+anchor [--data-dir DIR] --context SSH_NAME update upgrade --approve
 ```
 
-- 作用域：本机程序／更新缓存，不是 selected Context，所有子命令拒绝 `--context`；无需 init 或数据库。检查／下载不停止核心，不修改 Agent 配置。`--json` 沿用正常 JSON 输出。
+- 作用域：本机程序／更新缓存，不是 selected Context，config/configure/download/apply/desktop 拒绝 `--context`；显式 SSH Context 支持 check/upgrade。本机基础检查／下载无需 init 或数据库，upgrade/desktop 要求已初始化本机实例。检查／下载不停止核心，不修改 Agent 配置。`--json` 沿用正常 JSON 输出。
 - config：无参数，读取 `DIR/updates/config.json`；不存在时 `{channel:"alpha",manifest_url:""}`，无副作用。
 - configure：只修改更新配置；省略参数保留旧值，`--default-source` 清空源，不能同时指定 `--manifest`。合法渠道为上述五项。源为空时为 GitHub Releases；URL 必须 HTTPS，无凭据／query／fragment，字面量回环 IP 的 HTTP 仅用于本机测试。配置影响同一数据目录的桌面宿主，用户确保源可信。成功返回配置 JSON；无模型密钥、无 GitHub token。
 - check/download：参数只覆盖本次，不写配置。默认 product=cli、当前版本为当前 CLI 的注入版本；product=desktop 必须提供实际 `--current-version`，CLI 模式禁止该参数。默认先从API查询所选渠道的最高已发布 SemVer，不取 draft，最多500个 Release；成功查不到返回 available=false。API阶段最多10秒，网络/HTTP错误时尝试同仓库官方Atom近期发布，按同渠道SemVer最多读取5个候选清单；回退无兼容清单时报告失败，不误报无更新。自定义清单版本／渠道／平台必须一致。跨渠道更新同样必须严格高于当前版本，不支持在线降级。
 - check 输出 `{current_version,version,channel,product,source,available,artifact}`，artifact 可为空；附件含 file/target/kind/url/sha256/bytes；可用性依据版本，不仅依据附件存在。成功查询无需更新时退出0；网络、限流、非法元数据失败退出1。
 - download：先检查，再将更高版本的当前平台文件流式下载到 `DIR/updates/`，大小／SHA256 双重校验后写入 `<product>-download.json`；返回 `{check,path}`，path 是绝对路径。有效完整缓存可复用，不续传 partial。失败不覆盖现有程序或旧的完整缓存；无新版本、无兼容文件、大小或 SHA 不符均退出1。
-- apply：仅处理已下载的 CLI receipt，不联网；必须 `--approve`、能取得本机实例锁（用户先显式停止核心）、文件与目录属于当前用户；Linux 还要求不对组／其他用户开放写入。重新检查平台、版本和实际哈希，再在可执行文件目录进行备份／替换，`.previous` 保留一份上一版，下次替换会覆盖该备份；普通替换失败尝试恢复。安装权限不足、符号链接／reparse 路径、Linux 硬链接、文件被修改、核心未退出等失败拒绝；Windows 缓存有受保护 ACL，但不声称已全面审计任意安装路径的 ACL／硬链接。不自动提权／重启／停远程服务。目标是 os.Executable 解析后的实际 CLI 路径，不允许任意目标路径。
+- apply：runtime 管理目录内拒绝原位替换，改用 `update upgrade --approve` 维护启动校验；其他路径仅处理已下载的 CLI receipt，不联网；必须 `--approve`、能取得本机实例锁（用户先显式停止核心）、文件与目录属于当前用户；Linux 还要求不对组／其他用户开放写入。重新检查平台、版本和实际哈希，再在可执行文件目录进行备份／替换，`.previous` 保留一份上一版，下次替换会覆盖该备份；普通替换失败尝试恢复。安装权限不足、符号链接／reparse 路径、Linux 硬链接、文件被修改、核心未退出等失败拒绝；Windows 缓存有受保护 ACL，但不声称已全面审计任意安装路径的 ACL／硬链接。不自动提权／重启／停远程服务。目标是 os.Executable 解析后的实际 CLI 路径，不允许任意目标路径。
 - apply 成功输出 `{installed:true,backup:ABS_PATH,restart_required:true,core_restarted:false}`；installed 仅表示本次 CLI 文件替换完成，当前命令仍是旧进程，用户下一次运行／重新启动核心才使用新版本。需要回退时，正常停服后人工恢复备份；不承诺数据库回滚或所有数据目录中的进程都已退出。请先停止使用同一程序的其他核心。
+- upgrade：本机 CLI 一步检查／下载／准备／交接／验证，默认源配置同 check（未配置 alpha）；desktop：同流程更新桌面 runtime，首次渠道按调用版本（dev 为 dev），已有配置优先。均需 --approve 和已初始化实例，最多6分钟；准备阶段旧服务运行，最终一次保留托管配置的 restart_handoff，等待正常排空最多10秒，核心交接上限30秒。已有流式请求可能中断，不承诺毫秒级／零中断。成功返回 `{ready:true,version,instance_id,process_id}`；无新版本返回 `{updated:false,current_version}`，退出0。启动／身份／哈希／版本错误退出1，不强杀、不盲目降级或重放。
+- 新程序放在 `DIR/updates/runtime/`，不写 `/usr/bin` 或覆盖 Windows 正在运行的文件；就绪后写 `<product>-active.json`，已支持此功能的安装程序下次启动转到新版本，损坏的 active 文件明确报错。系统包版本／Windows 卸载记录不会随 runtime 更新改变；卸载保留用户数据与版本缓存。旧宿主／CLI 需先引导升级，新源需同时提供运行程序；没有 runtime 的旧桌面 release 仍手动安装。Linux 可执行 `anchor update desktop --approve`；桌面程序本身也接受 `anchor-desktop update desktop --approve`。命令会请求同数据目录的运行中 GUI 自动重开，未打开 GUI 时仅升级核心与下次启动版本。
+- `--expected-instance`、`--control-port` 在准备与交接前核对本机身份，port 必须与 expected-instance 配套；`--expected-version`／`--expected-sha256` 必须一起传，冻结批准的版本和字节。check/download 也接受身份／端口 pin，供 SSH 固定目标检查。拒绝更新为比运行核心更旧的版本。显式 expected pins 不允许绕过来源／SHA256校验。
+- 显式 `--context SSH_NAME update check` 用被控机自己的配置和渠道检查 CLI 更新；`update upgrade --approve` 冻结检查的版本与 SHA256，在同一 SSH 账号执行身份／端口固定的新命令，下载与准备期间旧服务可用，完成后经管理连接再次核对同实例、新版本、PID和 ready。密钥／密码复用已有 SSH 连接规则，密码仅 stdin／会话内存；不把主控机安装包发往其他平台，不自动提权或引导安装旧远端。旧远端不支持时报 remote_anchor_unsupported，先手工引导一次。SSH 失败／响应损坏／目标不符归为 unknown，不自动重复更新；先重新检查状态。该路径当前面向既有 POSIX/Linux SSH 被控机，Windows SSH shell 不在本轮范围。
 - 网络代理：check/download 每次请求和重定向实时读取对应协议的 `HTTPS_PROXY`／`HTTP_PROXY`（含小写），再用 `ALL_PROXY`／`all_proxy`；未指定对应环境代理时，Windows 通过 WinHTTP 读取当前用户手动代理/PAC，PAC按URL解析并有界等待，失败可回退手动代理，仅自动发现失败可直连。HTTP-only设置不抑制HTTPS系统代理。`NO_PROXY`／`no_proxy` 同时适用于环境和系统代理，回环始终直连。支持 HTTP/HTTPS/SOCKS5 代理，非法明确配置失败，不静默直连。不使用第三方更新镜像。
 - 当前平台包最多256 MiB、清单2 MiB；check/download 整个操作最多5分钟。更新清单格式、签名限制及 dev 投放步骤见 [在线更新](../design/online-updates.md)。SHA256 仅是完整性校验，不能替代独立发布签名。
 

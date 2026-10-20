@@ -122,3 +122,21 @@ python3 scripts/update_manifest.py --product desktop \
 UpdateInfo phase 为 idle/checked/downloaded/installing；空 latest_version 表示尚未发现兼容版本。问题码新增 integrity/permission，其他复用 invalid/conflict/read_error/unknown/identity/unauthorized/unsupported。installing 只是 installer handoff，不是已安装。前端验证白名单、无绑定失败关闭、不回退 Mock；初始化请求及卸载后的旧结果不得覆盖新查询。
 
 验证分层：共享 DTO/TS 漂移、Go 模拟更新服务器的检查／实际下载／校验／CLI 替换、真实 Go Bridge 读写下载、浏览器模拟绑定，以及 Windows／Linux 原生安装验收。前三类与模拟浏览器测试不替代最后一类；未发布或未运行原生安装时不能声称安装即用或线上升级已完成。
+
+## Runtime 与 SSH 更新（2026-10-20，源码未发布）
+
+此节取代上方旧安装器流程中“必须先停服、安装后手动重开”的一般描述。历史已发布版本仍沿用原行为；本轮未生成安装包或发布更新，也未修改真实运行实例。
+
+新桌面 feed 保留每平台原安装器，在 artifact 下可增加 `runtime`（同平台、kind=runtime、独立 URL／大小／SHA256）。旧宿主忽略新增字段，继续安装器流程；新版宿主优先选择 runtime。默认 GitHub 源同时核对安装器和 runtime 均为同一 Release 附件，自定义源遵循相同 HTTPS／完整性边界，不增加独立发布签名保证。`scripts/update_manifest.py --runtime TARGET=FILE` 生成该格式；Linux／Windows runtime 需要沿用支持的系统依赖，依赖缺失时预检失败并保留旧服务。
+
+新版在当前用户 `updates/runtime/` 旁路目录中准备，不覆盖运行文件，不提权。下载、SHA256、文件权限和实际运行版本探测都在停服前完成；helper 也在停服前准备。最终用既有 `restart_handoff` 保留 Agent 配置、凭据和恢复基线，正常排空最多10秒，交接最多30秒，不强杀；确认相同实例、新版版本和 ready 后才写 active 启动记录。原系统安装路径仍为启动入口，新启动器转到已校验的更高版本。GUI 请求完成并退出后，helper 自动打开新版，新窗口复用已经恢复的核心，避免二次中断。旧请求／长流可能中断，无毫秒级停顿承诺；新版失败不自动数据库降级或重放变更。
+
+`anchor update desktop --approve` 或 `anchor-desktop update desktop --approve` 提供 Linux 命令更新（同实现也支持 Windows）。已初始化实例必需；只升级核心／下次启动版本，运行中同数据目录桌面则通过已授权的当前用户 loopback IPC 请求重开。IPC 固定路径、Bearer 凭据、无 Origin、数据目录核验，不接受执行路径或任意命令。更新配置／版本缓存留在用户目录，系统包／注册表卸载版本仍为首次安装版本；卸载按既有规则保留数据。旧版启动入口尚无转发能力，需先用新安装器引导一次；旧源没有 runtime 时仍走安装器。
+
+CLI 自身 `update upgrade --approve` 同样准备新程序、一次交接、核验并激活 CLI 启动入口，不改原有 `apply` 的手动停服／原位替换语义。下载／准备失败保留原服务。运行中核心版本高于目标时拒绝降级。交接后失败可能已经开始迁移，保持状态并报告，用户先检查 status，不盲目恢复旧二进制。
+
+SSH 更新只作用于显式选择的既有 POSIX/Linux 被控机：桌面 `CheckRemoteUpdate(instance_id)` 返回 UpdateResult；`InstallRemoteUpdate({instance_id,version,approved})` 冻结上一轮检查的版本和完整 SHA256，只提交一次，清除候选，成功 phase=applied、available=false、current_version=实际新版。其余 UpdateInfo 结构不变。本机 `CheckUpdate/DownloadUpdate/InstallUpdate` 仍始终作用本机。所有前端接口均无 URL／路径／shell 参数。
+
+连接层复用已认证 SSH 密码或密钥连接，调用被控机自己的 `update check` 和 `update upgrade --approve`，两者携带 instance/control-port，后者额外固定 version/SHA256；更新来源和平台由被控机决定。接收有界、严格 JSON，成功后经管理通道复核 instance/version/PID/ready。不重授权、不调用普通 stop、不更新主控机、不重复未知变更。旧远端 CLI 不支持新参数时显示 remote_anchor_unsupported，需一次手工引导；当前 shell 发现是 POSIX，Windows SSH 被控机不在范围。SSH 断开、错误响应或最终身份／版本不符均报告 unknown，不能宣称未执行或已回滚，用户重新检查。远端系统安装目录不可写不影响旁路更新，但账号必须有用户数据目录写入权限。
+
+打包脚本为每平台额外生成唯一命名的 desktop runtime 与 CLI binary，并可生成 update-desktop/update-cli 两份清单。未来发布需把四个运行程序和两份清单与安装包／源码／许可元数据一并上传同版 Release，不再假设旧的固定六附件数量。本轮只更新构建逻辑，未实际打包或上线。

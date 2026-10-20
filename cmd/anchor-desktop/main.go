@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/candyflosssss/Anchor/desktop/branding"
@@ -30,9 +31,22 @@ import (
 
 func main() { os.Exit(run()) }
 func run() int {
-	// The managed adapter's token helper uses the same exact invocation as CLI.
-	// Dispatch only this internal command before GUI flags/window initialization.
-	if desktop.IsAgentTokenInvocation(os.Args[1:]) {
+	if len(os.Args) == 2 && os.Args[1] == "--runtime-version" {
+		fmt.Printf("{\"version\":%q}\n", core.Version)
+		return 0
+	}
+	// Headless update commands share the CLI without initializing a window.
+	if desktop.IsCLIInvocation(os.Args[1:]) || desktop.IsAgentTokenInvocation(os.Args[1:]) {
+		dir, err := desktop.CLIDataDir(os.Args[1:])
+		if err != nil {
+			return 1
+		}
+		if forwarded, code, err := updater.ForwardRuntime(context.Background(), dir, "desktop", core.Version, os.Args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, "Anchor runtime activation failed:", err)
+			return 1
+		} else if forwarded {
+			return code
+		}
 		return cli.Main(context.Background(), os.Args[1:])
 	}
 
@@ -63,14 +77,22 @@ func run() int {
 	if *installVersion != "" || *installHash != "" {
 		return 2
 	}
+	if forwarded, code, err := updater.ForwardRuntime(context.Background(), *dir, "desktop", core.Version, os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, "Anchor runtime activation failed:", err)
+		return 1
+	} else if forwarded {
+		return code
+	}
 	if *coreMode {
 		ctx, cancel := signal.NotifyContext(context.Background(), shutdownSignals()...)
 		defer cancel()
 		return cli.Main(ctx, []string{"--data-dir", *dir, "serve"})
 	}
+	var session *desktop.Session
+	var reloadSession atomic.Pointer[desktop.Session]
 	var window desktop.WindowLifecycle
 	activationContext, cancelActivation := context.WithTimeout(context.Background(), 5*time.Second)
-	host, err := desktop.AcquireHost(activationContext, defaults, window.Show)
+	host, err := desktop.AcquireHostWithReload(activationContext, defaults, window.Show, *dir, func() bool { current := reloadSession.Load(); return current != nil && current.ReloadUpdatedDesktop() })
 	cancelActivation()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Anchor is already starting or its desktop could not be opened; try again shortly.")
@@ -111,7 +133,7 @@ func run() int {
 	var hostContext context.Context
 	var contextMu sync.RWMutex
 	var tray desktoptray.Tray
-	session := desktop.NewSession(desktop.Options{Dir: *dir, Executable: executable, SaveLogFile: func() (string, error) {
+	session = desktop.NewSession(desktop.Options{Dir: *dir, Executable: executable, SaveLogFile: func() (string, error) {
 		contextMu.RLock()
 		ctx := hostContext
 		contextMu.RUnlock()
@@ -131,6 +153,7 @@ func run() int {
 			}
 		}()
 	}})
+	reloadSession.Store(session)
 	defer session.Close()
 	defer tray.Stop()
 	bridge := desktop.NewBridge(session)

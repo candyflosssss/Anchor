@@ -39,6 +39,9 @@ type hostEndpoint struct {
 // activate queues requests until the native window is ready and rejects them
 // once the host starts exiting. No launch arguments are sent to the incumbent.
 func AcquireHost(ctx context.Context, dir string, activate func() bool) (*HostInstance, error) {
+	return AcquireHostWithReload(ctx, dir, activate, "", nil)
+}
+func AcquireHostWithReload(ctx context.Context, dir string, activate func() bool, dataDir string, reload func() bool) (*HostInstance, error) {
 	if err := platform.SecureDir(dir); err != nil {
 		return nil, err
 	}
@@ -57,7 +60,7 @@ func AcquireHost(ctx context.Context, dir string, activate func() bool) (*HostIn
 		}
 		lock, err := platform.AcquireLock(filepath.Join(dir, "desktop-host.lock"))
 		if err == nil {
-			return startHost(lock, endpoint, activate)
+			return startHost(lock, endpoint, activate, dataDir, reload)
 		}
 		if activateHost(ctx, client, endpoint) == nil {
 			return nil, nil
@@ -70,7 +73,7 @@ func AcquireHost(ctx context.Context, dir string, activate func() bool) (*HostIn
 	}
 }
 
-func startHost(lock *platform.Lock, endpoint string, activate func() bool) (_ *HostInstance, err error) {
+func startHost(lock *platform.Lock, endpoint string, activate func() bool, dataDir string, reload func() bool) (_ *HostInstance, err error) {
 	defer func() {
 		if err != nil {
 			lock.Close()
@@ -105,9 +108,22 @@ func startHost(lock *platform.Lock, endpoint string, activate func() bool) (_ *H
 		ReadHeaderTimeout: time.Second, WriteTimeout: time.Second, IdleTimeout: time.Second,
 		MaxHeaderBytes: 4096,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path != "/activate" || r.Method != http.MethodPost || r.Header.Get("Origin") != "" ||
+			if (r.URL.Path != "/activate" && r.URL.Path != "/reload-update") || r.Method != http.MethodPost || r.Header.Get("Origin") != "" ||
 				subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+data.Token)) != 1 {
 				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			if r.URL.Path == "/reload-update" {
+				abs, _ := filepath.Abs(dataDir)
+				if dataDir == "" || r.Header.Get("X-Anchor-Data-Dir") != abs {
+					w.WriteHeader(http.StatusPreconditionFailed)
+					return
+				}
+				if reload == nil || !reload() {
+					w.WriteHeader(http.StatusConflict)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 			if !activate() {

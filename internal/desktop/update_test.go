@@ -23,12 +23,19 @@ func TestUpdateContractFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	var f struct {
-		Contract     string        `json:"contract"`
-		Downloaded   UpdateInfo    `json:"downloaded"`
-		Confirmation ConfirmUpdate `json:"confirmation"`
+		Contract           string              `json:"contract"`
+		Downloaded         UpdateInfo          `json:"downloaded"`
+		Confirmation       ConfirmUpdate       `json:"confirmation"`
+		Runtime            UpdateInfo          `json:"runtime_downloaded"`
+		RemoteChecked      UpdateInfo          `json:"remote_checked"`
+		RemoteApplied      UpdateInfo          `json:"remote_applied"`
+		RemoteConfirmation ConfirmRemoteUpdate `json:"remote_confirmation"`
 	}
 	if err := json.Unmarshal(b, &f); err != nil {
 		t.Fatal(err)
+	}
+	if f.Runtime.InstallKind != "runtime" || f.RemoteChecked.InstallKind != "binary" || f.RemoteChecked.LatestVersion != f.RemoteConfirmation.Version || !f.RemoteConfirmation.Approved || f.RemoteApplied.Phase != "applied" || f.RemoteApplied.Available {
+		t.Fatal("runtime/SSH fixture drift")
 	}
 	if f.Contract != Contract || f.Downloaded.LatestVersion != f.Confirmation.Version || !f.Confirmation.Approved || f.Downloaded.Phase != "downloaded" {
 		t.Fatal("update fixture drift")

@@ -205,3 +205,9 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 已托管配置损坏或删除时，「更新配置」与 CLI sync 可用最后一次已验证快照恢复；正常文件优先局部更新，无法表达的有效 TOML 在完整备份后重新序列化。后台同步不覆盖外部漂移。
 
 Codex 另提供「备份并重建配置」，包括未登记、profile 或 WebSocket 覆盖配置。Controller 冻结所选模型／revision，确认整体替换影响后只提交一次 EnrollAgent(rebuild=true, all-mapped, approved=true, model_templates={})；取消不写，失败只重读、不自动重放。核心先备份原文件和旧 journal，再按空配置生成并校验连接及最新模型目录，按当前快照原子替换；不从坏文件猜测设置。原来的其他设置仅在 recovery 完整备份保留，停用不自动还原坏配置。已有凭据不旋转，revision 仍必检，无法备份／不可写／危险路径仍明确失败。旧核心须升级，字段省略不改变行为。新绑定无需本地模型缓存。隔离 Mock 与真实桥接验证分别记录，不代表原生窗口和付费上游通过。
+
+## Runtime 与 SSH 更新（2026-10-20，当前源码未发布）
+
+本机 runtime 更新先准备旁路可执行文件和 helper，旧核心继续运行；最终一次 restart_handoff 后校验同身份／新版／ready，激活启动入口，退出旧 GUI 并自动打开新版，后者复用已就绪核心。CLI `update desktop --approve` 可更新本机并经受控 IPC 重开同数据目录 GUI。旧安装器 feed 保留原行为，旧宿主／CLI 需引导升级；不承诺在途流不断开或数据库自动回滚。
+
+SSH 更新使用 `CheckRemoteUpdate(instance_id)`／`InstallRemoteUpdate({instance_id,version,approved})`，锁定当前远端和检查候选。密码与密钥均复用 connection.Live，远端账号执行自身更新 CLI；成功再核对远端 ready/version/PID，失败候选清空且不重放。本机和远端操作在 UI 分开，远端操作不改本机程序／核心。契约、锁与来源／权限边界以[在线更新](online-updates.md#runtime-与-ssh-更新2026-10-20源码未发布)为准。

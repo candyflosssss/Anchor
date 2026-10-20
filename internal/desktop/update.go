@@ -140,6 +140,9 @@ func (b *Bridge) InstallUpdate(in ConfirmUpdate) UpdateResult {
 		r.Problem = &Problem{"invalid"}
 		return r
 	}
+	if d.Check.Artifact.Kind == "runtime" {
+		return s.installRuntime(service, d)
+	}
 	ctx, cancel := context.WithTimeout(s.ctx, 20*time.Second)
 	defer cancel()
 	// Prevent this host and other desktop windows from starting a replacement

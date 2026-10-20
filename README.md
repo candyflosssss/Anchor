@@ -100,6 +100,10 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
+### 新增更新能力（当前源码，尚未打包发布）
+
+已新增 Linux／Windows 桌面应用内 runtime 更新、Linux 一步命令更新和当前 SSH 被控机更新：先下载／校验，最后短暂交接核心并检查恢复，桌面自动重开。正在生成的回答仍可能中断。旧启动器／远端需先引导升级，SSH 沿用现有 POSIX/Linux 被控机支持范围；完整命令、来源／权限及失败边界见[最新指令大全](docs/cli/commands.md#11-本机与-ssh-在线更新)与[在线更新设计](docs/design/online-updates.md#runtime-与-ssh-更新2026-10-20源码未发布)。下方 `.56` 是历史已发布能力，不包含本轮源码增量。
+
 ### 在线更新（desktop.56 已投放 dev 渠道）
 
 **设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.56` 两平台安装包及同版清单，支持 Codex 坏配置备份后重写，并提供「备份并重建配置」入口；保留供应商多 Key／多地址与局部刷新等既有能力。沿用 schema9；升级前备份、配套升级核心与桌面，SSH远端另行升级。Linux 默认源真实下载与 SHA256、Windows远端digest核对通过；本机 CLI／核心／GUI 已配套升级，原生窗口／系统安装器／真实SSH或付费上游未验收。详见[发行记录](docs/release/desktop.md#codex-配置重建-56已发布-dev本机已升级)。

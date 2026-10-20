@@ -9,7 +9,7 @@ export function UpdateSettings({ onActivity }: { onActivity: (busy: boolean) => 
   const c = useUpdateController(!prototype, onActivity);
   const busy = c.busy;
   return <section className="space-y-4" aria-labelledby="updates-title">
-    <h2 id="updates-title" className="text-base font-semibold">在线更新</h2>
+    <h2 id="updates-title" className="text-base font-semibold">本机桌面在线更新</h2>
     {prototype ? <p role="status" className="rounded-lg border p-4 text-sm text-muted-foreground">桌面专用</p> : <>
       <div className="space-y-4 rounded-lg border p-5">
         <dl className="grid gap-3 text-sm sm:grid-cols-[6rem_1fr]">
@@ -26,15 +26,20 @@ export function UpdateSettings({ onActivity }: { onActivity: (busy: boolean) => 
       </div>
       {c.info && c.info.phase !== 'idle' && <div className="space-y-4 rounded-lg border p-5" aria-live="polite">
         <h2 className="font-medium">{c.info.phase === 'installing' ? '安装中' : c.info.phase === 'downloaded' ? '已校验' : c.info.available ? `新版本 ${c.info.latest_version}` : c.info.latest_version ? '已是最新' : '无可用更新'}</h2>
-        {c.info.latest_version && <p className="text-sm text-muted-foreground">版本：{c.info.latest_version} · {c.info.channel} · {c.info.install_kind === 'deb' ? 'Linux .deb' : 'Windows 安装器'}</p>}
+        {c.info.latest_version && <p className="text-sm text-muted-foreground">版本：{c.info.latest_version} · {c.info.channel} · {c.info.install_kind === 'runtime' ? '应用内更新' : c.info.install_kind === 'deb' ? 'Linux .deb' : 'Windows 安装器'}</p>}
         {c.info.download_path && <p className="break-all text-xs text-muted-foreground">文件：{c.info.download_path}</p>}
         {c.info.available && c.info.phase === 'checked' && <Button disabled={busy} onClick={() => void c.download()}><Download size={16} />{c.operation === 'downloading' ? '下载中…' : '下载更新'}</Button>}
         {c.info.phase === 'downloaded' && <Button disabled={busy} onClick={() => c.setConfirm(true)}>安装更新…</Button>}
       </div>}
       {c.error && <p role="alert" className="rounded-lg border border-destructive/30 p-4 text-sm text-destructive">{c.error}</p>}
       <ConfirmAction open={c.confirm} title={`安装 ${c.info?.latest_version ?? ''}？`} busy={busy} onCancel={() => c.setConfirm(false)} onConfirm={() => void c.install()}>
-        <p>确认后将正常停止本机核心，等待退出并关闭此窗口，然后打开已校验的安装包。不会强杀进程或自动注册服务。</p>
-        <p>请结束正在使用代理的请求并在其他 Anchor 窗口点击「退出界面」。安装完成后重新打开应用；数据目录保留。Linux 需在系统安装器中授权。</p>
+        {c.info?.install_kind === 'runtime' ? <>
+          <p>准备新版期间服务继续运行，最后短暂切换一次，恢复后自动打开新版界面。配置和连接保留。</p>
+          <p>切换时正在生成的回答可能中断。本次只更新本机，SSH 被控机保持运行。</p>
+        </> : <>
+          <p>此版本需要系统安装器。将停止本机核心并关闭窗口，安装完成后请重新打开应用。</p>
+          <p>请先结束正在使用代理的请求。配置保留，Linux 安装可能需要系统授权。</p>
+        </>}
       </ConfirmAction>
     </>}
   </section>;

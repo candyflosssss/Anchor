@@ -155,6 +155,20 @@ def main() -> int:
     finally:
         signal.signal(signal.SIGTERM, previous)
     (output / "SOURCE.json").write_text(json.dumps(source, indent=2) + "\n")
+    # Unique attachment names allow side-by-side runtime updates from a flat Release.
+    runtime_files, cli_files = {}, {}
+    for target in build.TARGETS:
+        folder = output / target
+        extension = ".exe" if target.startswith("windows") else ""
+        runtime_file = folder / f"anchor-desktop-{args.version}-{target}{extension}"
+        shutil.copy2(folder / ("anchor-desktop" + extension), runtime_file)
+        runtime_files[target] = runtime_file
+        cli_file = folder / f"anchor-{args.version}-{target}{extension}"
+        cli_env = env | {"GOOS": target.split("-")[0], "GOARCH": "amd64", "CGO_ENABLED": "0"}
+        build.run(["go", "build", "-trimpath", "-buildvcs=false", "-ldflags",
+                   f"-s -w -X github.com/candyflosssss/Anchor/internal/core.Version={args.version}",
+                   "-o", str(cli_file), "./cmd/anchor"], env=cli_env)
+        cli_files[target] = cli_file
     for target in build.TARGETS:
         folder = output / target
         artifacts = {p.name: digest(p) for p in sorted(folder.iterdir()) if p.is_file()}
@@ -176,8 +190,10 @@ def main() -> int:
             if len(matches) != 1:
                 raise RuntimeError("Expected exactly one installer for the update feed")
             packages[target] = matches[0]
-        feed = update_manifest.build_manifest("desktop", args.version, "dev", args.update_base_url, packages, "target")
+        feed = update_manifest.build_manifest("desktop", args.version, "dev", args.update_base_url, packages, "target", runtime_files)
         (output / "update-desktop.json").write_text(json.dumps(feed, indent=2) + "\n")
+        cli_feed = update_manifest.build_manifest("cli", args.version, "dev", args.update_base_url, cli_files, "target")
+        (output / "update-cli.json").write_text(json.dumps(cli_feed, indent=2) + "\n")
     print(f"Created local desktop installers in {output}. No installation, application launch, tests, acceptance or publication performed.")
     return 0
 

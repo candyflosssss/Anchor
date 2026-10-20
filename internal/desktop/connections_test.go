@@ -101,7 +101,7 @@ func isolatedSSHCommands(t *testing.T, restart func([]string) (string, uint32)) 
 	}
 	remoteScript := "#!/bin/sh\nif [ \"$*\" = 'context bootstrap --help' ]; then exit 0; fi\nprintf '%s\\n' \"$@\"\n"
 	if restart != nil {
-		remoteScript = "#!/bin/sh\nif [ \"$*\" = 'context bootstrap --help' ]; then exit 0; fi\nif [ \"$*\" = 'restart --help' ]; then printf '%s\\n' '-expected-instance'; exit 0; fi\nprintf '%s\\n' \"$@\"\n"
+		remoteScript = "#!/bin/sh\nif [ \"$*\" = 'context bootstrap --help' ]; then exit 0; fi\nif [ \"$*\" = 'restart --help' ]; then printf '%s\\n' '-expected-instance'; exit 0; fi\nif [ \"$*\" = 'update upgrade --help' ]; then printf '%s\\n' '-expected-sha256'; exit 0; fi\nprintf '%s\\n' \"$@\"\n"
 	}
 	if err := os.WriteFile(filepath.Join(remoteBin, "anchor"), []byte(remoteScript), 0700); err != nil {
 		t.Fatal(err)
@@ -164,7 +164,7 @@ func isolatedSSHCommands(t *testing.T, restart func([]string) (string, uint32)) 
 									_, _ = ch.SendRequest("exit-status", false, ssh.Marshal(struct{ Status uint32 }{1}))
 									return
 								}
-								if probeErr == nil && restart != nil && strings.HasPrefix(string(args), "restart\n") {
+								if probeErr == nil && restart != nil && (strings.HasPrefix(string(args), "restart\n") || strings.HasPrefix(string(args), "update\n")) {
 									request.Reply(true, nil)
 									output, status := restart(strings.Split(strings.TrimSuffix(string(args), "\n"), "\n"))
 									_, _ = io.WriteString(ch, output)

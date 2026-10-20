@@ -29,7 +29,14 @@ export function useUpdateController(enabled: boolean, onActivity: (busy: boolean
     const epoch = ++generation.current;
     latch.current = true; setOperation(name); setError('');
     try { const result = await action(); if (alive.current && epoch === generation.current) setInfo(result); }
-    catch (e) { if (alive.current && epoch === generation.current) setError(message(e)); }
+    catch (e) {
+      if (alive.current && epoch === generation.current) {
+        setError(message(e));
+        if (e instanceof DesktopProblem && ['unknown', 'startup_failed'].includes(e.code)) {
+          setInfo(current => current && { ...current, phase: 'idle', available: false, latest_version: '', install_kind: '', download_path: '' });
+        }
+      }
+    }
     finally { latch.current = false; if (alive.current && epoch === generation.current) { setOperation(''); setConfirm(false); } }
   }
   function selectChannel(value: Channel) {
@@ -43,14 +50,14 @@ export function useUpdateController(enabled: boolean, onActivity: (busy: boolean
     download: () => info && run('downloading', () => updates.download(info.latest_version)),
     install: () => info && run('installing', () => updates.install(info.latest_version)) };
 }
-function message(error: unknown): string {
+export function message(error: unknown): string {
   const code = error instanceof DesktopProblem ? error.code : 'unknown';
   const messages: Record<string, string> = {
     integrity: '安装包大小或 SHA256 校验失败。未执行安装，请重新检查并下载。',
     invalid: '更新源、渠道或确认版本无效。请重新检查；自定义更新源由 CLI 配置。',
     conflict: '更新任务或本机核心仍在使用中。不会强杀进程，请等待退出后重试。',
     permission: '无法写入下载目录或启动安装器。请检查当前用户权限。',
-    unsupported: '没有兼容安装包，或核心不支持正常停服。不会强制替换旧版。',
+    unsupported: '没有兼容更新，或对方版本不支持更新交接。请先安装支持此功能的版本。',
     identity: '本机核心身份不匹配，已取消更新。',
     unauthorized: '无法取得本机核心管理授权，已取消安装。',
     unknown: '更新操作结果未能确认。请检查下载状态及 updates/install.log，不要反复安装。',

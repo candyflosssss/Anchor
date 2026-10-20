@@ -122,3 +122,9 @@ func versionChannel(s string) (string, error) {
 func ValidChannel(c string) bool {
 	return c == "stable" || c == "alpha" || c == "beta" || c == "rc" || c == "dev"
 }
+
+// IsNewerVersion compares validated release versions without trusting string order.
+func IsNewerVersion(candidate, current string) (bool, error) {
+	order, err := compareVersions(candidate, current)
+	return order > 0, err
+}

@@ -93,6 +93,11 @@ type ConfirmUpdate struct {
 	Version  string `json:"version"`
 	Approved bool   `json:"approved"`
 }
+type ConfirmRemoteUpdate struct {
+	InstanceID string `json:"instance_id"`
+	Version    string `json:"version"`
+	Approved   bool   `json:"approved"`
+}
 type UpdateResult struct {
 	Contract string      `json:"contract"`
 	Data     *UpdateInfo `json:"data"`

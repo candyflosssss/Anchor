@@ -43,6 +43,13 @@ func (s *Service) ApplyBinary(dir, executable string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	dataDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", err
+	}
+	if relative, err := filepath.Rel(filepath.Join(dataDir, "updates", "runtime"), executable); err == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("%w: runtime-managed CLI requires update upgrade --approve", ErrInvalid)
+	}
 	root := filepath.Dir(executable)
 	if err := platform.CheckManagedPath(root, executable); err != nil {
 		return "", err
@@ -198,6 +205,24 @@ func FinishInstaller(ctx context.Context, dir, version string, parent int, appro
 		return err
 	}
 	defer lock.Close()
+	// Runtime activation has already restarted and verified the core. Reopening
+	// the GUI must not require or acquire its lifetime lock.
+	service := New("desktop", version)
+	downloaded, err := service.readApprovedDownload(dir, approved)
+	if err != nil {
+		return err
+	}
+	if downloaded.Check.Artifact.Kind == "runtime" {
+		active, err := ActiveRuntime(dir, "desktop", version)
+		if err != nil {
+			return err
+		}
+		if active.Version != approved.Version || active.Artifact.SHA256 != approved.SHA256 {
+			return ErrInvalid
+		}
+		_, _, err = LaunchRuntime(active.Path, "--data-dir", dir)
+		return err
+	}
 	coreLock, err := platform.AcquireLock(filepath.Join(dir, "instance.lock"))
 	if err != nil {
 		return fmt.Errorf("%w: another core is running; install cancelled", ErrBusy)
@@ -257,7 +282,7 @@ func RunHelper(dir, version string, parent int, approved InstallApproval) error 
 	if err != nil {
 		_, _ = fmt.Fprintln(f, "Installation did not complete:", err)
 	} else {
-		_, _ = fmt.Fprintln(f, "Installer handoff completed; native installation still requires confirmation/verification.")
+		_, _ = fmt.Fprintln(f, "Update handoff completed; native installers still require confirmation; runtime updates reopened the verified version.")
 	}
 	return err
 }

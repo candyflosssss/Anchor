@@ -25,6 +25,21 @@ class UpdateManifestTests(unittest.TestCase):
             self.assertEqual(json.loads(output.read_text())["channel"], "dev")
             self.assertNotEqual(subprocess.run(args, capture_output=True).returncode, 0)
 
+    def test_desktop_runtime_compatibility(self):
+        with tempfile.TemporaryDirectory() as root:
+            root = Path(root)
+            installer = root / "anchor.deb"
+            runtime = root / "anchor-desktop"
+            installer.write_bytes(b"installer")
+            runtime.write_bytes(b"runtime executable")
+            feed = build_manifest("desktop", "1.0.0-dev.1", "dev", "https://example.com", {"linux-amd64": installer}, runtimes={"linux-amd64": runtime})
+            artifact = feed["artifacts"][0]
+            self.assertEqual(artifact["kind"], "deb")  # Old clients keep their installer.
+            self.assertEqual(artifact["runtime"]["kind"], "runtime")
+            self.assertEqual(artifact["runtime"]["url"], "https://example.com/anchor-desktop")
+            with self.assertRaises(ValueError):
+                build_manifest("desktop", "1.0.0-dev.1", "dev", "https://example.com", {"linux-amd64": installer}, runtimes={"windows-amd64": runtime})
+
     def test_invalid_version_and_url(self):
         for version, channel in [("0.1.0-dev..1", "dev"), ("01.0.0", "stable"), ("0.1.0-beta.1", "alpha"), ("0.1.0-dev.01", "dev")]:
             with self.assertRaises(ValueError): validate_version(version, channel)

@@ -24,16 +24,18 @@ type Options struct {
 	Quit                                            func()
 }
 type Session struct {
-	mu          sync.Mutex
-	updateMu    sync.Mutex
-	updateCheck *updater.Check
-	updating    bool
-	ctx         context.Context
-	cancel      context.CancelFunc
-	options     Options
-	cfg         *state.Settings
-	remote      *connection.Live
-	launchedPID int
+	mu                   sync.Mutex
+	updateMu             sync.Mutex
+	updateCheck          *updater.Check
+	remoteUpdateCheck    *updater.Check
+	remoteUpdateInstance string
+	updating             bool
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	options              Options
+	cfg                  *state.Settings
+	remote               *connection.Live
+	launchedPID          int
 }
 
 func NewSession(o Options) *Session {

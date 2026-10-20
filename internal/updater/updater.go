@@ -34,12 +34,13 @@ type Config struct {
 	ManifestURL string `json:"manifest_url"`
 }
 type Artifact struct {
-	File   string `json:"file"`
-	Target string `json:"target"`
-	Kind   string `json:"kind"`
-	URL    string `json:"url"`
-	SHA256 string `json:"sha256"`
-	Bytes  int64  `json:"bytes"`
+	File    string    `json:"file"`
+	Target  string    `json:"target"`
+	Kind    string    `json:"kind"`
+	URL     string    `json:"url"`
+	SHA256  string    `json:"sha256"`
+	Bytes   int64     `json:"bytes"`
+	Runtime *Artifact `json:"runtime,omitempty"`
 }
 type Manifest struct {
 	SchemaVersion int        `json:"schema_version"`
@@ -152,8 +153,19 @@ func validateArtifact(a Artifact, product string) error {
 	if product == "cli" && a.Kind != "binary" {
 		return ErrInvalid
 	}
-	if product == "desktop" && !((a.Target == "windows-amd64" && a.Kind == "nsis" && strings.HasSuffix(a.File, ".exe")) || (a.Target == "linux-amd64" && a.Kind == "deb" && strings.HasSuffix(a.File, ".deb"))) {
+	if product == "desktop" && a.Kind != "runtime" && !((a.Target == "windows-amd64" && a.Kind == "nsis" && strings.HasSuffix(a.File, ".exe")) || (a.Target == "linux-amd64" && a.Kind == "deb" && strings.HasSuffix(a.File, ".deb"))) {
 		return ErrInvalid
+	}
+	if a.Kind == "runtime" && (product != "desktop" || (a.Target != "linux-amd64" && a.Target != "windows-amd64") || (a.Target == "windows-amd64" && !strings.HasSuffix(a.File, ".exe"))) {
+		return ErrInvalid
+	}
+	if a.Runtime != nil {
+		if product != "desktop" || a.Kind == "runtime" || a.Runtime.Kind != "runtime" || a.Runtime.Target != a.Target || a.Runtime.Runtime != nil {
+			return ErrInvalid
+		}
+		if err := validateArtifact(*a.Runtime, product); err != nil {
+			return err
+		}
 	}
 	return ValidateURL(a.URL)
 }
@@ -177,6 +189,9 @@ func (s *Service) validate(m Manifest, c Config) (*Artifact, error) {
 				return nil, ErrInvalid
 			}
 			copy := a
+			if a.Runtime != nil {
+				copy = *a.Runtime
+			}
 			selected = &copy
 		}
 	}
@@ -332,7 +347,7 @@ func (s *Service) githubAPI(ctx context.Context, c Config) (Manifest, error) {
 		return Manifest{}, ErrInvalid
 	}
 	// Default source cannot redirect downloads to an unrelated author-owned URL.
-	for _, a := range m.Artifacts {
+	for _, a := range allArtifacts(m.Artifacts) {
 		found := false
 		for _, asset := range chosen.Assets {
 			if asset.Name == a.File && asset.URL == a.URL {
@@ -357,4 +372,16 @@ func safeRequestCause(err error) error {
 		}
 	}
 	return nil
+}
+
+// Both installer and optional runtime must belong to the same trusted release.
+func allArtifacts(artifacts []Artifact) []Artifact {
+	var out []Artifact
+	for _, a := range artifacts {
+		out = append(out, a)
+		if a.Runtime != nil {
+			out = append(out, *a.Runtime)
+		}
+	}
+	return out
 }

@@ -117,6 +117,8 @@ async function host(page: Page, rateMappings = false) {
       },
       ConfigureLogs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ExportLogs: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      CheckRemoteUpdate: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      InstallRemoteUpdate: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       UpdateStatus: async () => ({ contract, data: { ...update, latest_version: '', available: false, phase: 'idle', download_path: '', install_kind: '' }, problem: null }),
       CheckUpdate: async channel => { counters.checks++; return { contract, data: { ...update, channel, phase: 'checked', download_path: '' }, problem: null }; },
       DownloadUpdate: async () => {
@@ -241,7 +243,7 @@ test('polling refreshes the authenticated source and stop capability without res
 test('online updates require a verified download and explicit confirmation (simulated host only)', async ({ page }) => {
   await host(page);
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '在线更新', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '本机桌面在线更新', exact: true })).toBeVisible();
   await page.getByLabel('更新渠道').selectOption('dev');
   await page.getByRole('button', { name: '检查更新', exact: true }).click();
   await expect(page.getByRole('heading', { name: '新版本 0.1.0-dev.desktop.10' })).toBeVisible();
@@ -250,7 +252,7 @@ test('online updates require a verified download and explicit confirmation (simu
   expect(await page.evaluate(() => window.desktopTest.downloads)).toBe(1);
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
   await page.getByRole('button', { name: '安装更新…', exact: true }).click();
-  await expect(page.getByRole('alertdialog')).toContainText('正常停止本机核心');
+  await expect(page.getByRole('alertdialog')).toContainText('将停止本机核心');
   await page.getByRole('button', { name: '取消', exact: true }).click();
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(0);
   await page.getByRole('button', { name: '安装更新…', exact: true }).click();
@@ -1160,4 +1162,77 @@ test('desktop request channel edit crosses the typed Wails boundary and reads ba
   await expect(detail.getByRole('row').filter({ has: page.getByRole('cell', { name: 'default', exact: true }) })).toContainText('Anthropic Messages');
   await detail.getByRole('button', { name: '编辑配置', exact: true }).click();
   await expect(page.getByRole('dialog').getByLabel('请求渠道', { exact: true })).toHaveValue('anthropic');
+});
+
+
+test('runtime update confirmation promises automatic reopening without a native installer', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    const download = api.DownloadUpdate;
+    api.DownloadUpdate = async version => { const r = await download(version); return { ...r, data: r.data && { ...r.data, install_kind: 'runtime' } }; };
+  });
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await page.getByRole('button', { name: '检查更新', exact: true }).click();
+  await page.getByRole('button', { name: '下载更新', exact: true }).click();
+  await page.getByRole('button', { name: '安装更新…', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('最后短暂切换一次');
+  await expect(page.getByRole('alertdialog')).toContainText('自动打开新版界面');
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '安装中', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(1);
+});
+
+test('SSH update pins the target, disables duplicate submission and requires a fresh check after unknown', async ({ page }) => {
+  await host(page);
+  await page.evaluate(({ checked, confirmation, applied }) => {
+    const api = window.go!.desktop!.Bridge!;
+    const status = api.Status;
+    api.Status = async () => { const r = await status(); return { ...r, data: r.data && { ...r.data, instance_id: confirmation.instance_id, transport: 'ssh', target: 'fixture@remote', profile_name: 'remote' } }; };
+    let attempts = 0;
+    api.CheckRemoteUpdate = async instance => {
+      if (instance !== confirmation.instance_id) throw new Error('wrong check target');
+      return { contract: 'anchor-desktop-v1', data: checked, problem: null };
+    };
+    api.InstallRemoteUpdate = async input => {
+      if (input.instance_id !== confirmation.instance_id || input.version !== confirmation.version || !input.approved) throw new Error('wrong confirmation');
+      attempts++; window.desktopTest.installs++;
+      await new Promise(resolve => setTimeout(resolve, 300));
+      return attempts === 1 ? { contract: 'anchor-desktop-v1', data: null, problem: { code: 'unknown' } } : { contract: 'anchor-desktop-v1', data: applied, problem: null };
+    };
+  }, { checked: updateFixture.remote_checked, confirmation: updateFixture.remote_confirmation, applied: updateFixture.remote_applied });
+  await expect(page.getByRole('button', { name: /remote.*已连接/ })).toBeVisible({ timeout: 10_000 });
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '本机桌面在线更新', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '检查被控机更新', exact: true }).click();
+  await page.getByRole('button', { name: '更新这台被控机…', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('本机服务继续运行');
+  await page.getByRole('button', { name: '确认变更', exact: true }).dblclick();
+  await expect(page.getByRole('alert')).toContainText('结果未能确认');
+  await expect(page.getByRole('button', { name: '更新这台被控机…', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(1);
+  await page.getByRole('button', { name: '检查被控机更新', exact: true }).click();
+  await page.getByRole('button', { name: '更新这台被控机…', exact: true }).click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: '服务已恢复' })).toBeVisible();
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(2);
+});
+
+
+test('unknown local update outcome clears the install candidate until a fresh check', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => {
+    window.go!.desktop!.Bridge!.InstallUpdate = async () => {
+      window.desktopTest.installs++;
+      return { contract: 'anchor-desktop-v1', data: null, problem: { code: 'unknown' } };
+    };
+  });
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  await page.getByRole('button', { name: '检查更新', exact: true }).click();
+  await page.getByRole('button', { name: '下载更新', exact: true }).click();
+  await page.getByRole('button', { name: '安装更新…', exact: true }).click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('结果未能确认');
+  await expect(page.getByRole('button', { name: '安装更新…', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.desktopTest.installs)).toBe(1);
 });

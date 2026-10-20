@@ -37,7 +37,8 @@ func TestUpdateLocalCLI(t *testing.T) {
 		{"update", "configure", "--channel", "nightly"}, {"update", "configure", "--manifest", "http://example.com/feed"},
 		{"update", "configure", "--manifest", "https://example.invalid/feed", "--default-source"},
 		{"update", "check", "--product", "desktop"}, {"update", "check", "--current-version", "1.0.0"},
-		{"update", "config", "extra"}, {"update", "unknown"},
+		{"update", "upgrade"}, {"update", "desktop"}, {"update", "upgrade", "--approve", "--expected-version", "1.0.0"},
+		{"--context", "remote", "update", "upgrade"}, {"update", "config", "extra"}, {"update", "unknown"},
 	} {
 		if err := run(args...); err == nil {
 			t.Fatal("invalid update command accepted", args)

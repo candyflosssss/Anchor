@@ -8,12 +8,20 @@ import (
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/core"
+	"github.com/candyflosssss/Anchor/internal/updateflow"
 	"github.com/candyflosssss/Anchor/internal/updater"
 )
 
 func (a App) update(ctx context.Context, dir string, args []string) error {
+	if len(args) > 0 && (args[0] == "upgrade" || args[0] == "desktop") {
+		product := "cli"
+		if args[0] == "desktop" {
+			product = "desktop"
+		}
+		return a.upgrade(ctx, dir, product, args[1:])
+	}
 	if len(args) == 0 {
-		return errors.New("update requires config, configure, check, download or apply")
+		return errors.New("update requires config, configure, check, download, apply, upgrade or desktop")
 	}
 	cfg, err := updater.ReadConfig(dir)
 	if err != nil {
@@ -56,8 +64,15 @@ func (a App) update(ctx context.Context, dir string, args []string) error {
 		manifest := f.String("manifest", cfg.ManifestURL, "source override for this operation")
 		product := f.String("product", "cli", "cli or desktop")
 		current := f.String("current-version", "", "required for desktop; omit for cli")
+		expected := f.String("expected-instance", "", "require this local instance before SSH update discovery")
+		port := f.Int("control-port", 0, "require this local control port with --expected-instance")
 		if err := parse(f, args[1:]); err != nil {
 			return err
+		}
+		if *expected != "" || *port != 0 {
+			if _, err := updateflow.VerifyLocal(dir, *expected, *port); err != nil {
+				return err
+			}
 		}
 		if *product != "cli" && *product != "desktop" {
 			return updater.ErrInvalid

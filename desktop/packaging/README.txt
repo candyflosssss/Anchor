@@ -29,7 +29,18 @@ requires confirmation in the GUI (or a compatible CLI: anchor stop --approve).
 Existing approved Agent management policies are retained; installation itself
 does not create or change them. No login autostart or system service is added.
 
-UPGRADE / REMOVE: first explicitly stop the core, wait for it to exit, then
+IN-APP UPDATE: a compatible feed can provide a verified runtime beside the
+installed application. Preparation leaves the old service running; final handoff
+briefly restarts the core and reopens the new GUI. Active requests may be cut.
+Linux command: anchor update desktop --approve (or anchor-desktop update desktop
+--approve). An initialized instance and a launcher supporting runtime updates
+are required. First-time migration from older launchers needs a native installer.
+Runtime updates retain the original system package/uninstall version and keep
+program versions in the per-user updates directory. They do not install missing
+system runtime libraries or automatically downgrade a migrated database.
+SSH targets use their own CLI update source; see the repository CLI reference.
+
+NATIVE INSTALLER UPGRADE / REMOVE: first explicitly stop the core, wait for it to exit, then
 close every Anchor window. Install the new package. The installer never kills
 processes or deletes per-user configuration, credentials, database or recovery
 materials. Linux may retain the old running process if you skip stopping it;

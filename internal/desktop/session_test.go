@@ -18,11 +18,38 @@ import (
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/cli"
+	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
+	"github.com/candyflosssss/Anchor/internal/updater"
 )
 
 func TestMain(m *testing.M) {
+	if version := os.Getenv("ANCHOR_TEST_RUNTIME_VERSION"); version != "" && (filepath.Base(os.Args[0]) == "anchor-desktop" || filepath.Base(os.Args[0]) == "anchor") {
+		core.Version = version
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--runtime-version" {
+		json.NewEncoder(os.Stdout).Encode(map[string]string{"version": core.Version})
+		os.Exit(0)
+	}
+
+	if len(os.Args) > 1 && os.Args[1] == "--desktop-test-forward" {
+		dir, err := CLIDataDir(os.Args[2:])
+		if err != nil {
+			os.Exit(1)
+		}
+		forwarded, code, err := updater.ForwardRuntime(context.Background(), dir, "desktop", core.Version, os.Args[1:])
+		if err != nil {
+			os.Exit(1)
+		}
+		if forwarded {
+			os.Exit(code)
+		}
+		os.Exit(cli.Main(context.Background(), os.Args[2:]))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "--desktop-test-cli" {
+		os.Exit(cli.Main(context.Background(), os.Args[2:]))
+	}
 	if IsAgentTokenInvocation(os.Args[1:]) {
 		os.Exit(cli.Main(context.Background(), os.Args[1:]))
 	}
@@ -43,6 +70,9 @@ func TestMain(m *testing.M) {
 			os.Exit(1)
 		}
 		os.Exit(0)
+	}
+	if filepath.Base(os.Args[0]) == "anchor" {
+		os.Exit(cli.Main(context.Background(), os.Args[1:]))
 	}
 	os.Exit(m.Run())
 }

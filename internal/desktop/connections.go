@@ -176,6 +176,8 @@ func (s *Session) activateRemote(live *connection.Live) {
 		s.remote.Close()
 	}
 	s.remote = live
+	s.remoteUpdateCheck = nil
+	s.remoteUpdateInstance = ""
 	s.cfg = &state.Settings{InstanceID: live.Profile.InstanceID}
 	s.launchedPID = 0
 }

@@ -2,6 +2,11 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed", "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe", "skill_unsafe", "skill_changed", "skill_limit", "skill_link_unavailable"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface ConfirmRemoteUpdate {
+  instance_id: string;
+  version: string;
+  approved: boolean;
+}
 export interface KeyCooldownSettings {
   weight_percent: number;
   enabled: boolean;
@@ -1063,6 +1068,7 @@ export interface LogSettingsResult {
 }
 export interface DesktopBridge {
   AgentWorkspace(): Promise<AgentWorkspaceResult>;
+  CheckRemoteUpdate(input1: string): Promise<UpdateResult>;
   CheckUpdate(input1: string): Promise<UpdateResult>;
   CodexSettings(): Promise<CodexSettingsResult>;
   ConfigureLogs(input1: Settings): Promise<LogSettingsResult>;
@@ -1075,6 +1081,7 @@ export interface DesktopBridge {
   EstimateModelCost(input1: CatalogEstimateInput): Promise<CatalogEstimateResult>;
   ExitDesktop(): Promise<StopResult>;
   ExportLogs(input1: Query): Promise<StopResult>;
+  InstallRemoteUpdate(input1: ConfirmRemoteUpdate): Promise<UpdateResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
   KeyCooldownSettings(): Promise<KeyCooldownSettingsResult>;
   LogDetail(input1: string): Promise<LogDetailResult>;

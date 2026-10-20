@@ -19,6 +19,7 @@ import (
 	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
+	"github.com/candyflosssss/Anchor/internal/updater"
 )
 
 const help = `Anchor — headless model gateway (development milestone)
@@ -128,6 +129,12 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   update check|download [--channel CHANNEL] [--manifest HTTPS_URL]
                 [--product desktop --current-version VERSION]
   update apply --approve             Replace local CLI; core must be stopped
+  update upgrade --approve           Prepare newer CLI; briefly restart and verify local core
+  update desktop --approve           Linux/Windows desktop runtime update; auto-reopen running GUI
+      [--channel CHANNEL] [--manifest HTTPS_URL] [--expected-instance ID] [--control-port N]
+      Safety pins: [--expected-version VERSION --expected-sha256 HASH]
+  --context NAME update check        Check the enrolled SSH machine's own update source
+  --context NAME update upgrade --approve  Update only that SSH machine; verify version/identity
   version
 Normal output is JSON; logs export is JSONL, logs follow emits repeated JSON pages, agent token is raw secret.
 Logs include optional reference_cost: usd is original; adjustment stores supplier/group multipliers, final usd and token parts.
@@ -142,7 +149,7 @@ Agent enable requires an existing default model; use agent set-models to replace
 Provider, Key, public model and Context names accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
 Agent binding names use the same characters, with a 64 UTF-8 byte limit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
-init/serve/access/context/recover/update/agent token operate locally. restart is local unless --context explicitly selects SSH. Business commands use the selected context.
+init/serve/access/context/recover/agent token operate locally. update is local except explicit --context check/upgrade. restart is local unless --context explicitly selects SSH. Business commands use the selected context.
 Codex, Claude Code user settings and independent DSH Web (dsh) / Desktop (dsh-desktop) profile management are available; runtime connection remains unverified.
 DSH Web/Desktop sync mapped display names, vision/input, context and supported off/minimal/low/medium/high/xhigh/max efforts.
 DSH defaults use the binding default model; native none/default/null and toggle/budget reasoning are not relabelled.
@@ -267,7 +274,7 @@ func (a App) Run(ctx context.Context, args []string) error {
 	switch args[0] {
 	case "update":
 		if target != "" {
-			return errors.New("update is local-only; omit --context")
+			return a.remoteUpdate(ctx, dir, target, args[1:])
 		}
 		return a.update(ctx, dir, args[1:])
 	case "init":
@@ -839,6 +846,21 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 
 // Main separates machine-readable output from diagnostic text and handles Ctrl+C via ctx.
 func Main(ctx context.Context, args []string) int {
+	if len(args) == 1 && args[0] == "--runtime-version" {
+		fmt.Printf("{\"version\":%q}\n", core.Version)
+		return 0
+	}
+	if dir, _, _, err := globals(args); err == nil {
+		forwarded, code, err := updater.ForwardRuntime(ctx, dir, "cli", core.Version, args)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "anchor: runtime activation failed:", err)
+			return 1
+		}
+		if forwarded {
+			return code
+		}
+	}
+
 	a := App{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}
 	if err := a.Run(ctx, args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {

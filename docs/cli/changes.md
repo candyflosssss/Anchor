@@ -776,3 +776,10 @@
 - 旧 → 新：带 reasoning/text、命名空间／custom 工具的 Responses 请求原来在转换阶段失败；现在支持对应 Chat 参数、明文思考历史／流式返回及逐请求工具身份还原。失败详情增加 conversion_target/conversion_reason 和所选路由身份，未派发仍 HTTP=null、attempt_count=0，不记录任意字段名或正文。
 - 兼容与迁移：需更新处理请求的核心，无 schema 变更，旧日志不回填。custom grammar 转为提示词指令，不保留原生强制约束；历史密文、tool_search、多模态和未覆盖的协议能力继续明确拒绝。没有请求真实付费上游或替换本机安装版本。
 - 验证：协议单元与模拟 HTTP 上游的定向回归通过，覆盖思考／输出格式、custom／namespace、参数分片、历史回放、拒绝边界和日志脱敏；完整执行结果见本轮任务记录。
+
+## 2026-10-20 — 本机 runtime 与 SSH 被控机更新（当前源码，未发布）
+- 类型：新增／修改。
+- 指令与参数：新增 `update upgrade|desktop --approve`、显式 `--context NAME update check|upgrade`；本机 check/download 增加 expected-instance/control-port，upgrade/desktop 增加渠道／源及身份、端口、版本与 SHA256 pins。
+- 旧 → 新：原 apply 在普通安装路径保留，runtime 版本目录改用 upgrade，防止破坏启动校验；新增旁路版本准备、最后一次核心保留交接、ready／版本核验与启动入口激活；运行中桌面同数据目录可自动重开。SSH 更新在目标账号完成，主控端核验结果，不再一律拒绝 update 的 --context。
+- 兼容与迁移：旧桌面／远端需先引导升级一次；安装包 feed 可新增嵌套 runtime，旧客户端继续选原安装器。新程序／原生依赖／系统包版本分开管理，无数据库自动回滚；远端沿用 POSIX/Linux SSH。
+- 验证：定向 Go 隔离真实核心交接、托管代理请求、SSH 密钥／密码传输及错误结果用例通过；前端类型检查、lint和模型测试通过；未打包／发布或进行双平台原生窗口验收。

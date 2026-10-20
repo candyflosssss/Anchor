@@ -36,11 +36,13 @@ def validate_base(base: str) -> None:
         raise ValueError("use HTTPS (HTTP only on literal loopback)")
 
 def build_manifest(product: str, version: str, channel: str, base: str,
-                   files: dict[str, Path], layout: str = "flat") -> dict:
+                   files: dict[str, Path], layout: str = "flat", runtimes: dict[str, Path] | None = None) -> dict:
     validate_version(version, channel)
     validate_base(base)
     if product not in {"cli", "desktop"} or layout not in {"flat", "target"} or not files:
         raise ValueError("invalid product, layout or empty artifacts")
+    if runtimes and (product != "desktop" or set(runtimes) != set(files)):
+        raise ValueError("runtime targets must match desktop installer targets")
     artifacts = []
     for target, path in sorted(files.items()):
         if target not in {"linux-amd64", "windows-amd64"} or path.is_symlink() or not path.is_file():
@@ -61,6 +63,15 @@ def build_manifest(product: str, version: str, channel: str, base: str,
         artifacts.append({"file": path.name, "target": target, "kind": kind,
                           "url": base.rstrip("/") + "/" + relative,
                           "sha256": digest.hexdigest(), "bytes": size})
+    if runtimes:
+        runtime_feed = build_manifest("cli", version, channel, base, runtimes, layout)
+        by_target = {a["target"]: a for a in runtime_feed["artifacts"]}
+        for artifact in artifacts:
+            runtime = by_target[artifact["target"]]
+            if artifact["target"] == "windows-amd64" and not runtime["file"].endswith(".exe"):
+                raise ValueError("Windows runtime needs .exe extension")
+            runtime["kind"] = "runtime"
+            artifact["runtime"] = runtime
     return {"schema_version": 1, "product": product, "version": version,
             "channel": channel, "artifacts": artifacts}
 
@@ -71,6 +82,7 @@ def main() -> None:
     parser.add_argument("--channel", required=True, choices=sorted(CHANNELS))
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--artifact", required=True, action="append", metavar="TARGET=FILE")
+    parser.add_argument("--runtime", action="append", default=[], metavar="TARGET=FILE", help="optional same-version desktop executable; one per installer")
     parser.add_argument("--layout", default="flat", choices=["flat", "target"])
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
@@ -80,8 +92,14 @@ def main() -> None:
         if not sep or target in files:
             parser.error("artifact must be unique TARGET=FILE")
         files[target] = Path(file)
+    runtimes = {}
+    for item in args.runtime:
+        target, sep, file = item.partition("=")
+        if not sep or target in runtimes:
+            parser.error("runtime must be unique TARGET=FILE")
+        runtimes[target] = Path(file)
     try:
-        result = build_manifest(args.product, args.version, args.channel, args.base_url, files, args.layout)
+        result = build_manifest(args.product, args.version, args.channel, args.base_url, files, args.layout, runtimes)
     except ValueError as error:
         parser.error(str(error))
     # Never overwrite a live feed in place or silently replace an existing file.
