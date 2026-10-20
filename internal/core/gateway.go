@@ -471,10 +471,15 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	if stream {
 		if allowRecovery {
 			setLogStage(r, "stream_start")
-			reader, reason, inspection, event := primeEncryptedContextStream(ctx, resp.Body)
+			var details encryptedContextStreamDetails
+			reader, reason, inspection, event := primeEncryptedContextStream(ctx, resp.Body, &details)
 			if t := trace(r); t != nil {
 				t.row.Evidence["encrypted_context_stream_inspection"] = inspection
 				t.row.Evidence["encrypted_context_stream_event"] = event
+				if details.TypeHash != "" {
+					t.row.Evidence["encrypted_context_stream_type_hash"] = details.TypeHash
+					t.row.Evidence["encrypted_context_stream_fields"] = details.Fields
+				}
 			}
 			recovery = recoverEncryptedContext(request, reason)
 			if recovery != nil {

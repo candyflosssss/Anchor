@@ -113,11 +113,13 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 ### 历史加密推理恢复（2026-10-20，当前源码，未打包／未发布）
 
-**后续修复（desktop.58 之后，未打包）**：`.58` 仍把空 reasoning/message 容器当作已输出而退出检查；23:01及23:25失败日志均为 non_lifecycle_event、单次尝试，有思考结构观察但无正文首字，旧日志不能区分空壳与实际思考内容。本轮允许严格验证的空 reasoning/message 条目、空 summary/text part 继续等待明确拒绝，保持64 KiB及原请求期限；未知字段、工具项、真实思考／正文／密文输出仍退出。`response.failed` 内仅含空壳 output 也可识别；SSE仅event行提供类型时同样识别。新增安全事件类别日志用于补齐诊断，不把本地模拟视作真实失败会话已恢复。
+**后续诊断与针对性修复（desktop.59之后，未公开打包）**：用户确认.59仍报同错。临时探针识别首个未知事件为`codex.response.metadata`，类型SHA256为`4928dcffeb7ec6134a0662ac1a91cbdbe737af8d60c407fc34e0245b540c3c28`，并核对[官方Codex SSE处理](https://github.com/openai/codex/blob/main/codex-rs/codex-api/src/sse/responses.rs)，其视为附加元信息而不产生输出。现仅将该确切类型加入可暂存列表，未知事件仍退出，不采用“所有未知都跳过”。新增类型哈希与固定字段名存在性诊断，不保存未知原名／字段值；临时探针2曾仅采集80字符以内小写字母／点／下划线格式的协议名用于确认，最终源码移除此临时原名采集。明确错误中的传输包装前缀不再妨碍识别。用户在修正探针.3安装后确认原失败会话已恢复正常。当前源码将检查前缀上限由64 KiB提升至2 MiB（与既有SSE事件上限一致），覆盖较大instructions/tools初始化信息；仍共享原请求期限与一次清理预算。
+
+**后续修复（desktop.59 已发布并更新本机）**：`.58` 仍把空 reasoning/message 容器当作已输出而退出检查；23:01及23:25失败日志均为 non_lifecycle_event、单次尝试，有思考结构观察但无正文首字，旧日志不能区分空壳与实际思考内容。本轮允许严格验证的空 reasoning/message 条目、空 summary/text part 继续等待明确拒绝，保持64 KiB及原请求期限；未知字段、工具项、真实思考／正文／密文输出仍退出。`response.failed` 内仅含空壳 output 也可识别；SSE仅event行提供类型时同样识别。新增安全事件类别日志用于补齐诊断，不把本地模拟视作真实失败会话已恢复。
 
 仅入站和实际 Key 协议均为 Responses、请求 input 带历史 reasoning.encrypted_content 时启用。原请求照常发送；HTTP 400/422 的 JSON 错误、HTTP 200 JSON 错误或流开头的 `error` / `response.failed` 明确包含 `invalid_encrypted_content`、`The encrypted content … could not be verified` 或推理密文 `was not issued to this caller` 时，移除本次请求 input 中全部 reasoning 条目，在同一供应商、Key、上游模型与选定基址上重试一次。所有候选合计只允许一次清理；共享原候选超时与并发名额，不增加退避。普通消息、函数调用及结果、compaction 与 agent_message（含加密任务）保持原样；不修改客户端历史、Agent 配置或请求文件。本轮不恢复压缩密文和加密工具结果；若错误来自这些内容，清理推理也可能无法恢复。
 
-流式恢复只在提交下游响应前进行：最多检查 64 KiB，沿用原候选请求超时，暂存心跳、created/in_progress/queued生命周期事件，以及严格检查无生成内容的reasoning/message空壳和空summary/text part；真实推理／正文／密文输出、任何工具项、含实际输出的生命周期事件、未知字段／无效事件或超限即原样交付并退出恢复窗口。超时／取消按原请求生命周期结束，不清理重试；取消 desktop.57 的独立 2 秒检查截止，防止在慢返回的明确拒绝到达前过早提交下游。检查退出原因写入安全枚举 `encrypted_context_stream_inspection`，最后检查的事件类别写入 `encrypted_context_stream_event`，即使没有清理也可诊断。未匹配错误、EOF、网络／超时、鉴权／限流及已提交的流不触发清理。两次实际派发各保存独立 attempt、用量；根 Token／参考费用沿用缺失任一次用量即未知的规则。Key 健康取清理重试后的最终渠道结果，避免一次已修复的上下文拒绝额外惩罚 Key。日志标记和诊断边界见[日志设计](logging.md#历史加密推理恢复2026-10-20当前源码未发布)。这是一种有损容错，可能失去隐藏推理连续性，不保证所有上游接受剩余上下文。
+流式恢复只在提交下游响应前进行：最多检查 2 MiB，沿用原候选请求超时，暂存心跳、codex.response.metadata附加元信息、created/in_progress/queued生命周期事件，以及严格检查无生成内容的reasoning/message空壳和空summary/text part；真实推理／正文／密文输出、任何工具项、含实际输出的生命周期事件、未知字段／无效事件或超限即原样交付并退出恢复窗口。超时／取消按原请求生命周期结束，不清理重试；取消 desktop.57 的独立 2 秒检查截止，防止在慢返回的明确拒绝到达前过早提交下游。检查退出原因写入安全枚举 `encrypted_context_stream_inspection`，最后检查的事件类别写入 `encrypted_context_stream_event`，即使没有清理也可诊断。未匹配错误、EOF、网络／超时、鉴权／限流及已提交的流不触发清理。两次实际派发各保存独立 attempt、用量；根 Token／参考费用沿用缺失任一次用量即未知的规则。Key 健康取清理重试后的最终渠道结果，避免一次已修复的上下文拒绝额外惩罚 Key。日志标记和诊断边界见[日志设计](logging.md#历史加密推理恢复2026-10-20当前源码未发布)。这是一种有损容错，可能失去隐藏推理连续性，不保证所有上游接受剩余上下文。
 
 ## 5. 生命周期与验证
 

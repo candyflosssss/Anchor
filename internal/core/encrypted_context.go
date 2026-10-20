@@ -3,13 +3,17 @@ package core
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"maps"
 	"strings"
 )
 
-const encryptedContextPrefixLimit = 64 << 10
+// Response initialization can echo large instruction/tool schemas. Match the
+// existing protocol SSE event bound instead of committing at just 64 KiB.
+const encryptedContextPrefixLimit = 2 << 20
 
 type encryptedContextRecovery struct {
 	request map[string]json.RawMessage
@@ -72,7 +76,7 @@ func encryptedContextError(data []byte) string {
 	if code == "invalid_encrypted_content" {
 		return "invalid_encrypted_content"
 	}
-	if strings.HasPrefix(message, "The encrypted content") && strings.Contains(message, "could not be verified") {
+	if strings.Contains(message, "The encrypted content") && strings.Contains(message, "could not be verified") {
 		return "encrypted_content_unverifiable"
 	}
 	if strings.Contains(message, "was not issued to this caller") && (strings.Contains(message, "encrypted_content") || strings.Contains(message, "reasoning")) {
@@ -163,6 +167,8 @@ func encryptedContextEventLabel(kind string, item json.RawMessage) string {
 	switch kind {
 	case "response.created", "response.in_progress", "response.queued":
 		return "lifecycle"
+	case "codex.response.metadata":
+		return "metadata"
 	case "error", "response.failed":
 		return "error"
 	case "response.output_item.added", "response.output_item.done":
@@ -229,6 +235,11 @@ type encryptedContextRead struct {
 	err  error
 }
 
+type encryptedContextStreamDetails struct {
+	TypeHash string
+	Fields   string
+}
+
 // At most one upstream Read is outstanding. On request cancellation, hand
 // that read back to the stream instead of abandoning it.
 // Closing the HTTP response body/canceling its context unblocks the read.
@@ -252,14 +263,14 @@ func (p *encryptedContextPendingRead) Read(b []byte) (int, error) {
 	return 0, io.EOF
 }
 
-// Hold pre-output announcements, for at most 64 KiB and within the existing
+// Hold pre-output announcements, for at most 2 MiB and within the existing
 // upstream request deadline. A slow validation error is still recoverable
 // before output; an independent short timer would commit it prematurely.
 // Empty message/reasoning shells and empty content-part announcements are also
 // held. Actual content, tool items and unknown events commit the stream.
 // Preserve every inspected byte when declining recovery. Never replay after
 // generated output, EOF, timeout, malformed data, or an unrelated stream error.
-func primeEncryptedContextStream(ctx context.Context, body io.Reader) (io.Reader, string, string, string) {
+func primeEncryptedContextStream(ctx context.Context, body io.Reader, details ...*encryptedContextStreamDetails) (io.Reader, string, string, string) {
 	prefix := make([]byte, 0, 4096)
 	lineStart := 0
 	var data strings.Builder
@@ -323,13 +334,31 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader) (io.Reader
 					}
 				}
 				lastEvent = encryptedContextEventLabel(header.Type, header.Item)
+				for _, detail := range details {
+					if detail == nil {
+						continue
+					}
+					detail.TypeHash = fmt.Sprintf("%x", sha256.Sum256([]byte(header.Type)))
+					var fields map[string]json.RawMessage
+					json.Unmarshal(payload, &fields)
+					var present []string
+					for _, name := range []string{"type", "event", "response", "item", "part", "error", "data", "object", "id", "choices", "message", "metadata"} {
+						if _, ok := fields[name]; ok {
+							present = append(present, name)
+						}
+					}
+					detail.Fields = strings.Join(present, ",")
+					if detail.Fields == "" {
+						detail.Fields = "none"
+					}
+				}
 				if header.Type == "error" || header.Type == "response.failed" || event == "error" {
 					if reason := encryptedContextError(payload); reason != "" {
 						return replay(body), reason, "rejected", lastEvent
 					}
 				}
 				switch header.Type {
-				case "response.created", "response.in_progress", "response.queued":
+				case "response.created", "response.in_progress", "response.queued", "codex.response.metadata":
 					if encryptedContextHasOutput(header.Response.Output) {
 						return pass(body, "output_started")
 					}

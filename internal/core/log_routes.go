@@ -85,7 +85,7 @@ func (s *Server) logRoutes(m *http.ServeMux) {
 		for i := range p.Requests {
 			p.Requests[i].Attempts = []logbook.Attempt{}
 			evidence := map[string]string{}
-			for _, name := range []string{"sent_service_tier", "sent_service_tier_raw", "fast_triggered", "upstream_service_tier", "upstream_service_tier_raw", "encrypted_context_recovery", "encrypted_context_reason", "encrypted_context_removed_reasoning", "encrypted_context_retry_count", "encrypted_context_stream_inspection", "encrypted_context_stream_event"} {
+			for _, name := range []string{"sent_service_tier", "sent_service_tier_raw", "fast_triggered", "upstream_service_tier", "upstream_service_tier_raw", "encrypted_context_recovery", "encrypted_context_reason", "encrypted_context_removed_reasoning", "encrypted_context_retry_count", "encrypted_context_stream_inspection", "encrypted_context_stream_event", "encrypted_context_stream_type_hash", "encrypted_context_stream_fields"} {
 				if value, ok := p.Requests[i].Evidence[name]; ok {
 					evidence[name] = value
 				}

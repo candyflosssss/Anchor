@@ -206,7 +206,7 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 
 ### 历史加密推理恢复（2026-10-20，当前源码，未发布）
 
-原生 Responses 对历史加密推理明确拒绝且尚未交付响应时，核心清理请求 input 的全部 reasoning 条目并在同一供应商／Key／模型／选定基址重试一次；所有候选共用一次清理预算。清理仅作用于转发副本，保留普通消息、工具调用／结果、压缩历史与加密任务；可能损失隐藏推理连续性。流开头检查仅暂存生命周期事件，最多 64 KiB，并共享原候选请求超时；任何输出／推理／工具事件或超过大小上限后不再清理重放。desktop.57 的独立 2 秒识别截止已在当前源码中取消，慢返回的明确拒绝仍可识别；超时和取消不触发恢复。详细触发与限制见[实施说明](implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。
+原生 Responses 对历史加密推理明确拒绝且尚未交付响应时，核心清理请求 input 的全部 reasoning 条目并在同一供应商／Key／模型／选定基址重试一次；所有候选共用一次清理预算。清理仅作用于转发副本，保留普通消息、工具调用／结果、压缩历史与加密任务；可能损失隐藏推理连续性。流开头检查暂存生命周期、codex.response.metadata及严格无内容的reasoning/message与summary/text part事件，最多 2 MiB，并共享原候选请求超时；实际正文／推理内容、工具事件或超过大小上限后不再清理重放。desktop.57 的独立 2 秒识别截止已在当前源码中取消，慢返回的明确拒绝仍可识别；超时和取消不触发恢复。详细触发与限制见[实施说明](implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。
 
 同一根请求的 evidence 标记：
 
@@ -216,10 +216,12 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 | `encrypted_context_reason` | 触发原因固定为 `invalid_encrypted_content`、`encrypted_content_unverifiable` 或 `encrypted_content_caller_mismatch`，不保存原始错误 |
 | `encrypted_context_removed_reasoning` | 本次删除的推理条目十进制数量，包括同一请求中的非加密 reasoning 条目 |
 | `encrypted_context_retry_count` | 固定字符串 `1`，与全部渠道 attempt_count 分开 |
-| `encrypted_context_stream_inspection` | 符合检查条件的首个流尝试的退出原因：`rejected` 明确命中；`output_started` 生命周期已带实际输出；`non_lifecycle_event` 已遇到生成内容、工具或其他未允许事件（空reasoning/message容器和空summary/text part继续检查）；`invalid_event` 无法解析；`prefix_limit` 达到 64 KiB；`timeout`／`cancelled` 原请求超时／取消；`eof`／`read_error`／`empty_read` 读取结束或异常。无清理时也可出现，不证明发生了恢复 |
-| `encrypted_context_stream_event` | desktop.58之后源码新增：检查退出时最后事件的代码固定类别 `none/lifecycle/error/reasoning_item/message_item/tool_item/other_item/reasoning_delta/text_delta/content_part/terminal/unknown`；不保存原始事件名、item ID或正文；结合inspection判断停止原因，列表／follow／详情／导出可见，旧日志不补写 |
+| `encrypted_context_stream_inspection` | 符合检查条件的首个流尝试的退出原因：`rejected` 明确命中；`output_started` 生命周期已带实际输出；`non_lifecycle_event` 已遇到生成内容、工具或其他未允许事件（空reasoning/message容器和空summary/text part继续检查）；`invalid_event` 无法解析；`prefix_limit` 达到 2 MiB；`timeout`／`cancelled` 原请求超时／取消；`eof`／`read_error`／`empty_read` 读取结束或异常。无清理时也可出现，不证明发生了恢复 |
+| `encrypted_context_stream_event` | 当前源码（.59后新增metadata）：检查退出时最后事件的代码固定类别 `none/lifecycle/metadata/error/reasoning_item/message_item/tool_item/other_item/reasoning_delta/text_delta/content_part/terminal/unknown`；不保存原始事件名、item ID或正文；结合inspection判断停止原因，列表／follow／详情／导出可见，旧日志不补写 |
+| `encrypted_context_stream_type_hash` | desktop.59后源码新增：退出检查时最后有效事件类型的SHA256；不保存未知事件原名，结合分类用于匹配已知协议常量，不代表清理成功 |
+| `encrypted_context_stream_fields` | 同期新增：只记录type/event/response/item/part/error/data/object/id/choices/message/metadata固定白名单字段是否存在（逗号分隔或none）；不保存字段值，不接受任意字段名 |
 
-上述五项加入列表／follow 的紧凑 evidence 白名单，详情／复制／JSONL 导出保留完整标记。此前“五项档位证据”限制扩展为五项档位加四项恢复证据与一项流检查证据，其他大诊断仍只在详情／导出。桌面状态列和复用的详情列显示「已清理加密上下文 · 恢复成功／重试失败／重试已取消／正在重试／结果未确认」，只按已记录枚举展示；旧日志或未知值不猜已清理。
+上述八项加入列表／follow 的紧凑 evidence 白名单，详情／复制／JSONL 导出保留完整标记。此前“五项档位证据”限制扩展为五项档位加四项恢复证据与四项流检查证据，其他大诊断仍只在详情／导出。桌面状态列和复用的详情列显示「已清理加密上下文 · 恢复成功／重试失败／重试已取消／正在重试／结果未确认」，只按已记录枚举展示；旧日志或未知值不猜已清理。
 
 两个实际派发保存为独立 attempt：首次拒绝 `code=encrypted_context_rejected`、`outcome=retry`，第二次保存真实结果。缺失第一次 usage 时根 Token／费用保持未知，不能把最后成功尝试冒充全部消耗；Key 健康按该渠道的最终恢复结果更新。无清理发生则不添加四项恢复标记；流检查证据独立记录。仅保存固定原因、计数与结果，不记录密文、推理 ID、请求／响应正文、工具参数或错误原文，历史日志不回填。既有 evidence 字典契约与 CLI／桥接入口不变，无数据库迁移。
 

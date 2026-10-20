@@ -27,6 +27,7 @@ func TestEncryptedContextErrorRecognition(t *testing.T) {
 	for _, tc := range []struct{ body, want string }{
 		{encryptedContextRejection, "invalid_encrypted_content"},
 		{encryptedContextFailedEvent, "encrypted_content_unverifiable"},
+		{`{"type":"error","message":"stream disconnected before completion: The encrypted content for item rs_private could not be verified. Reason: Encrypted content could not be decrypted or parsed."}`, "encrypted_content_unverifiable"},
 		{`{"type":"response.failed","response":{"error":{"code":"invalid_encrypted_content"},"output":[{"type":"reasoning","summary":[]}]}}`, "invalid_encrypted_content"},
 		{`{"error":{"code":"invalid_encrypted_content"},"output":[{"type":"reasoning","encrypted_content":"new output"}]}`, ""},
 		{`{"error":{"code":"invalid_encrypted_content"},"output":[{"type":"message","content":[{"type":"output_text","text":"hello"}]}]}`, ""},
@@ -84,6 +85,9 @@ func TestEncryptedContextStreamPriming(t *testing.T) {
 	failure := "data: " + encryptedContextFailedEvent + "\n\n"
 	for _, tc := range []struct{ name, wire, want string }{
 		{"early rejection", lifecycle + failure, "encrypted_content_unverifiable"},
+		{"codex metadata before rejection", `data: {"type":"codex.response.metadata","metadata":{"turn_id":"private-metadata"}}` + "\n\n" + lifecycle + failure, "encrypted_content_unverifiable"},
+		{"event-only codex metadata", "event: codex.response.metadata\ndata: {\"metadata\":{}}\n\n" + failure, "encrypted_content_unverifiable"},
+		{"unknown metadata remains boundary", `data: {"type":"private.response.metadata","metadata":{}}` + "\n\n" + failure, ""},
 		{"empty reasoning shell", lifecycle + `data: {"type":"response.output_item.added","item":{"type":"reasoning","id":"rs_private","status":"in_progress","summary":[],"encrypted_content":null}}` + "\n\n" + failure, "encrypted_content_unverifiable"},
 		{"empty message shell", `data: {"type":"response.output_item.added","item":{"type":"message","role":"assistant","content":[]}}` + "\n\n" + failure, "encrypted_content_unverifiable"},
 		{"empty summary part", `data: {"type":"response.reasoning_summary_part.added","part":{"type":"summary_text","text":""}}` + "\n\n" + failure, "encrypted_content_unverifiable"},
@@ -108,7 +112,11 @@ func TestEncryptedContextStreamPriming(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Tiny reads exercise frame and CRLF boundaries.
-			reader, reason, inspection, event := primeEncryptedContextStream(t.Context(), &smallEncryptedContextReader{reader: strings.NewReader(tc.wire)})
+			var source io.Reader = &smallEncryptedContextReader{reader: strings.NewReader(tc.wire)}
+			if tc.name == "buffer cap" {
+				source = strings.NewReader(tc.wire)
+			}
+			reader, reason, inspection, event := primeEncryptedContextStream(t.Context(), source)
 			if reason != tc.want || inspection == "" || event == "" {
 				t.Fatalf("got reason %q want %q", reason, tc.want)
 			}
@@ -449,7 +457,11 @@ func TestGatewayEncryptedContextRecoveryAfterDelayedValidation(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		if n == 1 {
-			io.WriteString(w, ": heartbeat\n\ndata: {\"type\":\"response.created\"}\n\n")
+			io.WriteString(w, `data: {"type":"codex.response.metadata","metadata":{"turn_id":"private-metadata"}}`+"\n\n")
+			w.(http.Flusher).Flush()
+			io.WriteString(w, ": heartbeat\n\n")
+			// Real lifecycle frames may echo long instructions and tool schemas.
+			fmt.Fprintf(w, "data: %s\n\n", fmt.Sprintf(`{"type":"response.created","response":{"output":[],"instructions":%q}}`, strings.Repeat("synthetic metadata ", 5000)))
 			io.WriteString(w, `data: {"type":"response.output_item.added","item":{"type":"reasoning","id":"rs_private","status":"in_progress","summary":[]}}`+"\n\n")
 			io.WriteString(w, `data: {"type":"response.reasoning_summary_part.added","part":{"type":"summary_text","text":""}}`+"\n\n")
 			w.(http.Flusher).Flush()
@@ -468,7 +480,7 @@ func TestGatewayEncryptedContextRecoveryAfterDelayedValidation(t *testing.T) {
 	f.model(t, state.Candidate{ProviderID: "p", Model: "up"})
 	resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","stream":true,"input":`+encryptedContextInput+`}`)
 	body := text(t, resp)
-	if resp.StatusCode != 200 || calls.Load() != 2 || !strings.Contains(body, "OK") || strings.Contains(body, "could not be verified") {
+	if resp.StatusCode != 200 || calls.Load() != 2 || !strings.Contains(body, "OK") || strings.Contains(body, "could not be verified") || strings.Contains(body, "private-metadata") {
 		t.Fatal("late validation bypassed cleanup", calls.Load(), resp.StatusCode, body)
 	}
 	f.core.logs.Flush(t.Context())
