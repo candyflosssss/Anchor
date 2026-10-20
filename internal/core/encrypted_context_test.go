@@ -95,8 +95,8 @@ func TestEncryptedContextStreamPriming(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Tiny reads exercise frame and CRLF boundaries.
-			reader, reason := primeEncryptedContextStream(t.Context(), &smallEncryptedContextReader{reader: strings.NewReader(tc.wire)}, time.Second)
-			if reason != tc.want {
+			reader, reason, inspection := primeEncryptedContextStream(t.Context(), &smallEncryptedContextReader{reader: strings.NewReader(tc.wire)})
+			if reason != tc.want || inspection == "" {
 				t.Fatalf("got reason %q want %q", reason, tc.want)
 			}
 			got, err := io.ReadAll(reader)
@@ -113,7 +113,7 @@ func (s *smallEncryptedContextReader) Read(p []byte) (int, error) {
 	return s.reader.Read(p[:min(len(p), 13)])
 }
 
-func TestEncryptedContextPrimingDeadlineHandsOffPendingRead(t *testing.T) {
+func TestEncryptedContextRequestDeadlineHandsOffPendingRead(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer reader.Close()
 	defer writer.Close()
@@ -122,10 +122,12 @@ func TestEncryptedContextPrimingDeadlineHandsOffPendingRead(t *testing.T) {
 		io.WriteString(writer, "data: {\"type\":\"response.created\"}\n\n")
 		close(ready)
 	}()
-	stream, reason := primeEncryptedContextStream(t.Context(), reader, 25*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
+	defer cancel()
+	stream, reason, inspection := primeEncryptedContextStream(ctx, reader)
 	<-ready
-	if reason != "" {
-		t.Fatal(reason)
+	if reason != "" || inspection != "timeout" {
+		t.Fatal(reason, inspection)
 	}
 	go func() {
 		io.WriteString(writer, "data: "+encryptedContextFailedEvent+"\n\n")
@@ -143,10 +145,10 @@ func TestEncryptedContextPrimingCancellationUnblocks(t *testing.T) {
 	defer writer.Close()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	stream, reason := primeEncryptedContextStream(ctx, reader, time.Second)
+	stream, reason, inspection := primeEncryptedContextStream(ctx, reader)
 	writer.CloseWithError(context.Canceled)
 	_, err := io.ReadAll(stream)
-	if reason != "" || !errors.Is(err, context.Canceled) {
+	if reason != "" || inspection != "cancelled" || !errors.Is(err, context.Canceled) {
 		t.Fatal(reason, err)
 	}
 }
@@ -284,6 +286,15 @@ func TestGatewayEncryptedContextNoUnsafeReplay(t *testing.T) {
 			if err != nil || row.AttemptCount != 1 || row.Evidence["encrypted_context_recovery"] != "" {
 				t.Fatal(row, err)
 			}
+			if tc.stream {
+				want := "non_lifecycle_event"
+				if tc.name == "incomplete stream" {
+					want = "eof"
+				}
+				if row.Evidence["encrypted_context_stream_inspection"] != want {
+					t.Fatal("missing safe inspection reason", row.Evidence)
+				}
+			}
 		})
 	}
 }
@@ -408,5 +419,50 @@ func TestGatewayEncryptedContextRecoveryCancellationIsLogged(t *testing.T) {
 	row, err := f.core.logs.Detail(t.Context(), w.Header().Get("X-Anchor-Request-ID"))
 	if err != nil || calls.Load() != 2 || row.Status != "cancelled" || row.Evidence["encrypted_context_recovery"] != "cancelled" || row.AttemptCount != 2 {
 		t.Fatal("cancelled recovery marker missing", row, err)
+	}
+}
+
+// The upstream may flush HTTP 200/lifecycle events while it validates history.
+// A definite rejection arriving after two seconds is still before any output.
+func TestGatewayEncryptedContextRecoveryAfterDelayedValidation(t *testing.T) {
+	f := setup(t)
+	var calls atomic.Int32
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]json.RawMessage
+		json.NewDecoder(r.Body).Decode(&body)
+		n := calls.Add(1)
+		if (n == 1) != hasEncryptedReasoning(body) {
+			t.Error("only the recovery request should remove reasoning")
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		if n == 1 {
+			io.WriteString(w, ": heartbeat\n\ndata: {\"type\":\"response.created\"}\n\n")
+			w.(http.Flusher).Flush()
+			select {
+			case <-time.After(2200 * time.Millisecond):
+			case <-r.Context().Done():
+				return
+			}
+			io.WriteString(w, "data: "+encryptedContextFailedEvent+"\n\n")
+			return
+		}
+		io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"OK\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"output\":[]}}\n\n")
+	}))
+	defer up.Close()
+	f.add(t, "p", up.URL, "synthetic")
+	f.model(t, state.Candidate{ProviderID: "p", Model: "up"})
+	resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","stream":true,"input":`+encryptedContextInput+`}`)
+	body := text(t, resp)
+	if resp.StatusCode != 200 || calls.Load() != 2 || !strings.Contains(body, "OK") || strings.Contains(body, "could not be verified") {
+		t.Fatal("late validation bypassed cleanup", calls.Load(), resp.StatusCode, body)
+	}
+	f.core.logs.Flush(t.Context())
+	row, err := f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
+	if err != nil || row.Status != "succeeded" || row.Evidence["encrypted_context_recovery"] != "succeeded" || row.Evidence["encrypted_context_stream_inspection"] != "rejected" || row.AttemptCount != 2 {
+		t.Fatal("late recovery marker missing", row, err)
+	}
+	page, err := logClient(t, f).Logs(t.Context(), logbook.Query{})
+	if err != nil || len(page.Requests) != 1 || page.Requests[0].Evidence["encrypted_context_stream_inspection"] != "rejected" {
+		t.Fatal("list inspection marker missing", page, err)
 	}
 }

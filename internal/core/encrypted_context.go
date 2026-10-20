@@ -7,11 +7,9 @@ import (
 	"io"
 	"maps"
 	"strings"
-	"time"
 )
 
 const encryptedContextPrefixLimit = 64 << 10
-const encryptedContextPrimeTimeout = 2 * time.Second
 
 type encryptedContextRecovery struct {
 	request map[string]json.RawMessage
@@ -119,8 +117,8 @@ type encryptedContextRead struct {
 	err  error
 }
 
-// At most one upstream Read is outstanding. After the priming deadline, hand
-// that read back to the stream instead of abandoning it or canceling inference.
+// At most one upstream Read is outstanding. On request cancellation, hand
+// that read back to the stream instead of abandoning it.
 // Closing the HTTP response body/canceling its context unblocks the read.
 type encryptedContextPendingRead struct {
 	result <-chan encryptedContextRead
@@ -142,18 +140,21 @@ func (p *encryptedContextPendingRead) Read(b []byte) (int, error) {
 	return 0, io.EOF
 }
 
-// Hold only lifecycle events, for at most 64 KiB / two seconds. The first
-// non-lifecycle event commits the stream, even an empty tool/reasoning shell.
+// Hold only lifecycle events, for at most 64 KiB and within the existing
+// upstream request deadline. A slow validation error is still recoverable
+// before output; an independent short timer would commit it prematurely.
+// The first non-lifecycle event commits the stream, even an empty tool/reasoning shell.
 // Preserve every inspected byte when declining recovery. Never replay after
 // generated output, EOF, timeout, malformed data, or an unrelated stream error.
-func primeEncryptedContextStream(ctx context.Context, body io.Reader, timeout time.Duration) (io.Reader, string) {
-	timer := time.NewTimer(timeout)
-	defer timer.Stop()
+func primeEncryptedContextStream(ctx context.Context, body io.Reader) (io.Reader, string, string) {
 	prefix := make([]byte, 0, 4096)
 	lineStart := 0
 	var data strings.Builder
 	event := ""
 	replay := func(tail io.Reader) io.Reader { return io.MultiReader(bytes.NewReader(prefix), tail) }
+	pass := func(tail io.Reader, inspection string) (io.Reader, string, string) {
+		return replay(tail), "", inspection
+	}
 	for len(prefix) < encryptedContextPrefixLimit {
 		chunkSize := min(4096, encryptedContextPrefixLimit-len(prefix))
 		result := make(chan encryptedContextRead, 1)
@@ -165,10 +166,12 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader, timeout ti
 		var chunk encryptedContextRead
 		select {
 		case chunk = <-result:
-		case <-timer.C:
-			return replay(io.MultiReader(&encryptedContextPendingRead{result: result}, body)), ""
 		case <-ctx.Done():
-			return replay(io.MultiReader(&encryptedContextPendingRead{result: result}, body)), ""
+			inspection := "cancelled"
+			if ctx.Err() == context.DeadlineExceeded {
+				inspection = "timeout"
+			}
+			return pass(io.MultiReader(&encryptedContextPendingRead{result: result}, body), inspection)
 		}
 		prefix = append(prefix, chunk.data...)
 		for {
@@ -192,7 +195,7 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader, timeout ti
 					} `json:"response"`
 				}
 				if json.Unmarshal(payload, &header) != nil {
-					return replay(body), ""
+					return pass(body, "invalid_event")
 				}
 				if header.Type == "" && event == "error" {
 					// Some SSE errors put type only in the event line.
@@ -204,16 +207,16 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader, timeout ti
 				}
 				if header.Type == "error" || header.Type == "response.failed" || event == "error" {
 					if reason := encryptedContextError(payload); reason != "" {
-						return replay(body), reason
+						return replay(body), reason, "rejected"
 					}
 				}
 				switch header.Type {
 				case "response.created", "response.in_progress", "response.queued":
 					if len(header.Response.Output) != 0 {
-						return replay(body), ""
+						return pass(body, "output_started")
 					}
 				default:
-					return replay(body), ""
+					return pass(body, "non_lifecycle_event")
 				}
 				data.Reset()
 				event = ""
@@ -228,11 +231,20 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader, timeout ti
 		}
 		if chunk.err != nil {
 			// A failed read is not a definite upstream rejection.
-			return replay(&encryptedContextPendingRead{data: bytes.NewReader(nil), err: chunk.err}), ""
+			inspection := "read_error"
+			switch {
+			case ctx.Err() == context.DeadlineExceeded:
+				inspection = "timeout"
+			case ctx.Err() != nil:
+				inspection = "cancelled"
+			case chunk.err == io.EOF:
+				inspection = "eof"
+			}
+			return pass(&encryptedContextPendingRead{data: bytes.NewReader(nil), err: chunk.err}, inspection)
 		}
 		if len(chunk.data) == 0 {
-			return replay(body), ""
+			return pass(body, "empty_read")
 		}
 	}
-	return replay(body), ""
+	return pass(body, "prefix_limit")
 }
