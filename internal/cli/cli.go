@@ -114,7 +114,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   proxy list                        List proxies, bindings and built-in mihomo status
   proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] --revision N --approve
   proxy delete ID --revision N --approve
-  proxy bind PROVIDER [--key KEY] --mode direct|inherit|proxy [--proxy ID] --revision N --approve
+  proxy bind PROVIDER [--key KEY] --mode direct|system|inherit|proxy [--proxy ID] --revision N --approve
+      direct ignores application proxies (not OS/router interception); system requires an OS/environment proxy, never falls back direct.
   skill scan | list                  Read-only Skill inventory and immutable library
   skill inspect | diff [ID]           Inspect snapshots or --source ID; see CLI docs
   skill register-project PATH        Add an explicitly approved project root

@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/candyflosssss/Anchor/internal/state"
+	"github.com/candyflosssss/Anchor/internal/systemproxy"
 )
 
 type routeKey struct{}
@@ -40,13 +41,20 @@ type entry struct {
 type Manager struct {
 	store   *state.Store
 	base    *http.Transport
+	system  *http.Transport
 	mu      sync.Mutex
 	entries map[string]*entry
 	closed  bool
 }
 
 func New(store *state.Store, base *http.Transport) *Manager {
-	return &Manager{store: store, base: base, entries: map[string]*entry{}}
+	// Direct is an explicit application-layer policy, independent of ambient
+	// HTTP_PROXY. It cannot override an OS TUN or a router's transparent proxy.
+	base = base.Clone()
+	base.Proxy = nil
+	system := base.Clone()
+	system.Proxy = requiredSystemProxy
+	return &Manager{store: store, base: base, system: system, entries: map[string]*entry{}}
 }
 func (m *Manager) Status() state.ProxyEngine {
 	m.mu.Lock()
@@ -81,6 +89,14 @@ func (m *Manager) RoundTrip(req *http.Request) (*http.Response, error) {
 	if p == nil {
 		m.mu.Unlock()
 		return m.base.RoundTrip(req)
+	}
+	if p.Mode == "system" {
+		m.mu.Unlock()
+		resp, err := m.system.RoundTrip(req)
+		if err != nil {
+			return nil, ErrUnavailable
+		}
+		return resp, nil
 	}
 	k := p.Profile.ID + ":" + strconv.FormatInt(p.Profile.Revision, 10)
 	item := m.entries[k]
@@ -181,6 +197,7 @@ func (m *Manager) Reconcile(profiles []state.ProxyProfile) {
 }
 func (m *Manager) CloseIdleConnections() {
 	m.base.CloseIdleConnections()
+	m.system.CloseIdleConnections()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, v := range m.entries {
@@ -191,8 +208,19 @@ func (m *Manager) Close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.closed = true
+	m.base.CloseIdleConnections()
+	m.system.CloseIdleConnections()
 	for k, v := range m.entries {
 		m.remove(k, v)
 	}
-	m.base.CloseIdleConnections()
+}
+
+// A selected proxy route must never silently become direct: absent settings,
+// NO_PROXY, OS bypass rules and PAC DIRECT are failures for supplier requests.
+func requiredSystemProxy(req *http.Request) (*url.URL, error) {
+	proxy, err := systemproxy.ForRequest(req)
+	if err != nil || proxy == nil {
+		return nil, ErrUnavailable
+	}
+	return proxy, nil
 }

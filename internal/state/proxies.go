@@ -46,6 +46,7 @@ type ProxyAction struct {
 	Binding          ProxyBinding `json:"binding"`
 }
 type ProxySecret struct {
+	Mode    string `json:"-"`
 	Profile ProxyProfile
 	Secret  string `json:"-"`
 }
@@ -154,6 +155,9 @@ func (s *Store) ProxySecretFor(provider, key string) (*ProxySecret, error) {
 	if mode == "direct" {
 		return nil, nil
 	}
+	if mode == "system" && id == "" {
+		return &ProxySecret{Mode: "system"}, nil
+	}
 	if mode != "proxy" || id == "" {
 		return nil, ErrInvalid
 	}
@@ -232,7 +236,7 @@ func (s *Store) MutateProxy(in ProxyAction, normalize func(string, string, strin
 		}
 	case "bind":
 		b := in.Binding
-		if b.Mode != "direct" && b.Mode != "proxy" && !(b.KeyID != "" && b.Mode == "inherit") {
+		if b.Mode != "direct" && b.Mode != "system" && b.Mode != "proxy" && !(b.KeyID != "" && b.Mode == "inherit") {
 			return ErrInvalid
 		}
 		if b.Mode == "proxy" {

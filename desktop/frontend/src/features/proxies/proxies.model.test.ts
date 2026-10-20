@@ -10,6 +10,8 @@ describe('proxy-v1 shared contract', () => {
     const w = checkedWorkspace(fixture.workspace);
     expect(bindingValue(w, 'demo', '')).toBe('proxy:edge');
     expect(bindingValue(w, 'demo', 'second')).toBe('direct');
+    expect(bindingValue(w, 'demo', 'system')).toBe('system');
+    expect(bindingFromValue('demo', 'system', 'system')).toEqual(fixture.system_bind.binding);
     expect(bindingValue(w, 'demo', 'other')).toBe('inherit');
     expect(bindingFromValue('demo', 'second', 'proxy:edge')).toEqual(fixture.bind.binding);
     expect(proxyAction('bind', 4).secret).toBeNull();
@@ -23,6 +25,6 @@ describe('proxy-v1 shared contract', () => {
   it('renders provider and key selectors using the same public fixture', () => {
     const c = { data: checkedWorkspace(fixture.workspace), busy: false, error: '', needsRead: false, disabled: false, refresh: async () => {}, save: async () => true };
     const html = renderToStaticMarkup(createElement(ProxyBindings, { c }));
-    expect(html).toContain('继承供应商'); expect(html).toContain('直连'); expect(html).toContain('Example node'); expect(html).not.toContain('password');
+    expect(html).toContain('使用系统代理'); expect(html).toContain('不能保证绕过系统 TUN'); expect(html).toContain('未配置'); expect(html).toContain('继承供应商'); expect(html).toContain('直连'); expect(html).toContain('Example node'); expect(html).not.toContain('password');
   });
 });

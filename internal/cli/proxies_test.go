@@ -48,4 +48,14 @@ func TestProxyCLIWorkflow(t *testing.T) {
 	run("", true, "proxy", "delete", "edge", "--revision", "1", "--approve")
 	run("", true, "proxy", "delete", "edge", "--revision", "2")
 	run("", false, "proxy", "delete", "edge", "--revision", "2", "--approve")
+	secret := "synthetic"
+	if _, e = s.PutProvider(state.Provider{ID: "p", BaseURL: "https://upstream.example", Protocol: "responses", Enabled: true, TimeoutSeconds: 10, MaxConcurrent: 1}, 0, &secret); e != nil {
+		t.Fatal(e)
+	}
+	if out := run("", false, "proxy", "bind", "p", "--mode", "system", "--revision", "3", "--approve"); !strings.Contains(out, `"mode":"system"`) {
+		t.Fatal(out)
+	}
+	run("", true, "proxy", "bind", "p", "--mode", "system", "--proxy", "edge", "--revision", "4", "--approve")
+	run("", true, "proxy", "bind", "p", "--mode", "direct", "--revision", "3", "--approve")
+	run("", false, "proxy", "bind", "p", "--key", "default", "--mode", "direct", "--revision", "4", "--approve")
 }

@@ -4,11 +4,23 @@
 
 ## 选择规则
 
-Key 指定代理 > 供应商默认代理；Key `direct` 强制直连、`inherit` 继承。供应商默认 `direct`。没有绑定不会读取环境代理。代理失效、节点无效或内核缺失报错，绝不降级直连。适用于推理、流式对话、测试、模型发现和供应商账户查询；公共模型元数据下载、连接 Anchor 的 SSH 隧道不使用供应商代理。
+Key 覆盖 > 供应商默认；`direct` 不使用应用代理，`system` 显式使用核心所在主机的系统／环境代理，`proxy` 使用指定节点，Key `inherit` 继承供应商。供应商未绑定仍默认 `direct`，不自动读取环境代理。代理失效、节点无效或内核缺失报错，绝不降级直连。适用于推理、流式对话、测试、模型发现和供应商账户查询；公共模型元数据下载、连接 Anchor 的 SSH 隧道不使用供应商代理。
+
+
+## 系统代理与真实直连的边界（2026-10-19，proxy-v1-system，当前源码未发布）
+
+- 管理 API、CLI 和桌面共同接受 `system`；没有新增秘密字段、桥接方法或数据库 schema。`system` 不引用 profile，传 `proxy_id` 为非空会拒绝；仍要求 approve + workspace revision。共享样例为 `desktop/contract/proxies.json`。
+- `system` 按请求读取核心进程的 `HTTPS_PROXY` / `HTTP_PROXY`，再取 `ALL_PROXY`，大写优先于小写；环境缺失时 Windows 读取当前用户系统代理／PAC。Linux 等其他平台当前只读核心进程环境，不自动发现 GNOME/KDE 桌面设置；可配置环境变量或添加显式 HTTP/SOCKS5 profile。桌面进程的环境不是远端核心环境，修改启动环境变量需重启核心。
+- 环境配置不合法、没有代理、NO_PROXY／系统绕过列表／PAC DIRECT／loopback 绕过以及代理连接失败均返回 `proxy_unavailable`（推理 HTTP502），不发出直连请求、不切换直连候选。公共升级器复用解析器但保留原来的 bypass/DIRECT 规则，不受供应商 fail-closed 语义影响。
+- `system`、`direct`、指定节点有独立连接池；切换后新请求按新设置分流，已经建立的 SSE 不因修改绑定而被主动切断。系统／环境代理每次请求重新解析，不使用 net/http 首次环境快照缓存；这是应用代理选择，不是修改外部代理软件的“全局／规则”模式。
+- **`direct` 仅保证 Anchor 不使用应用代理，不能绕过系统 TUN、透明重定向、网关 SNAT 或路由器分流，更不能保证公网 IP。** 要实现物理直连，须在实际接管流量的系统／路由器配置针对 Anchor／目标的绕过规则；本轮不自动更改路由、防火墙、TUN 或全局代理模式。界面不再声称“强制直连”。
+- 老核心不认识新 `system` 模式，需要配套升级；旧桌面严格校验枚举会拒绝读取含 `system` 的 workspace，须同步更新桌面。状态库 schema 未变；切回旧核心前先在新核心把 `system` 绑定改回旧模式。不把源码实现等同于已安装版本已生效。
+
+验证已覆盖隔离 HTTPS 上游与 CONNECT 代理、环境变更、Key 直连覆盖及继承、NO_PROXY 命中和代理断开时返回 HTTP502 且不尝试直连候选。关闭测试代理监听后先清理空闲 CONNECT 隧道，避免将既有隧道上的成功请求误判为断开后回退。升级器保留共享代理错误哨兵，非法代理配置返回脱敏错误。定向测试、默认 Go 编译检查和 Windows 代理相关包交叉编译通过；全量桌面测试另有后台倍率查询与旧测试桩不匹配，内置代理生命周期测试出现过一次失败后独立三次通过，不将这些检查记为全量通过。未验收 Windows 系统代理／PAC 原生运行、桌面原生窗口或真实网络出口，未打包安装。
 
 ## 配置与秘密
 
-HTTP、HTTPS 和 SOCKS5 以 URL 导入，支持认证；mihomo 导入单节点 YAML，或从 Clash YAML 的 `proxies` 列表按 `node_name` 选取一个节点。API 只返回 ID、名称、类型、revision；认证 URL/节点 YAML 单独存储，列表不回显。编辑时 secret 留空保持。只提取节点，不执行用户提供的监听器、规则、DNS、TUN、控制器或脚本。暂不包含订阅定时刷新、URI/Base64 订阅、测速或全局系统代理。
+HTTP、HTTPS 和 SOCKS5 以 URL 导入，支持认证；mihomo 导入单节点 YAML，或从 Clash YAML 的 `proxies` 列表按 `node_name` 选取一个节点。API 只返回 ID、名称、类型、revision；认证 URL/节点 YAML 单独存储，列表不回显。编辑时 secret 留空保持。只提取节点，不执行用户提供的监听器、规则、DNS、TUN、控制器或脚本。暂不包含订阅定时刷新、URI/Base64 订阅、测速或修改全局系统代理；`system` 只读取现有设置，不更改系统。
 
 ## 生命周期与分发
 
@@ -18,7 +30,7 @@ HTTP、HTTPS 和 SOCKS5 以 URL 导入，支持认证；mihomo 导入单节点 Y
 
 ## DTO
 
-规范 Go DTO 位于 `internal/state/proxies.go`，桌面 `internal/desktop/contract.go` 使用类型别名，TypeScript 通过现有生成器生成。绑定模式 `direct|proxy`（供应商）和 `inherit|direct|proxy`（Key）。`ProxyAction.action` 为 `put|delete|bind`。`put` 的 `secret` 可选，`bind` 空 `key_id` 表示供应商默认。`ProxyWorkspace` 包含 `revision/profiles/bindings/targets/engine`。远端旧核心返回 unsupported，不用 Mock 代替。
+规范 Go DTO 位于 `internal/state/proxies.go`，桌面 `internal/desktop/contract.go` 使用类型别名，TypeScript 通过现有生成器生成。绑定模式 `direct|system|proxy`（供应商）和 `inherit|direct|system|proxy`（Key）。`ProxyAction.action` 为 `put|delete|bind`。`put` 的 `secret` 可选，`bind` 空 `key_id` 表示供应商默认。`ProxyWorkspace` 包含 `revision/profiles/bindings/targets/engine`。远端旧核心返回 unsupported，不用 Mock 代替。
 
 ## 升级与构建
 

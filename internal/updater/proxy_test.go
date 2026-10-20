@@ -2,10 +2,29 @@ package updater
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 )
+
+func TestInvalidProxyRequestIsRedacted(t *testing.T) {
+	oldEnv := lookupEnv
+	t.Cleanup(func() { lookupEnv = oldEnv })
+	lookupEnv = func(k string) string {
+		if k == "HTTPS_PROXY" {
+			return "http://user:synthetic-proxy-password@127.0.0.1:0"
+		}
+		return ""
+	}
+	s := New("desktop", "0.1.0-dev.desktop.1")
+	defer s.Client.CloseIdleConnections()
+	_, err := s.get(context.Background(), "https://upstream.example/manifest")
+	if !errors.Is(err, errProxy) || strings.Contains(err.Error(), "synthetic-proxy-password") {
+		t.Fatal("invalid proxy was not returned as a redacted proxy error", err)
+	}
+}
 
 func TestPickSystemProxy(t *testing.T) {
 	gh, _ := url.Parse("https://api.github.com/repos")

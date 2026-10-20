@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-20
+- 最近核对：2026-10-21
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。
 - **本文件是唯一最新指令大全**，只列已实现入口。变更过程见 [指令变更历史](changes.md)，协议/安全细节见 [实施说明](../design/implementation.md)。
@@ -989,22 +989,25 @@ anchor skill delete SKILL_ID --revision R --approve
 
 发现范围为共享目录、已有配置目录证据下 Codex／Claude／Gemini／OpenCode 的已知全局位置、Codex 有界工作区索引及手动登记项目；不声称所有 Agent／项目全量发现，外部软链接只列出不跟随。单树8 MiB／256文件；编辑文本48 KiB，API JSON请求128 KiB；完整预算及不支持路径见设计。Windows软链接权限失败不退化为复制。中心库使用 `--data-dir` 对应核心状态目录下的 `skills/`。
 
-## 15. 出站代理（当前源码，未发布）
+## 15. 出站代理（含 2026-10-19 系统代理源码增量，未发布）
 
-仅控制当前 Context 核心所在主机的上游请求，不改变本机系统代理；远程 Context 在远端启动 mihomo。推理、对话测试、模型发现、账户查询共用解析规则：Key 指定代理 > 供应商默认；Key `direct` 强制直连、`inherit` 继承，未配置的供应商直连。环境代理不参与。代理故障不会降级为直连，也不会因连接失败自动切换到其他直连 Key/候选。
+仅控制当前 Context 核心所在主机的上游请求，不改变本机系统代理；远程 Context 在远端启动 mihomo。推理、对话测试、模型发现、账户查询共用解析规则：Key 覆盖 > 供应商默认；Key `direct` 不使用应用代理、`system` 显式使用系统／环境代理、`inherit` 继承，未配置的供应商仍不使用应用代理。仅 `system` 读取环境代理。代理故障不会降级为直连，也不会因连接失败自动切换到其他直连 Key/候选。
 
 ```text
 anchor [--context NAME] proxy list
 anchor [--context NAME] proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] --revision N --approve
 anchor [--context NAME] proxy delete ID --revision N --approve
-anchor [--context NAME] proxy bind PROVIDER [--key KEY] --mode direct|inherit|proxy [--proxy ID] --revision N --approve
+anchor [--context NAME] proxy bind PROVIDER [--key KEY] --mode direct|system|inherit|proxy [--proxy ID] --revision N --approve
 ```
 
 - `list` 不访问上游，输出 `revision/profiles/bindings/targets/engine`；profile 只含 ID、名称、类型、revision，没有代理 URL、认证或节点内容。engine 给出固定版本、平台、是否内置、运行节点数。
 - 写入的 `--revision` 是 **proxy list 的 workspace revision**，不是供应商 revision；`--approve` 必须显式提供。成功输出更新后的整个 workspace。并发冲突先重新读取，不自动重试。断线写入结果未知时同样先读取。
 - `put`：ID 使用项目名称规则，名称非空且最多 100 bytes，类型必填。`--secret-stdin` 最多 64 KiB：`http` 接受带端口的 `http://` 或 `https://` URL；`socks5` 接受 `socks5://` / `socks5h://`；可在 URL 中包含认证。不要把秘密写进命令参数。编辑省略 `--secret-stdin` 保留原秘密（类型不可改变）；新建必须输入。
 - `mihomo` 接受单节点 YAML，或包含 `proxies` 的 Clash YAML；多节点必须 `--node NAME` 精确选中唯一节点。仅提取该节点，忽略根级规则、DNS、TUN、控制器。支持 http、socks5、ss、vmess、vless、trojan、hysteria2、tuic；拒绝文件证书、插件、代理链等外部引用。不接受订阅 URL、URI/Base64 列表，不自动刷新订阅。
-- `bind`：省略 `--key` 设置供应商默认，此时只能 `direct|proxy`；指定 Key 可以 `inherit|direct|proxy`。`proxy` 必须配 `--proxy ID`，其他模式不得同时提供代理 ID。供应商、Key 和代理必须已存在。
+- `bind`：省略 `--key` 设置供应商默认，此时只能 `direct|system|proxy`；指定 Key 可以 `inherit|direct|system|proxy`。`proxy` 必须配 `--proxy ID`，其他模式不得同时提供代理 ID。供应商、Key 和代理必须已存在。
+- `system`：按请求使用当前核心进程的 HTTPS_PROXY/HTTP_PROXY → ALL_PROXY（大写优先小写）；Windows 环境未指定时读取系统代理/PAC，Linux 当前只读取核心环境，不自动发现桌面代理。未配置、格式无效、NO_PROXY/系统绕过/PAC DIRECT 或连接失败均报 `proxy_unavailable`，推理 HTTP502，不偷偷直连、不回退直连候选。更新启动环境需要重启核心；不改变外部代理的规则/全局模式。
+- `direct`：仅关闭应用层代理，不保证绕过系统 TUN 或路由器透明代理，不保证特定公网出口。物理直连需在实际接管流量的系统/网关设置绕过规则，Anchor 不自动改路由和防火墙。
+- 兼容：模式新增但 JSON 结构、revision/approve 与 schema 不变；核心与桌面需配套升级，旧客户端会拒绝新枚举。切回旧核心前把 `system` 改回旧模式。示例：先 `anchor proxy list` 获取 revision，再 `anchor proxy bind PROVIDER --mode system --revision N --approve`；改为不使用应用代理用 `--mode direct`，Key 覆盖追加 `--key KEY`。详见[代理契约](../design/proxy-settings.md)。
 - `delete`：仍被引用返回 referenced，先解绑。供应商改名、删除和复制遵循外键/复制规则；复制 Key 时也复制其代理覆盖。
 - 默认最多 64 个 profile，16 个存活（含正在结束旧流）的 mihomo 节点子进程。节点按需启动、仅本机回环监听、随机认证，不需要管理员权限。编辑不切断旧 SSE，旧代最后一个响应关闭后回收；核心关闭回收全部子进程。
 - 固定 mihomo v1.19.32；正式构建入口自动校验并嵌入 Windows/Linux amd64 payload。直接 `go build` 且未准备 payload 时显示未内置，选用 mihomo 报错，但外部 HTTP/SOCKS5 仍可用。构建方法和 GPLv3 通知见 [代理设计](../design/proxy-settings.md) 与 [mihomo notice](../../third_party/mihomo/NOTICE.md)。秘密依赖实例目录权限保护，**不是静态加密**。

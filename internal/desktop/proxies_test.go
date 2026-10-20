@@ -12,11 +12,12 @@ func TestProxySharedContractAndRealBridge(t *testing.T) {
 		t.Fatal(e)
 	}
 	var f struct {
-		Contract  string         `json:"contract"`
-		Workspace ProxyWorkspace `json:"workspace"`
-		Bind      ProxyAction    `json:"bind"`
+		Contract   string         `json:"contract"`
+		Workspace  ProxyWorkspace `json:"workspace"`
+		Bind       ProxyAction    `json:"bind"`
+		SystemBind ProxyAction    `json:"system_bind"`
 	}
-	if e = json.Unmarshal(raw, &f); e != nil || f.Contract != Contract || f.Bind.Binding.Mode != "proxy" {
+	if e = json.Unmarshal(raw, &f); e != nil || f.Contract != Contract || f.Bind.Binding.Mode != "proxy" || f.SystemBind.Binding.Mode != "system" {
 		t.Fatal(e)
 	}
 	s := testSession(t)
@@ -35,6 +36,26 @@ func TestProxySharedContractAndRealBridge(t *testing.T) {
 	stale := b.ManageProxy(in)
 	if stale.Problem == nil || stale.Problem.Code != "conflict" {
 		t.Fatal(stale)
+	}
+	created := b.SaveProvider(SaveProvider{Provider: Provider{ID: "demo", BaseURLs: []string{"https://upstream.example/v1"}, Enabled: true, TimeoutSeconds: 120, MaxConcurrent: 1}})
+	if created.Problem != nil {
+		t.Fatal(created)
+	}
+	system := f.SystemBind
+	system.ExpectedRevision = out.Data.Revision
+	system.Binding.KeyID = ""
+	result := b.ManageProxy(system)
+	if result.Problem != nil || result.Data == nil {
+		t.Fatal(result)
+	}
+	found := false
+	for _, binding := range result.Data.Bindings {
+		if binding.ProviderID == "demo" && binding.Mode == "system" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("system binding not persisted")
 	}
 	in.Approved = false
 	if x := b.ManageProxy(in); x.Problem == nil || x.Problem.Code != "invalid" {

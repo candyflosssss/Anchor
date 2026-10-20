@@ -2,15 +2,91 @@
   "contract": "anchor-desktop-v1",
   "workspace": {
     "revision": 4,
-    "profiles": [{"id":"edge","name":"Example node","kind":"mihomo","revision":1}],
-    "bindings": [{"provider_id":"demo","key_id":"","mode":"proxy","proxy_id":"edge"},{"provider_id":"demo","key_id":"second","mode":"direct","proxy_id":""}],
-    "targets": [{"provider_id":"demo","key_id":""},{"provider_id":"demo","key_id":"second"}],
-    "engine": {"available":true,"version":"v1.19.32","platform":"linux/amd64","running":0}
+    "profiles": [
+      {
+        "id": "edge",
+        "name": "Example node",
+        "kind": "mihomo",
+        "revision": 1
+      }
+    ],
+    "bindings": [
+      {
+        "provider_id": "demo",
+        "key_id": "",
+        "mode": "proxy",
+        "proxy_id": "edge"
+      },
+      {
+        "provider_id": "demo",
+        "key_id": "second",
+        "mode": "direct",
+        "proxy_id": ""
+      },
+      {
+        "provider_id": "demo",
+        "key_id": "system",
+        "mode": "system",
+        "proxy_id": ""
+      }
+    ],
+    "targets": [
+      {
+        "provider_id": "demo",
+        "key_id": ""
+      },
+      {
+        "provider_id": "demo",
+        "key_id": "second"
+      },
+      {
+        "provider_id": "demo",
+        "key_id": "system"
+      }
+    ],
+    "engine": {
+      "available": true,
+      "version": "v1.19.32",
+      "platform": "linux/amd64",
+      "running": 0
+    }
   },
   "bind": {
-    "action":"bind","expected_revision":4,"approved":true,
-    "profile":{"id":"","name":"","kind":"","revision":0},
-    "secret":null,"node_name":"",
-    "binding":{"provider_id":"demo","key_id":"second","mode":"proxy","proxy_id":"edge"}
+    "action": "bind",
+    "expected_revision": 4,
+    "approved": true,
+    "profile": {
+      "id": "",
+      "name": "",
+      "kind": "",
+      "revision": 0
+    },
+    "secret": null,
+    "node_name": "",
+    "binding": {
+      "provider_id": "demo",
+      "key_id": "second",
+      "mode": "proxy",
+      "proxy_id": "edge"
+    }
+  },
+  "system_bind": {
+    "action": "bind",
+    "expected_revision": 4,
+    "approved": true,
+    "profile": {
+      "id": "",
+      "name": "",
+      "kind": "",
+      "revision": 0
+    },
+    "secret": null,
+    "node_name": "",
+    "binding": {
+      "provider_id": "demo",
+      "key_id": "system",
+      "mode": "system",
+      "proxy_id": ""
+    }
   }
 }

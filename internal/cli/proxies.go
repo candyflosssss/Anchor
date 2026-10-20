@@ -34,7 +34,7 @@ func (a *App) proxies(ctx context.Context, c *client.Client, args []string) erro
 	input := f.Bool("secret-stdin", false, "read proxy URL or Clash YAML from stdin; omit to retain existing secret")
 	node := f.String("node", "", "node name when importing a multi-node Clash YAML")
 	key := f.String("key", "", "Key ID; omitted for supplier default (bind)")
-	mode := f.String("mode", "", "direct, proxy, or inherit for a Key (bind)")
+	mode := f.String("mode", "", "direct (no application proxy), system (require OS/environment proxy), proxy, or inherit for a Key (bind)")
 	profile := f.String("proxy", "", "configured proxy ID for mode proxy")
 	if e := parse(f, args[2:]); e != nil {
 		return e

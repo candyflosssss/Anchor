@@ -1,6 +1,6 @@
 //go:build !windows
 
-package updater
+package systemproxy
 
 import (
 	"context"
@@ -8,4 +8,4 @@ import (
 )
 
 // Non-Windows hosts use proxy environment variables.
-func readSystemProxy(context.Context, *url.URL) (*url.URL, error) { return nil, nil }
+func ReadSystem(context.Context, *url.URL) (*url.URL, error) { return nil, nil }

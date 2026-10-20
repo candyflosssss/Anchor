@@ -1,4 +1,4 @@
-package updater
+package systemproxy
 
 import (
 	"context"
@@ -44,7 +44,7 @@ func freeProxyString(p *uint16) {
 // to one call; its worker owns and releases the handle/returned strings.
 var autoProxySlot = make(chan struct{}, 1)
 
-func readSystemProxy(ctx context.Context, target *url.URL) (*url.URL, error) {
+func ReadSystem(ctx context.Context, target *url.URL) (*url.URL, error) {
 	var cfg ieProxyConfig
 	ok, _, _ := winHTTPGetIEProxyConfig.Call(uintptr(unsafe.Pointer(&cfg)))
 	if ok == 0 {
@@ -63,7 +63,7 @@ func readSystemProxy(ctx context.Context, target *url.URL) (*url.URL, error) {
 			return nil, err
 		}
 	}
-	return pickSystemProxy(server, bypass, target)
+	return Pick(server, bypass, target)
 }
 
 func autoProxy(ctx context.Context, target *url.URL, pac string, detect bool) (*url.URL, error) {
@@ -72,7 +72,7 @@ func autoProxy(ctx context.Context, target *url.URL, pac string, detect bool) (*
 	select {
 	case autoProxySlot <- struct{}{}:
 	case <-ctx.Done():
-		return nil, errProxy
+		return nil, ErrInvalid
 	}
 	type result struct {
 		u   *url.URL
@@ -88,15 +88,15 @@ func autoProxy(ctx context.Context, target *url.URL, pac string, detect bool) (*
 	case r := <-done:
 		return r.u, r.err
 	case <-ctx.Done():
-		return nil, errProxy
+		return nil, ErrInvalid
 	}
 }
 
 func resolveAutoProxy(target *url.URL, pac string, detect bool) (*url.URL, error) {
-	agent, _ := windows.UTF16PtrFromString("Anchor-Updater")
+	agent, _ := windows.UTF16PtrFromString("Anchor")
 	handle, _, _ := winHTTPOpen.Call(uintptr(unsafe.Pointer(agent)), 1, 0, 0, 0) // NO_PROXY for discovery session
 	if handle == 0 {
-		return nil, errProxy
+		return nil, ErrInvalid
 	}
 	defer winHTTPCloseHandle.Call(handle)
 	winHTTPSetTimeouts.Call(handle, 5000, 5000, 5000, 5000)
@@ -105,7 +105,7 @@ func resolveAutoProxy(target *url.URL, pac string, detect bool) (*url.URL, error
 	if pac != "" {
 		p, err := windows.UTF16PtrFromString(pac)
 		if err != nil {
-			return nil, errProxy
+			return nil, ErrInvalid
 		}
 		options.AutoConfigURL = p
 		options.Flags = 2
@@ -115,20 +115,20 @@ func resolveAutoProxy(target *url.URL, pac string, detect bool) (*url.URL, error
 	}
 	raw, err := windows.UTF16PtrFromString(target.String())
 	if err != nil {
-		return nil, errProxy
+		return nil, ErrInvalid
 	}
 	var info winProxyInfo
 	ok, _, _ := winHTTPGetProxyForURL.Call(handle, uintptr(unsafe.Pointer(raw)), uintptr(unsafe.Pointer(&options)), uintptr(unsafe.Pointer(&info)))
 	defer freeProxyString(info.Proxy)
 	defer freeProxyString(info.Bypass)
 	if ok == 0 {
-		return nil, errProxy
+		return nil, ErrInvalid
 	}
 	if info.AccessType == 1 {
 		return nil, nil
 	}
 	if info.AccessType != 3 || info.Proxy == nil {
-		return nil, errProxy
+		return nil, ErrInvalid
 	}
-	return pickSystemProxy(windows.UTF16PtrToString(info.Proxy), windows.UTF16PtrToString(info.Bypass), target)
+	return Pick(windows.UTF16PtrToString(info.Proxy), windows.UTF16PtrToString(info.Bypass), target)
 }

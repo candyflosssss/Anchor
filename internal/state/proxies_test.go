@@ -79,3 +79,41 @@ func TestProxyMutationValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestSystemProxyInheritanceValidationAndPersistence(t *testing.T) {
+	dir := t.TempDir()
+	s, e := Open(dir, true)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { s.Close() }()
+	secret := "synthetic"
+	if _, e = s.PutProvider(provider("p"), 0, &secret); e != nil {
+		t.Fatal(e)
+	}
+	proxyMutation(t, s, ProxyAction{Action: "bind", Binding: ProxyBinding{ProviderID: "p", Mode: "system"}})
+	r, e := s.ProxySecretFor("p", "default")
+	if e != nil || r == nil || r.Mode != "system" {
+		t.Fatal(r, e)
+	}
+	proxyMutation(t, s, ProxyAction{Action: "bind", Binding: ProxyBinding{ProviderID: "p", KeyID: "default", Mode: "direct"}})
+	if r, e = s.ProxySecretFor("p", "default"); e != nil || r != nil {
+		t.Fatal(r, e)
+	}
+	proxyMutation(t, s, ProxyAction{Action: "bind", Binding: ProxyBinding{ProviderID: "p", KeyID: "default", Mode: "system"}})
+	w, _ := s.ProxyWorkspace()
+	if e = s.MutateProxy(ProxyAction{Action: "bind", Approved: true, ExpectedRevision: w.Revision, Binding: ProxyBinding{ProviderID: "p", Mode: "system", ProxyID: "unexpected"}}, nil); !errors.Is(e, ErrInvalid) {
+		t.Fatal(e)
+	}
+	if e = s.MutateProxy(ProxyAction{Action: "bind", Approved: true, ExpectedRevision: 1, Binding: ProxyBinding{ProviderID: "p", Mode: "system"}}, nil); !errors.Is(e, ErrConflict) {
+		t.Fatal(e)
+	}
+	s.Close()
+	s, e = Open(dir, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if r, e = s.ProxySecretFor("p", "default"); e != nil || r == nil || r.Mode != "system" {
+		t.Fatal(r, e)
+	}
+}

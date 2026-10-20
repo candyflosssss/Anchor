@@ -11,7 +11,7 @@ export function bindingFromValue(provider: string, key: string, value: string): 
 export function checkedWorkspace(data: ProxyWorkspace): ProxyWorkspace {
   if (!data || !Number.isSafeInteger(data.revision) || data.revision < 1 || !Array.isArray(data.profiles) || !Array.isArray(data.bindings) || !Array.isArray(data.targets) ||
     data.profiles.some(p => !p.id || typeof p.name !== 'string' || !['http', 'socks5', 'mihomo'].includes(p.kind) || !Number.isSafeInteger(p.revision)) ||
-    data.bindings.some(b => typeof b.provider_id !== 'string' || typeof b.key_id !== 'string' || typeof b.proxy_id !== 'string' || !['direct', 'inherit', 'proxy'].includes(b.mode)) ||
+    data.bindings.some(b => typeof b.provider_id !== 'string' || typeof b.key_id !== 'string' || typeof b.proxy_id !== 'string' || !['direct', 'system', 'inherit', 'proxy'].includes(b.mode)) ||
     data.targets.some(t => typeof t.provider_id !== 'string' || typeof t.key_id !== 'string') || !data.engine || typeof data.engine.available !== 'boolean' || !Number.isSafeInteger(data.engine.running)) throw new DesktopProblem('read_error');
   // Explicitly pick public fields; even a malformed remote response cannot put secrets in UI state.
   return { revision: data.revision, profiles: data.profiles.map(p => ({ id: p.id, name: p.name, kind: p.kind, revision: p.revision })),
@@ -31,7 +31,7 @@ export function proxyError(error: unknown) {
     switch (error.code) {
       case 'unsupported': return '当前核心不支持代理设置，请先升级核心。';
       case 'conflict': return '配置已被其他操作修改，请重新读取后再保存。';
-      case 'referenced': return '此代理仍被供应商或 Key 引用，请先改为直连、继承或其他代理。';
+      case 'referenced': return '此代理仍被供应商或 Key 引用，请先改为不使用应用代理、系统代理、继承或其他代理。';
       case 'invalid': return '配置无效：检查 ID、代理 URL、节点 YAML 和节点名称。';
       case 'unknown': return '写入结果未知。请重新读取确认，不要直接重复提交。';
       case 'unauthorized': return '没有管理权限，请检查当前连接。';
