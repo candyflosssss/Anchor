@@ -6,11 +6,15 @@
 - 构建提交 `b87824e329ad3ea9f5e922f3bac3cd16282e3793`，SOURCE.json dirty=false；契约比对、TypeScript／Vite 和 Windows／Ubuntu24.04 AMD64 生产编译／打包通过。安装器、runtime、CLI、对应源码／vendor、许可元数据及全部远端附件摘要已核对。未混入工作区系统代理改动。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面配套升级；首次从旧宿主升级使用安装器，新宿主可使用 runtime，SSH 被控机需单独升级。
 - 默认 dev 源以 `.56` 为当前版本，真实下载 `.57` Linux runtime 与旧客户端兼容 deb；独立 CLI feed 同版下载通过，大小／SHA256 及运行版本均符合预期。Windows 三个程序的远端 digest 与本地一致，tag 指向构建提交，latest 保持不变。
-- 本轮仅在线投放和隔离下载核验，未安装或重启本机／远端实例；本机安装仍为 `.56`。未执行系统安装器／apply、双平台原生窗口或真实 SSH 升级验收。
+- 本机已于 `2026-10-20T21:52:31.182449+08:00` 从 `.56` 配套升级到 `.57`，CLI／核心／GUI 运行摘要与发布产物一致，core／gateway／agent_management ready，Codex／DSH applied。备份 `/home/mosaki/.config/anchor/backups/pre-desktop57-20261020-215227`；dev 源身份固定的 CLI 检查通过。未执行系统安装器／apply、双平台原生窗口交互或真实 SSH 更新传输验收。
 
 ## .57 在线投放验证（2026-10-20）
 
 11 项附件包含两平台安装器、两平台 desktop runtime 与 CLI binary、两份 flat 更新清单、对应源码、许可／构建元数据和 SHA256SUMS。默认 dev 源实际下载 Linux runtime（42,996,784 字节）、旧客户端兼容 deb（29,110,236 字节）和 CLI（37,642,402 字节），大小与 SHA256 均匹配，下载程序版本为 `.57`；Windows 三个程序使用 GitHub digest 核对通过。完整摘要及验收边界见[发行记录](../release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。本轮未更新真实运行实例。
+
+### .57 本机安装（2026-10-20T21:52:31.182449+08:00）
+
+已沿用用户目录安装方式完成 CLI／核心／GUI `.56`→`.57`，正常保留交接及配置核验通过，备份 `/home/mosaki/.config/anchor/backups/pre-desktop57-20261020-215227`。本机 dev 渠道已保存，保留更新源；通过与 SSH 相同的身份／端口固定参数执行 CLI `update check`，返回当前 `.57`、候选 `.57`、available=false。该主机即 `192.168.1.111`，已具备远端在线更新的 CLI 前置能力。没有重建或重新发布，没有验收跨机 SSH 更新传输；详见[本机安装记录](../release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。
 
 ## .56 在线投放与本机升级（2026-10-20）
 

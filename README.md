@@ -11,7 +11,7 @@
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.57 已发布为 GitHub prerelease**，NewAPI 自动识别后可直接填写用户令牌，保存后自动重查分组倍率；参考价格与分组倍率在启动及后台定时更新，并交付 runtime／SSH 更新能力。可在「设置 → 在线更新」选择 dev 获取。本次仅发布，本机仍运行 `.56`。详见[构建与发布记录](docs/release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。
+**desktop.57 已发布为 GitHub prerelease**，NewAPI 自动识别后可直接填写用户令牌，保存后自动重查分组倍率；参考价格与分组倍率在启动及后台定时更新，并交付 runtime／SSH 更新能力。可在「设置 → 在线更新」选择 dev 获取。本机 CLI／核心／GUI 已配套升级到 `.57`，托管状态保持。详见[构建与发布记录](docs/release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
@@ -106,7 +106,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ### 在线更新（desktop.57 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.57` 两平台安装包、runtime、独立 CLI 和同版更新清单，包含 NewAPI 就地授权、参考价格／分组倍率缓存维护。沿用 schema9；升级前备份、配套升级核心与桌面，SSH 远端另行升级。新旧客户端真实下载与 SHA256 校验通过；本轮未安装或重启真实实例，原生窗口／系统安装器／真实 SSH 升级未验收。详见[发行记录](docs/release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.57` 两平台安装包、runtime、独立 CLI 和同版更新清单，包含 NewAPI 就地授权、参考价格／分组倍率缓存维护。沿用 schema9；升级前备份、配套升级核心与桌面，SSH 远端另行升级。新旧客户端真实下载与 SHA256 校验通过；本机已配套升级到 `.57`，核心与托管状态核验通过；原生窗口／系统安装器／真实 SSH 升级未验收。详见[发行记录](docs/release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。
 
 **desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.57` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema9，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
 

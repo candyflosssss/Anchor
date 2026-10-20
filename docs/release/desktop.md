@@ -6,7 +6,7 @@
 - 构建提交 `b87824e329ad3ea9f5e922f3bac3cd16282e3793`，SOURCE.json dirty=false；契约比对、TypeScript／Vite 和 Windows／Ubuntu24.04 AMD64 生产编译／打包通过。安装器、runtime、CLI、对应源码／vendor、许可元数据及全部远端附件摘要已核对。未混入工作区系统代理改动。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面配套升级；首次从旧宿主升级使用安装器，新宿主可使用 runtime，SSH 被控机需单独升级。
 - 默认 dev 源以 `.56` 为当前版本，真实下载 `.57` Linux runtime 与旧客户端兼容 deb；独立 CLI feed 同版下载通过，大小／SHA256 及运行版本均符合预期。Windows 三个程序的远端 digest 与本地一致，tag 指向构建提交，latest 保持不变。
-- 本轮仅在线投放和隔离下载核验，未安装或重启本机／远端实例；本机安装仍为 `.56`。未执行系统安装器／apply、双平台原生窗口或真实 SSH 升级验收。
+- 本机已于 `2026-10-20T21:52:31.182449+08:00` 从 `.56` 配套升级到 `.57`，CLI／核心／GUI 运行摘要与发布产物一致，core／gateway／agent_management ready，Codex／DSH applied。备份 `/home/mosaki/.config/anchor/backups/pre-desktop57-20261020-215227`；dev 源身份固定的 CLI 检查通过。未执行系统安装器／apply、双平台原生窗口交互或真实 SSH 更新传输验收。
 
 ## NewAPI 授权与自动缓存 .57（已发布 dev）
 
@@ -30,7 +30,11 @@
 
 复用功能提交已完成的 typecheck／lint、72 项前端单测与 17 项模拟桌面浏览器测试，本轮未重跑全量／race／浏览器测试。默认源隔离下载三条路径（desktop runtime、旧 `.56` CLI 下载 deb、CLI binary）均通过，下载的 runtime 与 CLI 运行版本核对通过；全部 11 附件 GitHub digest 与大小匹配，标签指向实际构建提交。证据为 `preparation-verification.json`、`publication-verification.json`、`online-verification.json`。原始 BUILD.json 保留构建时未安装／未发布／未原生验收事实，实际投放另行记录。
 
-首次尝试因依赖软链接被识别为未跟踪文件而提前停止，未生成完整安装包；隔离在 `dist/desktop/desktop57-attempt1-incomplete/`，未上传。改为复制锁定依赖后从同一干净提交完整重建。本机仍为 `.56`，本轮未执行安装或真实实例更新。
+首次尝试因依赖软链接被识别为未跟踪文件而提前停止，未生成完整安装包；隔离在 `dist/desktop/desktop57-attempt1-incomplete/`，未上传。改为复制锁定依赖后从同一干净提交完整重建。发布当时本机仍为 `.56`，该发布步骤未执行安装或真实实例更新。
+
+**后续本机升级（2026-10-20T21:52:31.182449+08:00）**：应用户要求，直接复用已校验的 `.57` 发布 CLI 与 GUI，先备份至 `/home/mosaki/.config/anchor/backups/pre-desktop57-20261020-215227`（目录0700，文件不向组／其他用户开放），经身份固定的 `stop --approve --for-restart` 正常保留交接后原子替换 `~/.local/bin/anchor` 和 `anchor-desktop`，恢复原有受限 transient user services，Restart=no；未新增持久服务或登录自启动。没有重新构建安装包、改动 GitHub Release 或操作其他主机。
+
+核心／网关／Agent 管理 ready，Codex／DSH 保持 applied；配置表、凭据、托管文件与恢复日志校验保持，state.db schema9→9，state.db／logs.db quick_check 和 foreign_key_check 通过。后台维护允许 key_rate_cache 更新，未把该运行缓存纳入静态配置等值检查。CLI／GUI 运行 ELF 与发布附件相同，GUI 同时匹配 deb 载荷；绑定认证的本机 `/v1/models` 返回200且3个模型与已授权名单一致，无付费推理。首次保存 dev 更新渠道，与已安装开发版一致，保留原更新源；身份／端口固定的 CLI 检查返回 current=.57、dev、无新版本，SSH 更新所需 expected-sha256 能力存在。当前主机包含 `192.168.1.111`，因此此前远端旧 CLI 的前置条件已在该机器补齐；未通过另一台机器执行真实 SSH 检查。证据保留于 `local-install/`。不等于原生窗口交互／系统安装器／应用内 apply 验收；最近 `3a8179a` 的 UI 提示修复仍是未打包源码。
 
 ## Codex 配置重建 .56（已发布 dev，本机已升级）
 
