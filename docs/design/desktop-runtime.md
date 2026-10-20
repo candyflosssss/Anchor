@@ -200,7 +200,7 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 已移除模型设置的channel_retries字段与分模型重试。统一设置使用 `CodexSettings()`／`SaveCodexSettings(SaveCodexSettings)`，默认5、范围0–10；持久化、revision、安全同步与迁移见 [Codex统一重试](codex-retries.md)。Go DTO经既有生成器导出，共享样例desktop/contract/codex-settings.json。需要同步升级宿主与核心，未打包发布。
 
-## Codex 配置重建（2026-10-20，当前源码）
+## Codex 配置重建（2026-10-20，desktop.56 dev 已发布）
 
 已托管配置损坏或删除时，「更新配置」与 CLI sync 可用最后一次已验证快照恢复；正常文件优先局部更新，无法表达的有效 TOML 在完整备份后重新序列化。后台同步不覆盖外部漂移。
 

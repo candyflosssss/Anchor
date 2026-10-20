@@ -1,12 +1,16 @@
 # 在线更新 v1
 
 - 更新：2026-10-20。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.55](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.55)，发布于 `2026-10-20T14:57:29+08:00`；GitHub prerelease，非 latest，两平台安装包与 flat 更新清单同版投放。
-- 修复 Codex 外部编辑后，旧 Anchor 注释范围混入项目／其他 provider 表，导致“更新配置”拒绝重新接管的问题。按实际 TOML 表处理并保留其他设置，结合既有缺失／损坏目录重建；不需手动删注释。包含 `.54` 既有能力。
-- 构建提交 `8279f3a9dc0fada72b51d7798294c872ba515134`，SOURCE.json dirty=false；双平台生产编译、Go／TS 契约、提交源码逐文件／输入摘要、Anchor／mihomo vendor、元数据及附件完整性检查通过。9项新增回归与 managed／core／cli／desktop 四包测试通过。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff、state.db schema9，核心与桌面配套升级，SSH 远端另行升级；有停机窗口，无数据库降级。desktop.34 及更早版首次迁移须备份、正常停服并退出界面后手动安装。
-- 在线验证：同版六附件大小／SHA256 digest 与 tag revision 一致，latest 未改变；从默认 dev 源以 `.54` 为当前版真实发现并下载 `.55` Linux 包，大小和 SHA256 校验通过，Windows 远端 digest 与本地一致。
-- 本机已于 `2026-10-20T14:56:31.163936+08:00` 从 `.54` 配套升级到 `.55`，core／gateway／agent_management ready，Codex／DSH applied；运行 ELF 与候选一致，GUI 匹配发布 deb，schema9→9，数据库完整性、配置、凭据及托管／恢复文件核对通过。未执行系统安装器／应用内 apply、原生窗口交互、真实 SSH 或付费上游验收，安装器未签名。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.56](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.56)，发布于 `2026-10-20T16:07:18+08:00`；GitHub prerelease，非 latest，六项附件同版投放。
+- Codex 损坏或删除的已托管配置可从已验证快照恢复；新增「备份并重建配置」及 CLI `agent enroll --rebuild --model-scope all-mapped --approve`，即使从未托管过也可备份后生成干净配置。整份重建会移除当前其他设置，原件保留在 recovery；停用不自动还原坏文件。
+- 构建提交 `25c35776b32a25cd36de08eef351dc5f87a318d1`，SOURCE.json dirty=false；Go managed／core／cli／desktop 四包、16项前端单测、typecheck、lint、3项浏览器模拟绑定测试通过。双平台生产编译、契约比对、安装包／源码／vendor／元数据与六附件校验通过。未混入工作区系统代理改动。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。核心与桌面配套升级；沿用 restart_handoff 和 schema9，无数据库降级，远端核心另行升级。
+- 默认 dev 源以 `.55` 为当前版真实发现并下载 `.56` Linux 包，大小／SHA256通过；Windows GitHub digest 与本地一致，tag 指向实际构建提交，latest 未改变。
+- 本机已于 `2026-10-20T16:10:46.135172+08:00` 从 `.55` 配套升级到 `.56`，core／gateway／agent_management ready，Codex／DSH applied，运行程序哈希、数据库、配置／凭据／托管与恢复文件核验通过。未执行系统安装器／应用内 apply、原生窗口交互或付费上游验收。
+
+## .56 在线投放与本机升级（2026-10-20）
+
+默认 dev 源真实下载 Linux deb：29055484 字节，SHA256 `c27ec18cd3d62d26e94f697378857b89789e28c8bde4736b58bad22515156991`；Windows digest `405070f824e42fd55c78a7a8b95414116f80c5ec8c76a73c2ac4f114a340db5c`。六附件大小／摘要、tag revision 和非 latest 核验通过。本机保留交接升级与状态验证通过，备份 `/home/mosaki/.config/anchor/backups/pre-desktop56-20261020-161041`。边界与附件见[发行记录](../release/desktop.md#codex-配置重建-56已发布-dev本机已升级)。
 
 ## .55 在线投放与本机升级（2026-10-20）
 
