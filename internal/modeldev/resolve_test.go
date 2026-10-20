@@ -125,7 +125,11 @@ func TestResolveCachedDoesNotFetchAndPreservesSnapshot(t *testing.T) {
 		t.Fatal(again, err, calls)
 	}
 	c.now = func() time.Time { return time.Now().Add(2 * CacheTTL) }
+	if stale, err := c.ResolveCached("m"); err != nil || !stale.Stale || calls != 1 {
+		t.Fatal("cached lookup failed within reference grace period", stale, err, calls)
+	}
+	c.now = func() time.Time { return time.Now().Add(ReferenceTTL) }
 	if _, err := c.ResolveCached("m"); !errors.Is(err, ErrUnavailable) || calls != 1 {
-		t.Fatal("cached lookup fetched expired catalog", err, calls)
+		t.Fatal("cached lookup used expired prices or fetched catalog", err, calls)
 	}
 }

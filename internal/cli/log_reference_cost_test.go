@@ -45,7 +45,7 @@ func TestLogReferenceCostCLI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	snapshot := modeldev.ModelCatalog{Source: "models.dev", Version: strings.Repeat("a", 64), FetchedAt: 1, ExpiresAt: 3601, Models: []modeldev.CatalogModel{model}, Total: 1}
+	snapshot := modeldev.ModelCatalog{Source: "models.dev", Version: strings.Repeat("a", 64), FetchedAt: time.Now().Unix(), ExpiresAt: time.Now().Add(modeldev.CacheTTL).Unix(), Models: []modeldev.CatalogModel{model}, Total: 1}
 	if _, err = store.PutModel(state.Model{ID: "public", Candidates: []state.Candidate{{ProviderID: "p", Model: "priced"}}, Settings: &state.ModelSettings{Reference: &snapshot}}, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +98,7 @@ func TestLogReferenceCostCLI(t *testing.T) {
 		}
 	}
 	var help bytes.Buffer
-	if err := (App{Out: &help, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil || !strings.Contains(help.String(), "reference_cost") || !strings.Contains(help.String(), "cost_adjustment") {
+	if err := (App{Out: &help, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil || !strings.Contains(help.String(), "reference_cost") || !strings.Contains(help.String(), "cost_adjustment") || !strings.Contains(help.String(), "under 3h old") {
 		t.Fatal(help.String(), err)
 	}
 }

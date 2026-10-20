@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/logbook"
@@ -27,7 +28,8 @@ func logPriceSnapshot(t *testing.T, id string) modeldev.ModelCatalog {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return modeldev.ModelCatalog{Source: "models.dev", Version: strings.Repeat("a", 64), FetchedAt: 1, ExpiresAt: 3601, Models: []modeldev.CatalogModel{m}, Total: 1}
+	now := time.Now().Unix()
+	return modeldev.ModelCatalog{Source: "models.dev", Version: strings.Repeat("a", 64), FetchedAt: now, ExpiresAt: now + int64(modeldev.CacheTTL/time.Second), Models: []modeldev.CatalogModel{m}, Total: 1}
 }
 
 func TestLogReferenceCostAttemptsAndMissingUsage(t *testing.T) {

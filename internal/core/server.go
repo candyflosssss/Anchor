@@ -453,6 +453,7 @@ func (s *Server) Run(ctx context.Context) error {
 	errs := make(chan error, 2)
 	go func() { errs <- control.Serve(cl) }()
 	go func() { errs <- gateway.Serve(gl) }()
+	s.modelCatalog.StartRefresh()
 	managedResults, managedErr := s.Agents.Start()
 	if managedErr != nil {
 		s.Log.Warn("agent startup reconciliation unavailable")

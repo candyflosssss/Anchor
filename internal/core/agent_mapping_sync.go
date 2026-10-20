@@ -7,6 +7,9 @@ import "net/http"
 // lists must reflect the committed mapping. A synchronization conflict must
 // not turn a committed mutation into a retryable write failure.
 func (s *Server) syncAgentMappings(w http.ResponseWriter) {
+	// Recheck shared reference data after mapping changes, including removals
+	// caused by provider/Key deletion. This never delays a committed mutation.
+	s.modelCatalog.RefreshSoon()
 	results, err := s.Agents.SyncMappings()
 	partial := err != nil
 	for _, result := range results {

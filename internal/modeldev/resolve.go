@@ -22,12 +22,18 @@ func (c *Client) Resolve(ctx context.Context, id string) (ModelCatalog, error) {
 func (c *Client) ResolveCached(id string) (ModelCatalog, error) {
 	c.mu.Lock()
 	s := c.snapshot
-	usable := s != nil && !c.failed && c.now().Sub(s.fetched) < CacheTTL
+	usable := s != nil && c.now().Sub(s.fetched) < ReferenceTTL
+	stale := s != nil && (c.failed || c.now().Sub(s.fetched) >= CacheTTL)
 	c.mu.Unlock()
 	if !usable {
 		return ModelCatalog{}, ErrUnavailable
 	}
-	return resolveSnapshot(s, id)
+	out, err := resolveSnapshot(s, id)
+	out.Stale = stale
+	if stale {
+		out.Failure = "refresh_failed"
+	}
+	return out, err
 }
 
 func resolveSnapshot(s *snapshot, id string) (ModelCatalog, error) {

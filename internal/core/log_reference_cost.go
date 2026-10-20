@@ -18,7 +18,8 @@ func referenceCost(snapshot *modeldev.ModelCatalog) *logbook.ReferenceCost {
 		return nil
 	}
 	m := snapshot.Models[0]
-	return &logbook.ReferenceCost{Currency: "USD", Basis: "text_tokens", Reason: "missing_usage", Source: snapshot.Source, ProviderID: m.ProviderID, ModelID: m.ID, CatalogVersion: snapshot.Version, FetchedAt: snapshot.FetchedAt, Stale: snapshot.Stale || (snapshot.ExpiresAt > 0 && time.Now().Unix() >= snapshot.ExpiresAt), Pricing: m.Pricing}
+	stale := snapshot.Stale || (snapshot.FetchedAt > 0 && time.Since(time.Unix(snapshot.FetchedAt, 0)) >= modeldev.CacheTTL) || (snapshot.ExpiresAt > 0 && time.Now().Unix() >= snapshot.ExpiresAt)
+	return &logbook.ReferenceCost{Currency: "USD", Basis: "text_tokens", Reason: "missing_usage", Source: snapshot.Source, ProviderID: m.ProviderID, ModelID: m.ID, CatalogVersion: snapshot.Version, FetchedAt: snapshot.FetchedAt, Stale: stale, Pricing: m.Pricing}
 }
 
 func (s *Server) cachedLogReference(model string) *logbook.ReferenceCost {
@@ -34,7 +35,20 @@ func (s *Server) cachedLogReference(model string) *logbook.ReferenceCost {
 
 func (s *Server) logReference(m state.Model) *logbook.ReferenceCost {
 	if m.Settings != nil && m.Settings.Reference != nil {
-		return referenceCost(m.Settings.Reference)
+		// The saved reference chooses an identity, not an indefinitely frozen
+		// price. Prefer that identity's current cache without changing settings.
+		saved := m.Settings.Reference
+		if len(saved.Models) != 1 {
+			return nil
+		}
+		model := saved.Models[0]
+		if price := s.cachedLogReference(model.ProviderID + "/" + model.ID); price != nil {
+			return price
+		}
+		if saved.FetchedAt <= 0 || time.Since(time.Unix(saved.FetchedAt, 0)) >= modeldev.ReferenceTTL {
+			return nil
+		}
+		return referenceCost(saved)
 	}
 	// A speed variant has no inferred standard reference price. An explicitly
 	// selected reference above is still a reference, never a service-tier bill.

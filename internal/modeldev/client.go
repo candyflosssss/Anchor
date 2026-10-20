@@ -16,20 +16,26 @@ import (
 const Endpoint = "https://models.dev/api.json"
 const MaxBytes = 16 << 20
 const CacheTTL = time.Hour
+
+// ReferenceTTL bounds the age of prices used for new request estimates, even
+// when an hourly refresh fails. Metadata imports still require CacheTTL freshness.
+const ReferenceTTL = 3 * CacheTTL
 const FetchTimeout = 30 * time.Second
 
 // Client owns one bounded immutable catalog snapshot. Concurrent refreshes are
 // coalesced; network failure retains the last snapshot with explicit staleness.
 type Client struct {
-	http      *http.Client
-	ctx       context.Context
-	cancel    context.CancelFunc
-	now       func() time.Time
-	mu        sync.Mutex
-	snapshot  *snapshot
-	inflight  chan struct{}
-	failed    bool
-	attempted time.Time
+	http        *http.Client
+	ctx         context.Context
+	cancel      context.CancelFunc
+	now         func() time.Time
+	mu          sync.Mutex
+	snapshot    *snapshot
+	inflight    chan struct{}
+	failed      bool
+	attempted   time.Time
+	refreshWake chan struct{}
+	refreshDone chan struct{}
 }
 type snapshot struct {
 	data    map[string]providerData
@@ -48,7 +54,7 @@ func New() *Client {
 	tr.MaxIdleConns = 1
 	tr.ResponseHeaderTimeout = FetchTimeout
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Client{ctx: ctx, cancel: cancel, http: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, now: time.Now}
+	return &Client{ctx: ctx, cancel: cancel, http: &http.Client{Transport: tr, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, now: time.Now, refreshWake: make(chan struct{}, 1)}
 }
 
 // NewWithTransport injects an HTTP transport while preserving the fixed public
@@ -60,6 +66,12 @@ func NewWithTransport(transport http.RoundTripper) *Client {
 }
 func (c *Client) Close() {
 	c.cancel()
+	c.mu.Lock()
+	done := c.refreshDone
+	c.mu.Unlock()
+	if done != nil {
+		<-done
+	}
 	c.mu.Lock()
 	wait := c.inflight
 	c.mu.Unlock()
