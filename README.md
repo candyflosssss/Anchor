@@ -5,19 +5,19 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.53**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.54**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.53 已发布并更新本机**，新增供应商请求渠道编辑／默认 Key 协议同步，并包含 Key 失败降权与策略设置、日志费用细分，以及 `.52` 之后的余额和列表修复。本机 CLI／核心／GUI 已配套升级。详见[构建与安装记录](docs/release/desktop.md#请求渠道编辑-53已发布-dev本机已升级)。
+**desktop.54 已发布为 GitHub prerelease**，新增供应商多 Key 原子创建、多请求地址／IP 编辑，以及局部后台刷新保留页面与表单状态、余额查到后原位更新；日志参考费用保持分组展示。本轮未重新安装本机。详见[构建与安装记录](docs/release/desktop.md#局部刷新与多-key-54已发布-dev未重新安装本机)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.53/Anchor-Desktop-0.1.0-dev.desktop.53-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.53/anchor-desktop_0.1.0-dev.desktop.53_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.53)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.54/Anchor-Desktop-0.1.0-dev.desktop.54-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.54/anchor-desktop_0.1.0-dev.desktop.54_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.54)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -100,10 +100,10 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
 
 
-### 在线更新（desktop.53 已投放 dev 渠道）
+### 在线更新（desktop.54 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.53` 两平台安装包及同版清单，本机已完成 `.52`→`.53` CLI／核心／GUI 升级，供应商请求渠道可编辑。沿用 schema9；升级前备份、配套升级核心与桌面，SSH远端另行升级。Linux 默认源真实下载、Windows远端digest及运行二进制哈希核对通过；原生窗口／系统安装器／真实SSH或付费上游未验收。详见[发行记录](docs/release/desktop.md#请求渠道编辑-53已发布-dev本机已升级)。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.54` 两平台安装包及同版清单，供应商支持多 Key 原子创建、多请求地址／IP 编辑和局部刷新原位更新。沿用 schema9；升级前备份、配套升级核心与桌面，SSH远端另行升级。Linux 默认源真实下载与 SHA256、Windows远端digest核对通过；本轮未重新安装本机，原生窗口／系统安装器／真实SSH或付费上游未验收。详见[发行记录](docs/release/desktop.md#局部刷新与多-key-54已发布-dev未重新安装本机)。
 
-**desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.53` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema9，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
+**desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.54` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema9，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
 
 desktop.35 的桌面安装确认使用保留交接停服、真正退出当前宿主，再交给系统安装器；安装完成须重新打开程序。desktop.14 起普通关闭隐藏到系统托盘，托盘菜单可打开或退出界面；其他窗口需要用「退出界面」退出。「退出界面」「停止核心」也位于顶栏「本机实例」弹层。CLI 源码同时提供本机更新命令（alpha.6 不含），原位替换保留上一版。语法见[最新指令大全](docs/cli/commands.md)，渠道投放、数据库迁移与验证边界见[在线更新](docs/design/online-updates.md)及[桌面发行说明](docs/release/desktop.md)。

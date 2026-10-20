@@ -1,15 +1,20 @@
 # 在线更新 v1
 
-- 更新：2026-10-19。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.53](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.53)，发布于 `2026-10-19T17:51:53+08:00`；GitHub prerelease，非 latest，两平台安装包与 flat 更新清单同版投放。
-- 本版包含 `.52` 之后截至 `e22f8d9b92cd3858bc192b6c3e1f0ea0df7aa250` 的已提交功能：供应商请求渠道编辑并同步 default Key、列表顺序与直接启停、NewAPI 余额归一化、简化弹窗／模型说明、日志费用分项与倍率快照、Key 失败临时降权与可配置策略。未混入工作区未提交的系统代理改动。
+- 更新：2026-10-20。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.54](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.54)，发布于 `2026-10-20T11:25:27+08:00`；GitHub prerelease，非 latest，两平台安装包与 flat 更新清单同版投放。
+- 本版包含 `.53` 之后截至 `c81efd52e01ac2eaa801a267f2fe7880dd34ada5` 的已提交功能：供应商多 Key 原子创建、多请求地址／IP 编辑、供应商局部后台刷新保留页面与表单状态、余额查到后原位更新，以及日志参考费用分组展示。未混入工作区未提交的系统代理改动。
 - 构建：干净隔离源码，SOURCE.json dirty=false；Windows AMD64／Ubuntu24.04 AMD64 生产编译、Go／TS 契约比对、安装包哈希、提交源码逐文件／输入摘要、Anchor／mihomo Go vendor、元数据 ZIP CRC 均通过；原 BUILD.json 的未执行原生／安装验收状态保留。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff、state.db schema9，宿主与核心配套更新，SSH 远端单独升级；desktop.34 及更早版首次迁移须备份、正常停服并退出界面后手动安装。升级有停机窗口，无数据库降级。
-- 在线验证：六附件大小／SHA256 digest、tag 构建 revision 一致，latest 未改变；隔离本轮源码 CLI 从默认 dev 源以 `.52` 为当前版真实发现并下载 `.53` Linux 包，大小与 SHA256 通过；Windows 远端 digest 与本地一致。
-- 本机 CLI／核心／GUI 已于 `2026-10-19T17:53:49.054066+08:00` 从 `.52` 配套升级到 `.53`，运行中 ELF 与构建哈希一致。备份 `/home/mosaki/.config/anchor/backups/pre-desktop53-20261019-175341`（目录0700／文件0600）；保留交接后恢复原受限 transient user units，Restart=no，不新增持久服务／自启动。core／gateway／agent_management ready，schema9→9，SQLite quick_check／foreign_key_check 通过；实例身份、配置表、绑定凭据、托管文件和恢复基线原样保留，Codex／DSH applied。
-- 验收边界：本机为用户目录原子替换升级；未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收，安装器未签名。供应商定向 Go、typecheck／lint、129项单测及3项模拟浏览器测试沿用功能任务的实际结果；全量前端单测此前超时未计为通过，本轮不重跑全量／race。完整产物见[桌面发行说明](../release/desktop.md#请求渠道编辑-53已发布-dev本机已升级)。
+- 在线验证：六附件大小／SHA256 digest、tag 构建 revision 一致，latest 未改变；隔离本轮源码 CLI 从默认 dev 源以 `.53` 为当前版真实发现并下载 `.54` Linux 包，大小与 SHA256 通过；Windows 远端 digest 与本地一致。
+- 本机状态与验收边界：本轮未重新安装本机，未修改真实用户配置；未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收，安装器未签名。供应商与刷新功能沿用相关 Go 测试、前端 typecheck／lint、367项单测及69项模拟浏览器回归的实际结果。完整产物见[桌面发行说明](../release/desktop.md#局部刷新与多-key-54已发布-dev未重新安装本机)。
 
 - 本轮不改变在线更新契约或新增管理操作，继续使用既有默认 GitHub 源、dev 渠道与受控安装交接。
+
+## .54 在线投放验证（2026-10-20）
+
+Release tag 指向构建提交 `c81efd52e01ac2eaa801a267f2fe7880dd34ada5`，同版附件包括两平台安装器、`update-desktop.json`、对应源码、许可／构建元数据和 `SHA256SUMS`，六项均通过大小与 SHA256／GitHub digest 校验。`latest` 发布前后保持未改变。
+
+以 `.53` 为当前版本，在隔离数据目录通过本轮源码 CLI 从默认 GitHub dev 源真实发现并下载 `.54` Linux `.deb`：29,045,388 字节，SHA256 `c29a698b5e4ff694034e27f3bcaef6d3e4eb782624cc5ebb00795912d203cec6`。Windows 远端 digest 与本地 SHA256 `790d301d05c17983192c1378b03ed437a07e1655fdcf9c32597fc50837aeacb9` 一致。未执行 `apply` 或安装器，未修改真实用户配置，未请求真实付费上游。
 
 ## 1. 使用流程
 
