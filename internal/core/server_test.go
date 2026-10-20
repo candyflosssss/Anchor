@@ -103,6 +103,20 @@ func TestAuthenticationAndHostBoundaries(t *testing.T) {
 		if r.StatusCode != tc.status {
 			t.Fatal(tc.url, r.StatusCode, text(t, r))
 		}
+		if tc.status >= 400 {
+			var result struct {
+				Error struct {
+					Code    string `json:"code"`
+					Message string `json:"message"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
+				t.Fatal(err)
+			}
+			if result.Error.Code != "unauthorized" || !strings.HasPrefix(result.Error.Message, "[Anchor] ") {
+				t.Fatalf("local authentication error lacks origin: %+v", result.Error)
+			}
+		}
 	}
 	for _, kind := range []string{"origin", "host"} {
 		r, _ := http.NewRequest("GET", f.control.URL+"/control/v1/status", nil)

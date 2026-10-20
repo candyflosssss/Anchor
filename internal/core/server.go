@@ -121,7 +121,7 @@ func fail(w http.ResponseWriter, status int, code, message string) {
 	if recorder, ok := w.(interface{ logFailure(string) }); ok {
 		recorder.logFailure(code)
 	}
-	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": message}})
+	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": "[Anchor] " + message}})
 }
 func apiError(w http.ResponseWriter, err error) {
 	switch {

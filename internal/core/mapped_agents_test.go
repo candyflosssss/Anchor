@@ -67,6 +67,18 @@ func TestMappedAgentsGatewayProtocols(t *testing.T) {
 			if resp.StatusCode != 403 || calls.Load() != 1 {
 				t.Fatal("unknown mapping reached supplier", resp.StatusCode, calls.Load(), text(t, resp))
 			}
+			var denied struct {
+				Error struct {
+					Code    string `json:"code"`
+					Message string `json:"message"`
+				} `json:"error"`
+			}
+			if err := json.NewDecoder(resp.Body).Decode(&denied); err != nil {
+				t.Fatal(err)
+			}
+			if denied.Error.Code != "binding_model_denied" || denied.Error.Message != "[Anchor] model is outside the binding route scope" {
+				t.Fatalf("binding rejection lacks origin: %+v", denied.Error)
+			}
 			resp = request(t, "GET", f.control.URL+"/control/v1/status", token, "")
 			if resp.StatusCode != 401 {
 				t.Fatal("binding managed core", resp.StatusCode)
