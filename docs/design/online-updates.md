@@ -6,7 +6,7 @@
 - 构建：干净隔离源码，SOURCE.json dirty=false；Windows AMD64／Ubuntu24.04 AMD64 生产编译、Go／TS 契约比对、安装包哈希、提交源码逐文件／输入摘要、Anchor／mihomo Go vendor、元数据 ZIP CRC 均通过；原 BUILD.json 的未执行原生／安装验收状态保留。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff、state.db schema9，宿主与核心配套更新，SSH 远端单独升级；desktop.34 及更早版首次迁移须备份、正常停服并退出界面后手动安装。升级有停机窗口，无数据库降级。
 - 在线验证：六附件大小／SHA256 digest、tag 构建 revision 一致，latest 未改变；隔离本轮源码 CLI 从默认 dev 源以 `.53` 为当前版真实发现并下载 `.54` Linux 包，大小与 SHA256 通过；Windows 远端 digest 与本地一致。
-- 本机状态与验收边界：本轮未重新安装本机，未修改真实用户配置；未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收，安装器未签名。供应商与刷新功能沿用相关 Go 测试、前端 typecheck／lint、367项单测及69项模拟浏览器回归的实际结果。完整产物见[桌面发行说明](../release/desktop.md#局部刷新与多-key-54已发布-dev未重新安装本机)。
+- 本机状态与验收边界：CLI／核心／GUI 已于 `2026-10-20T14:18:14+08:00` 从 `.53` 配套升级到 `.54`，核心与网关 ready；schema9→9，数据库完整性、配置行、凭据与托管文件核对通过。原有 Codex model conflict／DSH applied 保持；未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收，安装器未签名。供应商与刷新功能沿用相关 Go 测试、前端 typecheck／lint、367项单测及69项模拟浏览器回归的实际结果。完整产物见[桌面发行说明](../release/desktop.md#局部刷新与多-key-54已发布-dev本机已升级)。
 
 - 本轮不改变在线更新契约或新增管理操作，继续使用既有默认 GitHub 源、dev 渠道与受控安装交接。
 

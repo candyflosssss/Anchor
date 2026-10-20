@@ -6,9 +6,9 @@
 - 构建：干净隔离源码，SOURCE.json dirty=false；Windows AMD64／Ubuntu24.04 AMD64 生产编译、Go／TS 契约比对、安装包哈希、提交源码逐文件／输入摘要、Anchor／mihomo Go vendor、元数据 ZIP CRC 均通过；原 BUILD.json 的未执行原生／安装验收状态保留。
 - 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff、state.db schema9，宿主与核心配套更新，SSH 远端单独升级；desktop.34 及更早版首次迁移须备份、正常停服并退出界面后手动安装。升级有停机窗口，无数据库降级。
 - 在线验证：六附件大小／SHA256 digest、tag 构建 revision 一致，latest 未改变；隔离本轮源码 CLI 从默认 dev 源以 `.53` 为当前版真实发现并下载 `.54` Linux 包，大小与 SHA256 通过；Windows 远端 digest 与本地一致。
-- 本机状态与验收边界：本轮未重新安装本机，未修改真实用户配置；未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收，安装器未签名。供应商与刷新功能沿用相关 Go 测试、前端 typecheck／lint、367项单测及69项模拟浏览器回归的实际结果。完整产物见[下节](#局部刷新与多-key-54已发布-dev未重新安装本机)。
+- 本机状态与验收边界：CLI／核心／GUI 已于 `2026-10-20T14:18:14+08:00` 从 `.53` 配套升级到 `.54`，核心与网关 ready；schema9→9，数据库完整性、配置行、凭据与托管文件核对通过。原有 Codex model conflict／DSH applied 保持；未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收，安装器未签名。供应商与刷新功能沿用相关 Go 测试、前端 typecheck／lint、367项单测及69项模拟浏览器回归的实际结果。完整产物见[下节](#局部刷新与多-key-54已发布-dev本机已升级)。
 
-## 局部刷新与多 Key .54（已发布 dev，未重新安装本机）
+## 局部刷新与多 Key .54（已发布 dev，本机已升级）
 
 构建提交 `c81efd52e01ac2eaa801a267f2fe7880dd34ada5`，输入摘要 `eed522cc60a8b1ac7ba58972f2b2eca33bd15c197ecbc2cc8cb3fb1631bf39ad`。供应商新增支持一次原子创建多个命名 Key；添加与编辑均支持多个请求地址／IP，修改地址时可保留已有凭据。供应商局部后台刷新会保留当前页面、列表和表单状态，余额等数据查到后再原位更新，减少闪烁与页面跳回。NewAPI 余额与模型倍率继续按两位小数展示；日志参考费用保持原始费用、供应商／分组倍率和最终费用在同一区块。
 
@@ -22,6 +22,8 @@
 | `SHA256SUMS` | 539 | `2b45f961ee5535df682c5de0d7dfcb108a3a68d55891d3945a33533fae685159` |
 
 同版六附件已通过大小与 SHA256／GitHub digest 校验，tag 指向实际构建 revision，Release 保持 prerelease 且未改变 latest。默认源隔离验证以 `.53` 为当前版本，真实发现并下载 Linux `.deb`；Windows 仅核对远端 digest 与本地哈希，未下载安装器。源码包包含对应提交的 Anchor 文件与 Go vendor、未修改的 mihomo v1.19.32 完整对应源码与 Go vendor、固定 payload，以及许可／构建元数据。历史 `.53` 包与说明继续保留。
+
+**本机升级（2026-10-20 14:18）**：从同版发布源码与 vendor 离线受限编译 CLI，GUI 与发布 deb 真实载荷一致。备份 `/home/mosaki/.config/anchor/backups/pre-desktop54-20261020-141811`（目录0700、文件0600）；通过 `restart_handoff` 正常退出旧核心后原子替换用户目录程序，启动受限 transient user units，Restart=no，无持久服务或登录自启动。运行中 CLI／GUI ELF 与候选哈希一致，core／gateway ready；SQLite quick_check／foreign_key_check 通过，schema9→9。实例身份、配置表、绑定凭据、托管文件及恢复日志保持；原有 Codex model conflict／DSH applied 保持，不重新接管。未执行 apt／NSIS／应用内 apply、原生窗口交互、真实 SSH 或付费上游验收。
 
 ## 请求渠道编辑 .53（已发布 dev，本机已升级）
 

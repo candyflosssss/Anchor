@@ -11,7 +11,7 @@
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.54 已发布为 GitHub prerelease**，新增供应商多 Key 原子创建、多请求地址／IP 编辑，以及局部后台刷新保留页面与表单状态、余额查到后原位更新；日志参考费用保持分组展示。本轮未重新安装本机。详见[构建与安装记录](docs/release/desktop.md#局部刷新与多-key-54已发布-dev未重新安装本机)。
+**desktop.54 已发布为 GitHub prerelease**，新增供应商多 Key 原子创建、多请求地址／IP 编辑，以及局部后台刷新保留页面与表单状态、余额查到后原位更新；日志参考费用保持分组展示。本机 CLI／核心／GUI 已配套升级。详见[构建与安装记录](docs/release/desktop.md#局部刷新与多-key-54已发布-dev本机已升级)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
@@ -102,7 +102,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ### 在线更新（desktop.54 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.54` 两平台安装包及同版清单，供应商支持多 Key 原子创建、多请求地址／IP 编辑和局部刷新原位更新。沿用 schema9；升级前备份、配套升级核心与桌面，SSH远端另行升级。Linux 默认源真实下载与 SHA256、Windows远端digest核对通过；本轮未重新安装本机，原生窗口／系统安装器／真实SSH或付费上游未验收。详见[发行记录](docs/release/desktop.md#局部刷新与多-key-54已发布-dev未重新安装本机)。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.54` 两平台安装包及同版清单，供应商支持多 Key 原子创建、多请求地址／IP 编辑和局部刷新原位更新。沿用 schema9；升级前备份、配套升级核心与桌面，SSH远端另行升级。Linux 默认源真实下载与 SHA256、Windows远端digest核对通过；本机 CLI／核心／GUI 已配套升级，原生窗口／系统安装器／真实SSH或付费上游未验收。详见[发行记录](docs/release/desktop.md#局部刷新与多-key-54已发布-dev本机已升级)。
 
 **desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.54` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema9，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
 
