@@ -3,6 +3,7 @@ import { useMappingSelection } from './use-provider-mapping-batch';
 import { KeyMultiplierView } from './key-multiplier.view';
 import { probeFailureText } from './provider-test.model';
 import { ProviderCatalogView } from './provider-catalog.view';
+import { ProviderNewAPIAuth } from './provider-newapi-auth.view';
 import { ProviderAccountView } from './provider-account.view';
 import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Trash2, TextCursorInput } from 'lucide-react';
@@ -66,6 +67,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
         </Popover>
       </div>
     </header>
+    {c.detailTab !== 'account' && !c.editor && <ProviderNewAPIAuth key={`${p.id}:${p.revision}`} c={c} />}
     <div className="detail-tabs" role="tablist" aria-label="供应商详情分区" onKeyDown={tabKeys}>
       {tabs.map(([id, title]) => <button key={id} ref={node => { tabRefs.current[id] = node; }} role="tab" id={`tab-${id}`} aria-controls={`panel-${id}`} aria-selected={c.detailTab === id} tabIndex={c.detailTab === id ? 0 : -1} onClick={() => c.setDetailTab(id)}>
         {title}{id === 'keys' && w ? <span className="tab-count">{w.keys.length}</span> : id === 'models' && w ? <span className="tab-count">{w.models.length}</span> : null}

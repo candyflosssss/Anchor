@@ -38,6 +38,7 @@ export function useProviderController(environment: ProviderEnvironment) {
   const [modelsBusy, setModelsBusy] = useState(false);
   const catalogQuery = useRef<AbortController | null>(null);
   const catalogEpoch = useRef(0);
+  const authorizedCatalog = useRef<{ id: string; revision: number } | null>(null);
   const clearModels = useCallback(() => {
     catalogEpoch.current++;
     if (catalogQuery.current) { catalogQuery.current.abort(); catalogQuery.current = null; locked.current = false; }
@@ -59,6 +60,11 @@ export function useProviderController(environment: ProviderEnvironment) {
       const result = await transport.list(abort.signal);
       if (abort.signal.aborted || epoch !== generation.current) return false;
       setProviders(old => reconcileEntities(old, result));
+      setEditor(old => {
+        if (!old?.models || !old.source) return old;
+        const source = result.find(p => p.id === old.source!.id);
+        return source ? { ...old, source, draft: newDraft(source) } : old;
+      });
       hasSnapshot.current = true;
       if (scope === 'all') { setReadVersion(value => value + 1); setRefreshVersion(value => value + 1); }
       if (scope !== 'provider') setSummaryVersion(value => value + 1);
@@ -195,10 +201,24 @@ export function useProviderController(environment: ProviderEnvironment) {
       setNotice(action === 'rename' ? `已改名为 ${id}` : action === 'copy' ? `已复制为 ${id}（默认停用）` : `已删除 ${from}`);
     } else await load(undefined, scope);
   }, () => setNotice(''), readVersion);
-  const account = useProviderAccount(selected, transport, async () => {
-    clearModels(); await load(undefined, 'provider');
-    setNotice(`${mock ? '演示：' : ''}平台配置已保存。可在「账户与余额」刷新余额或 Key 额度。`);
-  }, () => blocked || locked.current || features.busy || !!editor || !!dialog, readVersion);
+  const account = useProviderAccount(selected, transport, async saved => {
+    if (models || editor?.models) authorizedCatalog.current = { id: saved.provider_id, revision: saved.revision };
+    clearModels();
+    await load(undefined, 'provider');
+    setNotice(`${mock ? '演示：' : ''}平台配置已保存。`);
+  }, () => blocked || locked.current || features.busy || (!!editor && !editor.models) || !!dialog, readVersion,
+  !blocked && !features.busy && (!editor || !!editor.models) && !dialog && !!features.data?.keys.some(k => k.enabled),
+  () => features.refresh());
+  const catalogAfterAuth = useRef(() => {});
+  catalogAfterAuth.current = () => {
+    const pending = authorizedCatalog.current;
+    if (!pending) return;
+    if (pending.id !== selected?.id) { authorizedCatalog.current = null; return; }
+    if (pending.revision !== selected.revision || blocked || features.busy || locked.current || account.isBusy()) return;
+    authorizedCatalog.current = null;
+    void fetchModels(selected);
+  };
+  useEffect(() => { catalogAfterAuth.current(); }, [selected, blocked, features.busy, account.busy]);
   function openProvider(id: string, tab: DetailTab = 'overview', next?: ProviderDialog) {
     if (locked.current || (features.isBusy() || account.isBusy()) || dialog || editor) return;
     if (id !== selectedId) { clearModels(); setNotice(''); }
@@ -210,7 +230,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     transport, quickId, openQuickTest: (id: string) => { if (!blocked && !locked.current && !dialog && !features.isBusy() && !account.isBusy()) { setQuickId(id); setDialog({ kind: 'test' }); } },
     mock, providers, visible, selected, selectedId, phase, refreshing, refreshVersion, summaryVersion, problem, problemMessage: problem ? problemText[problem] : '',
     notice, search, setSearch, filter, setFilter, editor, errors, busy: refreshing || busy || modelsBusy || features.busy || account.busy, blocked: blocked || features.busy || account.busy, scenario,
-    models: models?.provider_id === selected?.id ? models : null,
+    models: models && selected && models.provider_id === selected.id && models.revision === selected.revision ? models : null,
     modelsProblem, modelsBusy, discoverModels, editSetup,
     detailTab, setDetailTab, dialog, openProvider,
     openDialog: (next: ProviderDialog) => { if (!(features.isBusy() || account.isBusy()) && !locked.current) setDialog(next); },

@@ -12,9 +12,9 @@ import { CONTRACT, type AccountSettings, type DesktopBridge, type KeyRateCache, 
 declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | 'invalid' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 declare global { interface Window { keyCooldownTest: { saves: number } } }
 declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
-async function host(page: Page, rateMappings = false) {
+async function host(page: Page, rateMappings = false, detectedPlatform = '') {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, keyCooldown, rateMappings }) => {
+  await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, keyCooldown, rateMappings, detectedPlatform }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     window.accountTest = { saves: 0, queries: 0, failure: '' };
@@ -67,7 +67,7 @@ async function host(page: Page, rateMappings = false) {
       ProviderRate: async input => {
         window.accountTest.queries++;
         await new Promise(resolve => setTimeout(resolve, 150));
-        const failure = window.accountTest.failure;
+        const failure = window.accountTest.failure || (detectedPlatform === 'newapi' && !settings(input.provider_id).has_user_token ? 'auth_required' : '');
         if (!input.remote_key_id) {
           const cacheID = JSON.stringify([input.provider_id, input.key_id || 'default']);
           const now = new Date().toISOString();
@@ -75,7 +75,7 @@ async function host(page: Page, rateMappings = false) {
             ? { ...(rateCache[cacheID] ?? { multiplier: null, group: '', group_name: '', basis: '', observed_at: '' }), attempted_at: now, failure }
             : { multiplier: Number(account.rate.rate.multiplier), group: account.rate.rate.group, group_name: account.rate.rate.group_name, basis: account.rate.rate.basis, observed_at: now, attempted_at: now, failure: '' };
         }
-        return { contract, data: { ...account.rate, provider_id: input.provider_id, revision: input.expected_revision, platform: settings(input.provider_id).platform || 'sub2api', key_id: input.key_id || 'default', remote_key_id: input.remote_key_id, failure,
+        return { contract, data: { ...account.rate, provider_id: input.provider_id, revision: input.expected_revision, platform: !settings(input.provider_id).platform || settings(input.provider_id).platform === 'auto' ? detectedPlatform || 'sub2api' : settings(input.provider_id).platform, key_id: input.key_id || 'default', remote_key_id: input.remote_key_id, failure,
           rate: failure ? null : { ...account.rate.rate } }, problem: null };
       },
       ProviderAllowance: async input => {
@@ -139,7 +139,7 @@ async function host(page: Page, rateMappings = false) {
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
         return { contract, data: { provider_id: provider.id, key_id: input.key_id || 'anonymous', revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '', partial: false, entries: [{ id: 'demo-model', key_ids: [input.key_id || 'anonymous'] }], keys: [{ id: input.key_id || 'anonymous', enabled: true, protocol: 'responses', http_status: 200, failure: '', group: '', group_name: '', multiplier: null, rate_basis: '', rate_failure: 'platform_required' }] }, problem: null };
       },
-      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ rate: rateCache[JSON.stringify([input.provider_id, 'default'])] ?? null, effective_multiplier: rateCache[JSON.stringify([input.provider_id, 'default'])]?.multiplier != null ? providers.find(p => p.id === input.provider_id)!.cost_multiplier * rateCache[JSON.stringify([input.provider_id, 'default'])].multiplier! : null, id: 'default', protocol: providers.find(p => p.id === input.provider_id)?.protocol ?? 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
+      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ rate: rateCache[JSON.stringify([input.provider_id, 'default'])] ?? null, effective_multiplier: rateCache[JSON.stringify([input.provider_id, 'default'])]?.multiplier != null ? providers.find(p => p.id === input.provider_id)!.cost_multiplier * rateCache[JSON.stringify([input.provider_id, 'default'])].multiplier! : null, id: 'default', protocol: providers.find(p => p.id === input.provider_id)?.protocol ?? 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings && routingState['shared-one'].order.some(p => p.provider_id === input.provider_id) ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
@@ -157,7 +157,7 @@ async function host(page: Page, rateMappings = false) {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, codexSettings: codexSettingsFixture, keyCooldown: keyCooldownFixture, rateMappings });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, codexSettings: codexSettingsFixture, keyCooldown: keyCooldownFixture, rateMappings, detectedPlatform });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -360,7 +360,6 @@ test('account page configures authorization and keeps wallet and key quota indep
   await page.getByRole('tab', { name: '账户与余额' }).click();
   await page.getByLabel('平台类型', { exact: true }).selectOption('newapi');
   await page.getByLabel('NewAPI 用户 ID').fill('7');
-  await page.getByLabel('NewAPI 系统访问令牌 · 未配置', { exact: true }).selectOption('replace');
   await page.getByLabel('NewAPI 系统访问令牌', { exact: true }).fill('synthetic-account-private-token');
   await expect(page.getByRole('button', { name: '刷新余额', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '保存平台配置' }).click();
@@ -543,7 +542,9 @@ test('group rate mappings distinguish routing and platform values and deduplicat
   await host(page, true);
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'shared-one', exact: true })).toBeVisible();
+  await expect(page.locator('.mapping-keys')).toHaveCount(6);
   for (const summary of await page.locator('.model-sources > summary').all()) await summary.click();
+  for (const summary of await page.locator('.model-sources-body > .unavailable-section > summary').all()) await summary.click();
   for (const summary of await page.locator('.mapping-keys > summary').all()) await summary.click();
   await expect(page.getByText('供应商倍率 0.5×', { exact: true })).toHaveCount(2);
   const before = await page.evaluate(() => window.accountTest.queries);
@@ -1235,4 +1236,83 @@ test('unknown local update outcome clears the install candidate until a fresh ch
   await expect(page.getByRole('alert')).toContainText('结果未能确认');
   await expect(page.getByRole('button', { name: '安装更新…', exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(1);
+});
+
+
+test('detected NewAPI offers a token directly and retries the rate after saving (simulated host)', async ({ page }) => {
+  await host(page, true, 'newapi');
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderAccountSettings, save = api.SaveProviderAccount;
+    api.ProviderAccountSettings = async input => {
+      const result = await read(input);
+      if (result.data) result.data.user_id = 7;
+      return result;
+    };
+    api.SaveProviderAccount = async input => input.user_id === 7 ? save(input) : { contract: 'anchor-desktop-v1', data: null, problem: { code: 'invalid' } };
+  });
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const auth = page.getByRole('region', { name: 'NewAPI 用户授权' });
+  await expect(auth.getByLabel('NewAPI 用户令牌', { exact: true })).toBeVisible();
+  await expect(auth.getByLabel('NewAPI 用户 ID')).toBeHidden();
+  await auth.getByLabel('NewAPI 用户令牌', { exact: true }).fill('synthetic-inline-newapi-token');
+  await auth.getByRole('button', { name: '保存并查询分组倍率' }).dblclick();
+  await expect(auth.getByRole('heading', { name: 'NewAPI 分组倍率' })).toBeVisible();
+  await expect(auth.getByText(`${accountFixture.rate.rate.multiplier}×`, { exact: true })).toBeVisible();
+  await expect(auth.getByLabel('NewAPI 用户令牌', { exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: /^模型/ }).click();
+  await expect(page.locator('.key-multiplier').first()).toContainText('0.8×');
+  expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
+  expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain('synthetic-inline-newapi-token');
+});
+
+test('inline NewAPI unknown writes clear the token and never replay the save (simulated host)', async ({ page }) => {
+  await host(page, true, 'newapi');
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const auth = page.getByRole('region', { name: 'NewAPI 用户授权' });
+  await auth.getByLabel('NewAPI 用户令牌', { exact: true }).fill('synthetic-inline-unknown-token');
+  await page.evaluate(() => { window.desktopTest.writeError = 'unknown'; });
+  await auth.getByRole('button', { name: '保存并查询分组倍率' }).click();
+  await expect(auth.getByRole('alert')).toContainText('写入结果未知');
+  await expect(auth.getByLabel('NewAPI 用户令牌', { exact: true })).toHaveValue('');
+  await expect(auth.getByRole('button', { name: '保存并查询分组倍率' })).toBeDisabled();
+  await page.evaluate(() => { window.desktopTest.writeError = null; });
+  await auth.getByRole('button', { name: '重新读取配置' }).click();
+  await expect(auth.getByLabel('NewAPI 用户令牌', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
+});
+
+test('new provider setup detects NewAPI, saves authorization and reloads its catalog (simulated host)', async ({ page }) => {
+  await host(page, true, 'newapi');
+  await page.getByRole('button', { name: '添加供应商', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('供应商名称 / ID').fill('NewAPI测试');
+  await dialog.getByLabel('API 根地址', { exact: true }).fill('https://newapi.example.test/v1');
+  await dialog.getByLabel('API Key（可选）', { exact: true }).fill('synthetic-inference-key');
+  await dialog.getByRole('button', { name: '添加并获取模型', exact: true }).click();
+  await expect(dialog.getByRole('heading', { name: 'NewAPI测试 · 配置模型' })).toBeVisible();
+  const auth = dialog.getByRole('region', { name: 'NewAPI 用户授权' });
+  await auth.getByLabel('NewAPI 用户令牌', { exact: true }).fill('synthetic-new-provider-token');
+  await auth.getByRole('button', { name: '保存并查询分组倍率' }).click();
+  await expect(auth.getByText(`${accountFixture.rate.rate.multiplier}×`, { exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => window.desktopTest.directories)).toBe(2);
+  await dialog.getByRole('button', { name: '修改配置 / Key' }).click();
+  await dialog.getByRole('button', { name: '保存并获取模型', exact: true }).click();
+  await expect(dialog.getByRole('heading', { name: 'NewAPI测试 · 配置模型' })).toBeVisible();
+  expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
+});
+
+
+test('automatic NewAPI detection also exposes the account token without selectors (simulated host)', async ({ page }) => {
+  await host(page, true, 'newapi');
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await expect(page.getByLabel('NewAPI 用户令牌', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '账户与余额', exact: true }).click();
+  await expect(page.getByLabel('平台类型', { exact: true })).toHaveValue('auto');
+  await expect(page.getByLabel('NewAPI 系统访问令牌 · 未配置', { exact: true })).toHaveCount(0);
+  await page.getByLabel('NewAPI 系统访问令牌', { exact: true }).fill('synthetic-direct-account-token');
+  await page.getByRole('button', { name: '保存平台配置' }).click();
+  await expect(page.getByLabel('NewAPI 系统访问令牌 · 已保存', { exact: true })).toBeVisible();
+  await expect(page.getByText(`${accountFixture.rate.rate.multiplier}×`, { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
 });

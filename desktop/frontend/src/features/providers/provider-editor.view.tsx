@@ -5,6 +5,7 @@ import { Input } from '../../components/ui/input';
 import { Switch } from '../../components/ui/switch';
 import { Dialog, DialogContent, DialogTitle } from '../../components/ui/dialog';
 import { ProviderInitialKeys } from './provider-initial-keys.view';
+import { ProviderNewAPIAuth } from './provider-newapi-auth.view';
 import { ProviderCatalogView } from './provider-catalog.view';
 import type { ProviderController } from './use-provider-controller';
 import { protocolName, MAX_PROVIDER_URLS, type FieldErrors } from './provider.model';
@@ -32,6 +33,7 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
         <div className="editor-fields">
           {c.problem && <div role="alert" className="editor-problem">{c.problemMessage}</div>}
           {c.features.error && <div role="alert" className="editor-problem">{c.features.error}</div>}
+          <ProviderNewAPIAuth key={`${source?.id}:${source?.revision}`} c={c} />
           {c.features.data ? <ProviderCatalogView c={c} w={c.features.data} disabled={c.busy || c.blocked || c.features.needsRead} setup />
             : !c.features.error && <div className="provider-setup-state" role="status">{c.busy && <LoaderCircle className="loading-icon" aria-hidden="true" />}{c.busy ? '加载中…' : '读取失败'}</div>}
         </div>

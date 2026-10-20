@@ -772,7 +772,7 @@ anchor recover [--id ID]
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；降权策略设置见 settings key-cooldown（§16） |
 | 平台自动识别与列表余额（desktop.27，缓存随desktop.52交付） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；切页立即显示同实例／同配置的上次余额，后台刷新，失败保留旧值并支持单行重试。当前源码（未打包）余额显示两位小数；NewAPI 新增 Key 获准返回的账户余额与只读 Key 额度兼容，按站点公开比例换算；沿用既有命令，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
-| 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单与倍率仍仅源码 CLI；额度保留原始单位 |
+| 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单由 CLI 提供，当前源码 GUI 已接入分组倍率；额度保留原始单位。2026-10-20 未打包 GUI 增量：供应商详情／新增模型步骤识别 NewAPI 后直接输入用户令牌，保存后自动以新 revision 查询倍率（effective-rate），无需手选平台／替换模式；沿用既有命令 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；显示块选择、顺序、预设与费用合块是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |

@@ -103,3 +103,9 @@ export const rateFailureText: Record<string, string> = {
   unsupported: '该平台未提供可读取的分组倍率；原版 OneAPI 不支持此查询。',
   invalid_response: '平台没有返回有效的分组倍率，无法确认数值。',
 };
+
+/** Shared validation for the account editor and inline NewAPI authorization. */
+export function userTokenError(token: string): string {
+  return !token.trim() || /[\r\n]/.test(token) || new TextEncoder().encode(token.trim()).length > 8192
+    ? '用户令牌须非空、无换行，且不超过 8192 字节。' : '';
+}

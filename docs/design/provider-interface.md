@@ -171,6 +171,10 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；当前源码进一步将本地 Key 自动核对查询持久缓存，按供应商倍率×分组倍率调度；显式远端数字ID不写缓存，旧模型倍率字段仅预留。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按来源 Key 逐项查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
 
+### NewAPI 探测后的桌面授权入口（2026-10-20，未打包）
+
+供应商详情及新增后的模型配置步骤复用 ProviderAccountSettings / ProviderRate / SaveProviderAccount。配置与目录空闲后，每次选择、revision 或明确重读最多执行一次自动倍率查询；平台以返回的 platform 为准，不用 URL、推理协议或 auth_required 猜测。NewAPI 缺少用户授权时直接展示令牌输入，按需展开 user_id，不要求用户先选平台或切换令牌模式。已有令牌但认证／权限失败时允许原位替换。保存保留原 platform/site_url/user_id（用户明确更改 ID 除外），令牌仅短暂用于一次提交；确认保存且取得新 revision 后再自动查询原所选 Key 的倍率并刷新工作区；有目录时重新获取目录。新供应商模型配置对话框同步更新来源 revision。冲突及 unknown 只允许明确重新读取后继续，不自动重放写入。账户页的缺失 NewAPI 令牌同样直接输入；已有授权保留既有显式清除确认。没有改变桌面 DTO、核心授权或 CLI 语义。
+
 
 ## 9. 来源 Key与模型调度（2026-10-13，当前源码）
 

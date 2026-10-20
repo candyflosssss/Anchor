@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { RefreshCw, LoaderCircle } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { requestURLError } from './provider.model';
-import { accountFailureText, amountText, platformLabels, allowanceScopeText, billingScopeHint, type AccountObservation, type AccountSettings, type AccountQuery } from './provider-account.model';
+import { accountFailureText, userTokenError, amountText, platformLabels, allowanceScopeText, billingScopeHint, type AccountObservation, type AccountSettings, type AccountQuery } from './provider-account.model';
 import { GroupRateObservation } from './provider-rate.view';
 import type { ProviderController } from './use-provider-controller';
 
@@ -33,7 +33,9 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
     setTokenMode('keep'); setToken(''); setConfirmClear(false); setFormError('');
   }
   const a = c.account;
-  const dirty = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || (userID.trim() || '0') !== String(s.user_id) || tokenMode !== 'keep';
+  const directToken = !s.has_user_token && (platform === 'newapi' || platform === 'auto' && a.observedPlatform === 'newapi');
+  const mode = directToken && token ? 'replace' : tokenMode;
+  const dirty = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || (userID.trim() || '0') !== String(s.user_id) || tokenMode !== 'keep' || !!token;
   const disabled = c.blocked || a.needsRead || !a.ready;
   const queryDisabled = disabled || dirty;
   const authTargetChanged = platform !== (s.platform || 'auto') || siteURL.trim().replace(/\/+$/, '') !== s.site_url || Number(userID || '0') !== s.user_id;
@@ -49,9 +51,9 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
     if (siteURL.trim() && requestURLError(siteURL.trim())) { setFormError(requestURLError(siteURL.trim()) ?? '地址无效'); return; }
     const uid = userID.trim() || '0';
     if (!/^\d+$/.test(uid) || !Number.isSafeInteger(Number(uid))) { setFormError('用户 ID 必须为安全范围内的非负整数。'); return; }
-    if (tokenMode === 'replace' && (!token.trim() || /[\r\n]/.test(token) || new TextEncoder().encode(token.trim()).length > 8192)) { setFormError('用户令牌须非空、无换行，且不超过 8192 字节。'); return; }
+    if (mode === 'replace' && userTokenError(token)) { setFormError('用户令牌须非空、无换行，且不超过 8192 字节。'); return; }
     if (tokenMode === 'clear' && !confirmClear) { setFormError('请确认清除已保存用户令牌。'); return; }
-    const userToken = tokenMode === 'keep' ? null : tokenMode === 'clear' ? '' : token.trim();
+    const userToken = mode === 'keep' ? null : mode === 'clear' ? '' : token.trim();
     setToken(''); // Never keep a submitted credential in the visible form, including failures.
     if (await a.save({ provider_id: s.provider_id, expected_revision: s.revision, platform, site_url: siteURL.trim(), user_id: Number(uid), user_token: userToken })) { setTokenMode('keep'); setConfirmClear(false); }
   }
@@ -79,14 +81,14 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
           {newAPI && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID（按站点要求填写）</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="可先留空；该站要求时填写数字用户 ID" /><p className="card-hint">这是该站后台的账户 ID。仅当该站要求用户 ID 时填写。</p></div>}
           <details className="pricing-details"><summary>账户接口地址（可选）</summary><div className="field"><label htmlFor="account-site-url">站点根地址</label><input id="account-site-url" value={siteURL} onChange={e => setSiteURL(e.target.value)} placeholder="留空，沿用请求地址并移除末尾 /v1" /><p className="card-hint">后台与推理 API 地址不同时填写。包含站点实际使用的部署路径前缀。</p></div></details>
           {(platform === 'sub2api' || a.observedPlatform === 'sub2api') && <p className="card-hint">sub2api 查询所选 Key 的当前计费倍率可直接使用推理 Key，无需用户 JWT。旧站缺少 Key 倍率接口，或指定后台 Key ID 时，才需要用户授权。</p>}
-          {platform === 'auto' && !a.observedPlatform && <p className="card-hint">NewAPI 账户余额需要后台单独生成的系统访问令牌。选择「NewAPI」可查看获取步骤并配置。</p>}
+          {platform === 'auto' && !a.observedPlatform && <p className="card-hint">查询会自动识别平台；识别为 NewAPI 后直接显示用户令牌输入框。</p>}
           {newAPI && <div className="card-hint">
-            <p>登录该 NewAPI 站点后台 → 个人设置／安全设置 → 系统访问令牌，生成后选择下方「输入／替换系统访问令牌」，粘贴并保存。它与调用模型的 API Key 分开配置。</p>
+            <p>登录该 NewAPI 站点后台 → 个人设置／安全设置 → 系统访问令牌，生成后粘贴到下方并保存，随后自动查询分组倍率。它与调用模型的 API Key 分开配置。</p>
             <p>支持权限选择的站点：余额查询需「个人信息读取」（profile:read）；自动核对 Key 的分组倍率还需「API Key 读取」（api_key:read）和「查看完整 API Key」（api_key:reveal）。</p>
             <p>{s.has_user_token ? '已保存系统访问令牌，列表与详情优先查询账户余额。' : '尚未配置系统访问令牌，查询结果可能是 Key 限额；确认账户余额请先配置。'}</p>
           </div>}
-          <div className="field"><label htmlFor="account-token-mode">{tokenLabel} · {s.has_user_token ? '已保存' : '未配置'}</label><select id="account-token-mode" className="select-field" value={tokenMode} onChange={e => { setTokenMode(e.target.value as typeof tokenMode); setToken(''); setConfirmClear(false); }}><option value="keep">保留现有授权</option><option value="replace">输入／替换{newAPI ? '系统访问令牌' : '用户令牌'}</option><option value="clear">清除{newAPI ? '系统访问令牌' : '用户令牌'}</option></select>
-            {tokenMode === 'replace' && <><label htmlFor="account-token" className="account-token-label">{newAPI ? tokenLabel : '平台用户令牌'}</label><input id="account-token" type="password" autoComplete="new-password" value={token} onChange={e => setToken(e.target.value)} placeholder={newAPI ? '粘贴后台生成的系统访问令牌' : platform === 'sub2api' ? '用户登录 JWT' : '平台用户 access token'} /></>}
+          <div className="field">{!directToken && <><label htmlFor="account-token-mode">{tokenLabel} · {s.has_user_token ? '已保存' : '未配置'}</label><select id="account-token-mode" className="select-field" value={tokenMode} onChange={e => { setTokenMode(e.target.value as typeof tokenMode); setToken(''); setConfirmClear(false); }}><option value="keep">保留现有授权</option><option value="replace">输入／替换{newAPI ? '系统访问令牌' : '用户令牌'}</option><option value="clear">清除{newAPI ? '系统访问令牌' : '用户令牌'}</option></select></>}
+            {(directToken || mode === 'replace') && <><label htmlFor="account-token" className="account-token-label">{newAPI ? tokenLabel : '平台用户令牌'}</label><input id="account-token" type="password" autoComplete="new-password" value={token} onChange={e => setToken(e.target.value)} placeholder={newAPI ? '粘贴后台生成的系统访问令牌' : platform === 'sub2api' ? '用户登录 JWT' : '平台用户 access token'} /></>}
             {tokenMode === 'clear' && <label className="account-clear"><input type="checkbox" checked={confirmClear} onChange={e => setConfirmClear(e.target.checked)} />确认清除，之后部分查询将需要重新授权</label>}
             {s.has_user_token && authTargetChanged && tokenMode === 'keep' && <p className="card-hint">平台、站点地址或用户 ID 已改变，保存时将清除旧用户令牌。需要继续查询时请选择「输入／替换用户令牌」。</p>}
           </div>
