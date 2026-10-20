@@ -27,6 +27,9 @@ func TestEncryptedContextErrorRecognition(t *testing.T) {
 	for _, tc := range []struct{ body, want string }{
 		{encryptedContextRejection, "invalid_encrypted_content"},
 		{encryptedContextFailedEvent, "encrypted_content_unverifiable"},
+		{`{"type":"response.failed","response":{"error":{"code":"invalid_encrypted_content"},"output":[{"type":"reasoning","summary":[]}]}}`, "invalid_encrypted_content"},
+		{`{"error":{"code":"invalid_encrypted_content"},"output":[{"type":"reasoning","encrypted_content":"new output"}]}`, ""},
+		{`{"error":{"code":"invalid_encrypted_content"},"output":[{"type":"message","content":[{"type":"output_text","text":"hello"}]}]}`, ""},
 		{`{"type":"error","message":"reasoning encrypted_content was not issued to this caller"}`, "encrypted_content_caller_mismatch"},
 		{`{"error":{"message":"The encrypted content gAAA could not be verified."}}`, "encrypted_content_unverifiable"},
 		{`{"message":"The encrypted content could not be verified."}`, ""},
@@ -81,6 +84,16 @@ func TestEncryptedContextStreamPriming(t *testing.T) {
 	failure := "data: " + encryptedContextFailedEvent + "\n\n"
 	for _, tc := range []struct{ name, wire, want string }{
 		{"early rejection", lifecycle + failure, "encrypted_content_unverifiable"},
+		{"empty reasoning shell", lifecycle + `data: {"type":"response.output_item.added","item":{"type":"reasoning","id":"rs_private","status":"in_progress","summary":[],"encrypted_content":null}}` + "\n\n" + failure, "encrypted_content_unverifiable"},
+		{"empty message shell", `data: {"type":"response.output_item.added","item":{"type":"message","role":"assistant","content":[]}}` + "\n\n" + failure, "encrypted_content_unverifiable"},
+		{"empty summary part", `data: {"type":"response.reasoning_summary_part.added","part":{"type":"summary_text","text":""}}` + "\n\n" + failure, "encrypted_content_unverifiable"},
+		{"empty text part", `data: {"type":"response.content_part.added","part":{"type":"output_text","text":"","annotations":[],"logprobs":[]}}` + "\n\n" + failure, "encrypted_content_unverifiable"},
+		{"event-only lifecycle", "event: response.created\ndata: {\"response\":{\"output\":[]}}\n\n" + failure, "encrypted_content_unverifiable"},
+		{"event-only failure", "event: response.failed\ndata: {\"response\":{\"error\":{\"code\":\"invalid_encrypted_content\"}}}\n\n", "invalid_encrypted_content"},
+		{"reasoning item has content", `data: {"type":"response.output_item.added","item":{"type":"reasoning","summary":[{"text":"thinking"}]}}` + "\n\n" + failure, ""},
+		{"reasoning item has ciphertext", `data: {"type":"response.output_item.added","item":{"type":"reasoning","encrypted_content":"new output"}}` + "\n\n" + failure, ""},
+		{"unknown item field", `data: {"type":"response.output_item.added","item":{"type":"reasoning","private_payload":"generated"}}` + "\n\n" + failure, ""},
+		{"summary part has content", `data: {"type":"response.reasoning_summary_part.added","part":{"type":"summary_text","text":"thinking"}}` + "\n\n" + failure, ""},
 		{"event-only type", "event: error\ndata: {\"code\":\"invalid_encrypted_content\"}\n\n", "invalid_encrypted_content"},
 		{"multiline", "data: {\"type\":\"error\",\ndata: \"code\":\"invalid_encrypted_content\"}\n\n", "invalid_encrypted_content"},
 		{"text already started", lifecycle + "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hello\"}\n\n" + failure, ""},
@@ -95,8 +108,8 @@ func TestEncryptedContextStreamPriming(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Tiny reads exercise frame and CRLF boundaries.
-			reader, reason, inspection := primeEncryptedContextStream(t.Context(), &smallEncryptedContextReader{reader: strings.NewReader(tc.wire)})
-			if reason != tc.want || inspection == "" {
+			reader, reason, inspection, event := primeEncryptedContextStream(t.Context(), &smallEncryptedContextReader{reader: strings.NewReader(tc.wire)})
+			if reason != tc.want || inspection == "" || event == "" {
 				t.Fatalf("got reason %q want %q", reason, tc.want)
 			}
 			got, err := io.ReadAll(reader)
@@ -124,7 +137,7 @@ func TestEncryptedContextRequestDeadlineHandsOffPendingRead(t *testing.T) {
 	}()
 	ctx, cancel := context.WithTimeout(t.Context(), 25*time.Millisecond)
 	defer cancel()
-	stream, reason, inspection := primeEncryptedContextStream(ctx, reader)
+	stream, reason, inspection, _ := primeEncryptedContextStream(ctx, reader)
 	<-ready
 	if reason != "" || inspection != "timeout" {
 		t.Fatal(reason, inspection)
@@ -145,7 +158,7 @@ func TestEncryptedContextPrimingCancellationUnblocks(t *testing.T) {
 	defer writer.Close()
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	stream, reason, inspection := primeEncryptedContextStream(ctx, reader)
+	stream, reason, inspection, _ := primeEncryptedContextStream(ctx, reader)
 	writer.CloseWithError(context.Canceled)
 	_, err := io.ReadAll(stream)
 	if reason != "" || inspection != "cancelled" || !errors.Is(err, context.Canceled) {
@@ -437,13 +450,15 @@ func TestGatewayEncryptedContextRecoveryAfterDelayedValidation(t *testing.T) {
 		w.Header().Set("Content-Type", "text/event-stream")
 		if n == 1 {
 			io.WriteString(w, ": heartbeat\n\ndata: {\"type\":\"response.created\"}\n\n")
+			io.WriteString(w, `data: {"type":"response.output_item.added","item":{"type":"reasoning","id":"rs_private","status":"in_progress","summary":[]}}`+"\n\n")
+			io.WriteString(w, `data: {"type":"response.reasoning_summary_part.added","part":{"type":"summary_text","text":""}}`+"\n\n")
 			w.(http.Flusher).Flush()
 			select {
 			case <-time.After(2200 * time.Millisecond):
 			case <-r.Context().Done():
 				return
 			}
-			io.WriteString(w, "data: "+encryptedContextFailedEvent+"\n\n")
+			io.WriteString(w, `event: response.failed`+"\n"+`data: {"response":{"error":{"code":"invalid_encrypted_content"},"output":[{"type":"reasoning","summary":[]}]}}`+"\n\n")
 			return
 		}
 		io.WriteString(w, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"OK\"}\n\ndata: {\"type\":\"response.completed\",\"response\":{\"id\":\"r\",\"output\":[]}}\n\n")
@@ -458,11 +473,11 @@ func TestGatewayEncryptedContextRecoveryAfterDelayedValidation(t *testing.T) {
 	}
 	f.core.logs.Flush(t.Context())
 	row, err := f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
-	if err != nil || row.Status != "succeeded" || row.Evidence["encrypted_context_recovery"] != "succeeded" || row.Evidence["encrypted_context_stream_inspection"] != "rejected" || row.AttemptCount != 2 {
+	if err != nil || row.Status != "succeeded" || row.Evidence["encrypted_context_recovery"] != "succeeded" || row.Evidence["encrypted_context_stream_inspection"] != "rejected" || row.AttemptCount != 2 || row.Evidence["encrypted_context_stream_event"] != "error" {
 		t.Fatal("late recovery marker missing", row, err)
 	}
 	page, err := logClient(t, f).Logs(t.Context(), logbook.Query{})
-	if err != nil || len(page.Requests) != 1 || page.Requests[0].Evidence["encrypted_context_stream_inspection"] != "rejected" {
+	if err != nil || len(page.Requests) != 1 || page.Requests[0].Evidence["encrypted_context_stream_inspection"] != "rejected" || page.Requests[0].Evidence["encrypted_context_stream_event"] != "error" {
 		t.Fatal("list inspection marker missing", page, err)
 	}
 }

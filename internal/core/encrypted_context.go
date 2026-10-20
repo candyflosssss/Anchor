@@ -50,7 +50,7 @@ func encryptedContextError(data []byte) string {
 	if json.Unmarshal(data, &envelope) != nil {
 		return ""
 	}
-	if len(envelope.Output) != 0 || len(envelope.Response.Output) != 0 {
+	if encryptedContextHasOutput(envelope.Output) || encryptedContextHasOutput(envelope.Response.Output) {
 		return ""
 	}
 	code, message := envelope.Code, envelope.Message
@@ -79,6 +79,118 @@ func encryptedContextError(data []byte) string {
 		return "encrypted_content_caller_mismatch"
 	}
 	return ""
+}
+
+// An empty message/reasoning item announces a container, not generated content
+// or a tool invocation. Some upstreams emit these before validating history.
+// Unknown fields and item kinds remain a commit boundary.
+func encryptedContextEmptyItem(raw json.RawMessage) bool {
+	var item map[string]json.RawMessage
+	if json.Unmarshal(raw, &item) != nil || item == nil {
+		return false
+	}
+	var kind, status string
+	if json.Unmarshal(item["type"], &kind) != nil || (kind != "reasoning" && kind != "message") {
+		return false
+	}
+	for name, value := range item {
+		switch name {
+		case "type", "id", "role":
+			var s string
+			if json.Unmarshal(value, &s) != nil {
+				return false
+			}
+		case "status":
+			if json.Unmarshal(value, &status) != nil || (status != "" && status != "in_progress") {
+				return false
+			}
+		case "summary", "content":
+			var parts []json.RawMessage
+			if json.Unmarshal(value, &parts) != nil || len(parts) != 0 {
+				return false
+			}
+		case "encrypted_content":
+			if string(value) != "null" && string(value) != `""` {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func encryptedContextHasOutput(items []json.RawMessage) bool {
+	for _, item := range items {
+		if !encryptedContextEmptyItem(item) {
+			return true
+		}
+	}
+	return false
+}
+
+func encryptedContextEmptyPart(raw json.RawMessage) bool {
+	var part map[string]json.RawMessage
+	if json.Unmarshal(raw, &part) != nil || part == nil {
+		return false
+	}
+	var kind string
+	if json.Unmarshal(part["type"], &kind) != nil || (kind != "summary_text" && kind != "output_text" && kind != "refusal") {
+		return false
+	}
+	for name, value := range part {
+		switch name {
+		case "type":
+		case "text", "refusal":
+			var s string
+			if json.Unmarshal(value, &s) != nil || s != "" {
+				return false
+			}
+		case "annotations", "logprobs":
+			var values []json.RawMessage
+			if json.Unmarshal(value, &values) != nil || len(values) != 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// Only these code-owned categories are logged, never raw event names or items.
+func encryptedContextEventLabel(kind string, item json.RawMessage) string {
+	switch kind {
+	case "response.created", "response.in_progress", "response.queued":
+		return "lifecycle"
+	case "error", "response.failed":
+		return "error"
+	case "response.output_item.added", "response.output_item.done":
+		var header struct {
+			Type string `json:"type"`
+		}
+		json.Unmarshal(item, &header)
+		switch header.Type {
+		case "reasoning":
+			return "reasoning_item"
+		case "message":
+			return "message_item"
+		case "function_call", "custom_tool_call":
+			return "tool_item"
+		default:
+			return "other_item"
+		}
+	case "response.reasoning_text.delta", "response.reasoning_summary_text.delta":
+		return "reasoning_delta"
+	case "response.output_text.delta", "response.refusal.delta":
+		return "text_delta"
+	case "response.reasoning_summary_part.added", "response.content_part.added":
+		return "content_part"
+	case "response.completed", "response.incomplete":
+		return "terminal"
+	default:
+		return "unknown"
+	}
 }
 
 // Drop all historical reasoning only after a definite rejection; the error ID
@@ -140,20 +252,22 @@ func (p *encryptedContextPendingRead) Read(b []byte) (int, error) {
 	return 0, io.EOF
 }
 
-// Hold only lifecycle events, for at most 64 KiB and within the existing
+// Hold pre-output announcements, for at most 64 KiB and within the existing
 // upstream request deadline. A slow validation error is still recoverable
 // before output; an independent short timer would commit it prematurely.
-// The first non-lifecycle event commits the stream, even an empty tool/reasoning shell.
+// Empty message/reasoning shells and empty content-part announcements are also
+// held. Actual content, tool items and unknown events commit the stream.
 // Preserve every inspected byte when declining recovery. Never replay after
 // generated output, EOF, timeout, malformed data, or an unrelated stream error.
-func primeEncryptedContextStream(ctx context.Context, body io.Reader) (io.Reader, string, string) {
+func primeEncryptedContextStream(ctx context.Context, body io.Reader) (io.Reader, string, string, string) {
 	prefix := make([]byte, 0, 4096)
 	lineStart := 0
 	var data strings.Builder
 	event := ""
+	lastEvent := "none"
 	replay := func(tail io.Reader) io.Reader { return io.MultiReader(bytes.NewReader(prefix), tail) }
-	pass := func(tail io.Reader, inspection string) (io.Reader, string, string) {
-		return replay(tail), "", inspection
+	pass := func(tail io.Reader, inspection string) (io.Reader, string, string, string) {
+		return replay(tail), "", inspection, lastEvent
 	}
 	for len(prefix) < encryptedContextPrefixLimit {
 		chunkSize := min(4096, encryptedContextPrefixLimit-len(prefix))
@@ -189,7 +303,9 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader) (io.Reader
 				}
 				payload := []byte(data.String())
 				var header struct {
-					Type     string `json:"type"`
+					Type     string          `json:"type"`
+					Item     json.RawMessage `json:"item"`
+					Part     json.RawMessage `json:"part"`
 					Response struct {
 						Output []json.RawMessage `json:"output"`
 					} `json:"response"`
@@ -197,23 +313,33 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader) (io.Reader
 				if json.Unmarshal(payload, &header) != nil {
 					return pass(body, "invalid_event")
 				}
-				if header.Type == "" && event == "error" {
-					// Some SSE errors put type only in the event line.
+				if header.Type == "" && event != "" {
+					// SSE may carry the event type only in its event field.
+					header.Type = event
 					var fields map[string]json.RawMessage
 					if json.Unmarshal(payload, &fields) == nil && fields != nil {
-						fields["type"] = json.RawMessage(`"error"`)
+						fields["type"], _ = json.Marshal(event)
 						payload, _ = json.Marshal(fields)
 					}
 				}
+				lastEvent = encryptedContextEventLabel(header.Type, header.Item)
 				if header.Type == "error" || header.Type == "response.failed" || event == "error" {
 					if reason := encryptedContextError(payload); reason != "" {
-						return replay(body), reason, "rejected"
+						return replay(body), reason, "rejected", lastEvent
 					}
 				}
 				switch header.Type {
 				case "response.created", "response.in_progress", "response.queued":
-					if len(header.Response.Output) != 0 {
+					if encryptedContextHasOutput(header.Response.Output) {
 						return pass(body, "output_started")
+					}
+				case "response.output_item.added":
+					if !encryptedContextEmptyItem(header.Item) {
+						return pass(body, "non_lifecycle_event")
+					}
+				case "response.reasoning_summary_part.added", "response.content_part.added":
+					if !encryptedContextEmptyPart(header.Part) {
+						return pass(body, "non_lifecycle_event")
 					}
 				default:
 					return pass(body, "non_lifecycle_event")

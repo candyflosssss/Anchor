@@ -216,7 +216,8 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 | `encrypted_context_reason` | 触发原因固定为 `invalid_encrypted_content`、`encrypted_content_unverifiable` 或 `encrypted_content_caller_mismatch`，不保存原始错误 |
 | `encrypted_context_removed_reasoning` | 本次删除的推理条目十进制数量，包括同一请求中的非加密 reasoning 条目 |
 | `encrypted_context_retry_count` | 固定字符串 `1`，与全部渠道 attempt_count 分开 |
-| `encrypted_context_stream_inspection` | 符合检查条件的首个流尝试的退出原因：`rejected` 明确命中；`output_started` 生命周期已带输出；`non_lifecycle_event` 已遇到其他事件；`invalid_event` 无法解析；`prefix_limit` 达到 64 KiB；`timeout`／`cancelled` 原请求超时／取消；`eof`／`read_error`／`empty_read` 读取结束或异常。无清理时也可出现，不证明发生了恢复 |
+| `encrypted_context_stream_inspection` | 符合检查条件的首个流尝试的退出原因：`rejected` 明确命中；`output_started` 生命周期已带实际输出；`non_lifecycle_event` 已遇到生成内容、工具或其他未允许事件（空reasoning/message容器和空summary/text part继续检查）；`invalid_event` 无法解析；`prefix_limit` 达到 64 KiB；`timeout`／`cancelled` 原请求超时／取消；`eof`／`read_error`／`empty_read` 读取结束或异常。无清理时也可出现，不证明发生了恢复 |
+| `encrypted_context_stream_event` | desktop.58之后源码新增：检查退出时最后事件的代码固定类别 `none/lifecycle/error/reasoning_item/message_item/tool_item/other_item/reasoning_delta/text_delta/content_part/terminal/unknown`；不保存原始事件名、item ID或正文；结合inspection判断停止原因，列表／follow／详情／导出可见，旧日志不补写 |
 
 上述五项加入列表／follow 的紧凑 evidence 白名单，详情／复制／JSONL 导出保留完整标记。此前“五项档位证据”限制扩展为五项档位加四项恢复证据与一项流检查证据，其他大诊断仍只在详情／导出。桌面状态列和复用的详情列显示「已清理加密上下文 · 恢复成功／重试失败／重试已取消／正在重试／结果未确认」，只按已记录枚举展示；旧日志或未知值不猜已清理。
 
