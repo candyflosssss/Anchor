@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/candyflosssss/Anchor/internal/apierror"
 )
 
 // Stream incrementally forwards/converts bounded SSE events. EOF without a terminal
@@ -30,13 +32,14 @@ func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model
 			usage = Usage{}
 		}
 		if streamErr != nil && !same {
+			_, detail := apierror.Render(apierror.UpstreamStreamIncomplete, apierror.LanguageOf(w))
 			// No terminal success and no replay after downstream output has begun.
 			if to == "responses" {
-				_ = emit.send("error", Object{"code": "upstream_stream_error", "message": "Upstream stream incomplete or unsupported", "param": nil})
+				_ = emit.send("error", Object{"code": detail.Code, "message": detail.Message, "param": nil})
 			} else if to == "anthropic" {
-				_ = emit.send("error", Object{"error": Object{"type": "api_error", "message": "Upstream stream incomplete or unsupported"}})
+				_ = emit.send("error", Object{"error": Object{"type": "api_error", "message": detail.Message}})
 			} else {
-				_ = emit.send("", Object{"error": Object{"type": "upstream_stream_error", "message": "Upstream stream incomplete or unsupported"}})
+				_ = emit.send("", Object{"error": Object{"type": detail.Code, "message": detail.Message}})
 			}
 		}
 	}()

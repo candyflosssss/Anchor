@@ -7,17 +7,18 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 )
 
 func logError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, logbook.ErrInvalid):
-		fail(w, 400, "invalid_log_query", "invalid log query")
+		fail(w, apierror.InvalidLogQuery)
 	case errors.Is(err, logbook.ErrNotFound):
-		fail(w, 404, "log_not_found", "log not found")
+		fail(w, apierror.LogNotFound)
 	default:
-		fail(w, 503, "log_storage_unavailable", "log storage unavailable")
+		fail(w, apierror.LogStorageUnavailable)
 	}
 }
 func (s *Server) logRoutes(m *http.ServeMux) {

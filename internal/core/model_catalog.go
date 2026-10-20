@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -55,6 +56,6 @@ func modelCatalogError(w http.ResponseWriter, err error) {
 	case errors.Is(err, modeldev.ErrNotFound):
 		apiError(w, state.ErrNotFound)
 	default:
-		fail(w, http.StatusBadGateway, "catalog_unavailable", "model reference catalog unavailable")
+		fail(w, apierror.CatalogUnavailable)
 	}
 }

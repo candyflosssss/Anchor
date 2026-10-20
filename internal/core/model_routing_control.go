@@ -3,6 +3,7 @@ package core
 import (
 	"net/http"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -13,7 +14,7 @@ func (s *Server) configureModelRouting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.ModelID != r.PathValue("id") || !state.ValidModelID(in.ModelID) || in.ExpectedRevision < 1 || in.Strategy == "" || !state.ValidModelStrategy(in.Strategy) {
-		fail(w, 400, "invalid", "invalid routing configuration")
+		fail(w, apierror.InvalidRouting)
 		return
 	}
 	m, err := s.Store.Model(in.ModelID)
@@ -26,7 +27,7 @@ func (s *Server) configureModelRouting(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(in.Order) != len(m.Candidates) {
-		fail(w, 400, "invalid", "candidate membership must remain unchanged")
+		fail(w, apierror.CandidateMembershipChanged)
 		return
 	}
 	candidates := map[catalog.RouteCandidate]state.Candidate{}
@@ -37,7 +38,7 @@ func (s *Server) configureModelRouting(w http.ResponseWriter, r *http.Request) {
 	for _, ref := range in.Order {
 		c, ok := candidates[ref]
 		if !ok {
-			fail(w, 400, "invalid", "unknown or duplicate candidate")
+			fail(w, apierror.UnknownCandidate)
 			return
 		}
 		ordered = append(ordered, c)

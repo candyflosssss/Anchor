@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -93,7 +94,7 @@ func (s *Server) providerChat(w http.ResponseWriter, r *http.Request) {
 	if len(s.probeRuns) >= 64 || s.stopping.Load() {
 		s.mu.Unlock()
 		cancel()
-		fail(w, 503, "busy", "Too many tests")
+		fail(w, apierror.Busy)
 		return
 	}
 	s.probeRuns[id] = run

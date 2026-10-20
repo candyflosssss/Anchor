@@ -90,7 +90,7 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 响应错误采用 `{error:{code,message}}`，常见状态：400 无效 / 未支持字段，401 鉴权失败，403 浏览器请求，404 未配置资源，409 实例或 revision 冲突，413 网关请求过大，429 网关总并发超限，502 上游拒绝 / 传输错误，503 无可用候选或核心 starting/stopping/not_running，504 总超时。
 
-2026-10-20 当前源码（未发布）：核心网关与管理 API 经统一错误入口生成的 `error.message` 使用 `[Anchor] ` 前缀，例如 `[Anchor] model is outside the binding route scope`，便于从客户端报错识别响应生成方；HTTP 状态与 `error.code` 保持原样。Anchor 对上游拒绝或传输失败生成的脱敏说明也带此前缀，具体原因仍以错误码判断；透传的上游 SSE 错误不追加此前缀。
+2026-10-20 当前源码（未发布）：核心网关与管理 API 的显式错误统一由 `internal/apierror` 目录管理状态码、错误码与中英文模板；`error.message` 使用 `[Anchor] ` 前缀，例如 `[Anchor] model is outside the binding route scope`。每次请求按 `Accept-Language` 选择英文或简体中文，缺省／不支持的语言回退英文，JSON 错误带 `Content-Language` 与 `Vary: Accept-Language`；HTTP 状态、`error.code` 及原响应结构保持原样。Anchor 生成的上游拒绝／传输失败说明和跨协议流式失败事件也接入目录；透传的上游 SSE 错误保留原文。具体目录、参数、回退、日志和客户端边界见[核心错误管理与多语言](errors.md)。
 
 实例能力包含 `graceful_stop`；2026-10-15 当前未发布源码增加 `restart_handoff`。客户端缺少后者时拒绝维护交接，不发送停服写请求或回退普通停服。真实 Run 未 ready 时拒绝新管理写入（正常停服请求除外）和网关调用；正在 stopping 时拒绝新管理写入／网关调用，读取状态仍可进行。管理客户端用结构化 RequestError 返回受限分类；写入网络错误、5xx、无效／超大回包标记 Unknown，不重放。
 

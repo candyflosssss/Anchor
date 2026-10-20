@@ -4,19 +4,20 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/skills"
 )
 
 func skillError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, skills.ErrUnsafe):
-		fail(w, 409, "skill_unsafe", "skill path, permissions or file types are unsupported")
+		fail(w, apierror.SkillUnsafe)
 	case errors.Is(err, skills.ErrChanged):
-		fail(w, 409, "skill_changed", "skill content or managed link changed; refresh before retrying")
+		fail(w, apierror.SkillChanged)
 	case errors.Is(err, skills.ErrLimit):
-		fail(w, 400, "skill_limit", "skill inventory or content exceeds the documented limits")
+		fail(w, apierror.SkillLimit)
 	case errors.Is(err, skills.ErrLink):
-		fail(w, 409, "skill_link_unavailable", "symbolic link creation failed; no copy fallback was performed")
+		fail(w, apierror.SkillLinkUnavailable)
 	default:
 		apiError(w, err)
 	}

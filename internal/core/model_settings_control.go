@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/modelconfig"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
@@ -83,7 +84,7 @@ func (s *Server) saveModelSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if snapshot.Stale {
-			fail(w, 502, "catalog_unavailable", "refresh failed; reference was not replaced")
+			fail(w, apierror.CatalogRefreshFailed)
 			return
 		}
 		settings.Reference = &snapshot

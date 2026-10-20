@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/managed"
@@ -117,24 +118,30 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
-func fail(w http.ResponseWriter, status int, code, message string) {
+func fail(w http.ResponseWriter, id apierror.ID, args ...any) {
+	language := apierror.LanguageOf(w)
+	status, detail := apierror.Render(id, language, args...)
 	if recorder, ok := w.(interface{ logFailure(string) }); ok {
-		recorder.logFailure(code)
+		recorder.logFailure(detail.Code)
 	}
-	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": "[Anchor] " + message}})
+	w.Header().Set("Content-Language", string(detail.Language))
+	w.Header().Add("Vary", "Accept-Language")
+	writeJSON(w, status, struct {
+		Error apierror.Detail `json:"error"`
+	}{detail})
 }
 func apiError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, state.ErrReferenced):
-		fail(w, 409, "referenced", "resource is still referenced")
+		fail(w, apierror.Referenced)
 	case errors.Is(err, state.ErrInvalid):
-		fail(w, 400, "invalid", "invalid operation")
+		fail(w, apierror.Invalid)
 	case errors.Is(err, state.ErrConflict):
-		fail(w, 409, "conflict", "revision changed or resource already exists")
+		fail(w, apierror.Conflict)
 	case errors.Is(err, state.ErrNotFound):
-		fail(w, 404, "not_found", "resource not found")
+		fail(w, apierror.NotFound)
 	default:
-		fail(w, 500, "internal_error", "operation failed; no secrets are included in diagnostics")
+		fail(w, apierror.Internal)
 	}
 }
 func decode(w http.ResponseWriter, r *http.Request, out any) bool {
@@ -142,27 +149,28 @@ func decode(w http.ResponseWriter, r *http.Request, out any) bool {
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(out); err != nil {
-		fail(w, 400, "invalid_json", "invalid, unknown or oversized JSON fields")
+		fail(w, apierror.InvalidJSONFields)
 		return false
 	}
 	if err := d.Decode(&struct{}{}); err != io.EOF {
-		fail(w, 400, "invalid_json", "exactly one JSON object is required")
+		fail(w, apierror.SingleJSONObject)
 		return false
 	}
 	return true
 }
 func (s *Server) guard(scope string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w = apierror.WithLanguage(w, apierror.Negotiate(r.Header.Get("Accept-Language")))
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		// Browsers are not a supported management transport. No wildcard CORS.
 		if r.Header.Get("Origin") != "" {
-			fail(w, 403, "browser_origin_rejected", "browser requests are not supported")
+			fail(w, apierror.BrowserOriginRejected)
 			return
 		}
 		host, _, err := net.SplitHostPort(r.Host)
 		ip := net.ParseIP(host)
 		if err != nil || ip == nil || !ip.IsLoopback() {
-			fail(w, 400, "invalid_host", "Host must be a numeric loopback address and port")
+			fail(w, apierror.InvalidHost)
 			return
 		}
 		auth := r.Header.Get("Authorization")
@@ -177,15 +185,15 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 			}
 		}
 		if !valid {
-			fail(w, 401, "unauthorized", "valid bearer credential required")
+			fail(w, apierror.Unauthorized)
 			return
 		}
 		if s.running.Load() && !s.ready.Load() && !s.stopping.Load() && (scope == "gateway" || (r.Method != http.MethodGet && r.URL.Path != "/control/v1/shutdown")) {
-			fail(w, 503, "starting", "core is starting")
+			fail(w, apierror.Starting)
 			return
 		}
 		if s.stopping.Load() && (scope == "gateway" || r.Method != http.MethodGet) {
-			fail(w, 503, "stopping", "core is stopping")
+			fail(w, apierror.Stopping)
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -209,7 +217,7 @@ func (s *Server) Control() http.Handler {
 			return
 		}
 		if in == nil {
-			fail(w, 400, "invalid_json", "a shutdown JSON object is required")
+			fail(w, apierror.ShutdownObjectRequired)
 			return
 		}
 		forRestart := false
@@ -218,11 +226,11 @@ func (s *Server) Control() http.Handler {
 		case "true":
 			forRestart = true
 		default:
-			fail(w, 400, "invalid_json", "for_restart must be a boolean")
+			fail(w, apierror.RestartBooleanRequired)
 			return
 		}
 		if !s.running.Load() {
-			fail(w, 503, "not_running", "no running lifecycle")
+			fail(w, apierror.NotRunning)
 			return
 		}
 		s.stopOnce.Do(func() {
@@ -233,7 +241,7 @@ func (s *Server) Control() http.Handler {
 		// Requests that crossed the stopping guard cannot change the first
 		// accepted shutdown intent (including signal-driven ordinary stops).
 		if s.restartHandoff.Load() != forRestart {
-			fail(w, 409, "conflict", "a different shutdown mode is already selected")
+			fail(w, apierror.ShutdownModeConflict)
 			return
 		}
 		result := map[string]bool{"accepted": true}
@@ -297,18 +305,18 @@ func (s *Server) Control() http.Handler {
 			return
 		}
 		if in.Provider.ID != r.PathValue("id") {
-			fail(w, 400, "invalid_id", "path and object ID must agree")
+			fail(w, apierror.InvalidID)
 			return
 		}
 		if err := in.Provider.Validate(); err != nil {
-			fail(w, 400, "invalid_provider", err.Error())
+			fail(w, apierror.InvalidProvider)
 			return
 		}
 		if in.Secret != nil {
 			p := in.Provider
 			p.Secret = *in.Secret
 			if err := p.Validate(); err != nil {
-				fail(w, 400, "invalid_provider", err.Error())
+				fail(w, apierror.InvalidProvider)
 				return
 			}
 		}
@@ -347,7 +355,7 @@ func (s *Server) Control() http.Handler {
 			return
 		}
 		if in.Model.ID != r.PathValue("id") {
-			fail(w, 400, "invalid_id", "path and object ID must agree")
+			fail(w, apierror.InvalidID)
 			return
 		}
 		// Scoped settings writes own the metadata and server-captured reference.
@@ -370,13 +378,13 @@ func (s *Server) Control() http.Handler {
 			return
 		}
 		if err := in.Model.Validate(); err != nil {
-			fail(w, 400, "invalid_model", err.Error())
+			fail(w, apierror.InvalidModelConfiguration)
 			return
 		}
 		for _, c := range in.Model.Candidates {
 			if _, err := s.Store.Provider(c.ProviderID); err != nil {
 				if errors.Is(err, state.ErrNotFound) {
-					fail(w, 400, "invalid_candidate", "candidate provider does not exist")
+					fail(w, apierror.InvalidCandidate)
 				} else {
 					apiError(w, err)
 				}
@@ -406,7 +414,7 @@ func (s *Server) identity(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	if r.Header.Get("X-Anchor-Instance") != cfg.InstanceID {
-		fail(w, 409, "instance_mismatch", "write requires the expected instance identity")
+		fail(w, apierror.InstanceMismatch)
 		return false
 	}
 	return true

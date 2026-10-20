@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/providerapi"
@@ -24,7 +25,7 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if !state.ValidProviderID(in.ProviderID) || in.ProviderID != r.PathValue("id") || in.ExpectedRevision < 1 {
-		fail(w, 400, "invalid_request", "saved provider ID and revision are required")
+		fail(w, apierror.ProviderRevisionRequired)
 		return
 	}
 	p, err := s.Store.Provider(in.ProviderID)

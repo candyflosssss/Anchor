@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/logbook"
@@ -138,7 +139,7 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 	case "price-import":
 		imported, err = s.importPrice(r.Context(), in.Target, in.CatalogProvider, in.Model)
 		if errors.Is(err, errTieredReferencePrice) {
-			fail(w, 400, "invalid", "context-tiered price cannot be flattened; use model-catalog model/estimate or model settings reference")
+			fail(w, apierror.TieredPrice)
 			return
 		}
 	case "delete", "copy", "rename", "key-put", "key-delete", "strategy":

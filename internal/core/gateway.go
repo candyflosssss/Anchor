@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/protocol"
 	"io"
@@ -73,24 +74,24 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 	case s.slots <- struct{}{}:
 		defer func() { <-s.slots }()
 	default:
-		fail(w, 429, "gateway_busy", "gateway concurrency limit reached")
+		fail(w, apierror.GatewayBusy)
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBytes)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		fail(w, 413, "request_too_large", "request exceeds the "+strconv.Itoa(MaxRequestBytes>>20)+" MiB gateway limit or cannot be read")
+		fail(w, apierror.RequestTooLarge, MaxRequestBytes>>20)
 		return
 	}
 	var request map[string]json.RawMessage
 	if err = json.Unmarshal(body, &request); err != nil || request == nil {
-		fail(w, 400, "invalid_json", "a JSON request object is required")
+		fail(w, apierror.RequestObjectRequired)
 		return
 	}
 	observeRequestedServiceTier(r, request)
 	var modelID string
 	if err = json.Unmarshal(request["model"], &modelID); err != nil || !state.ValidModelID(modelID) {
-		fail(w, 400, "invalid_model", "a public model ID is required")
+		fail(w, apierror.ModelIDRequired)
 		return
 	}
 	if b, ok := r.Context().Value(bindingKey{}).(state.Binding); ok {
@@ -100,37 +101,37 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !allowed {
-			fail(w, 403, "binding_model_denied", "model is outside the binding route scope")
+			fail(w, apierror.BindingModelDenied)
 			return
 		}
 	}
 	var stream bool
 	if raw, ok := request["stream"]; ok {
 		if err = json.Unmarshal(raw, &stream); err != nil {
-			fail(w, 400, "invalid_stream", "stream must be boolean")
+			fail(w, apierror.InvalidStream)
 			return
 		}
 	}
 	// Provider fallback cannot preserve server-side response IDs. Start with stateless requests.
 	if raw, ok := request["previous_response_id"]; ok && string(raw) != "null" {
-		fail(w, 400, "unsupported_state", "previous_response_id is not supported; submit full input history")
+		fail(w, apierror.PreviousResponseUnsupported)
 		return
 	}
 	if raw, ok := request["conversation"]; ok && string(raw) != "null" {
-		fail(w, 400, "unsupported_state", "server-side conversations are not supported; submit full input history")
+		fail(w, apierror.ConversationUnsupported)
 		return
 	}
 	if raw, ok := request["store"]; ok {
 		var store bool
 		if err = json.Unmarshal(raw, &store); err != nil || store {
-			fail(w, 400, "unsupported_state", "this milestone supports store:false only")
+			fail(w, apierror.StoreUnsupported)
 			return
 		}
 	}
 	if raw, ok := request["background"]; ok {
 		var background bool
 		if err = json.Unmarshal(raw, &background); err != nil || background {
-			fail(w, 400, "unsupported_background", "background responses are not supported")
+			fail(w, apierror.BackgroundUnsupported)
 			return
 		}
 	}
@@ -139,7 +140,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 	model, err := s.Store.Model(modelID)
 	if err != nil {
 		if errors.Is(err, state.ErrNotFound) {
-			fail(w, 404, "unknown_model", "public model is not configured")
+			fail(w, apierror.UnknownModel)
 		} else {
 			apiError(w, err)
 		}
@@ -159,22 +160,22 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if stream && !model.Streaming {
-		fail(w, 400, "unsupported_capability", "public model does not advertise streaming")
+		fail(w, apierror.StreamingUnsupported)
 		return
 	}
 	if raw, ok := request["tools"]; ok && string(raw) != "null" {
 		var tools []json.RawMessage
 		if err = json.Unmarshal(raw, &tools); err != nil {
-			fail(w, 400, "invalid_tools", "tools must be an array")
+			fail(w, apierror.InvalidTools)
 			return
 		}
 		if len(tools) > 0 && !model.Tools {
-			fail(w, 400, "unsupported_capability", "public model does not advertise tools")
+			fail(w, apierror.ToolsUnsupported)
 			return
 		}
 		for _, raw := range tools {
 			if !agentExecutedTool(raw, false) {
-				fail(w, 400, "unsupported_tool", "only Agent-executed function/custom tools, their namespaces and client tool_search are supported")
+				fail(w, apierror.UnsupportedTool)
 				return
 			}
 		}
@@ -219,14 +220,14 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		s.release(provider.ID)
 	}
 	setLogStage(r, "route")
-	fail(w, 503, "no_available_candidate", "no enabled, supported and available candidate succeeded")
+	fail(w, apierror.NoAvailableCandidate)
 }
 func (s *Server) protocolHandler(from string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBytes)
 		raw, err := io.ReadAll(r.Body)
 		if err != nil {
-			fail(w, 413, "request_too_large", "request exceeds the "+strconv.Itoa(MaxRequestBytes>>20)+" MiB gateway limit or cannot be read")
+			fail(w, apierror.RequestTooLarge, MaxRequestBytes>>20)
 			return
 		}
 		var fields map[string]json.RawMessage
@@ -235,7 +236,7 @@ func (s *Server) protocolHandler(from string) http.HandlerFunc {
 		}
 		converted, err := protocol.ConvertRequest(raw, from, "responses")
 		if err != nil {
-			fail(w, 400, "unsupported_conversion", "unsupported field or content for protocol conversion")
+			fail(w, apierror.UnsupportedConversion)
 			return
 		}
 		r.Body = io.NopCloser(bytes.NewReader(converted))
@@ -356,7 +357,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 			t.row.Evidence["conversion_target"] = p.Protocol
 			t.row.Evidence["conversion_reason"] = reason
 		}
-		fail(w, 400, "unsupported_conversion", "candidate protocol "+p.Protocol+" cannot represent request ("+reason+")")
+		fail(w, apierror.CandidateConversionUnsupported, p.Protocol, reason)
 		return false
 	}
 	target := strings.TrimRight(base, "/") + protocol.Endpoint(p.Protocol)
@@ -398,7 +399,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		if errors.Is(err, egress.ErrUnavailable) {
 			code = "proxy_unavailable"
 			status = 502
-			fail(w, 502, "proxy_unavailable", "configured proxy is unavailable; direct fallback is disabled")
+			fail(w, apierror.ProxyUnavailable)
 			return false
 		}
 		if r.Context().Err() != nil {
@@ -410,10 +411,10 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			status = 504
-			fail(w, 504, "upstream_timeout", "upstream timed out; execution may be unknown")
+			fail(w, apierror.UpstreamTimeout)
 		} else {
 			status = 502
-			fail(w, 502, "upstream_transport", "upstream transport failed; request was not replayed")
+			fail(w, apierror.UpstreamTransport)
 		}
 		return false
 	}
@@ -445,13 +446,13 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 			}
 			return true
 		}
-		fail(w, 502, "upstream_rejected", "upstream rejected request")
+		fail(w, apierror.UpstreamRejected)
 		return false
 	}
 	setLogStage(r, "response_validate")
 	if evidence["response_kind"] == "html" {
 		code = "unexpected_html"
-		fail(w, 502, code, "upstream returned an HTML page instead of an API response; check the API base URL (usually ending in /v1)")
+		fail(w, apierror.UnexpectedHTML)
 		return false
 	}
 	media, _, e := mime.ParseMediaType(resp.Header.Get("Content-Type"))
@@ -460,7 +461,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		expected = "text/event-stream"
 	}
 	if e != nil || media != expected {
-		fail(w, 502, "invalid_upstream_response", "unexpected upstream content type")
+		fail(w, apierror.UpstreamContentType)
 		return false
 	}
 	to, _ := r.Context().Value(protocolKey{}).(string)
@@ -496,7 +497,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20+1))
 	if err != nil || len(data) > 16<<20 {
-		fail(w, 502, "invalid_upstream_response", "upstream response incomplete or oversized")
+		fail(w, apierror.UpstreamIncomplete)
 		return false
 	}
 	m, decodeErr := protocol.Decode(data)
@@ -513,13 +514,13 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	}
 	if p.Protocol == to {
 		if decodeErr != nil {
-			fail(w, 502, "invalid_upstream_response", "invalid upstream JSON")
+			fail(w, apierror.UpstreamInvalidJSON)
 			return false
 		}
 		usage = protocol.ReadUsage(m, p.Protocol)
 		observation.Status = safeGenerationStatus(m, p.Protocol)
 		if m["error"] != nil || m["status"] == "failed" {
-			fail(w, 502, "upstream_failed", "upstream generation failed")
+			fail(w, apierror.UpstreamFailed)
 			return false
 		}
 		setLogStage(r, "respond")
@@ -530,7 +531,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	}
 	result, err := protocol.ParseResponse(data, p.Protocol)
 	if err != nil {
-		fail(w, 502, "unsupported_upstream_response", "upstream returned unsupported content")
+		fail(w, apierror.UpstreamUnsupportedContent)
 		return false
 	}
 	usage = result.Usage
@@ -538,7 +539,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		err = mapping.RestoreResult(&result)
 	}
 	if err != nil || result.CheckTarget(to) != nil {
-		fail(w, 502, "unsupported_upstream_response", "upstream returned unsupported content")
+		fail(w, apierror.UpstreamUnsupportedContent)
 		return false
 	}
 	observation.Status = "completed"
@@ -546,7 +547,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		observation.Status = "incomplete"
 	}
 	if to == "anthropic" && !usage.Known {
-		fail(w, 502, "unsupported_upstream_response", "upstream omitted usage required by Messages")
+		fail(w, apierror.UpstreamMissingUsage)
 		return false
 	}
 	setLogStage(r, "respond")

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/egress"
 	"github.com/candyflosssss/Anchor/internal/providerapi"
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -28,7 +29,7 @@ func (s *Server) providerPlatformRoutes(mux *http.ServeMux) {
 			return
 		}
 		if in.ProviderID != r.PathValue("id") {
-			fail(w, 400, "invalid_request", "provider IDs must match")
+			fail(w, apierror.ProviderIDMismatch)
 			return
 		}
 		out, err := s.Store.ConfigureProviderPlatform(in)
@@ -47,7 +48,7 @@ func (s *Server) providerPlatformRoutes(mux *http.ServeMux) {
 			return
 		}
 		if in.ProviderID != r.PathValue("id") || !state.ValidProviderID(in.ProviderID) || (in.KeyID != "" && !state.ValidID(in.KeyID)) || in.Validate() != nil {
-			fail(w, 400, "invalid_request", "invalid platform query")
+			fail(w, apierror.InvalidPlatformQuery)
 			return
 		}
 		out, err := s.QueryProvider(r.Context(), in)

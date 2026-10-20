@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -41,7 +42,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	}
 	if ctx.Err() != nil {
 		if r.Context().Err() == nil {
-			fail(w, 504, "upstream_timeout", "upstream timed out before encrypted context recovery")
+			fail(w, apierror.RecoveryTimeout)
 		}
 		return false
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -11,21 +12,21 @@ import (
 func agentError(w http.ResponseWriter, e error) {
 	// Only allowlisted categories cross the boundary. Never return a parser or
 	// filesystem error string, which may contain private configuration values.
-	code, message := "agent_operation_failed", "agent operation failed; inspect local target status and recovery records"
+	id := apierror.AgentOperationFailed
 	switch {
 	case errors.Is(e, managed.ErrModelUnavailable):
-		code, message = "agent_model_unavailable", "default model is unavailable under the selected model scope; check enabled provider candidates"
+		id = apierror.AgentModelUnavailable
 	case errors.Is(e, managed.ErrCatalogInvalid):
-		code, message = "agent_catalog_invalid", "managed model catalog could not be generated; check local templates and model metadata"
+		id = apierror.AgentCatalogInvalid
 	case errors.Is(e, managed.ErrChanged):
-		code, message = "agent_config_conflict", "managed configuration or catalog changed externally; external edits were preserved"
+		id = apierror.AgentConfigConflict
 	case errors.Is(e, managed.ErrUnsafe):
-		code, message = "agent_config_unsafe", "agent configuration cannot be safely edited; check structure, file types and permissions"
+		id = apierror.AgentConfigUnsafe
 	case errors.Is(e, state.ErrConflict), errors.Is(e, state.ErrNotFound):
 		apiError(w, e)
 		return
 	}
-	fail(w, http.StatusConflict, code, message)
+	fail(w, id)
 }
 
 // logAgentFailure records safe diagnostic labels, never the underlying error.
@@ -122,7 +123,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			return
 		}
 		if !in.Approved {
-			fail(w, 400, "approval_required", "explicit approved configuration root required")
+			fail(w, apierror.ApprovalRequired)
 			return
 		}
 		b, e := s.Agents.Add(in.Binding)
@@ -183,7 +184,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			writeJSON(w, 200, v)
 		case "set-models":
 			if !state.ValidModelID(in.Model) || (in.ModelScope != "single" && in.ModelScope != "all-compatible" && in.ModelScope != "all-mapped") {
-				fail(w, 400, "invalid_model_policy", "model and explicit single, all-mapped or all-compatible model_scope required")
+				fail(w, apierror.InvalidModelPolicy)
 				return
 			}
 			b, v, e := s.Agents.SetModels(id, in.ExpectedRevision, in.Model, in.ModelScope)
@@ -194,7 +195,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			writeJSON(w, 200, map[string]any{"binding": publicBinding(b), "management": v, "apply_required": true})
 		case "apply":
 			if in.Fingerprint == "" {
-				fail(w, 400, "plan_required", "apply requires a reviewed plan fingerprint")
+				fail(w, apierror.PlanRequired)
 				return
 			}
 			v, e := s.Agents.Apply(id, in.ExpectedRevision, in.Fingerprint)
@@ -218,7 +219,7 @@ func (s *Server) agentRoutes(mux *http.ServeMux) {
 			}
 			writeJSON(w, 200, map[string]any{"binding": publicBinding(b), "management": v})
 		default:
-			fail(w, 404, "not_found", "unknown agent action")
+			fail(w, apierror.UnknownAgentAction)
 		}
 	})
 }
