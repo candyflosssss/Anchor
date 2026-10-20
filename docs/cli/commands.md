@@ -673,6 +673,8 @@ anchor agent disable ID --revision N
 - `model put` 不会自动刷新已写入的 Codex 目录；网关 all-compatible 授权按每次请求的当前模型/供应商配置判断，而 Codex 目录是接管时快照。新增模型/改元数据后可用 `agent sync ID --revision N`，或 `restore` → `plan` → `apply`（或正常停服再启动），再重启远端 Codex app-server。更新目录不等于让已有会话立即切换。
 - 当前没有 Binding 删除、改路径或改适配器版本入口；默认模型与授权范围用下面的 set-models 显式修改。
 
+Codex 外部编辑保留了旧 Anchor 注释、并将项目或其他 provider 表移入注释范围时，`agent enroll`／`agent sync`／`agent restore` 按实际 TOML 表定位已托管 provider，保留其他配置，不再需要手动删除注释。显式更新仍可重建缺失或损坏的 Anchor 模型目录，并保存恢复基线；参数、revision 和批准要求不变。
+
 ### `agent codex-settings`
 
 ```sh

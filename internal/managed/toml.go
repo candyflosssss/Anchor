@@ -213,32 +213,15 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 		} else if len(edit.Path) == 2 && edit.Path[0] == "model_providers" {
 			begin := "# anchor:begin " + key
 			end := "# anchor:end " + key
-			start := strings.Index(out, begin)
-			if start > 0 && out[start-1] != '\n' {
-				return nil, ErrUnsafe
-			}
-			finish := strings.Index(out, end)
-			if finish > 0 && out[finish-1] != '\n' {
-				return nil, ErrUnsafe
-			}
 			if edit.Before.Exists {
-				if start >= 0 && finish > start && strings.Count(out, begin) == 1 && strings.Count(out, end) == 1 {
-					finish += len(end)
-					if strings.HasPrefix(out[finish:], "\r\n") {
-						finish += 2
-					} else if strings.HasPrefix(out[finish:], "\n") {
-						finish++
-					}
-					out = out[:start] + out[finish:]
-				} else {
-					// Third-party TOML encoders routinely discard comments. Markers
-					// are an optimization, not proof of ownership (the journal is).
-					out, e = removeProviderSections(out, key)
-					if e != nil {
-						return nil, e
-					}
+				// Editors can preserve our comments while moving unrelated tables
+				// inside them. Always locate the actual provider sections; marker
+				// boundaries never establish ownership of intervening bytes.
+				out, e = removeProviderSections(out, key)
+				if e != nil {
+					return nil, e
 				}
-			} else if start >= 0 || finish >= 0 {
+			} else if strings.Contains(out, begin) || strings.Contains(out, end) {
 				return nil, ErrUnsafe
 			}
 			if edit.After.Exists {
@@ -281,7 +264,8 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 }
 
 // removeProviderSections handles ordinary, quoted and nested provider tables
-// after a serializer has removed Anchor's markers. It never reserializes the
+// even when marker comments are missing, duplicated or enclose other tables.
+// It never reserializes the
 // document. The caller still verifies the entire resulting semantic document,
 // so ambiguous inline/dotted/multiline forms fail closed without a file write.
 func removeProviderSections(raw, provider string) (string, error) {
