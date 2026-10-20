@@ -1,6 +1,7 @@
 import { ProviderProxyPanel } from '../proxies/proxies.view';
 import { useMappingSelection } from './use-provider-mapping-batch';
 import { KeyMultiplierView } from './key-multiplier.view';
+import { KeyGroupName } from './provider-rate.view';
 import { probeFailureText } from './provider-test.model';
 import { ProviderCatalogView } from './provider-catalog.view';
 import { ProviderNewAPIAuth } from './provider-newapi-auth.view';
@@ -142,7 +143,7 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
     </div>
     {w.keys.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">Key</th><th scope="col">默认协议 / 模型覆盖</th><th scope="col">状态</th><th scope="col">最近测试</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
       {w.keys.map(k => <tr key={k.id}>
-        <td className="mono">{k.id}</td><td>{protocolName[k.protocol as keyof typeof protocolName]}<span className="cell-hint"> · {k.model_protocols.length} 个覆盖</span></td>
+        <td><span className="mono">{k.id}</span><KeyGroupName rate={k.rate} /></td><td>{protocolName[k.protocol as keyof typeof protocolName]}<span className="cell-hint"> · {k.model_protocols.length} 个覆盖</span></td>
         <td><span className={`health-label ${k.state}`}>{healthText[k.state] ?? k.state}</span>{k.failures > 0 && <span className="cell-hint">连续失败 {k.failures} 次</span>}</td>
         <td>{k.test ? <span className={k.test.failure ? 'text-destructive' : ''}>{k.test.failure ? '失败' : '成功'} · {k.test.elapsed_ms} ms · {formatAgo(k.test.at)}</span> : <span className="cell-hint">未测试</span>}</td>
         <td className="row-actions">

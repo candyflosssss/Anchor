@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { ImeForm } from '../../components/shared/ime-form';
 import { Button } from '../../components/ui/button';
-import type { AccountSettings } from './provider-account.model';
-import { GroupRateObservation } from './provider-rate.view';
+import { rateFailureText, type AccountSettings } from './provider-account.model';
+import { GroupRateObservation, ProviderKeyRates } from './provider-rate.view';
 import type { ProviderController } from './use-provider-controller';
 
 /** The parent keys this form by provider and revision; the workbench isolates transports. */
@@ -13,6 +13,8 @@ export function ProviderNewAPIAuth({ c }: { c: ProviderController }) {
 }
 function NewAPIAuthForm({ c, settings: s }: { c: ProviderController; settings: AccountSettings }) {
   const a = c.account;
+  const workspace = c.features.data;
+  const w = workspace?.provider_id === s.provider_id && workspace.revision === s.revision ? workspace : null;
   const [token, setToken] = useState('');
   const [userID, setUserID] = useState(s.user_id ? String(s.user_id) : '');
   const failure = a.rate?.failure || a.balance?.failure || '';
@@ -38,6 +40,9 @@ function NewAPIAuthForm({ c, settings: s }: { c: ProviderController; settings: A
       </ImeForm>
     </> : <h2>NewAPI 分组倍率</h2>}
     {a.error && <div className="feedback error-feedback" role="alert"><span>{a.error}</span>{a.needsRead && <Button variant="outline" size="sm" disabled={c.busy} onClick={() => void c.load()}>重新读取配置</Button>}</div>}
-    {a.rate && a.rate.failure !== 'auth_required' && <GroupRateObservation value={a.rate} />}
+    {w?.keys.length ? <>
+      <ProviderKeyRates keys={w.keys} />
+      {a.rate?.failure && a.rate.failure !== 'auth_required' && <p className="feedback error-feedback" role="alert">Key {a.rate.key_id}：{rateFailureText[a.rate.failure] ?? '查询失败，分组倍率未知。'}{a.rate.http_status > 0 && `（HTTP ${a.rate.http_status}）`}</p>}
+    </> : w ? <GroupRateObservation value={a.rate} /> : <p className="card-hint" role="status">{c.features.error ? 'Key 倍率读取失败。' : '正在读取 Key 倍率…'}</p>}
   </section>;
 }

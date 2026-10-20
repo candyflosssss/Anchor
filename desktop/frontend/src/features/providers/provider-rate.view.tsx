@@ -1,4 +1,20 @@
 import { rateBasisText, rateFailureText, type AccountRateObservation } from './provider-account.model';
+import type { KeyRateCache, KeyStatus } from '../../desktop/contract.generated';
+import { KeyMultiplierView } from './key-multiplier.view';
+
+export function KeyGroupName({ rate }: { rate: KeyRateCache | null }) {
+  return <span className="cell-hint block break-words">分组：{rate?.group_name || rate?.group || '未知'}</span>;
+}
+
+export function ProviderKeyRates({ keys }: { keys: KeyStatus[] }) {
+  return <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="全部 Key 倍率">
+    {keys.map(key => <div key={key.id} className="min-w-0 rounded-md border p-3 [overflow-wrap:anywhere]">
+      <div className="flex flex-wrap items-baseline gap-x-2"><strong className="mono">{key.id}</strong>{!key.enabled && <span className="cell-hint">已停用</span>}</div>
+      <KeyGroupName rate={key.rate} />
+      <KeyMultiplierView value={key} />
+    </div>)}
+  </div>;
+}
 
 export function GroupRateObservation({ value }: { value: AccountRateObservation | null }) {
   if (!value) return <p className="card-hint">分组倍率 · 未查询</p>;
