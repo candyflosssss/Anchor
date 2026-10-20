@@ -27,6 +27,8 @@
 
 2026-10-19 交付核对：desktop.52 已统一发布截至 `2024e3f` 的功能，本机 CLI／核心／GUI 同版升级；包含 `agent codex-settings`、Key／供应商删除后的模型清理、日志参考费用及余额列表缓存。独立公开 CLI 仍为 alpha.6；桌面安装包不提供通用CLI，本机CLI从同版发布源码及vendor离线构建。本次仅同步交付状态，无新增命令或参数。详见[桌面发行说明](../release/desktop.md#统一更新-52已发布-dev本机已升级)。
 
+2026-10-20 交付核对：desktop.57 已发布 NewAPI 就地授权、参考价格／分组倍率后台缓存维护、runtime 本机更新与 SSH 被控机更新，并提供同版独立 CLI dev feed。新旧客户端的默认源下载及 SHA256 校验通过；本轮不新增命令／参数，未安装到真实实例，本机仍为 `.56`。本条覆盖相关旧章节的“源码未发布”交付标记，系统代理的未提交增量不在本次构建中。详见[发行记录](../release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。
+
 ## 1. 调用与公共约定
 
 下文 `anchor` 表示可执行文件。源码开发时使用仓库内 `./scripts/anchor-dev.sh` 替换 `anchor`；脚本会切换到仓库目录，并在当前机器使用 resource-guard。可通过 [发行流程](../release/README.md) 生成便携测试包；另提供 [一键安装脚本](../release/install.md)，从公开 Release 下载并校验单文件，不是 `anchor install` 命令，也不初始化状态。公开 Release 是安装源；实际公开版本及平台附件见发行页。发行程序的核心、CLI 和认证 helper 是同一个可执行文件，单独的 `anchor` / `anchor.exe` 即可运行，完整文档归档不是运行依赖；状态/配置仍独立保存。源码脚本不包含在用户包中。
@@ -771,9 +773,9 @@ anchor recover [--id ID]
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；降权策略设置见 settings key-cooldown（§16） |
-| 平台自动识别与列表余额（desktop.27，缓存随desktop.52交付） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；切页立即显示同实例／同配置的上次余额，后台刷新，失败保留旧值并支持单行重试。当前源码（未打包）余额显示两位小数；NewAPI 新增 Key 获准返回的账户余额与只读 Key 额度兼容，按站点公开比例换算；沿用既有命令，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
-| 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单由 CLI 提供，当前源码 GUI 已接入分组倍率；额度保留原始单位。2026-10-20 未打包 GUI 增量：供应商详情／新增模型步骤识别 NewAPI 后直接输入用户令牌，保存后自动以新 revision 查询倍率（effective-rate），无需手选平台／替换模式；沿用既有命令 |
-| 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法已提供；映射设置及显式默认值导入已接入源码，日志逐请求比价待接入，详见§6、§13 |
+| 平台自动识别与列表余额（desktop.27，缓存随desktop.52交付） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；切页立即显示同实例／同配置的上次余额，后台刷新，失败保留旧值并支持单行重试。desktop.57 已包含余额显示两位小数；NewAPI 新增 Key 获准返回的账户余额与只读 Key 额度兼容，按站点公开比例换算；沿用既有命令，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
+| 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单由 CLI 提供，当前源码 GUI 已接入分组倍率；额度保留原始单位。desktop.57 dev GUI 已发布：供应商详情／新增模型步骤识别 NewAPI 后直接输入用户令牌，保存后自动以新 revision 查询倍率（effective-rate），无需手选平台／替换模式；沿用既有命令 |
+| 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法、映射设置及显式默认值导入、日志逐请求比价与价格缓存维护已随 desktop.57 交付，详见§6、§12、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；显示块选择、顺序、预设与费用合块是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
 | 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；desktop.45 dev 已发布认证 Codex 原生线程及同机项目元数据关联，其他客户端仍需显式标签；历史不回填 |
@@ -784,7 +786,7 @@ anchor recover [--id ID]
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
 | Codex统一重试 | agent codex-settings [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
-| 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；本轮源码未打包／未发布，无数据库回滚，见 [在线更新](../design/online-updates.md) |
+| 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；desktop.57 已同版发布安装器／runtime／CLI feed，无数据库回滚，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。

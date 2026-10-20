@@ -1,12 +1,36 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-20。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.56](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.56)，发布于 `2026-10-20T16:07:18+08:00`；GitHub prerelease，非 latest，六项附件同版投放。
-- Codex 损坏或删除的已托管配置可从已验证快照恢复；新增「备份并重建配置」及 CLI `agent enroll --rebuild --model-scope all-mapped --approve`，即使从未托管过也可备份后生成干净配置。整份重建会移除当前其他设置，原件保留在 recovery；停用不自动还原坏文件。
-- 构建提交 `25c35776b32a25cd36de08eef351dc5f87a318d1`，SOURCE.json dirty=false；Go managed／core／cli／desktop 四包、16项前端单测、typecheck、lint、3项浏览器模拟绑定测试通过。双平台生产编译、契约比对、安装包／源码／vendor／元数据与六附件校验通过。未混入工作区系统代理改动。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。核心与桌面配套升级；沿用 restart_handoff 和 schema9，无数据库降级，远端核心另行升级。
-- 默认 dev 源以 `.55` 为当前版真实发现并下载 `.56` Linux 包，大小／SHA256通过；Windows GitHub digest 与本地一致，tag 指向实际构建提交，latest 未改变。
-- 本机已于 `2026-10-20T16:10:46.135172+08:00` 从 `.55` 配套升级到 `.56`，core／gateway／agent_management ready，Codex／DSH applied，运行程序哈希、数据库、配置／凭据／托管与恢复文件核验通过。未执行系统安装器／应用内 apply、原生窗口交互或付费上游验收。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.57](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.57)，发布于 `2026-10-20T20:12:19+08:00`；GitHub prerelease，非 latest，11 项附件同版投放。
+- NewAPI 自动识别后就地输入用户令牌，保存后重查分组倍率与模型目录；参考价格与分组倍率启动时检查、成功满一小时刷新，新请求只接受不足三小时的有效缓存，映射变更后异步检查。授权失败或过期保持未知。
+- 构建提交 `b87824e329ad3ea9f5e922f3bac3cd16282e3793`，SOURCE.json dirty=false；契约比对、TypeScript／Vite 和 Windows／Ubuntu24.04 AMD64 生产编译／打包通过。安装器、runtime、CLI、对应源码／vendor、许可元数据及全部远端附件摘要已核对。未混入工作区系统代理改动。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面配套升级；首次从旧宿主升级使用安装器，新宿主可使用 runtime，SSH 被控机需单独升级。
+- 默认 dev 源以 `.56` 为当前版本，真实下载 `.57` Linux runtime 与旧客户端兼容 deb；独立 CLI feed 同版下载通过，大小／SHA256 及运行版本均符合预期。Windows 三个程序的远端 digest 与本地一致，tag 指向构建提交，latest 保持不变。
+- 本轮仅在线投放和隔离下载核验，未安装或重启本机／远端实例；本机安装仍为 `.56`。未执行系统安装器／apply、双平台原生窗口或真实 SSH 升级验收。
+
+## NewAPI 授权与自动缓存 .57（已发布 dev）
+
+参考价格与 Key 分组倍率支持启动检查、每小时后台维护及配置／映射变更后的异步检查；不把超过三小时的值当作新请求的有效参考。NewAPI 识别后可直接输入用户令牌，保存后以新 revision 重查倍率并重新获取已打开的模型目录。此版同时交付统一错误提示、Responses 协议兼容及 runtime／SSH 更新能力；旧宿主忽略 runtime 字段并继续使用同版安装器。
+
+构建输入摘要 `530dd67a5a666a8e854958695cd9a6fd75e5e9aa9b561a2b15f24c1cbd3ea4cf`。产物与证据位于 `dist/desktop/0.1.0-dev.desktop.57/`，`publication/` 包含下列 11 个同版附件；源码包含 Anchor 与未修改 mihomo v1.19.32 的对应源码／Go vendor 和固定 payload。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.57_amd64.deb` | 29110236 | `4abc51d12d8c6c97f22c335bc34fb9e129a4c6bb2843d92614d4eb85b002d825` |
+| `Anchor-Desktop-0.1.0-dev.desktop.57-windows-amd64-setup.exe` | 31128529 | `d053e3ac87d7fcbda76b552986fd87928c631f24753a6be9999f4d5b7eee055d` |
+| `anchor-desktop-0.1.0-dev.desktop.57-linux-amd64` | 42996784 | `23dfa51767a24e7b4b1b3b59102e4da2f4a7b1387546e995a6380f5ee2184403` |
+| `anchor-desktop-0.1.0-dev.desktop.57-windows-amd64.exe` | 44119552 | `479b8043b3539a4f2de5cee2722045ef38290c456885d55182205dd01dc7643e` |
+| `anchor-0.1.0-dev.desktop.57-linux-amd64` | 37642402 | `e832014a86425c93f445bf8b2c3db10813a5335693ea8feae3e61e300f96e78f` |
+| `anchor-0.1.0-dev.desktop.57-windows-amd64.exe` | 37767680 | `14dfe3e3e74d0a85a7bb97981674efd9fc899a27a3660535ab65be2be187f147` |
+| `update-desktop.json` | 1755 | `8c5590ba2bacf31d1b6ed8d4abf3020e8d329ea0e80d2758e658559c5c0f0028` |
+| `update-cli.json` | 876 | `4646104ac3d4e162ebab5b7a02b13ab9e664b1ab017168fa31e31730dfc461aa` |
+| `anchor_0.1.0-dev.desktop.57_source.tar.gz` | 97563069 | `80497d3381f5b186a350d2a0b045413372c813f0425e951a2847360012a9d74a` |
+| `anchor_0.1.0-dev.desktop.57_metadata.zip` | 122175 | `663c207b7037742ad35ab2dc1715d3bb9ed54709207cb73a0b0bae75ec8e6513` |
+| `SHA256SUMS` | 1073 | `979f119a32daec8fcf5d7797e1f294ce5b7fba8d1f3407f0c4b2995f934c7917` |
+
+复用功能提交已完成的 typecheck／lint、72 项前端单测与 17 项模拟桌面浏览器测试，本轮未重跑全量／race／浏览器测试。默认源隔离下载三条路径（desktop runtime、旧 `.56` CLI 下载 deb、CLI binary）均通过，下载的 runtime 与 CLI 运行版本核对通过；全部 11 附件 GitHub digest 与大小匹配，标签指向实际构建提交。证据为 `preparation-verification.json`、`publication-verification.json`、`online-verification.json`。原始 BUILD.json 保留构建时未安装／未发布／未原生验收事实，实际投放另行记录。
+
+首次尝试因依赖软链接被识别为未跟踪文件而提前停止，未生成完整安装包；隔离在 `dist/desktop/desktop57-attempt1-incomplete/`，未上传。改为复制锁定依赖后从同一干净提交完整重建。本机仍为 `.56`，本轮未执行安装或真实实例更新。
 
 ## Codex 配置重建 .56（已发布 dev，本机已升级）
 

@@ -1,12 +1,16 @@
 # 在线更新 v1
 
 - 更新：2026-10-20。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.56](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.56)，发布于 `2026-10-20T16:07:18+08:00`；GitHub prerelease，非 latest，六项附件同版投放。
-- Codex 损坏或删除的已托管配置可从已验证快照恢复；新增「备份并重建配置」及 CLI `agent enroll --rebuild --model-scope all-mapped --approve`，即使从未托管过也可备份后生成干净配置。整份重建会移除当前其他设置，原件保留在 recovery；停用不自动还原坏文件。
-- 构建提交 `25c35776b32a25cd36de08eef351dc5f87a318d1`，SOURCE.json dirty=false；Go managed／core／cli／desktop 四包、16项前端单测、typecheck、lint、3项浏览器模拟绑定测试通过。双平台生产编译、契约比对、安装包／源码／vendor／元数据与六附件校验通过。未混入工作区系统代理改动。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。核心与桌面配套升级；沿用 restart_handoff 和 schema9，无数据库降级，远端核心另行升级。
-- 默认 dev 源以 `.55` 为当前版真实发现并下载 `.56` Linux 包，大小／SHA256通过；Windows GitHub digest 与本地一致，tag 指向实际构建提交，latest 未改变。
-- 本机已于 `2026-10-20T16:10:46.135172+08:00` 从 `.55` 配套升级到 `.56`，core／gateway／agent_management ready，Codex／DSH applied，运行程序哈希、数据库、配置／凭据／托管与恢复文件核验通过。未执行系统安装器／应用内 apply、原生窗口交互或付费上游验收。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.57](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.57)，发布于 `2026-10-20T20:12:19+08:00`；GitHub prerelease，非 latest，11 项附件同版投放。
+- NewAPI 自动识别后就地输入用户令牌，保存后重查分组倍率与模型目录；参考价格与分组倍率启动时检查、成功满一小时刷新，新请求只接受不足三小时的有效缓存，映射变更后异步检查。授权失败或过期保持未知。
+- 构建提交 `b87824e329ad3ea9f5e922f3bac3cd16282e3793`，SOURCE.json dirty=false；契约比对、TypeScript／Vite 和 Windows／Ubuntu24.04 AMD64 生产编译／打包通过。安装器、runtime、CLI、对应源码／vendor、许可元数据及全部远端附件摘要已核对。未混入工作区系统代理改动。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面配套升级；首次从旧宿主升级使用安装器，新宿主可使用 runtime，SSH 被控机需单独升级。
+- 默认 dev 源以 `.56` 为当前版本，真实下载 `.57` Linux runtime 与旧客户端兼容 deb；独立 CLI feed 同版下载通过，大小／SHA256 及运行版本均符合预期。Windows 三个程序的远端 digest 与本地一致，tag 指向构建提交，latest 保持不变。
+- 本轮仅在线投放和隔离下载核验，未安装或重启本机／远端实例；本机安装仍为 `.56`。未执行系统安装器／apply、双平台原生窗口或真实 SSH 升级验收。
+
+## .57 在线投放验证（2026-10-20）
+
+11 项附件包含两平台安装器、两平台 desktop runtime 与 CLI binary、两份 flat 更新清单、对应源码、许可／构建元数据和 SHA256SUMS。默认 dev 源实际下载 Linux runtime（42,996,784 字节）、旧客户端兼容 deb（29,110,236 字节）和 CLI（37,642,402 字节），大小与 SHA256 均匹配，下载程序版本为 `.57`；Windows 三个程序使用 GitHub digest 核对通过。完整摘要及验收边界见[发行记录](../release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。本轮未更新真实运行实例。
 
 ## .56 在线投放与本机升级（2026-10-20）
 
@@ -123,9 +127,11 @@ UpdateInfo phase 为 idle/checked/downloaded/installing；空 latest_version 表
 
 验证分层：共享 DTO/TS 漂移、Go 模拟更新服务器的检查／实际下载／校验／CLI 替换、真实 Go Bridge 读写下载、浏览器模拟绑定，以及 Windows／Linux 原生安装验收。前三类与模拟浏览器测试不替代最后一类；未发布或未运行原生安装时不能声称安装即用或线上升级已完成。
 
-## Runtime 与 SSH 更新（2026-10-20，源码未发布）
+<a id="runtime-与-ssh-更新2026-10-20源码未发布"></a>
 
-此节取代上方旧安装器流程中“必须先停服、安装后手动重开”的一般描述。历史已发布版本仍沿用原行为；本轮未生成安装包或发布更新，也未修改真实运行实例。
+## Runtime 与 SSH 更新（2026-10-20，desktop.57 dev 已发布）
+
+此节取代上方旧安装器流程中“必须先停服、安装后手动重开”的一般描述。旧宿主仍沿用原行为；desktop.57 已同版投放安装包、runtime 和 CLI feed，并通过隔离下载校验；未修改真实运行实例。
 
 新桌面 feed 保留每平台原安装器，在 artifact 下可增加 `runtime`（同平台、kind=runtime、独立 URL／大小／SHA256）。旧宿主忽略新增字段，继续安装器流程；新版宿主优先选择 runtime。默认 GitHub 源同时核对安装器和 runtime 均为同一 Release 附件，自定义源遵循相同 HTTPS／完整性边界，不增加独立发布签名保证。`scripts/update_manifest.py --runtime TARGET=FILE` 生成该格式；Linux／Windows runtime 需要沿用支持的系统依赖，依赖缺失时预检失败并保留旧服务。
 
@@ -139,4 +145,4 @@ SSH 更新只作用于显式选择的既有 POSIX/Linux 被控机：桌面 `Chec
 
 连接层复用已认证 SSH 密码或密钥连接，调用被控机自己的 `update check` 和 `update upgrade --approve`，两者携带 instance/control-port，后者额外固定 version/SHA256；更新来源和平台由被控机决定。接收有界、严格 JSON，成功后经管理通道复核 instance/version/PID/ready。不重授权、不调用普通 stop、不更新主控机、不重复未知变更。旧远端 CLI 不支持新参数时显示 remote_anchor_unsupported，需一次手工引导；当前 shell 发现是 POSIX，Windows SSH 被控机不在范围。SSH 断开、错误响应或最终身份／版本不符均报告 unknown，不能宣称未执行或已回滚，用户重新检查。远端系统安装目录不可写不影响旁路更新，但账号必须有用户数据目录写入权限。
 
-打包脚本为每平台额外生成唯一命名的 desktop runtime 与 CLI binary，并可生成 update-desktop/update-cli 两份清单。未来发布需把四个运行程序和两份清单与安装包／源码／许可元数据一并上传同版 Release，不再假设旧的固定六附件数量。本轮只更新构建逻辑，未实际打包或上线。
+打包脚本为每平台额外生成唯一命名的 desktop runtime 与 CLI binary，并可生成 update-desktop/update-cli 两份清单。desktop.57 已把四个运行程序和两份清单与安装包／源码／许可元数据一并上传同版 Release，共 11 项附件；后续发布沿用该集合，不再假设旧的固定六附件数量。真实 SSH 升级与双平台原生窗口仍未在本轮验收。
