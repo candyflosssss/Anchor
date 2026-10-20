@@ -27,7 +27,7 @@
 
 2026-10-19 交付核对：desktop.52 已统一发布截至 `2024e3f` 的功能，本机 CLI／核心／GUI 同版升级；包含 `agent codex-settings`、Key／供应商删除后的模型清理、日志参考费用及余额列表缓存。独立公开 CLI 仍为 alpha.6；桌面安装包不提供通用CLI，本机CLI从同版发布源码及vendor离线构建。本次仅同步交付状态，无新增命令或参数。详见[桌面发行说明](../release/desktop.md#统一更新-52已发布-dev本机已升级)。
 
-2026-10-20 交付核对：desktop.58 已发布历史加密推理延迟拒绝的清理重试修复及流检查日志标记，去掉独立2秒识别窗口，沿用原请求超时；同时包含各 Key 倍率／分组展示及 SSH 更新失败提示修复，保留 desktop.57 的 NewAPI 授权、缓存维护、runtime／SSH 更新和同版 CLI feed。新旧客户端下载及全部11附件摘要校验通过；本机 CLI／核心／GUI 已由`.57`升级到`.58`，配置／凭据／托管状态与 dev 更新配置保持，身份／端口固定更新检查通过。本轮不新增命令／参数；本条覆盖相关章节的旧“源码未发布”交付标记，系统代理的未提交增量不在本次构建中。详见[发行记录](../release/desktop.md#加密上下文延迟恢复-58已发布-dev本机已升级)。
+2026-10-21 交付核对：desktop.60已发布codex.response.metadata继续检查密文拒绝的修复、2 MiB初始化检查上限、传输包装错误兼容及安全类别／类型哈希／固定字段存在性日志；原请求期限、同渠道一次清理及真实内容／工具／其他未知结构不重放保持。用户已确认修正探针.3使原失败会话恢复，本机CLI／核心／GUI已配套换为正式.60。默认源3条实际下载、11附件摘要、配置／凭据／托管／恢复文件及dev更新配置核验通过。无新增命令／参数，未提交系统代理增量未纳入构建，详见[发行记录](../release/desktop.md#codex元信息与密文恢复-60已发布-dev本机已升级)。
 
 ## 1. 调用与公共约定
 
@@ -876,7 +876,9 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 
 desktop.58 已发布（2026-10-20）：原生 Responses 网关在明确历史密文校验错误、尚未交付响应时，移除请求中全部 reasoning 条目并向同一供应商／Key／模型／选定基址重试一次，共享超时；每个根请求最多一次清理，不改变 Codex 自身的重试设置。普通消息、工具调用／结果、压缩历史与加密任务不删除，不修改本地聊天。普通断网／超时、鉴权／限流、已开始输出不触发清理；流开头最多暂存 64 KiB，并沿用原供应商请求超时；不再使用 desktop.57 的独立 2 秒识别窗口，慢返回的明确拒绝仍可恢复。首次非生命周期事件或超过大小上限后原样转发，不重放已开始输出的请求。`logs list/follow/detail/export` 的安全 evidence 增加 `encrypted_context_recovery=pending|succeeded|failed|cancelled`、`encrypted_context_reason`（固定标签）、`encrypted_context_removed_reasoning`（十进制数量）、`encrypted_context_retry_count=1`；只在实际执行清理重试时出现，succeeded 仅指该次恢复尝试成功，不代表没有损失隐藏推理上下文。符合检查条件的流另记录 `encrypted_context_stream_inspection` 固定枚举（`rejected`、`output_started`、`non_lifecycle_event`、`invalid_event`、`prefix_limit`、`timeout`、`cancelled`、`eof`、`read_error`、`empty_read`），未清理时也可出现；该字段描述首个检查尝试的退出原因，不代表恢复成功。列表／follow 保留这五项紧凑标记，detail／export 还保留两次 attempt，初次拒绝码为 `encrypted_context_rejected`。根用量缺失则保持未知，不把最终成功用量当完整总额。沿用现有日志命令与鉴权，无新增手工清理命令；历史不补写，不记录密文、条目 ID、正文或原始错误文本。桌面状态列与详情显示中文恢复标记；完整边界见[日志设计](../design/logging.md#历史加密推理恢复2026-10-20当前源码未发布)。
 
-2026-10-20 后续源码修复（未打包，desktop.58不含）：严格无内容的reasoning/message空壳与summary/text part不再提前结束密文检查；真实思考／正文／密文输出、工具调用和未知结构仍原样转发且不重放。失败响应内只有空壳output时可识别明确密文拒绝，SSE仅event行提供类型同样识别。`logs list/follow/detail/export`另保留 `encrypted_context_stream_event` 安全类别：none、lifecycle、error、reasoning_item、message_item、tool_item、other_item、reasoning_delta、text_delta、content_part、terminal、unknown；不记录原始事件名或内容。已发布.58的失败日志只说明non_lifecycle_event且存在思考结构，不能反推具体事件形态；新增分类升级核心后生效，历史不回填，无新增命令／参数。
+2026-10-20 后续修复（desktop.59已发布，desktop.58不含）：严格无内容的reasoning/message空壳与summary/text part不再提前结束密文检查；真实思考／正文／密文输出、工具调用和未知结构仍原样转发且不重放。失败响应内只有空壳output时可识别明确密文拒绝，SSE仅event行提供类型同样识别。`logs list/follow/detail/export`另保留 `encrypted_context_stream_event` 安全类别：none、lifecycle、error、reasoning_item、message_item、tool_item、other_item、reasoning_delta、text_delta、content_part、terminal、unknown；不记录原始事件名或内容。已发布.58的失败日志只说明non_lifecycle_event且存在思考结构，不能反推具体事件形态；新增分类升级核心后生效，历史不回填，无新增命令／参数。
+
+2026-10-21 元信息事件修复（desktop.60已发布）：真实诊断识别流首事件为 `codex.response.metadata`（类型SHA256为4928dcffeb7ec6134a0662ac1a91cbdbe737af8d60c407fc34e0245b540c3c28）。.58/.59把此附加信息当未知事件提前结束密文检查，后续明确拒绝未被清理；现在按无正文元信息继续检查，未知类型仍退出，不扩大到任意事件。`encrypted_context_stream_event`增加固定metadata类别；新增 `encrypted_context_stream_type_hash`（有效事件类型SHA256）和 `encrypted_context_stream_fields`（固定白名单字段名存在性），列表／follow／详情／导出保留，不记录原始未知事件名、正文、密文或字段值。明确错误envelope中带传输包装前缀的密文验证消息同样识别，无新增命令／参数。官方Codex源码把codex.response.metadata作为附加事件忽略；回归含元信息→空壳→延迟2.2秒拒绝→一次恢复。当前检查前缀上限为2 MiB（旧版64 KiB）以容纳较大的初始化信息，仍共享原请求期限与一次清理预算。用户已确认本机修正探针.3使原失败会话恢复；现已从干净源码打包并将本机换为正式.60，临时探针不作为公开发行版。
 
 `stats`（2026-10-16 已随 desktop.42 dev 宿主／核心发布；命令由兼容源码 CLI 提供，独立公开 alpha.6 CLI 不含，桌面程序不提供通用 CLI）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
 
@@ -1033,6 +1035,3 @@ anchor settings key-cooldown --revision N [--enabled=true|false] [--weight-perce
 轮询把健康因子乘到原有调度权重上，不改计费倍率；原始权重相同时，10% 与正常 Key 的首选比例约 1:10。优先级、最低价格、最低延迟和缓存亲和保留原偏好，降权首选按其相对健康权重周期性让位，仍保留为失败转移候选。费用已知／免费优先仅由当前最高健康权重的来源决定，防止故障免费来源持续压过正常来源。关闭自动降权清除现有降权并停止新增；策略持久化，重启后临时健康重置。GUI「设置 → Key 自动降权」提供同能力，只显示名称、数值、控件和简短状态。
 
 兼容：保留 `key-cooldown` 命令、API 路径和旧时长字段名；旧设置缺失 `weight_percent` 时补 10，旧写请求省略或传 null 时保留已存比例。客户端与核心应一同更新，旧核心仍执行旧冷却规则。
-
-
-2026-10-20 元信息事件修复（当前源码，desktop.59之后）：真实诊断识别流首事件为 `codex.response.metadata`（类型SHA256为4928dcffeb7ec6134a0662ac1a91cbdbe737af8d60c407fc34e0245b540c3c28）。.58/.59把此附加信息当未知事件提前结束密文检查，后续明确拒绝未被清理；现在按无正文元信息继续检查，未知类型仍退出，不扩大到任意事件。`encrypted_context_stream_event`增加固定metadata类别；新增 `encrypted_context_stream_type_hash`（有效事件类型SHA256）和 `encrypted_context_stream_fields`（固定白名单字段名存在性），列表／follow／详情／导出保留，不记录原始未知事件名、正文、密文或字段值。明确错误envelope中带传输包装前缀的密文验证消息同样识别，无新增命令／参数。官方Codex源码把codex.response.metadata作为附加事件忽略；回归含元信息→空壳→延迟2.2秒拒绝→一次恢复。检查前缀上限由64 KiB提升至2 MiB以容纳较大的初始化信息，仍共享原请求期限与一次清理预算。用户已确认本机修正探针.3使原失败会话恢复；临时探针不是公开发行版。

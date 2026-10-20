@@ -204,7 +204,9 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 
 归属筛选／分组基础能力已随 desktop.44 宿主／核心发布到默认 dev 在线源，并完成本机 CLI／核心／GUI 同版用户目录升级；desktop.44 仍仅接受显式项目／会话标签。上述 Codex 原生归属与稀疏曲线增量已从干净提交打包为 desktop.45，并于2026-10-16 19:09完成本机 CLI／核心／GUI 升级；两平台包及哈希、本机核心／网关就绪、六档统计／四维分类／候选／导出验证通过。同版现已于北京时间 2026-10-16 20:03:09 发布到默认 GitHub dev 在线源，两平台安装包、清单及源码／元数据／校验附件齐全；Linux 默认源真实下载与大小／SHA256校验通过，Windows 附件 digest 与本地一致。在线投放未重启本机，SSH 远端未更新；旧日志不补归属。原生归属复用隔离 Codex 与本地模拟上游验证，未请求真实付费推理；原生窗口／系统安装器未验收。详见[desktop.45 dev 发行记录](../release/desktop.md#当前在线-dev-版-45)。
 
-### 历史加密推理恢复（2026-10-20，当前源码，未发布）
+<a id="历史加密推理恢复2026-10-20当前源码未发布"></a>
+
+### 历史加密推理恢复（desktop.60已发布）
 
 原生 Responses 对历史加密推理明确拒绝且尚未交付响应时，核心清理请求 input 的全部 reasoning 条目并在同一供应商／Key／模型／选定基址重试一次；所有候选共用一次清理预算。清理仅作用于转发副本，保留普通消息、工具调用／结果、压缩历史与加密任务；可能损失隐藏推理连续性。流开头检查暂存生命周期、codex.response.metadata及严格无内容的reasoning/message与summary/text part事件，最多 2 MiB，并共享原候选请求超时；实际正文／推理内容、工具事件或超过大小上限后不再清理重放。desktop.57 的独立 2 秒识别截止已在当前源码中取消，慢返回的明确拒绝仍可识别；超时和取消不触发恢复。详细触发与限制见[实施说明](implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。
 
@@ -217,8 +219,8 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 | `encrypted_context_removed_reasoning` | 本次删除的推理条目十进制数量，包括同一请求中的非加密 reasoning 条目 |
 | `encrypted_context_retry_count` | 固定字符串 `1`，与全部渠道 attempt_count 分开 |
 | `encrypted_context_stream_inspection` | 符合检查条件的首个流尝试的退出原因：`rejected` 明确命中；`output_started` 生命周期已带实际输出；`non_lifecycle_event` 已遇到生成内容、工具或其他未允许事件（空reasoning/message容器和空summary/text part继续检查）；`invalid_event` 无法解析；`prefix_limit` 达到 2 MiB；`timeout`／`cancelled` 原请求超时／取消；`eof`／`read_error`／`empty_read` 读取结束或异常。无清理时也可出现，不证明发生了恢复 |
-| `encrypted_context_stream_event` | 当前源码（.59后新增metadata）：检查退出时最后事件的代码固定类别 `none/lifecycle/metadata/error/reasoning_item/message_item/tool_item/other_item/reasoning_delta/text_delta/content_part/terminal/unknown`；不保存原始事件名、item ID或正文；结合inspection判断停止原因，列表／follow／详情／导出可见，旧日志不补写 |
-| `encrypted_context_stream_type_hash` | desktop.59后源码新增：退出检查时最后有效事件类型的SHA256；不保存未知事件原名，结合分类用于匹配已知协议常量，不代表清理成功 |
+| `encrypted_context_stream_event` | desktop.60已发布（.59后新增metadata）：检查退出时最后事件的代码固定类别 `none/lifecycle/metadata/error/reasoning_item/message_item/tool_item/other_item/reasoning_delta/text_delta/content_part/terminal/unknown`；不保存原始事件名、item ID或正文；结合inspection判断停止原因，列表／follow／详情／导出可见，旧日志不补写 |
+| `encrypted_context_stream_type_hash` | desktop.60已发布：退出检查时最后有效事件类型的SHA256；不保存未知事件原名，结合分类用于匹配已知协议常量，不代表清理成功 |
 | `encrypted_context_stream_fields` | 同期新增：只记录type/event/response/item/part/error/data/object/id/choices/message/metadata固定白名单字段是否存在（逗号分隔或none）；不保存字段值，不接受任意字段名 |
 
 上述八项加入列表／follow 的紧凑 evidence 白名单，详情／复制／JSONL 导出保留完整标记。此前“五项档位证据”限制扩展为五项档位加四项恢复证据与四项流检查证据，其他大诊断仍只在详情／导出。桌面状态列和复用的详情列显示「已清理加密上下文 · 恢复成功／重试失败／重试已取消／正在重试／结果未确认」，只按已记录枚举展示；旧日志或未知值不猜已清理。

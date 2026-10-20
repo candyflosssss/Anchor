@@ -1,12 +1,70 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-20。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.58](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.58)，发布于 `2026-10-20T22:26:41+08:00`；GitHub prerelease，非 latest，11 项附件同版投放。
-- 修复历史加密推理拒绝在流开头超过 2 秒才返回时漏掉清理重试的问题；在原请求超时内等待首个实际输出，明确拒绝后清理历史 reasoning 并同渠道重试一次，日志标记清理／恢复及流检查结束原因。
-- 构建提交 `4ec5ea31637751a488f10211e7e9c59c13a7cad9`，SOURCE.json dirty=false；契约比对、TypeScript／Vite 和 Windows／Ubuntu24.04 AMD64 生产编译／打包通过。包含各 Key 倍率／分组展示与 SSH 更新失败提示修复，未混入工作区系统代理改动。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面配套升级，SSH 被控机另行升级。
-- 默认 dev 源以 `.57` 为当前版本，真实下载 `.58` Linux runtime 与旧客户端兼容 deb；独立 CLI feed 同版下载通过，大小／SHA256 及运行版本均符合预期。全部11附件远端摘要与本地一致，tag 指向构建提交，latest 保持不变。
-- 本机已于 `2026-10-20T22:27:32.220140+08:00` 从 `.57` 配套升级到 `.58`，CLI／核心／GUI 运行摘要与发布产物一致，core／gateway／agent_management ready，Codex／DSH applied。备份 `/home/mosaki/.config/anchor/backups/pre-desktop58-20261020-222728`；配置、凭据、托管文件、恢复日志与 dev 更新配置保持，身份／端口固定的 CLI 检查通过。未执行系统安装器／apply、双平台原生窗口交互、真实 SSH 更新传输或真实付费推理验收。
+- 更新：2026-10-21。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.60](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.60)，发布于 `2026-10-21T00:11:33+08:00`；GitHub prerelease，非 latest，11项附件同版投放，构建提交 `e481ca87758d774111fea119e2070a16a983d6df`、SOURCE dirty=false。
+- 修复`codex.response.metadata`被误作输出而提前结束密文检查的问题；仅将此确切附加元信息事件列入允许列表。初始化检查上限由64 KiB提高至2 MiB，仍共享原请求期限、同渠道一次清理重试；实际内容、工具和其他未知结构不重放。日志保存metadata类别、事件类型SHA256及固定字段名存在性，不保存正文、密文或字段值。
+- 最终core/protocol/logbook回归15.503s／0.007s／0.623s通过；双平台生产编译／打包、11附件远端摘要及3条默认源实际下载通过。更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新；SSH被控机另行升级。
+- 用户确认修正探针.3已使原失败会话恢复正常；本机现已于 `2026-10-21T00:12:28.906214+08:00` 将CLI／核心／GUI换为正式`.60`。schema9、配置／凭据／托管／恢复文件及dev更新配置保持，运行摘要与ready/applied核对通过；备份 `/home/mosaki/.config/anchor/backups/pre-desktop60-20261021-001215`。未主动请求付费推理，未执行系统安装器／apply、原生窗口或跨机SSH更新验收。
+
+## Codex元信息与密文恢复 .60（已发布 dev，本机已升级）
+
+用户在desktop.59安装后确认仍报原错。临时诊断识别首个事件为`codex.response.metadata`（SHA256 `4928dcffeb7ec6134a0662ac1a91cbdbe737af8d60c407fc34e0245b540c3c28`）；.58/.59把它当未知事件提前结束检查，从而漏掉后续密文拒绝。[官方Codex SSE处理](https://github.com/openai/codex/blob/main/codex-rs/codex-api/src/sse/responses.rs)同样将该类型视为附加元信息。修正探针.3安装后，用户明确确认原失败会话已恢复正常。探针属于dirty诊断构建；本次正式发行来自干净提交。
+
+此版仅允许确切的codex.response.metadata继续检查，其他未知事件保持透传、不重放。较大的instructions/tools初始化信息还会触及旧64 KiB上限，因此将前缀上限提升至2 MiB（与现有SSE事件上限一致）。明确错误envelope允许验证消息前带传输包装；仍在原请求期限内、同供应商／Key／模型／基址清理一次，只作用于转发副本中的reasoning，保留普通消息、工具调用／结果、compaction与加密任务。真实输出、工具及超限不重放。
+
+日志固定类别新增metadata；另保存encrypted_context_stream_type_hash与encrypted_context_stream_fields，用于核对类型SHA256和固定白名单字段是否存在，列表／follow／详情／导出均保留。最终源码不采集原始未知事件名、ID、正文、密文或字段值。临时探针2仅为定位采集严格格式的协议名，已在探针3及正式源码移除；历史日志不补写。清理实际发生时仍记录原因、删除数量、一次重试及恢复结果，未命中不伪造成功标记。
+
+构建提交 `e481ca87758d774111fea119e2070a16a983d6df`，输入摘要 `e58f8f9a9c59a83e3fd9009a745efaaa58857fa465d6df9243a287963f922b93`；产物与证据位于 `dist/desktop/0.1.0-dev.desktop.60/`，源码含Anchor及未改动mihomo v1.19.32源码／Go vendor与固定payload。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.60_amd64.deb` | 29118408 | `36308ebcaabd9ca9ef3ab2901654724477887c2f34071676771667f72961be2f` |
+| `Anchor-Desktop-0.1.0-dev.desktop.60-windows-amd64-setup.exe` | 31132085 | `88fa6561e981ac7848aad267a524df319bfa3c7ff75518a39b54cb0815dab8b5` |
+| `anchor-desktop-0.1.0-dev.desktop.60-linux-amd64` | 43013168 | `c2869a7fafd88e9f8fde3d17ab39863599f0862c6947a4c42b4fca0b850ee894` |
+| `anchor-desktop-0.1.0-dev.desktop.60-windows-amd64.exe` | 44132864 | `3e2ff28fb994acec1f2313444b5e6001a85820a120e258c26faba620dc53b66c` |
+| `anchor-0.1.0-dev.desktop.60-linux-amd64` | 37654690 | `55a5e67fda5fdb74727b51d2319b7d0470b22b670521ae5be09f569bd9a85f9f` |
+| `anchor-0.1.0-dev.desktop.60-windows-amd64.exe` | 37776896 | `7afd4a330ec578655b27b8ee572cc4b6dc5b5425030a71bce6b74563ebb8a6a4` |
+| `update-desktop.json` | 1755 | `ba9277a23f6bb835ac8062dd8c9717bc217e5588fb846922a87d25e9b9a4758d` |
+| `update-cli.json` | 876 | `2232731b1d2a68d0fe8f7001439197657d07a6c1a99424569e50a2f6ffdadd0e` |
+| `anchor_0.1.0-dev.desktop.60_source.tar.gz` | 97586718 | `d2bb225d197aa3c9cfae6c469e5ba921eb28951e3a58b92cf2d6bf8639e6facf` |
+| `anchor_0.1.0-dev.desktop.60_metadata.zip` | 122171 | `60e9ad45d68708b76dd8eb8c6f6f4574174502cab391327c664e3ce72f4f7cd5` |
+| `SHA256SUMS` | 1073 | `a05d5b0d89233984dbd7e1ebc0da2d55ff393f7329221bc03d9c9b5c99c6575b` |
+
+最终模拟回归覆盖元信息→大于64 KiB初始化→空壳→延迟2.2秒明确拒绝→同渠道一次恢复，core/protocol/logbook分别15.503s／0.007s／0.623s通过；包含超限／超时／取消／真实内容／工具不重放及原始字节透传。契约比对、TypeScript／Vite与双平台生产编译／打包通过。Linux默认源实际下载runtime、旧客户端兼容deb及CLI，版本／大小／SHA256核对通过；Windows三程序远端digest匹配。11附件、构建tag及非latest状态核对通过。未重复全量、race或浏览器测试。原始BUILD.json的未安装／未发布／未原生验收状态保持，实际交付另存证据。
+
+本机于 `2026-10-21T00:12:28.906214+08:00` 正常保留交接，从CLI/core `.59.probe.3`、GUI `.59`配套替换为正式`.60`，备份 `/home/mosaki/.config/anchor/backups/pre-desktop60-20261021-001215`；沿用受限transient user units，未新增持久服务。state.db schema9→9，state.db/logs.db quick_check及foreign_key_check通过，配置表（排除运行用量／缓存）、凭据、托管与恢复文件摘要保持，dev更新配置未修改。CLI/core/GUI运行摘要与发布程序一致，GUI匹配deb载荷；core/gateway/agent_management ready、绑定applied，已有凭据只读/v1/models核对3个授权模型，固定身份／端口dev检查当前=.60、候选=.60、available=false。
+
+用户确认恢复的依据是原失败会话在修正探针.3上的实际使用；另在探针.3运行期间只读抽取最近40个自然请求，记录到19条succeeded与1条pending清理标记（快照时状态），均有一次重试与拒绝原因；不将pending写成成功，不把普通请求成功当清理成功。未主动发起付费推理，未验收原生窗口、系统安装器／apply或跨机SSH传输。
+
+## 空思考容器恢复 .59（已发布 dev，本机已升级）
+
+desktop.58更新后的23:01和23:25请求仍失败，均为HTTP200、stream_interrupted、non_lifecycle_event、单次尝试，没有清理恢复标记；有思考结构观察但正文首字为空。旧日志未记录事件类型，不能断言每次失败恰好来自空壳。代码存在明确的提前退出路径：连空reasoning/message容器也会立刻退出恢复检查。
+
+此版严格识别无生成内容的reasoning/message条目及空summary/text part，并在64 KiB及原请求期限内继续检查；失败响应的output仅含空壳时也可匹配明确密文拒绝，SSE仅event行有类型同样识别。真实思考／正文／新密文输出、工具项、未知字段／结构保持原样交付且不重放。只清理转发副本中的历史reasoning并同供应商／Key／模型／基址重试一次，消息、工具结果、compaction与加密任务保持，不修改本地聊天。
+
+新增 `encrypted_context_stream_event` 固定分类：none、lifecycle、error、reasoning_item、message_item、tool_item、other_item、reasoning_delta、text_delta、content_part、terminal、unknown。配合原inspection及清理结果标记定位检查停止原因，列表／follow／详情／导出可见，不保存原始事件名、ID、密文或正文；旧日志不回填。
+
+构建输入摘要 `98f65af03de7d6a01627b1aeb657ed8550f42079d1ab0c4a39a0f3de4b70c392`；产物与证据位于 `dist/desktop/0.1.0-dev.desktop.59/`。对应源码包含Anchor与未改动mihomo v1.19.32源码／Go vendor及固定payload。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.59_amd64.deb` | 29116100 | `478e0c647cc84c05e4648902ae1e79ddcb282bb5207a8c1dedc510f20ffbef14` |
+| `Anchor-Desktop-0.1.0-dev.desktop.59-windows-amd64-setup.exe` | 31134086 | `c63232982cd3ae529b9dc9714ab0f9b70bafe02ebc8085f346f850bee1549691` |
+| `anchor-desktop-0.1.0-dev.desktop.59-linux-amd64` | 43009072 | `98f6049e7ac2f45527145b3041055f7b55f5028692cefb86b92ceaf1fb098b34` |
+| `anchor-desktop-0.1.0-dev.desktop.59-windows-amd64.exe` | 44129792 | `5b55471e045cba4c03e14375b7f7155447a2dd4da905df122f11ac47f968bd25` |
+| `anchor-0.1.0-dev.desktop.59-linux-amd64` | 37650594 | `b312d7f48dd6c5f01aef49919d866dd4f8260c5f82e8870b2bcc978be0fcc16a` |
+| `anchor-0.1.0-dev.desktop.59-windows-amd64.exe` | 37774336 | `dc41e771b332fe0af0e2336f947f6031676177c1e0256d7686e8bcd5999a82c0` |
+| `update-desktop.json` | 1755 | `62781b8340592aa48c4b43fa9f61fd0e636c8c67f41eb506608b47766d2b0280` |
+| `update-cli.json` | 876 | `55e2b2bed0ab2dc9c8aab7010d713002d53b8476e497f339be26919909a3d8b7` |
+| `anchor_0.1.0-dev.desktop.59_source.tar.gz` | 97585964 | `12139f453c36f7b456c6a733694edb675f243ab7fea745a227d45753878b6103` |
+| `anchor_0.1.0-dev.desktop.59_metadata.zip` | 122175 | `7cd5cc31027cd2e0544c82a2ae207cd42c11a244a05f029ce18a9222140179e2` |
+| `SHA256SUMS` | 1073 | `31f8085f58eb516ced1de65d431fcef5cde268a00297936957196901c220e4dc` |
+
+定向加密恢复回归4.511s，完整core/protocol/logbook回归16.036s／0.007s／0.637s通过。模拟空壳之后2.2秒才拒绝可清理恢复，真实内容及工具不重放、事件行类型兼容、失败output空壳、诊断保留与原始字节透传均覆盖。双平台生产构建／打包及3条默认源实际下载通过，全部11附件远端digest一致，tag指向实际构建提交、latest保持。未额外重复全量CLI／race／浏览器测试。第一次打包因复制node_modules时未保留内部链接而在TypeScript入口提前停止，无分发产物；修正复制方式后从同一干净提交重新完整构建。原始BUILD.json的未安装／未发布／未原生验收状态保持，实际投放与安装分别记录。
+
+本机备份 `/home/mosaki/.config/anchor/backups/pre-desktop59-20261020-234243`，经身份固定的保留交接正常停止核心，原子替换用户目录CLI／GUI，恢复既有受限transient user units（Restart=no），未增加持久服务／自启动。state.db schema9→9；state.db和logs.db quick_check、foreign_key_check通过。配置表（排除usage_totals及key_rate_cache运行数据）、凭据、托管文件与恢复日志摘要保持，dev更新配置未改动。运行CLI/core/GUI均为.59，GUI同时匹配deb载荷；core/gateway/agent_management ready、绑定applied。绑定鉴权的本机/v1/models核对3个授权模型，身份／端口固定dev检查current=.59、候选=.59、available=false，无主动付费推理。
+
+后续用户确认.59仍失败；诊断定位codex.response.metadata提前退出，修正探针.3后原会话恢复，最终正式修复见上方.60记录。未执行Windows/Linux原生窗口交互、系统安装器／apply或跨机SSH更新验收。
 
 ## 加密上下文延迟恢复 .58（已发布 dev，本机已升级）
 
