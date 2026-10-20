@@ -94,8 +94,8 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 ## 4. 网关的真实支持边界
 
-- 改写公共模型 ID 为候选上游 ID。Responses 同协议受限透传；Chat/Anthropic 入口和跨协议转换支持无状态文本、函数调用/结果、SSE 与用量；图片、音频、推理块、引用注解、服务端状态或无法表达的字段明确拒绝。
-- `function`、`custom`、仅含这两类工具的 namespace、`tool_search execution=client` 可同协议透传；工具由客户端执行。未知 / 服务端工具明确拒绝，不能借此宣称实际 Agent 工具兼容。
+- 改写公共模型 ID 为候选上游 ID。Responses 同协议受限透传；Chat/Anthropic 入口和跨协议转换支持无状态文本、函数调用/结果、SSE 与用量。2026-10-20 当前源码新增 Responses → Chat 的思考配置、输出格式、明文思考历史及工具身份映射，以及 Chat → Responses 的思考／自定义工具返回；精确范围见[Chat 转换兼容说明](protocol-chat-bridge.md)。图片、音频、未覆盖的推理块、引用注解、服务端状态或无法表达的字段仍明确拒绝。
+- `function`、`custom`、仅含这两类工具的 namespace、`tool_search execution=client` 可同协议透传；工具由客户端执行。Responses → Chat 另支持 function/custom/namespace：custom 转为单个 input 字符串参数的函数，原生 grammar 约束降为提示词指令，返回恢复身份；不支持跨协议的 tool_search。未知 / 服务端工具明确拒绝，不能借此宣称所有 Agent 工具已兼容。
 - 默认设置 `store:false`。拒绝 `store:true`、非 null 的 `previous_response_id` / `conversation`、`background:true`；客户端需发送完整 input 历史。未来服务器状态需要供应商亲和与相应 API，不可直接沿备用路由重放。
 - `tools`、`streaming` 能力由用户在公开模型上显式声明；声明不等于真实上游探测通过。
 - 全局并发上限 16；单供应商并发可配置 1..64；网关请求体上限 32 MiB（包含内嵌图片与完整历史），管理写入上限仍为 128 KiB；超限返回 HTTP 413 `request_too_large` 并提示 32 MiB 上限。此上限按字节计，不是模型 token 上下文限制；Chat/Anthropic 转换后的 Responses 请求也受同一上限保护。

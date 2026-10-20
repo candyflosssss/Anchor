@@ -69,17 +69,26 @@ func (u Usage) JSON(p string) any {
 		return nil
 	}
 	if p == "chat-completions" {
-		return Object{"prompt_tokens": u.Input, "completion_tokens": u.Output, "total_tokens": u.Input + u.Output, "prompt_tokens_details": Object{"cached_tokens": u.CacheRead}}
+		result := Object{"prompt_tokens": u.Input, "completion_tokens": u.Output, "total_tokens": u.Input + u.Output, "prompt_tokens_details": Object{"cached_tokens": u.CacheRead}}
+		if u.ReasoningKnown {
+			result["completion_tokens_details"] = Object{"reasoning_tokens": u.Reasoning}
+		}
+		return result
 	}
 	if p == "anthropic" {
 		return Object{"input_tokens": max(0, u.Input-u.CacheRead-u.CacheWrite), "output_tokens": u.Output, "cache_read_input_tokens": u.CacheRead, "cache_creation_input_tokens": u.CacheWrite}
 	}
-	return Object{"input_tokens": u.Input, "output_tokens": u.Output, "total_tokens": u.Input + u.Output, "input_tokens_details": Object{"cached_tokens": u.CacheRead}}
+	result := Object{"input_tokens": u.Input, "output_tokens": u.Output, "total_tokens": u.Input + u.Output, "input_tokens_details": Object{"cached_tokens": u.CacheRead}}
+	if u.ReasoningKnown {
+		result["output_tokens_details"] = Object{"reasoning_tokens": u.Reasoning}
+	}
+	return result
 }
 
 type Item struct {
 	ID, CallID, Name, Text, Arguments string
-	Tool                              bool
+	Namespace                         string
+	Tool, Custom, Reasoning           bool
 }
 type Result struct {
 	ID, Model, Finish string
@@ -135,6 +144,15 @@ func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 		if msg["refusal"] != nil && msg["refusal"] != "" {
 			return r, validationFailure("refusal", ErrUnsupported)
 		}
+		if reasoning := msg["reasoning_content"]; reasoning != nil {
+			t, ok := reasoning.(string)
+			if !ok {
+				return r, validationFailure("unsupported_content", ErrUnsupported)
+			}
+			if t != "" && !probe {
+				r.Items = append(r.Items, Item{Text: t, Reasoning: true})
+			}
+		}
 		t, e := responseText(msg["content"], probe)
 		if e != nil {
 			return r, validationFailure("unsupported_content", e)
@@ -185,7 +203,19 @@ func (r *Result) item(i int) Object {
 		id = fmt.Sprintf("item_%s_%d", r.ID, i)
 	}
 	if x.Tool {
-		return Object{"type": "function_call", "id": id, "call_id": x.CallID, "name": x.Name, "arguments": x.Arguments, "status": "completed"}
+		item := Object{"type": "function_call", "id": id, "call_id": x.CallID, "name": x.Name, "arguments": x.Arguments, "status": "completed"}
+		if x.Namespace != "" {
+			item["namespace"] = x.Namespace
+		}
+		if x.Custom {
+			item["type"] = "custom_tool_call"
+			item["input"], _ = customToolInput(x.Arguments)
+			delete(item, "arguments")
+		}
+		return item
+	}
+	if x.Reasoning {
+		return Object{"type": "reasoning", "id": id, "summary": []any{Object{"type": "summary_text", "text": x.Text}}}
 	}
 	return Object{"type": "message", "id": id, "role": "assistant", "status": "completed", "content": []any{Object{"type": "output_text", "text": x.Text, "annotations": []any{}}}}
 }
@@ -233,6 +263,8 @@ func (r *Result) JSON(p string) Object {
 	for _, x := range r.Items {
 		if x.Tool {
 			calls = append(calls, Object{"id": x.CallID, "type": "function", "function": Object{"name": x.Name, "arguments": x.Arguments}})
+		} else if x.Reasoning {
+			msg["reasoning_content"] = str(msg["reasoning_content"]) + x.Text
 		} else {
 			t += x.Text
 		}
@@ -245,4 +277,15 @@ func (r *Result) JSON(p string) Object {
 		}
 	}
 	return Object{"id": r.ID, "object": "chat.completion", "created": time.Now().Unix(), "model": r.Model, "choices": []any{Object{"index": 0, "message": msg, "finish_reason": finish}}, "usage": r.Usage.JSON(p)}
+}
+
+// CheckTarget prevents unsupported reasoning from being relabeled as visible
+// text or unsigned Anthropic thinking. Responses/Chat can preserve plaintext.
+func (r *Result) CheckTarget(p string) error {
+	for _, item := range r.Items {
+		if (p == "anthropic" && item.Reasoning) || (p != "responses" && item.Custom) {
+			return ErrUnsupported
+		}
+	}
+	return nil
 }

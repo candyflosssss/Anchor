@@ -82,6 +82,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   Attribution filters: [--agent TYPE] [--binding ID] [--project ID] [--session ID]; explicit empty selects unknown.
   Authenticated Codex requests can use native thread IDs and local project metadata; explicit tags take precedence.
   Historical logs are not backfilled; session titles and conversation content are not collected.
+  Conversion failures retain route IDs and safe conversion_target/conversion_reason evidence in detail/export.
   logs detail REQUEST_ID | logs settings
   logs configure [--days 7] [--system-days 7] [--max-requests 50000]
       [--request-mib 256] [--system-mib 32]

@@ -17,6 +17,10 @@ func Stream(w http.ResponseWriter, body io.Reader, from, to, model string) (Usag
 	return StreamObserved(w, body, from, to, model, nil)
 }
 func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model string, observation *Observation) (usage Usage, streamErr error) {
+	return StreamObservedMapped(w, body, from, to, model, observation, nil)
+}
+
+func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping) (usage Usage, streamErr error) {
 	r := Result{ID: fmt.Sprintf("resp_anchor_%d", time.Now().UnixNano()), Model: model}
 	emit := &emitter{w: w, p: to, r: &r}
 	same := from == to
@@ -43,6 +47,7 @@ func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model strin
 	size := 0
 	index := map[int]int{}
 	chatText := -1
+	chatReasoning := -1
 	add := func(up int, item Item) (int, error) {
 		if i, ok := index[up]; ok {
 			return i, nil
@@ -52,6 +57,9 @@ func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model strin
 		}
 		i := len(r.Items)
 		index[up] = i
+		if from == "chat-completions" && to == "responses" {
+			mapping.restore(&item)
+		}
 		r.Items = append(r.Items, item)
 		if !same {
 			if e := emit.startItem(i); e != nil {
@@ -164,11 +172,28 @@ func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model strin
 					r.Finish = finish
 				}
 				d := obj(c["delta"])
-				if allowed(d, "role content tool_calls refusal") != nil || c["logprobs"] != nil {
+				if allowed(d, "role content tool_calls refusal reasoning_content") != nil || c["logprobs"] != nil {
 					return ErrUnsupported
 				}
 				if d["refusal"] != nil && d["refusal"] != "" {
 					return ErrUnsupported
+				}
+				if v := d["reasoning_content"]; v != nil {
+					t, ok := v.(string)
+					if !ok || to != "responses" {
+						return ErrUnsupported
+					}
+					if t != "" {
+						if chatReasoning < 0 {
+							chatReasoning, e = add(-2, Item{Reasoning: true})
+							if e != nil {
+								return e
+							}
+						}
+						if e = delta(chatReasoning, t, false); e != nil {
+							return e
+						}
+					}
 				}
 				if t := str(d["content"]); t != "" {
 					if chatText < 0 {
@@ -184,13 +209,23 @@ func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model strin
 				for _, v := range arr(d["tool_calls"]) {
 					c := obj(v)
 					f := obj(c["function"])
+					if c["type"] != nil && c["type"] != "function" || num(c["index"]) < 0 {
+						return ErrUnsupported
+					}
 					if _, exists := index[int(num(c["index"]))]; !exists && (str(c["id"]) == "" || str(f["name"]) == "") {
 						return ErrUnsupported
 					}
-					if j, exists := index[int(num(c["index"]))]; exists && str(f["name"]) != "" && str(f["name"]) != r.Items[j].Name {
-						return ErrUnsupported
+					x := Item{Tool: true, CallID: str(c["id"]), Name: str(f["name"])}
+					if j, exists := index[int(num(c["index"]))]; exists {
+						check := x
+						if to == "responses" {
+							mapping.restore(&check)
+						}
+						if x.Name != "" && (check.Name != r.Items[j].Name || check.Namespace != r.Items[j].Namespace || check.Custom != r.Items[j].Custom) || x.CallID != "" && x.CallID != r.Items[j].CallID {
+							return ErrUnsupported
+						}
 					}
-					i, e := add(int(num(c["index"])), Item{Tool: true, CallID: str(c["id"]), Name: str(f["name"])})
+					i, e := add(int(num(c["index"])), x)
 					if e != nil {
 						return e
 					}
@@ -431,11 +466,20 @@ func (e *emitter) startItem(i int) error {
 	if e.p == "responses" {
 		item := e.r.item(i)
 		item["status"] = "in_progress"
-		if !x.Tool {
+		if x.Reasoning {
+			item["summary"] = []any{}
+		} else if x.Custom {
+			item["input"] = ""
+		} else if x.Tool {
+			item["arguments"] = ""
+		} else if !x.Tool {
 			item["content"] = []any{}
 		}
 		if err := e.send("response.output_item.added", Object{"output_index": i, "item": item}); err != nil {
 			return err
+		}
+		if x.Reasoning {
+			return e.send("response.reasoning_summary_part.added", Object{"output_index": i, "item_id": item["id"], "summary_index": 0, "part": Object{"type": "summary_text", "text": ""}})
 		}
 		if !x.Tool {
 			return e.send("response.content_part.added", Object{"output_index": i, "item_id": item["id"], "content_index": 0, "part": Object{"type": "output_text", "text": "", "annotations": []any{}}})
@@ -468,6 +512,14 @@ func (e *emitter) toolIndex(i int) int {
 }
 func (e *emitter) delta(i int, s string, tool bool) error {
 	if e.p == "responses" {
+		if e.r.Items[i].Custom {
+			// A JSON string can split in the middle of an escape or UTF-8 code
+			// point. Buffer its bounded wrapper until it can be decoded exactly.
+			return nil
+		}
+		if e.r.Items[i].Reasoning {
+			return e.send("response.reasoning_summary_text.delta", Object{"output_index": i, "item_id": e.r.item(i)["id"], "summary_index": 0, "delta": s})
+		}
 		typ := "response.output_text.delta"
 		if tool {
 			typ = "response.function_call_arguments.delta"
@@ -494,6 +546,9 @@ func (e *emitter) delta(i int, s string, tool bool) error {
 	return e.chat(Object{"content": s}, nil, nil)
 }
 func (e *emitter) done() error {
+	if err := e.r.CheckTarget(e.p); err != nil {
+		return err
+	}
 	if e.p == "anthropic" && !e.r.Usage.Known {
 		return errors.New("upstream omitted usage required by Messages")
 	}
@@ -508,11 +563,31 @@ func (e *emitter) done() error {
 			if x.CallID == "" || x.Name == "" || json.Unmarshal([]byte(x.Arguments), &args) != nil || args == nil {
 				return errors.New("incomplete or unsupported tool arguments")
 			}
+			if x.Custom {
+				if _, err := customToolInput(x.Arguments); err != nil {
+					return err
+				}
+			}
 		}
 		if e.p == "responses" {
 			item := e.r.item(i)
-			if x.Tool {
+			if x.Custom {
+				input, _ := customToolInput(x.Arguments)
+				if err := e.send("response.custom_tool_call_input.delta", Object{"output_index": i, "item_id": item["id"], "delta": input}); err != nil {
+					return err
+				}
+				if err := e.send("response.custom_tool_call_input.done", Object{"output_index": i, "item_id": item["id"], "input": input}); err != nil {
+					return err
+				}
+			} else if x.Tool {
 				if err := e.send("response.function_call_arguments.done", Object{"output_index": i, "item_id": item["id"], "arguments": x.Arguments}); err != nil {
+					return err
+				}
+			} else if x.Reasoning {
+				if err := e.send("response.reasoning_summary_text.done", Object{"output_index": i, "item_id": item["id"], "summary_index": 0, "text": x.Text}); err != nil {
+					return err
+				}
+				if err := e.send("response.reasoning_summary_part.done", Object{"output_index": i, "item_id": item["id"], "summary_index": 0, "part": Object{"type": "summary_text", "text": x.Text}}); err != nil {
 					return err
 				}
 			} else {

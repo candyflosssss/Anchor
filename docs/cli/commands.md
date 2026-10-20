@@ -815,6 +815,8 @@ anchor [--data-dir DIR] update apply --approve
 桌面宿主配置入口为 `anchor-desktop [--data-dir DIR] [--update-channel CHANNEL] [--update-manifest HTTPS_URL]`，首次 GUI 启动时只在指定参数后保存配置；当前用户已有 GUI 时再次启动只恢复已有窗口，不切换其 `--data-dir` 或保存新更新参数。已有宿主未响应时有界等待后退出1，不再开第二个 GUI。核心 `--core` 和内部安装 helper 不受 GUI 锁限制。窗口连接和供应商功能仍走原会话规则。桌面 GUI 只接收受控渠道和已检查版本，不提供任意 URL/路径/命令执行。Linux 安装权限交由系统安装器，不能等同于 CLI apply 原位替换 `/usr/bin`。
 
 
+2026-10-20 协议转换增量（当前源码，未打包／未发布）：Responses → Chat 支持 `reasoning.effort`、`text.format`、明文思考历史及 function/custom/namespace 工具；Chat 返回恢复思考和工具身份，custom grammar 降为描述指令而非原生强制约束。历史密文、tool_search 和多模态仍明确拒绝，详见[协议兼容说明](../design/protocol-chat-bridge.md)。这是网关数据面修复，无新增 CLI 配置开关。`logs detail/export` 的失败详情增加安全 `conversion_target/conversion_reason` evidence，并保留未派发的路由身份；HTTP=null、attempt_count=0 保持原义。需升级处理请求的核心，不回填历史；命令、参数、退出码及列表 evidence 白名单不变。
+
 ## 12. 请求与系统日志（当前源码；基础能力自 desktop.16 dev）
 
 需要升级并正常重启到支持日志的核心；旧版不会补采历史。使用所选 Context、owner 管理授权及实例身份核验。日志独立于累计 usage，配置日志保留不删除累计用量。

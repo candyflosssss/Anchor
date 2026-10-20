@@ -97,6 +97,10 @@ Agent 管理接口在处理 workspace、enroll、add、inspect、plan、sync、s
 
 页面显示 dropped、write_failures 与存储错误；队列故障不得被伪装成“没有日志”。缺口计数与保留清理不同；退出/断电前未刷盘的计数可能丢失。这里没有事件订阅或精确丢失区间协议。
 
+### 协议转换失败诊断（2026-10-20 当前源码，未发布）
+
+`unsupported_conversion` 在尚未派发时保留所选 provider/key/upstream_model，HTTP=null、attempt_count=0 和 sent_service_tier=not_sent 不变。详情／复制／导出的 evidence 新增固定目标协议 `conversion_target` 和代码自有错误类别 `conversion_reason`；未知字段名和原始解析错误不入日志，历史记录不补写。列表沿用现有 evidence 白名单，不增加正文搜索或新的 DTO。支持范围与类别见[Chat 转换兼容说明](protocol-chat-bridge.md)。
+
 ## 5. 管理接口、CLI 与桌面边界
 
 以下接口继承 owner 鉴权、Origin 防护和实例身份核验：

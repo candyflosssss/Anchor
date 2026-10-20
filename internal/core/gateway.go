@@ -347,9 +347,16 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	}()
 	request["model"], _ = json.Marshal(c.Model)
 	raw, _ := json.Marshal(request)
-	body, err := protocol.ConvertRequest(raw, "responses", p.Protocol)
+	body, mapping, err := protocol.ConvertRequestMapped(raw, "responses", p.Protocol)
 	if err != nil {
-		fail(w, 400, "unsupported_conversion", "candidate protocol cannot represent a request field or content")
+		reason := protocol.ConversionReason(err)
+		if t := trace(r); t != nil {
+			t.row.Provider, t.row.Key, t.row.UpstreamModel = p.ID, key.ID, c.Model
+			t.row.HTTP = nil
+			t.row.Evidence["conversion_target"] = p.Protocol
+			t.row.Evidence["conversion_reason"] = reason
+		}
+		fail(w, 400, "unsupported_conversion", "candidate protocol "+p.Protocol+" cannot represent request ("+reason+")")
 		return false
 	}
 	target := strings.TrimRight(base, "/") + protocol.Endpoint(p.Protocol)
@@ -476,7 +483,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		w.Header().Set("X-Accel-Buffering", "no")
 		w.WriteHeader(200)
 		setLogStage(r, "stream")
-		usage, err = protocol.StreamObserved(w, resp.Body, p.Protocol, to, public, &observation)
+		usage, err = protocol.StreamObservedMapped(w, resp.Body, p.Protocol, to, public, &observation, mapping)
 		if err != nil {
 			code = "stream_interrupted"
 			if t := trace(r); t != nil {
@@ -527,6 +534,13 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		return false
 	}
 	usage = result.Usage
+	if to == "responses" && p.Protocol == "chat-completions" {
+		err = mapping.RestoreResult(&result)
+	}
+	if err != nil || result.CheckTarget(to) != nil {
+		fail(w, 502, "unsupported_upstream_response", "upstream returned unsupported content")
+		return false
+	}
 	observation.Status = "completed"
 	if result.Finish == "length" {
 		observation.Status = "incomplete"

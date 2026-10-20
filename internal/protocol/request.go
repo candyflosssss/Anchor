@@ -72,39 +72,61 @@ func Decode(raw []byte) (Object, error) {
 	return m, nil
 }
 func ConvertRequest(raw []byte, from, to string) ([]byte, error) {
+	body, _, err := ConvertRequestMapped(raw, from, to)
+	return body, err
+}
+
+// ConvertRequestMapped retains request-local tool identities for the return
+// path. A mapping must never be shared between requests or candidate attempts.
+func ConvertRequestMapped(raw []byte, from, to string) ([]byte, *ChatMapping, error) {
 	if from == to {
-		return raw, nil
+		return raw, nil, nil
 	}
 	m, err := Decode(raw)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if from != "responses" {
 		m, err = toResponses(m, from)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
+		}
+	}
+	var mapping *ChatMapping
+	var options Object
+	if to == "chat-completions" {
+		mapping, options, err = prepareChatRequest(m)
+		if err != nil {
+			return nil, nil, err
 		}
 	}
 	if to != "responses" {
 		m, err = fromResponses(m, to)
 		if err != nil {
-			return nil, err
+			return nil, nil, conversionFailure("request_content", err)
 		}
 	}
-	return json.Marshal(m)
+	for k, v := range options {
+		m[k] = v
+	}
+	body, err := json.Marshal(m)
+	return body, mapping, err
 }
 func toResponses(m Object, from string) (Object, error) {
 	keys := "model messages stream temperature top_p tools tool_choice max_tokens"
 	if from == "anthropic" {
 		keys += " system"
 	} else {
-		keys += " max_completion_tokens stream_options parallel_tool_calls service_tier"
+		keys += " max_completion_tokens stream_options parallel_tool_calls service_tier reasoning_effort response_format metadata user safety_identifier prompt_cache_key prompt_cache_retention verbosity"
 	}
 	if err := allowed(m, keys); err != nil {
 		return nil, err
 	}
 	out := Object{"model": m["model"], "store": false}
 	if from == "chat-completions" {
+		if err := chatIngressOptions(m, out); err != nil {
+			return nil, err
+		}
 		if tier, ok := m["service_tier"]; ok {
 			out["service_tier"] = tier
 		}
@@ -145,7 +167,11 @@ func toResponses(m Object, from string) (Object, error) {
 	}
 	for _, v := range messages {
 		msg := obj(v)
-		if err := allowed(msg, "role content tool_calls tool_call_id"); err != nil {
+		messageKeys := "role content tool_calls tool_call_id"
+		if from == "chat-completions" {
+			messageKeys += " reasoning_content"
+		}
+		if err := allowed(msg, messageKeys); err != nil {
 			return nil, err
 		}
 		role := str(msg["role"])
@@ -153,6 +179,15 @@ func toResponses(m Object, from string) (Object, error) {
 		case "user", "assistant", "system", "developer", "tool":
 		default:
 			return nil, ErrUnsupported
+		}
+		if reasoning := msg["reasoning_content"]; reasoning != nil {
+			t, ok := reasoning.(string)
+			if !ok || role != "assistant" {
+				return nil, conversionFailure("reasoning_history", ErrUnsupported)
+			}
+			if t != "" {
+				input = append(input, Object{"type": "reasoning", "summary": []any{Object{"type": "summary_text", "text": t}}})
+			}
 		}
 		if role == "tool" {
 			t, e := text(msg["content"])
@@ -349,7 +384,11 @@ func fromResponses(m Object, to string) (Object, error) {
 		item := obj(v)
 		switch str(item["type"]) {
 		case "", "message":
-			if err := allowed(item, "type role content id status"); err != nil {
+			keys := "type role content id status"
+			if to == "chat-completions" {
+				keys += " reasoning_content"
+			}
+			if err := allowed(item, keys); err != nil {
 				return nil, err
 			}
 			role := str(item["role"])
@@ -369,7 +408,25 @@ func fromResponses(m Object, to string) (Object, error) {
 				}
 				out["system"] = t
 			} else {
-				messages = append(messages, Object{"role": role, "content": t})
+				message := Object{"role": role, "content": t}
+				if item["reasoning_content"] != nil {
+					if _, ok := item["reasoning_content"].(string); !ok || role != "assistant" {
+						return nil, ErrUnsupported
+					}
+					message["reasoning_content"] = item["reasoning_content"]
+				}
+				messages = append(messages, message)
+			}
+		case "reasoning":
+			if to != "chat-completions" {
+				return nil, ErrUnsupported
+			}
+			t, err := chatHistoryReasoning(item)
+			if err != nil {
+				return nil, err
+			}
+			if t != "" {
+				messages = append(messages, Object{"role": "assistant", "content": "", "reasoning_content": t})
 			}
 		case "function_call":
 			if str(item["call_id"]) == "" || str(item["name"]) == "" || !json.Valid([]byte(str(item["arguments"]))) {
@@ -432,6 +489,9 @@ func fromResponses(m Object, to string) (Object, error) {
 			if len(merged) > 0 && m["role"] == "assistant" && obj(merged[len(merged)-1])["role"] == "assistant" {
 				prev := obj(merged[len(merged)-1])
 				prev["content"] = str(prev["content"]) + str(m["content"])
+				if reasoning, ok := m["reasoning_content"]; ok {
+					prev["reasoning_content"] = str(prev["reasoning_content"]) + str(reasoning)
+				}
 				if calls := arr(m["tool_calls"]); len(calls) > 0 {
 					prev["tool_calls"] = append(arr(prev["tool_calls"]), calls...)
 				}
