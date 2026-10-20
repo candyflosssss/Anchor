@@ -1,14 +1,18 @@
 # 在线更新 v1
 
 - 更新：2026-10-20。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.54](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.54)，发布于 `2026-10-20T11:25:27+08:00`；GitHub prerelease，非 latest，两平台安装包与 flat 更新清单同版投放。
-- 本版包含 `.53` 之后截至 `c81efd52e01ac2eaa801a267f2fe7880dd34ada5` 的已提交功能：供应商多 Key 原子创建、多请求地址／IP 编辑、供应商局部后台刷新保留页面与表单状态、余额查到后原位更新，以及日志参考费用分组展示。未混入工作区未提交的系统代理改动。
-- 构建：干净隔离源码，SOURCE.json dirty=false；Windows AMD64／Ubuntu24.04 AMD64 生产编译、Go／TS 契约比对、安装包哈希、提交源码逐文件／输入摘要、Anchor／mihomo Go vendor、元数据 ZIP CRC 均通过；原 BUILD.json 的未执行原生／安装验收状态保留。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff、state.db schema9，宿主与核心配套更新，SSH 远端单独升级；desktop.34 及更早版首次迁移须备份、正常停服并退出界面后手动安装。升级有停机窗口，无数据库降级。
-- 在线验证：六附件大小／SHA256 digest、tag 构建 revision 一致，latest 未改变；隔离本轮源码 CLI 从默认 dev 源以 `.53` 为当前版真实发现并下载 `.54` Linux 包，大小与 SHA256 通过；Windows 远端 digest 与本地一致。
-- 本机状态与验收边界：CLI／核心／GUI 已于 `2026-10-20T14:18:14+08:00` 从 `.53` 配套升级到 `.54`，核心与网关 ready；schema9→9，数据库完整性、配置行、凭据与托管文件核对通过。原有 Codex model conflict／DSH applied 保持；未执行 Windows／Linux 原生窗口交互、系统安装器／应用内 apply、SSH 远端或真实付费上游验收，安装器未签名。供应商与刷新功能沿用相关 Go 测试、前端 typecheck／lint、367项单测及69项模拟浏览器回归的实际结果。完整产物见[桌面发行说明](../release/desktop.md#局部刷新与多-key-54已发布-dev本机已升级)。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.55](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.55)，发布于 `2026-10-20T14:57:29+08:00`；GitHub prerelease，非 latest，两平台安装包与 flat 更新清单同版投放。
+- 修复 Codex 外部编辑后，旧 Anchor 注释范围混入项目／其他 provider 表，导致“更新配置”拒绝重新接管的问题。按实际 TOML 表处理并保留其他设置，结合既有缺失／损坏目录重建；不需手动删注释。包含 `.54` 既有能力。
+- 构建提交 `8279f3a9dc0fada72b51d7798294c872ba515134`，SOURCE.json dirty=false；双平台生产编译、Go／TS 契约、提交源码逐文件／输入摘要、Anchor／mihomo vendor、元数据及附件完整性检查通过。9项新增回归与 managed／core／cli／desktop 四包测试通过。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff、state.db schema9，核心与桌面配套升级，SSH 远端另行升级；有停机窗口，无数据库降级。desktop.34 及更早版首次迁移须备份、正常停服并退出界面后手动安装。
+- 在线验证：同版六附件大小／SHA256 digest 与 tag revision 一致，latest 未改变；从默认 dev 源以 `.54` 为当前版真实发现并下载 `.55` Linux 包，大小和 SHA256 校验通过，Windows 远端 digest 与本地一致。
+- 本机已于 `2026-10-20T14:56:31.163936+08:00` 从 `.54` 配套升级到 `.55`，core／gateway／agent_management ready，Codex／DSH applied；运行 ELF 与候选一致，GUI 匹配发布 deb，schema9→9，数据库完整性、配置、凭据及托管／恢复文件核对通过。未执行系统安装器／应用内 apply、原生窗口交互、真实 SSH 或付费上游验收，安装器未签名。
 
-- 本轮不改变在线更新契约或新增管理操作，继续使用既有默认 GitHub 源、dev 渠道与受控安装交接。
+## .55 在线投放与本机升级（2026-10-20）
+
+默认 GitHub dev 源以 `.54` 为当前版本真实发现并下载 `.55` Linux deb：29046240 字节，SHA256 `4032f537784ba076f405925344d88307cf51bcdd76dcc43154ecd50daef1a3f2`；Windows GitHub digest `c29e41b5abf67b7c0222c52777fdb453193f94f864d6fd16c7f689e376470618` 与本地一致。同版六附件和构建 tag 已核对，prerelease／非 latest。
+
+本机采用用户目录二进制替换；备份 `/home/mosaki/.config/anchor/backups/pre-desktop55-20261020-145618`，正常 restart_handoff，核心／宿主运行哈希、schema9、数据库完整性、配置／凭据／托管文件和 applied 状态核对通过。未走系统安装器／应用内 apply。完整边界见[发行记录](../release/desktop.md#配置接管修复-55已发布-dev本机已升级)。
 
 ## .54 在线投放验证（2026-10-20）
 
