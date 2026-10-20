@@ -1,12 +1,18 @@
 # 在线更新 v1
 
 - 更新：2026-10-20。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.57](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.57)，发布于 `2026-10-20T20:12:19+08:00`；GitHub prerelease，非 latest，11 项附件同版投放。
-- NewAPI 自动识别后就地输入用户令牌，保存后重查分组倍率与模型目录；参考价格与分组倍率启动时检查、成功满一小时刷新，新请求只接受不足三小时的有效缓存，映射变更后异步检查。授权失败或过期保持未知。
-- 构建提交 `b87824e329ad3ea9f5e922f3bac3cd16282e3793`，SOURCE.json dirty=false；契约比对、TypeScript／Vite 和 Windows／Ubuntu24.04 AMD64 生产编译／打包通过。安装器、runtime、CLI、对应源码／vendor、许可元数据及全部远端附件摘要已核对。未混入工作区系统代理改动。
-- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面配套升级；首次从旧宿主升级使用安装器，新宿主可使用 runtime，SSH 被控机需单独升级。
-- 默认 dev 源以 `.56` 为当前版本，真实下载 `.57` Linux runtime 与旧客户端兼容 deb；独立 CLI feed 同版下载通过，大小／SHA256 及运行版本均符合预期。Windows 三个程序的远端 digest 与本地一致，tag 指向构建提交，latest 保持不变。
-- 本机已于 `2026-10-20T21:52:31.182449+08:00` 从 `.56` 配套升级到 `.57`，CLI／核心／GUI 运行摘要与发布产物一致，core／gateway／agent_management ready，Codex／DSH applied。备份 `/home/mosaki/.config/anchor/backups/pre-desktop57-20261020-215227`；dev 源身份固定的 CLI 检查通过。未执行系统安装器／apply、双平台原生窗口交互或真实 SSH 更新传输验收。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.58](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.58)，发布于 `2026-10-20T22:26:41+08:00`；GitHub prerelease，非 latest，11 项附件同版投放。
+- 修复历史加密推理拒绝在流开头超过 2 秒才返回时漏掉清理重试的问题；在原请求超时内等待首个实际输出，明确拒绝后清理历史 reasoning 并同渠道重试一次，日志标记清理／恢复及流检查结束原因。
+- 构建提交 `4ec5ea31637751a488f10211e7e9c59c13a7cad9`，SOURCE.json dirty=false；契约比对、TypeScript／Vite 和 Windows／Ubuntu24.04 AMD64 生产编译／打包通过。包含各 Key 倍率／分组展示与 SSH 更新失败提示修复，未混入工作区系统代理改动。
+- 更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。沿用 restart_handoff 和 schema9，核心与桌面配套升级，SSH 被控机另行升级。
+- 默认 dev 源以 `.57` 为当前版本，真实下载 `.58` Linux runtime 与旧客户端兼容 deb；独立 CLI feed 同版下载通过，大小／SHA256 及运行版本均符合预期。全部11附件远端摘要与本地一致，tag 指向构建提交，latest 保持不变。
+- 本机已于 `2026-10-20T22:27:32.220140+08:00` 从 `.57` 配套升级到 `.58`，CLI／核心／GUI 运行摘要与发布产物一致，core／gateway／agent_management ready，Codex／DSH applied。备份 `/home/mosaki/.config/anchor/backups/pre-desktop58-20261020-222728`；配置、凭据、托管文件、恢复日志与 dev 更新配置保持，身份／端口固定的 CLI 检查通过。未执行系统安装器／apply、双平台原生窗口交互、真实 SSH 更新传输或真实付费推理验收。
+
+## .58 在线投放与本机升级（2026-10-20）
+
+默认 dev 源真实下载新版 Linux runtime、旧客户端兼容 deb 与同版 CLI，版本／目标／大小／SHA256核对通过，11附件远端摘要全部匹配，构建 tag 指向 `4ec5ea31637751a488f10211e7e9c59c13a7cad9`，prerelease／非 latest。安装器与runtime配套清单保留新旧客户端兼容。加密上下文识别等待原请求超时，日志标记检查结束原因和实际清理／恢复；详见[发行记录](../release/desktop.md#加密上下文延迟恢复-58已发布-dev本机已升级)。
+
+本机经备份、保留交接完成`.57`→`.58`，核心／GUI运行摘要、ready／applied、schema9和配置／凭据／托管恢复文件核验通过，dev更新配置保持。备份 `/home/mosaki/.config/anchor/backups/pre-desktop58-20261020-222728`。身份／端口固定更新检查返回当前`.58`、available=false；本机只读模型目录核对通过。未执行付费推理、系统安装器／apply、原生窗口或跨机SSH传输验收。
 
 ## .57 在线投放验证（2026-10-20）
 

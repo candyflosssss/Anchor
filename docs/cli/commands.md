@@ -27,7 +27,7 @@
 
 2026-10-19 交付核对：desktop.52 已统一发布截至 `2024e3f` 的功能，本机 CLI／核心／GUI 同版升级；包含 `agent codex-settings`、Key／供应商删除后的模型清理、日志参考费用及余额列表缓存。独立公开 CLI 仍为 alpha.6；桌面安装包不提供通用CLI，本机CLI从同版发布源码及vendor离线构建。本次仅同步交付状态，无新增命令或参数。详见[桌面发行说明](../release/desktop.md#统一更新-52已发布-dev本机已升级)。
 
-2026-10-20 交付核对：desktop.57 已发布 NewAPI 就地授权、参考价格／分组倍率后台缓存维护、runtime 本机更新与 SSH 被控机更新，并提供同版独立 CLI dev feed。新旧客户端的默认源下载及 SHA256 校验通过；本轮不新增命令／参数；发布后应用户要求，本机 CLI／核心／GUI 已于21:52配套升级为 `.57`，保存 dev 渠道，身份／端口固定的 CLI 更新检查通过。本条覆盖相关旧章节的“源码未发布”交付标记，系统代理的未提交增量不在本次构建中。详见[发行记录](../release/desktop.md#newapi-授权与自动缓存-57已发布-dev)。
+2026-10-20 交付核对：desktop.58 已发布历史加密推理延迟拒绝的清理重试修复及流检查日志标记，去掉独立2秒识别窗口，沿用原请求超时；同时包含各 Key 倍率／分组展示及 SSH 更新失败提示修复，保留 desktop.57 的 NewAPI 授权、缓存维护、runtime／SSH 更新和同版 CLI feed。新旧客户端下载及全部11附件摘要校验通过；本机 CLI／核心／GUI 已由`.57`升级到`.58`，配置／凭据／托管状态与 dev 更新配置保持，身份／端口固定更新检查通过。本轮不新增命令／参数；本条覆盖相关章节的旧“源码未发布”交付标记，系统代理的未提交增量不在本次构建中。详见[发行记录](../release/desktop.md#加密上下文延迟恢复-58已发布-dev本机已升级)。
 
 ## 1. 调用与公共约定
 
@@ -354,7 +354,7 @@ anchor usage
 
 配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403、429 和连续失败触发临时降权，不自动停用 Key；成功或到期恢复，无独占探测。自动降权开关、保留权重、失败阈值及两类时长由 `settings key-cooldown` 配置（§16）。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
-当前网关每个供应商／Key／候选模型通常仅尝试一次，可安全失败时切换其他Key或候选；2026-10-20 当前源码增加明确密文校验拒绝后的单次清理重试例外（未打包／未发布），规则见下文日志章节和[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
+当前网关每个供应商／Key／候选模型通常仅尝试一次，可安全失败时切换其他Key或候选；desktop.58 已发布明确密文校验拒绝后的单次清理重试例外，规则见下文日志章节和[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
 
 401/403/429沿用Key切换与降权；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康、日志与用量按实际渠道尝试更新，不设置半开探测预约。此处不改变 provider test 固定目标与管理写入不自动重试的规则。
 
@@ -525,7 +525,7 @@ anchor model settings --id ID --file FILE
 
 写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
 
-当前网关每个供应商／Key／候选模型通常仅尝试一次，可安全失败时切换其他Key或候选；2026-10-20 当前源码增加明确密文校验拒绝后的单次清理重试例外（未打包／未发布），规则见下文日志章节和[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
+当前网关每个供应商／Key／候选模型通常仅尝试一次，可安全失败时切换其他Key或候选；desktop.58 已发布明确密文校验拒绝后的单次清理重试例外，规则见下文日志章节和[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
 
 `reference_action` 必须是 `keep`（保留已保存快照）、`clear`（清除）或 `set`（核心按精确 provider/model ID 保存 models.dev 快照，同时补齐未声明的上下文、限制、能力及思考范围）。补值保留显式设置，目录输入/输出与手工上下文或默认输出预算冲突时跳过相应限制；未知默认思考值不猜测。clear 只清除已保存快照，不禁用后续读取的自动建议。keep/clear 的两个来源 ID 必须为空；set 时必须都给出，不能传入前端生成的报价。目录下载失败/陈旧不保存新来源；写入超时/断线结果未知，应先重新读取核对 revision，不自动重试。
 
@@ -874,7 +874,7 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 
 输出 `{items:[{value,count}],has_more}`：基于整个时间范围而非当前页，空值不列出，按次数降序、相同次数按值升序。search 对应请求 ID／模型／供应商／Key／错误码，system 为事件名；单条请求同一值只计一次。HTTP 候选是字符串，Key 只包含日志安全 ID。超上限 has_more=true，使用更长前缀缩小；无匹配成功输出空数组。旧核心不支持、鉴权／身份错误、非法字段／范围和存储故障均非零退出，不伪装成空历史。例：`anchor logs suggestions --field model --prefix gpt --since 24h`。桌面搜索与各文本过滤复用此接口；已有精确过滤／前缀搜索语义不变。
 
-2026-10-20 当前源码（未打包／未发布）：原生 Responses 网关在明确历史密文校验错误、尚未交付响应时，移除请求中全部 reasoning 条目并向同一供应商／Key／模型／选定基址重试一次，共享超时；每个根请求最多一次清理，不改变 Codex 自身的重试设置。普通消息、工具调用／结果、压缩历史与加密任务不删除，不修改本地聊天。普通断网／超时、鉴权／限流、已开始输出不触发清理；流开头最多暂存 64 KiB，并沿用原供应商请求超时；不再使用 desktop.57 的独立 2 秒识别窗口，慢返回的明确拒绝仍可恢复。首次非生命周期事件或超过大小上限后原样转发，不重放已开始输出的请求。`logs list/follow/detail/export` 的安全 evidence 增加 `encrypted_context_recovery=pending|succeeded|failed|cancelled`、`encrypted_context_reason`（固定标签）、`encrypted_context_removed_reasoning`（十进制数量）、`encrypted_context_retry_count=1`；只在实际执行清理重试时出现，succeeded 仅指该次恢复尝试成功，不代表没有损失隐藏推理上下文。符合检查条件的流另记录 `encrypted_context_stream_inspection` 固定枚举（`rejected`、`output_started`、`non_lifecycle_event`、`invalid_event`、`prefix_limit`、`timeout`、`cancelled`、`eof`、`read_error`、`empty_read`），未清理时也可出现；该字段描述首个检查尝试的退出原因，不代表恢复成功。列表／follow 保留这五项紧凑标记，detail／export 还保留两次 attempt，初次拒绝码为 `encrypted_context_rejected`。根用量缺失则保持未知，不把最终成功用量当完整总额。沿用现有日志命令与鉴权，无新增手工清理命令；历史不补写，不记录密文、条目 ID、正文或原始错误文本。桌面状态列与详情显示中文恢复标记；完整边界见[日志设计](../design/logging.md#历史加密推理恢复2026-10-20当前源码未发布)。
+desktop.58 已发布（2026-10-20）：原生 Responses 网关在明确历史密文校验错误、尚未交付响应时，移除请求中全部 reasoning 条目并向同一供应商／Key／模型／选定基址重试一次，共享超时；每个根请求最多一次清理，不改变 Codex 自身的重试设置。普通消息、工具调用／结果、压缩历史与加密任务不删除，不修改本地聊天。普通断网／超时、鉴权／限流、已开始输出不触发清理；流开头最多暂存 64 KiB，并沿用原供应商请求超时；不再使用 desktop.57 的独立 2 秒识别窗口，慢返回的明确拒绝仍可恢复。首次非生命周期事件或超过大小上限后原样转发，不重放已开始输出的请求。`logs list/follow/detail/export` 的安全 evidence 增加 `encrypted_context_recovery=pending|succeeded|failed|cancelled`、`encrypted_context_reason`（固定标签）、`encrypted_context_removed_reasoning`（十进制数量）、`encrypted_context_retry_count=1`；只在实际执行清理重试时出现，succeeded 仅指该次恢复尝试成功，不代表没有损失隐藏推理上下文。符合检查条件的流另记录 `encrypted_context_stream_inspection` 固定枚举（`rejected`、`output_started`、`non_lifecycle_event`、`invalid_event`、`prefix_limit`、`timeout`、`cancelled`、`eof`、`read_error`、`empty_read`），未清理时也可出现；该字段描述首个检查尝试的退出原因，不代表恢复成功。列表／follow 保留这五项紧凑标记，detail／export 还保留两次 attempt，初次拒绝码为 `encrypted_context_rejected`。根用量缺失则保持未知，不把最终成功用量当完整总额。沿用现有日志命令与鉴权，无新增手工清理命令；历史不补写，不记录密文、条目 ID、正文或原始错误文本。桌面状态列与详情显示中文恢复标记；完整边界见[日志设计](../design/logging.md#历史加密推理恢复2026-10-20当前源码未发布)。
 
 `stats`（2026-10-16 已随 desktop.42 dev 宿主／核心发布；命令由兼容源码 CLI 提供，独立公开 alpha.6 CLI 不含，桌面程序不提供通用 CLI）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
 
