@@ -77,5 +77,14 @@
     "model_templates": {},
     "approved": true,
     "model_scope": "all-mapped"
+  },
+  "rebuild": {
+    "target_id": "codex-fixture",
+    "model": "public",
+    "expected_revision": 1,
+    "model_templates": {},
+    "approved": true,
+    "model_scope": "all-mapped",
+    "rebuild": true
   }
 }

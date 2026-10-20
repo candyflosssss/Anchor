@@ -594,7 +594,7 @@ anchor access revoke ID
 
 ```text
 anchor agent discover
-anchor agent enroll --target ID --model MODEL --approve [--revision N]
+anchor agent enroll --target ID --model MODEL --approve [--revision N] [--rebuild]
                     [--model-scope all-mapped|all-compatible]
                     [--template PUBLIC_ALIAS:LOCAL_SOURCE ...]
 anchor agent sync ID --revision N
@@ -620,11 +620,13 @@ Codex 目录导出把模型设置中的推理档位投影为客户端可表示�
 
 **2026-10-17 统一更新（desktop.46 宿主／核心已发布）**：桌面将「保存并应用」和独立同步合并为「更新配置」，确认后一次提交当前选择的默认模型与 revision。CLI 等价入口为 `agent enroll --target ID --model MODEL --revision N --model-scope all-mapped --approve`；新目标 revision 为0。在线且 journal 已应用或为可重新接管的 conflict 时，以本次设置和最新映射原位更新，外部改过的托管字段／生成目录保存为恢复基线，未变字段保留原基线。无需先 sync 再 enroll，成功递增 revision、不旋转凭据、不改现有映射。无改动也可提交以更新列表／修复托管配置。已恢复、待应用或未完成 journal 仍走原受控恢复／应用流程；语法、权限、不安全配置、并发文件变化继续拒绝。策略保存后应用可能失败，需重新 discover 核对新 revision 和状态，不自动重复旧请求。已随 desktop.46 宿主／核心发布；旧安装包需同步升级核心与客户端，独立 alpha.6 CLI 不含。
 
-`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。**2026-10-17 起（desktop.46 宿主／核心已发布），显式 `agent sync ID --revision N` 是重新接管请求**：对已应用或条件恢复后 conflict 的绑定，重新应用既有批准范围内的连接、默认模型和目录；受影响字段若被外部改过，先把当前值保存为下次恢复基线，未变化字段仍保留原基线。不先向客户端发布临时恢复配置，不吸收 Anchor 自己上次写入值为原值；对象字段保留生成键之外的外部扩展。生成目录被修改（含内容损坏）或删除也可重建，停用时还原其外部内容／缺失状态。完整配置语法错误、不支持的 profile／传输、危险路径、权限或未完成 journal 的错误仍拒绝，不能用 sync 盲目覆盖。revision 不匹配和写入前再次发生修改仍失败，失败不重放。set-models 遇外部冲突时，可先在现有策略下 sync 解除冲突，再重新选择策略；enroll 更新已应用配置已合并重新接管，无需先 sync。旧版本 sync 遇外部修改只报冲突；本语义需升级核心，桌面「更新配置」会先确认当前选择与影响。未新增命令或参数。
+`sync` 必填 Binding ID 和当前 revision≥1，仅 enabled 且网关就绪时可操作，不增加 revision、不旋转凭据。**2026-10-17 起（desktop.46 宿主／核心已发布），显式 `agent sync ID --revision N` 是重新接管请求**：对已应用或条件恢复后 conflict 的绑定，重新应用既有批准范围内的连接、默认模型和目录；受影响字段若被外部改过，先把当前值保存为下次恢复基线，未变化字段仍保留原基线。不先向客户端发布临时恢复配置，不吸收 Anchor 自己上次写入值为原值；对象字段保留生成键之外的外部扩展。生成目录被修改（含内容损坏）或删除也可重建，停用时还原其外部内容／缺失状态。Codex 已登记绑定的完整 TOML 损坏、被删除或无法用字节级编辑安全表达时，显式 `sync`／桌面「更新配置」会先把当前文件原样放入受保护恢复目录，再从最后一次已验证的托管快照重写一份干净配置并验证后替换；未登记目标、权限／路径错误、未完成 journal、并发写入和不支持的 profile／传输仍拒绝，避免猜测并覆盖未知配置。revision 不匹配和写入前再次发生修改仍失败，失败不重放。set-models 遇外部冲突时，可先在现有策略下 sync 解除冲突，再重新选择策略；enroll 更新已应用配置已合并重新接管，无需先 sync。旧版本 sync 遇外部修改只报冲突；本语义需升级核心，桌面「更新配置」会先确认当前选择与影响。未新增命令或参数。
+
+**2026-10-20 配置重建（当前源码）**：`agent enroll --target ID --model MODEL --revision N --model-scope all-mapped --rebuild --approve` 为 Codex 整份重建入口；新目标 revision=0，已登记目标使用当前 revision≥1。网关必须就绪，不接受 `--template` 或其他适配器。先将现有 config.toml 原样备份到数据目录 `recovery/<binding>.config-<fingerprint>.bak`，旧 journal 归档为 `.journal-<fingerprint>.bak`，再从空配置生成并校验连接和最新模型名单，最后按当前文件快照原子替换。原 profile、传输及其他设置全部从当前文件移除，仅保留在完整备份中；不读取其中的模板，也不要求以前托管过。停用只撤销新托管字段，不自动恢复旧坏文件。原有 token 保留，成功递增 revision；可替代未完成操作，但不绕过身份、revision、权限、安全路径、大小上限或备份失败。输出仍为脱敏 AgentWorkspace；失败可能已保存策略／恢复日志，必须重新 discover，不自动重放。旧核心不支持该参数，需配套升级。桌面等价入口为「备份并重建配置」，会先说明影响并确认。
 
 **后台自动同步及启动仍不抢回外部修改**。映射、模型设置／路由和供应商候选变化后，核心自动刷新已启用且已接管 Agent 的名单；single/all-compatible/all-mapped 各守原有范围，不扩大权限、不自动登记或复活已恢复目标。单个 Agent 冲突不回滚映射保存，不影响其他绑定；状态报告 needs_sync／overridden／recovery_pending，HTTP 成功响应带 `X-Anchor-Agent-Sync: applied|needs_sync`。默认模型失去可用候选时不会擅自换默认值，需先处理默认模型再同步。`sync` 同时作为手动重试和明确重新接管入口。Codex/Claude Code 需要重启，DSH 默认模型在新会话生效；配置落盘成功不证明真实请求已通过 Anchor。
 
-Codex provider 的 Anchor 注释不是所有权凭据；journal 才是恢复依据。第三方 TOML 序列化删掉注释、重排普通／带引号／嵌套 provider table 时，按语义定位既有托管表，完整核对结果并保留其他配置，不整份重新序列化。无法无歧义定位的 inline／dotted／multiline 形式仍安全拒绝。
+Codex provider 的 Anchor 注释不是所有权凭据；journal 才是恢复依据。第三方 TOML 序列化删掉注释、重排普通／带引号／嵌套 provider table 时，按语义定位既有托管表，完整核对结果并保留其他配置。显式修复可以在受保护备份后整份重写，但只使用已登记的托管快照，不把未知内容当成 Anchor 所有权；后台同步仍不抢回外部修改。
 
 ### `agent add`
 

@@ -269,6 +269,14 @@ func TestCLIDiscoverEnrollSync(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(root, "anchor_"+id+".models.json")); !os.IsNotExist(err) {
 		t.Fatal("catalog not restored", err)
 	}
+	// Whole-file rebuild is explicit and uses the same real management API.
+	os.WriteFile(configPath, []byte("model = [broken"), 0600)
+	run(false, "agent", "enroll", "--target", id, "--model", "public", "--revision", "3", "--rebuild", "--approve")
+	output = run(true, "agent", "enroll", "--target", id, "--model", "public", "--revision", "3", "--model-scope", "all-mapped", "--rebuild", "--approve")
+	if json.Unmarshal([]byte(output), &workspace) != nil || workspace.Bindings[0].Status != "applied" || workspace.Bindings[0].Revision != 4 {
+		t.Fatal("CLI rebuild did not apply clean configuration", output)
+	}
+	run(true, "agent", "disable", id, "--revision", "4")
 	// Both DSH adapters use the same home but independent CLI IDs and files.
 	dshRoot := filepath.Join(home, ".dsh")
 	for adapter, profile := range map[string]string{"dsh": "web", "dsh-desktop": "desktop"} {

@@ -75,6 +75,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		model := f.String("model", "", "default public model (required)")
 		revision := f.Int64("revision", 0, "existing binding revision; 0 for new target")
 		approve := f.Bool("approve", false, "approve target-local catalog and configuration management")
+		rebuild := f.Bool("rebuild", false, "back up and replace the entire Codex config with a clean all-mapped configuration")
 		var templates repeated
 		f.Var(&templates, "template", "public-model:local-catalog-model; empty source excludes alias; repeatable")
 		if err := parse(f, args[1:]); err != nil {
@@ -94,7 +95,10 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		if *target == "" || *model == "" || !*approve || *revision < 0 {
 			return errors.New("--target, --model and --approve are required; revision must be nonnegative")
 		}
-		v, err := c.EnrollAgent(ctx, managed.EnrollAgent{ModelScope: *scope, TargetID: *target, Model: *model, ExpectedRevision: *revision, ModelTemplates: choices, Approved: *approve})
+		if *rebuild && (*scope != "all-mapped" || len(choices) != 0) {
+			return errors.New("--rebuild requires --model-scope all-mapped and no --template")
+		}
+		v, err := c.EnrollAgent(ctx, managed.EnrollAgent{Rebuild: *rebuild, ModelScope: *scope, TargetID: *target, Model: *model, ExpectedRevision: *revision, ModelTemplates: choices, Approved: *approve})
 		if err != nil {
 			return err
 		}

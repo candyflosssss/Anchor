@@ -53,17 +53,19 @@ type catalogArtifact struct {
 	Existed  bool   `json:"existed,omitempty"`
 }
 type journal struct {
-	Previous       *previousWrite   `json:"previous,omitempty"`
-	Schema         int              `json:"schema"`
-	BindingID      string           `json:"binding_id"`
-	AdapterVersion string           `json:"adapter_version"`
-	OperationID    string           `json:"operation_id"`
-	Path           string           `json:"path"`
-	Original       []byte           `json:"original"`
-	Existed        bool             `json:"existed"`
-	Edits          []Edit           `json:"edits"`
-	Status         string           `json:"status"`
-	Catalog        *catalogArtifact `json:"catalog,omitempty"`
+	ReplacementFingerprint string           `json:"replacement_fingerprint,omitempty"`
+	LastWritten            []byte           `json:"last_written,omitempty"`
+	Previous               *previousWrite   `json:"previous,omitempty"`
+	Schema                 int              `json:"schema"`
+	BindingID              string           `json:"binding_id"`
+	AdapterVersion         string           `json:"adapter_version"`
+	OperationID            string           `json:"operation_id"`
+	Path                   string           `json:"path"`
+	Original               []byte           `json:"original"`
+	Existed                bool             `json:"existed"`
+	Edits                  []Edit           `json:"edits"`
+	Status                 string           `json:"status"`
+	Catalog                *catalogArtifact `json:"catalog,omitempty"`
 }
 type Engine struct {
 	Dir    string
@@ -124,6 +126,12 @@ func (e *Engine) load(id string) (journal, error) {
 		return j, ErrUnsafe
 	}
 	if j.Schema != 1 || j.BindingID != id || j.AdapterVersion != "1" || !supportedConfig(j.Path) || !filepath.IsAbs(j.Path) {
+		return j, ErrUnsafe
+	}
+	if len(j.LastWritten) > maxConfig {
+		return j, ErrUnsafe
+	}
+	if j.ReplacementFingerprint != "" && (len(j.ReplacementFingerprint) != 64 || (j.Status != "prepared" && j.Status != "conflict")) {
 		return j, ErrUnsafe
 	}
 	if j.Catalog != nil && (filepath.Dir(j.Catalog.Path) != filepath.Dir(j.Path) || filepath.Base(j.Catalog.Path) != catalogName(id) || len(j.Catalog.Written) > maxConfig || len(j.Catalog.Original) > maxConfig || !json.Valid(j.Catalog.Written)) {
@@ -254,7 +262,7 @@ func (e *Engine) Apply(p Plan) (Result, error) {
 		if err != nil {
 			return err
 		}
-		j := journal{Schema: 1, BindingID: p.BindingID, AdapterVersion: p.AdapterVersion, OperationID: op[:16], Path: p.Path, Original: b, Existed: exists, Edits: p.Edits, Status: "prepared", Catalog: p.catalog}
+		j := journal{Schema: 1, BindingID: p.BindingID, AdapterVersion: p.AdapterVersion, OperationID: op[:16], Path: p.Path, Original: b, Existed: exists, Edits: p.Edits, Status: "prepared", Catalog: p.catalog, LastWritten: next}
 		// Save recovery before the first config write. A crash on either side of
 		// rename can be recovered by comparing original and written field values.
 		if err = e.save(j); err != nil {
@@ -297,6 +305,27 @@ func (e *Engine) Recover(id string) (Result, error) {
 		b, exists, err := readConfig(filepath.Dir(j.Path), j.Path)
 		if err != nil {
 			return err
+		}
+		// A replacement interrupted before publishing config has not changed
+		// these bytes. They may be invalid TOML; do not parse or overwrite them.
+		if j.ReplacementFingerprint != "" && fingerprint(b, exists) == j.ReplacementFingerprint {
+			if j.Catalog != nil {
+				if _, parseErr := document(b); parseErr != nil {
+					// Cannot prove that an unreadable untouched config does not
+					// reference the catalog. Retain it for explicit rebuilding.
+					out.Conflicts = append(out.Conflicts, []string{"catalog", filepath.Base(j.Catalog.Path)})
+				} else if err := e.recoverCatalog(j, &out); err != nil {
+					return err
+				}
+			}
+			out.Status = "restored"
+			if len(out.Conflicts) > 0 {
+				out.Status = "conflict"
+			} else {
+				j.Previous, j.ReplacementFingerprint = nil, ""
+			}
+			j.Status = out.Status
+			return e.save(j)
 		}
 		paths := [][]string{}
 		for _, x := range j.Edits {
@@ -368,6 +397,7 @@ func (e *Engine) Recover(id string) (Result, error) {
 		j.Status = out.Status
 		if out.Status == "restored" {
 			j.Previous = nil
+			j.ReplacementFingerprint = ""
 		}
 		return e.save(j)
 	})
@@ -385,9 +415,12 @@ func (e *Engine) Status(id string) (Result, error) {
 	if j.Status == "restored" {
 		return out, nil
 	}
-	b, _, err := readConfig(filepath.Dir(j.Path), j.Path)
+	b, exists, err := readConfig(filepath.Dir(j.Path), j.Path)
 	if err != nil {
 		return out, err
+	}
+	if j.ReplacementFingerprint != "" && fingerprint(b, exists) == j.ReplacementFingerprint {
+		return out, nil
 	}
 	paths := [][]string{}
 	for _, x := range j.Edits {

@@ -99,7 +99,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
   access list | access revoke ID      Local-owner authorization operations
   agent discover                     Read targets, mapped model availability and bindings
-  agent enroll --target ID --model MODEL --approve [--revision N] [--model-scope all-mapped|all-compatible]
+  agent enroll --target ID --model MODEL --approve [--revision N] [--model-scope all-mapped|all-compatible] [--rebuild]
                [--template ALIAS:LOCAL_SOURCE ...] (empty source excludes alias)
   agent add --id ID --adapter codex|claude|dsh|dsh-desktop --config-root ABS_DIR --model MODEL --approve
             [--model-scope all-compatible|all-mapped|single] [--anchor-executable ABS_PATH]
@@ -149,6 +149,7 @@ All-mapped reads model mappings with enabled providers, without Codex metadata/t
 Mapping/provider changes refresh applied Agent model lists without overwriting external changes.
 agent sync explicitly reclaims approved fields and catalogs; external values become recovery baselines.
 agent enroll updates the selected default and latest mappings, reclaiming approved fields when the gateway is ready.
+Codex enroll --rebuild requires --approve --model-scope all-mapped and no --template: back up the entire config, then replace it with a clean configuration; other settings remain only in the backup.
 Unset model context stays within the first models.dev input-price band when known; explicit limits are retained.
 Long-context pricing is selected by actual request input (including cache), not the configured window.
 provider price-import rejects context-tiered prices; use model-catalog model/estimate or model settings references.

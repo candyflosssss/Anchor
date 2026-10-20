@@ -56,7 +56,7 @@ export function agentMessage(error: unknown): string {
     invalid: '托管选择无效。请检查默认模型、模板、目录和版本，重新识别后再提交。',
     conflict: '托管记录版本已变化，本次操作未完成。请核对重新读取的状态后再操作。',
     agent_config_conflict: '托管配置或模型目录已变化。请展开对应 Agent，确认“重新接管并同步”以恢复托管；也可以停用以保留外部修改。写入未完成时需先处理恢复记录。',
-    agent_config_unsafe: '无法安全修改 Agent 配置。请检查配置结构、文件类型和目录权限；不要直接删除原配置。',
+    agent_config_unsafe: '配置无法直接更新。Codex 可以使用“备份并重建配置”生成干净配置；文件权限或类型问题仍需处理。',
     agent_model_unavailable: '默认模型在当前托管范围内不可用。请检查模型映射和候选供应商的启用状态，或选择其他默认模型。',
     agent_catalog_invalid: '无法生成托管模型目录。请检查本地 Codex 模板和模型元数据；这不是托管记录版本冲突，重复重启不能修复。',
     agent_operation_failed: 'Agent 托管操作未完成，后台未提供更具体的安全诊断。请核对当前状态和本机恢复记录；不能据此判定为配置冲突。',

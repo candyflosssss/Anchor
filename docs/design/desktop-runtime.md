@@ -199,3 +199,9 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 ## Codex统一重试契约（2026-10-19 当前源码）
 
 已移除模型设置的channel_retries字段与分模型重试。统一设置使用 `CodexSettings()`／`SaveCodexSettings(SaveCodexSettings)`，默认5、范围0–10；持久化、revision、安全同步与迁移见 [Codex统一重试](codex-retries.md)。Go DTO经既有生成器导出，共享样例desktop/contract/codex-settings.json。需要同步升级宿主与核心，未打包发布。
+
+## Codex 配置重建（2026-10-20，当前源码）
+
+已托管配置损坏或删除时，「更新配置」与 CLI sync 可用最后一次已验证快照恢复；正常文件优先局部更新，无法表达的有效 TOML 在完整备份后重新序列化。后台同步不覆盖外部漂移。
+
+Codex 另提供「备份并重建配置」，包括未登记、profile 或 WebSocket 覆盖配置。Controller 冻结所选模型／revision，确认整体替换影响后只提交一次 EnrollAgent(rebuild=true, all-mapped, approved=true, model_templates={})；取消不写，失败只重读、不自动重放。核心先备份原文件和旧 journal，再按空配置生成并校验连接及最新模型目录，按当前快照原子替换；不从坏文件猜测设置。原来的其他设置仅在 recovery 完整备份保留，停用不自动还原坏配置。已有凭据不旋转，revision 仍必检，无法备份／不可写／危险路径仍明确失败。旧核心须升级，字段省略不改变行为。新绑定无需本地模型缓存。隔离 Mock 与真实桥接验证分别记录，不代表原生窗口和付费上游通过。

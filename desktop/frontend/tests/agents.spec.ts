@@ -325,3 +325,23 @@ for (const failureCode of ['conflict', 'unknown'] as const) {
     expect(await page.evaluate(() => window.agentTest.reads)).toBe(reads + 2);
   });
 }
+
+for (const fail of [false, true]) {
+  test(`broken unregistered Codex config can be rebuilt with confirmation; failure=${fail}`, async ({ page }) => {
+    await page.evaluate(fail => { window.agentTest.data.targets[0].status = 'config_unsupported'; window.agentTest.failWrite = fail; window.agentTest.failureCode = 'agent_config_unsafe'; }, fail);
+    await page.getByRole('button', { name: '重新识别', exact: true }).click();
+    await openSettings(page);
+    await expect(page.getByRole('button', { name: '开启托管', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: '备份并重建配置', exact: true }).click();
+    await expect(page.getByRole('alertdialog')).toContainText('整个 config.toml');
+    expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([]);
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([]);
+    await page.getByRole('button', { name: '备份并重建配置', exact: true }).click();
+    await page.getByRole('button', { name: '确认变更', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => window.agentTest.enrolls)).toEqual([{ ...fixture.enroll, rebuild: true }]);
+    if (fail) await expect(page.getByRole('alert')).toContainText('已重新读取');
+    else await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).toBeChecked();
+    expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+  });
+}

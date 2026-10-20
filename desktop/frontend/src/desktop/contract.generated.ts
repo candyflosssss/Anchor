@@ -570,6 +570,7 @@ export interface AgentWorkspace {
   models: AgentModel[];
 }
 export interface EnrollAgent {
+  rebuild?: boolean;
   target_id: string;
   model_scope: string;
   model: string;

@@ -64,7 +64,7 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 			return err
 		}
 		out.OperationID = j.OperationID
-		if (j.Status != "applied" && !(reclaim && j.Status == "conflict")) || j.Previous != nil {
+		if (j.Status != "applied" && !(reclaim && j.Status == "conflict")) || j.Previous != nil || j.ReplacementFingerprint != "" {
 			return withDiagnostic(ErrChanged, "sync_precondition", "unfinished_journal", "")
 		}
 		root := filepath.Dir(j.Path)
@@ -72,11 +72,26 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 		if err != nil {
 			return err
 		}
+		observed := raw
+		editor := e.editor(j.Path)
+		var repair *codexRepairEditor
+		backup := false
+		if reclaim && b.AdapterID == "codex" {
+			repair = &codexRepairEditor{Editor: editor}
+			editor = repair
+			if _, parseErr := document(raw); parseErr != nil || !exists {
+				raw, err = codexLastWritten(j)
+				if err != nil {
+					return err
+				}
+				backup = exists
+			}
+		}
 		paths := make([][]string, len(j.Edits))
 		for i, edit := range j.Edits {
 			paths[i] = edit.Path
 		}
-		values, err := e.editor(j.Path).Values(raw, paths)
+		values, err := editor.Values(raw, paths)
 		if err != nil {
 			return err
 		}
@@ -97,7 +112,7 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 		}
 		// Restore only in memory for planning; never publish an intermediate
 		// user configuration or adopt our own written values as originals.
-		original, err := e.editor(j.Path).Patch(raw, inverse)
+		original, err := editor.Patch(raw, inverse)
 		if err != nil {
 			return withDiagnostic(err, "sync_verify", "", "")
 		}
@@ -157,14 +172,14 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 		for i, edit := range writeEdits {
 			writePaths[i] = edit.Path
 		}
-		current, err := e.editor(j.Path).Values(raw, writePaths)
+		current, err := editor.Values(raw, writePaths)
 		if err != nil {
 			return err
 		}
 		for i := range writeEdits {
 			writeEdits[i].Before = current[i]
 		}
-		next, err := e.editor(j.Path).Patch(raw, writeEdits)
+		next, err := editor.Patch(raw, writeEdits)
 		if err != nil {
 			return err
 		}
@@ -179,13 +194,27 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 		if j.Catalog != nil && p.catalog != nil {
 			sameBaseline = sameBaseline && j.Catalog.Existed == p.catalog.Existed && bytes.Equal(j.Catalog.Original, p.catalog.Original)
 		}
-		if bytes.Equal(raw, next) && sameCatalog && sameBaseline && j.Status == "applied" {
+		if bytes.Equal(observed, next) && exists && sameCatalog && sameBaseline && j.Status == "applied" {
+			if b.AdapterID == "codex" && !bytes.Equal(j.LastWritten, next) {
+				j.LastWritten = next
+				if err := e.save(j); err != nil {
+					return err
+				}
+			}
 			out.Status = "applied"
 			return nil
+		}
+		if backup || (repair != nil && repair.normalized) {
+			if err := e.backupCodexConfig(j, observed); err != nil {
+				return err
+			}
 		}
 		oldCatalog := j.Catalog
 		j.Previous = &previousWrite{Edits: j.Edits, Catalog: oldCatalog}
 		j.Edits, j.Catalog, j.Status = p.Edits, p.catalog, "prepared"
+		if b.AdapterID == "codex" {
+			j.LastWritten = next
+		}
 		if err := e.save(j); err != nil {
 			return err
 		}
@@ -196,8 +225,8 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 				return err
 			}
 		}
-		if !bytes.Equal(raw, next) {
-			if err := atomicWrite(root, j.Path, next, fingerprint(raw, exists), true); err != nil {
+		if !bytes.Equal(observed, next) || !exists {
+			if err := atomicWrite(root, j.Path, next, fingerprint(observed, exists), true); err != nil {
 				return err
 			}
 		}

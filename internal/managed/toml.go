@@ -221,8 +221,17 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 				if e != nil {
 					return nil, e
 				}
-			} else if strings.Contains(out, begin) || strings.Contains(out, end) {
-				return nil, ErrUnsafe
+			} else {
+				// A deleted provider can leave its comments behind. Comments do
+				// not own a table and must not prevent rebuilding that provider.
+				lines := strings.SplitAfter(out, "\n")
+				for i, line := range lines {
+					trimmed := strings.TrimSpace(line)
+					if trimmed == begin || trimmed == end {
+						lines[i] = ""
+					}
+				}
+				out = strings.Join(lines, "")
 			}
 			if edit.After.Exists {
 				table, ok := edit.After.Data.(map[string]any)

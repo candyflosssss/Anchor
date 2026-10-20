@@ -22,11 +22,12 @@ func TestSharedAgentContract(t *testing.T) {
 		Enroll    EnrollAgent    `json:"enroll"`
 		Sync      ManageAgent    `json:"sync"`
 		Update    EnrollAgent    `json:"update"`
+		Rebuild   EnrollAgent    `json:"rebuild"`
 	}
 	if err = json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatal(err)
 	}
-	if fixture.Contract != Contract || len(fixture.Workspace.Targets) != 1 || len(fixture.Workspace.Models) != 1 || len(fixture.Workspace.Bindings) != 1 || !fixture.Enroll.Approved || fixture.Sync.Action != "sync" || !fixture.Update.Approved || fixture.Update.ExpectedRevision != fixture.Workspace.Bindings[0].Revision || fixture.Update.ModelScope != "all-mapped" {
+	if !fixture.Rebuild.Rebuild || !fixture.Rebuild.Approved || fixture.Rebuild.ModelScope != "all-mapped" || fixture.Contract != Contract || len(fixture.Workspace.Targets) != 1 || len(fixture.Workspace.Models) != 1 || len(fixture.Workspace.Bindings) != 1 || !fixture.Enroll.Approved || fixture.Sync.Action != "sync" || !fixture.Update.Approved || fixture.Update.ExpectedRevision != fixture.Workspace.Bindings[0].Revision || fixture.Update.ModelScope != "all-mapped" {
 		t.Fatal("contract drift")
 	}
 	encoded, _ := json.Marshal(fixture.Workspace)
@@ -183,5 +184,48 @@ func TestRealCoreAgentBridgeLifecycle(t *testing.T) {
 	now, err = os.ReadFile(path)
 	if err != nil || !strings.Contains(string(now), `model = "external-edit"`) || strings.Contains(string(now), "anchor_") {
 		t.Fatal("external recovery baseline lost", err)
+	}
+}
+
+func TestRealCoreCodexRebuildBridge(t *testing.T) {
+	home := t.TempDir()
+	root := filepath.Join(home, ".codex")
+	os.Mkdir(root, 0700)
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("CODEX_HOME", root)
+	path := filepath.Join(root, "config.toml")
+	os.WriteFile(path, []byte("model = [broken"), 0600)
+	s := testSession(t)
+	b := NewBridge(s)
+	requireReady(t, b)
+	st, err := state.Open(s.options.Dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "synthetic"
+	if _, err := st.PutProvider(state.Provider{ID: "p", BaseURL: "http://127.0.0.1:1", Protocol: "responses", Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, 0, &secret); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.PutModel(state.Model{ID: "public", Candidates: []state.Candidate{{ProviderID: "p", Model: "fixture"}}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	r := b.AgentWorkspace()
+	if r.Problem != nil || r.Data == nil || r.Data.Targets[0].Status != "config_unsupported" || len(r.Data.Models[0].AvailableTargets) == 0 {
+		t.Fatal("rebuild unavailable", r)
+	}
+	in := EnrollAgent{TargetID: r.Data.Targets[0].ID, Model: "public", ModelScope: "all-mapped", Approved: true, Rebuild: true}
+	r = b.EnrollAgent(in)
+	if r.Problem != nil || r.Data.Bindings[0].Status != "applied" {
+		t.Fatal("rebuild failed", r)
+	}
+	in.ExpectedRevision = 0
+	if r := b.EnrollAgent(in); r.Problem == nil || r.Problem.Code != "conflict" {
+		t.Fatal("stale rebuild accepted", r)
+	}
+	now, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(now), `model = "public"`) {
+		t.Fatal("configuration not replaced", err)
 	}
 }

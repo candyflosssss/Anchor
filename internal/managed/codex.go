@@ -51,6 +51,10 @@ func (Codex) Inspect(b state.Binding) (Inspection, error) {
 	if e != nil {
 		return Inspection{}, e
 	}
+	return inspectCodex(path, raw, exists)
+}
+
+func inspectCodex(path string, raw []byte, exists bool) (Inspection, error) {
 	m, e := document(raw)
 	if e != nil {
 		return Inspection{}, e
@@ -93,10 +97,10 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 	if !g.Ready || (b.ModelScope != "all-mapped" && (!g.Tools || !g.Streaming)) {
 		return Plan{}, ErrUnsafe
 	}
-	if _, err := (Codex{}).Inspect(b); err != nil {
+	path := filepath.Join(b.ConfigRoot, "config.toml")
+	if _, err := inspectCodex(path, raw, exists); err != nil {
 		return Plan{}, err
 	}
-	path := filepath.Join(b.ConfigRoot, "config.toml")
 	provider := "anchor_" + strings.NewReplacer("-", "_", ".", "_").Replace(b.ID)
 	paths := [][]string{{"model"}, {"model_provider"}, {"web_search"}, {"model_providers", provider}}
 	var catalog []byte
@@ -210,6 +214,14 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 	return out, nil
 }
 func ValidateTarget(b *state.Binding) error {
+	if e := validateTargetIdentity(b); e != nil {
+		return e
+	}
+	_, e := AdapterFor(b.AdapterID).Inspect(*b)
+	return e
+}
+
+func validateTargetIdentity(b *state.Binding) error {
 	root, e := filepath.Abs(b.ConfigRoot)
 	if e != nil {
 		return e
@@ -217,9 +229,6 @@ func ValidateTarget(b *state.Binding) error {
 	root = filepath.Clean(root)
 	b.ConfigRoot = root
 	if e = b.Validate(); e != nil {
-		return e
-	}
-	if _, e = AdapterFor(b.AdapterID).Inspect(*b); e != nil {
 		return e
 	}
 	st, e := os.Stat(b.Executable)

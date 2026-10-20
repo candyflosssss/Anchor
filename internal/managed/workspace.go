@@ -35,6 +35,7 @@ type AgentWorkspace struct {
 	Models   []AgentModel   `json:"models"`
 }
 type EnrollAgent struct {
+	Rebuild          bool              `json:"rebuild,omitempty"`
 	TargetID         string            `json:"target_id"`
 	ModelScope       string            `json:"model_scope"`
 	Model            string            `json:"model"`
@@ -54,13 +55,28 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 	if err != nil {
 		return out, err
 	}
+	known, err := m.Store.Bindings()
+	if err != nil {
+		return out, err
+	}
+	for i := range targets {
+		if targets[i].Status != "config_unsupported" {
+			continue
+		}
+		for _, b := range known {
+			if b.AdapterID == targets[i].Agent && sameRoot(b.ConfigRoot, targets[i].ConfigRoot) && m.codexRepairable(b) {
+				targets[i].Status = "ready"
+				break
+			}
+		}
+	}
 	out.Targets = targets
 	// Preview the same automatic policy used by Enroll and live authorization.
 	// Availability belongs to the core, including shared metadata and enabled
 	// provider checks; clients must not reconstruct it from model names.
 	availableTargets := map[string][]string{}
 	for _, target := range targets {
-		if !target.Supported || target.Status != "ready" {
+		if !target.Supported || (target.Status != "ready" && !(target.Agent == "codex" && target.Status == "config_unsupported")) {
 			continue
 		}
 		available, err := m.Store.BindingModels(state.Binding{ModelScope: "all-mapped"})
@@ -134,6 +150,9 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	if !in.Approved || !state.ValidModelID(in.Model) || in.ExpectedRevision < 0 {
 		return state.Binding{}, state.ErrInvalid
 	}
+	if in.Rebuild && (in.ModelScope != "all-mapped" || len(in.ModelTemplates) != 0) {
+		return state.Binding{}, state.ErrInvalid
+	}
 	targets, err := Discover(env)
 	if err != nil {
 		return state.Binding{}, err
@@ -145,7 +164,10 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 			break
 		}
 	}
-	if target == nil || !target.Supported || target.Status != "ready" {
+	if target == nil || !target.Supported || (target.Status != "ready" && target.Status != "config_unsupported") {
+		return state.Binding{}, state.ErrInvalid
+	}
+	if in.Rebuild && target.Agent != "codex" {
 		return state.Binding{}, state.ErrInvalid
 	}
 	scope := in.ModelScope
@@ -171,9 +193,6 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 		return b, state.ErrInvalid
 	}
 
-	if err := ValidateTarget(&b); err != nil {
-		return b, err
-	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.stopping {
@@ -202,7 +221,18 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	if b.Revision != in.ExpectedRevision {
 		return b, state.ErrConflict
 	}
-	g, err := m.gateway(b)
+	repairable := b.Revision > 0 && m.codexRepairable(b)
+	if target.Status != "ready" && !repairable && !in.Rebuild {
+		return b, state.ErrInvalid
+	}
+	validate := ValidateTarget
+	if repairable || in.Rebuild {
+		validate = validateTargetIdentity
+	}
+	if err := validate(&b); err != nil {
+		return b, err
+	}
+	g, err := m.gatewayFor(b, !in.Rebuild)
 	if err != nil {
 		return b, err
 	}
@@ -212,11 +242,21 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 		}
 	}
 	reapply := false
+	if in.Rebuild {
+		if !m.ready {
+			return b, errors.New("gateway is not ready")
+		}
+		if err := m.Engine.validateRebuild(b); err != nil {
+			return b, err
+		}
+	}
 	if b.Revision == 0 {
 		b, err = m.Store.AddBinding(b)
 	} else {
-		if _, err := AdapterFor(b.AdapterID).Inspect(b); err != nil {
-			return b, err
+		if !repairable && !in.Rebuild {
+			if _, err := AdapterFor(b.AdapterID).Inspect(b); err != nil {
+				return b, err
+			}
 		}
 		current, e := m.Engine.load(b.ID)
 		if e != nil && !errors.Is(e, os.ErrNotExist) {
@@ -227,7 +267,7 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 		// without temporarily publishing a restored configuration. Incomplete
 		// writes still require ordinary recovery; they are never blindly reclaimed.
 		reapply = m.ready && e == nil && current.Previous == nil && (current.Status == "applied" || current.Status == "conflict")
-		if !reapply {
+		if !reapply && !in.Rebuild {
 			restored, e := m.Engine.Recover(b.ID)
 			if e != nil {
 				return b, e
@@ -245,7 +285,12 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	if m.ready {
 		var r Result
 		var e error
-		if reapply {
+		if in.Rebuild {
+			g, e = m.gatewayFor(b, false)
+			if e == nil {
+				r, e = m.Engine.RebuildCodex(b, g)
+			}
+		} else if reapply {
 			g, e = m.gateway(b)
 			if e == nil {
 				r, e = m.Engine.Reapply(b, g)

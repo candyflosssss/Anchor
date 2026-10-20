@@ -22,6 +22,10 @@ func NewManager(s *state.Store) *Manager {
 	return &Manager{Store: s, Engine: NewEngine(s), last: map[string]Result{}}
 }
 func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
+	return m.gatewayFor(b, true)
+}
+
+func (m *Manager) gatewayFor(b state.Binding, useTemplates bool) (GatewayBinding, error) {
 	cfg, e := m.Store.Settings()
 	if e != nil {
 		return GatewayBinding{}, e
@@ -66,7 +70,7 @@ func (m *Manager) gateway(b state.Binding) (GatewayBinding, error) {
 		version = ""
 	}
 	var templates map[string]json.RawMessage
-	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
+	if useTemplates && b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
 		var err error
 		templates, err = m.codexTemplates(b)
 		if err != nil {
