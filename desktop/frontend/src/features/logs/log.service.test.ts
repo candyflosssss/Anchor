@@ -1,10 +1,25 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import suggestionsFixture from '../../../../contract/log-suggestions.json';
 import fixture from '../../../../contract/logs.json';
+import usageFixture from '../../../../contract/log-known-usage.json';
 import type { Request } from '../../desktop/contract.generated';
 import { logService, requestLog } from './log.service';
 import { outputTps } from './log-columns.model';
 afterEach(() => vi.unstubAllGlobals());
+it('preserves retry usage coverage without replacing unknown root totals', async () => {
+  const request = { ...usageFixture.request, attempts: [] };
+  vi.stubGlobal('window', { go: { desktop: { Bridge: { Logs: async () => ({ contract: usageFixture.contract, data: { ...fixture.page, requests: [request] }, problem: null }) } } } });
+  const page = await logService.list(fixture.query);
+  const result = requestLog(page.requests[0]);
+  expect(result.knownUsage).toEqual({ input: 1200, output: 300, attempts: 1 });
+  expect(result.input).toBeNull(); expect(result.output).toBeNull();
+  expect(result.attempts).toEqual([]); expect(outputTps(result)).toBeNull();
+});
+it('rejects malformed subtotal measurements and impossible coverage', () => {
+  for (const known_usage of [{ input: -1, output: 3, attempts: 1 }, { input: 1, output: NaN, attempts: 1 }, { input: 1.5, output: 3, attempts: 1 }, { input: 1, output: 3, attempts: 3 }]) {
+    expect(() => requestLog({ ...usageFixture.request, known_usage } as Request)).toThrow();
+  }
+});
 it('shares canonical log fields and preserves missing versus zero', () => {
   const failed = requestLog(fixture.page.requests[0] as Request);
   expect(failed).toMatchObject({ http: 200, code: 'invalid_response', input: null, stream: false });

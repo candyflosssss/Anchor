@@ -1,0 +1,117 @@
+{
+  "contract": "anchor-desktop-v1",
+  "request": {
+    "id": "fixture_retry_partial",
+    "started_at_ms": 1791738000000,
+    "status": "succeeded",
+    "source": "proxy",
+    "upstream_model": "codex-auto-review",
+    "model": "public",
+    "protocol": "responses",
+    "elapsed_ms": 2100,
+    "http": 200,
+    "provider": "provider-a",
+    "key": "default",
+    "revision": 2,
+    "delivery": "complete",
+    "stage": "respond",
+    "code": "",
+    "input": null,
+    "output": null,
+    "reasoning_effort": "high",
+    "reasoning_observed": true,
+    "stream": true,
+    "generation_status": "completed",
+    "metrics": {
+      "time_to_first_output_ms": 584,
+      "time_to_first_text_ms": 584,
+      "generation_ms": null,
+      "output_text_tokens": null,
+      "text_interval_complete": false,
+      "cache_read_tokens": 1100,
+      "reasoning_tokens": 60,
+      "output_generation_ms": 1500,
+      "non_reasoning_output_tokens": 240,
+      "output_interval_complete": true
+    },
+    "attempt_count": 2,
+    "attempts_truncated": false,
+    "evidence": {
+      "encrypted_context_recovery": "succeeded",
+      "encrypted_context_reason": "invalid_encrypted_content"
+    },
+    "attempts": [
+      {
+        "number": 1,
+        "provider": "provider-a",
+        "key": "default",
+        "model": "codex-auto-review",
+        "protocol": "responses",
+        "http": 200,
+        "elapsed_ms": 100,
+        "outcome": "retry",
+        "code": "encrypted_context_rejected",
+        "stage": "stream_start",
+        "input": null,
+        "output": null
+      },
+      {
+        "number": 2,
+        "provider": "provider-a",
+        "key": "default",
+        "model": "codex-auto-review",
+        "protocol": "responses",
+        "http": 200,
+        "elapsed_ms": 2000,
+        "outcome": "succeeded",
+        "code": "",
+        "stage": "respond",
+        "input": 1200,
+        "output": 300
+      }
+    ],
+    "reference_cost": {
+      "usd": null,
+      "currency": "USD",
+      "basis": "text_tokens",
+      "reason": "missing_usage",
+      "source": "models.dev",
+      "provider_id": "fixture",
+      "model_id": "fixture-model",
+      "catalog_version": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "fetched_at": 1791849600,
+      "stale": false,
+      "pricing": {
+        "currency": "USD",
+        "unit": "per_million_tokens",
+        "rates": {
+          "input": "2.5",
+          "output": "10",
+          "cache_read": "0.25",
+          "cache_write": "3",
+          "reasoning": null,
+          "input_audio": null,
+          "output_audio": null
+        },
+        "tiers": []
+      },
+      "adjustment": {
+        "usd": null,
+        "reason": "missing_usage",
+        "supplier_multiplier": "0.5",
+        "group_multiplier": "0.8",
+        "group": "vip",
+        "group_name": "VIP",
+        "basis": "key_billing",
+        "observed_at": "2026-10-19T00:00:00Z",
+        "failure": "",
+        "parts": []
+      }
+    },
+    "known_usage": {
+      "input": 1200,
+      "output": 300,
+      "attempts": 1
+    }
+  }
+}

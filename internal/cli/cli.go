@@ -142,6 +142,7 @@ Logs include optional reference_cost: usd is original; adjustment stores supplie
 Reference prices refresh at core startup and hourly; mapping changes check the cache. New estimates require prices under 3h old.
 Key group rates refresh at startup/hourly and after configuration changes; rates older than 3h stay unknown for new costs/routing.
 Attempts retain reference_usd and cost_adjustment snapshots. Missing prices are omitted; unknown usage/rates stay null.
+Logs retain optional known_usage {input, output, attempts} subtotals across retries; unknown root totals stay null.
 Logs include safe raw service-tier evidence; fast_triggered is true/false/unknown from upstream reports, not measured speed.
 Logs mark encrypted-context cleanup, removed reasoning count and recovery outcome; native Responses may retry once before output after a definite encrypted-content rejection.
 Stream inspection shares the upstream deadline and logs a safe inspection outcome, including when no cleanup occurs.

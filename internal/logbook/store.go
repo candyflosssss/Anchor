@@ -137,6 +137,7 @@ func (s *Store) submit(c command) bool {
 // Serialize at submission: callers may mutate their trace immediately after returning.
 // The queue contains only immutable, size-bounded documents.
 func (s *Store) Request(r Request) bool {
+	r.fillKnownUsage()
 	if len(r.Attempts) > 64 {
 		r.Attempts = r.Attempts[:64]
 		r.AttemptsTruncated = true
@@ -393,6 +394,7 @@ func (s *Store) Detail(ctx context.Context, id string) (Request, error) {
 	if json.Unmarshal([]byte(raw), &r) != nil {
 		return r, ErrUnavailable
 	}
+	r.fillKnownUsage()
 	return r, nil
 }
 func (s *Store) List(ctx context.Context, q Query) (Page, error) {
@@ -432,6 +434,7 @@ func (s *Store) List(ctx context.Context, q Query) (Page, error) {
 			if json.Unmarshal([]byte(raw), &r) != nil {
 				return out, ErrUnavailable
 			}
+			r.fillKnownUsage()
 			out.Requests = append(out.Requests, r)
 		} else {
 			var e Event

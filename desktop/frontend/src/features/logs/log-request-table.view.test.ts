@@ -5,6 +5,7 @@ import { logColumns, columnPresets } from './log-columns.model';
 import { ColumnValue } from './log-request-table.view';
 import { requestFixtures } from './log.mock';
 import fixture from '../../../../contract/logs.json';
+import usageFixture from '../../../../contract/log-known-usage.json';
 import { requestLog } from './log.service';
 import type { Request } from '../../desktop/contract.generated';
 import type { RequestLog } from './log.model';
@@ -52,7 +53,21 @@ describe('grouped request log values', () => {
     const html = render('tokens');
     for (const value of ['输入', '输出', '缓存命中', '思考', '合计', '1,200', '300', '400', '60', '1,500']) expect(html).toContain(value);
     expect(html).not.toContain('1,960');
-    expect(render('tokens', { ...row, attemptCount: 2 })).toContain('已知小计');
+    expect(render('tokens', { ...row, attemptCount: 2 })).toContain('合计');
+    expect(render('tokens', { ...row, attemptCount: 2 })).not.toContain('已知小计');
+  });
+  it('shows confirmed retry subtotals even when list responses omit attempts, keeping totals and rates unknown', () => {
+    const partial = requestLog({ ...usageFixture.request, attempts: [] } as Request);
+    const html = render('tokens', partial);
+    for (const value of ['输入小计', '输出小计', '1,200', '300', '1,500', '已知小计', '已知 1/2 次 · 总量未知', '命中率 未知']) expect(html).toContain(value);
+    expect(render('timing', partial)).not.toContain('t/s');
+    expect(render('referenceCost', partial)).toContain('未知');
+    expect(partial.input).toBeNull(); expect(partial.output).toBeNull();
+    expect(render('tokens', requestLog(usageFixture.request as Request))).toBe(html);
+    const zero = render('tokens', { ...partial, knownUsage: { input: 0, output: 0, attempts: 1 } });
+    expect(zero).toContain('>0</dd>'); expect(zero).toContain('已知小计');
+    const legacy = render('tokens', { ...partial, knownUsage: undefined });
+    expect(legacy).not.toContain('输入小计'); expect(legacy).toContain('未知');
   });
   it('distinguishes zero from unknown and does not infer totals with missing usage', () => {
     const html = render('tokens', { ...row, input: 0, output: null, metrics: undefined });

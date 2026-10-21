@@ -1,4 +1,4 @@
-import type { CostAdjustment, ReferenceCost } from '../../desktop/contract.generated';
+import type { CostAdjustment, KnownUsage, ReferenceCost } from '../../desktop/contract.generated';
 import { adjustmentValue, costMultiplier, referenceUSD } from './log-reference-cost.model';
 import { accelerationSummary, tierSnapshot } from './log-service-tier.model';
 import type { Query } from '../../desktop/contract.generated';
@@ -13,6 +13,7 @@ export interface LogAttempt {
   http: number | null; input?: number | null; output?: number | null; elapsed: number; outcome: string; code?: string; note: string;
 }
 export interface RequestLog {
+  knownUsage?: KnownUsage | null;
   referenceCost?: ReferenceCost | null;
   agent?: string; binding?: string; project?: string; session?: string;
   id: string; ageMinutes: number; time: string; status: LogStatus; source: LogSource;

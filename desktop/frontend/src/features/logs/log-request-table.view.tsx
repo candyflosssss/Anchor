@@ -50,12 +50,15 @@ export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
     }
     case 'tokens': {
       const hitRate = cacheHitRate(row);
+      const subtotal = row.input == null && row.output == null ? row.knownUsage : null;
+      const input = subtotal?.input ?? row.input, output = subtotal?.output ?? row.output;
       return <div className="log-token-block"><dl className="log-metric-grid" aria-label="Token 用量">
-        <Metric tone="input" icon={ArrowDownToLine} label="输入" value={number(row.input)} />
-        <Metric tone="output" icon={ArrowUpFromLine} label="输出" value={number(row.output)} />
+        <Metric tone="input" icon={ArrowDownToLine} label={subtotal ? '输入小计' : '输入'} value={number(input)} />
+        <Metric tone="output" icon={ArrowUpFromLine} label={subtotal ? '输出小计' : '输出'} value={number(output)} />
         <Metric tone="cache" icon={Database} label="缓存命中" value={number(row.metrics?.cacheReadTokens)} detail={`命中率 ${hitRate === null ? '未知' : `${hitRate.toFixed(1)}%`}`} />
         <Metric tone="reasoning" icon={BrainCircuit} label="思考" value={number(row.metrics?.reasoningTokens)} />
-      </dl><div className="log-token-total"><span>{(row.attemptCount ?? row.attempts.length) > 1 ? '已知小计' : '合计'}</span><span className="mono">{number(row.input == null || row.output == null ? null : row.input + row.output)}</span></div></div>;
+      </dl><div className="log-token-total"><span>{subtotal ? '已知小计' : '合计'}</span><span className="mono">{number(input == null || output == null ? null : input + output)}</span></div>
+      {subtotal && <small className="log-subtext">已知 {subtotal.attempts}/{row.attemptCount ?? row.attempts.length} 次 · 总量未知</small>}</div>;
     }
     case 'attempts': return <span className="mono">{row.attemptCount ?? row.attempts.length}</span>;
     case 'diagnostics': return <div className="log-info-block"><span className={`mono log-block-primary ${row.code ? 'text-destructive' : 'text-muted-foreground'}`}>{row.code ?? '—'}</span><dl className="log-meta-list"><Metric label="阶段" value={row.stage} /></dl></div>;

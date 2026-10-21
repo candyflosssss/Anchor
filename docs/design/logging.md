@@ -52,6 +52,8 @@
 
 一次尝试缺失 usage 时，根请求输入/输出/总 Token 均未知，详情仍显示各次确认值；不会把已知小计当完整总量。明确报告的零与未报告分开。现有累计用量继续独立写入 state.db，日志到期不删除累计用量。
 
+2026-10-21 当前源码（未打包／未发布）：Request 增加可选 `known_usage: {input, output, attempts}`，仅累加输入和输出均确认的尝试，`attempts` 为参与小计的次数；完全无已知用量时省略，明确零会生成零值小计。该字段同时保留在紧凑列表、详情、follow 与 JSONL 导出中，根 `input/output` 及统计口径保持不变。新记录在逐次观测时累计，超过64项明细限制后仍保留完整已知小计；旧记录无该字段时，在读取时从现存明细恢复，不写回数据库，不推测截断部分。桌面仅在根输入输出都未知时显示小计及覆盖次数，不用于 TPS、缓存比例或总费用；全部用量已知时显示根合计。无数据库 schema 迁移，新旧客户端可忽略／省略可选字段；新桌面连接旧核心时仍保留未知，需升级核心才能提供小计。规范源为 logbook.KnownUsage 与桌面别名，双方共享 `desktop/contract/log-known-usage.json`。
+
 日志不记录请求/响应正文、提示词、思考原文、工具参数、认证头、密钥或任意上游错误文本。probe 只记录固定错误码及 `body_bytes`、`json_valid`、校验通过等有限结构事实。2026-10-13 当前源码（未发布）在失败详情的 `evidence` 中增加 `validation_reason`：`invalid_json`、`missing_response_id`、`upstream_error`、`unsupported_content`、`unsupported_output`、`invalid_tool_call`、`invalid_choices`、`refusal`，未知错误固定为 `invalid_structure`；不直接存储解析错误字符串，其中可能含任意上游字段名。已有 evidence 字典契约、查询/复制/导出沿用，列表仅保留下述档位证据白名单，历史记录不补写。文本项的 `logprobs` 和 `annotations` 只用于测试结构校验，不进入日志。系统事件使用代码消息与属性白名单。复制和导出来自这些安全结构化字段，不触发新的上游请求。未知 reasoning effort 不作为任意字符串写入日志。
 
 2026-10-13 当前源码（未发布）修正完成响应的取消误判：协议正常结束且响应写入成功后，即使客户端在日志／用量收尾前断开，也保留 succeeded/complete；尚未完成或写入失败时的客户端取消仍保存 cancelled。已经写出 HTTP 200 数据的失败请求保存 partial；没有写出数据则 none。success/complete 只表示本机写入没有报错，不代表最终用户确认收到。历史记录不自动重判；总 TPS 仅对成功且总输出与总耗时已确认的记录计算，不以首字后的区间作为依据。旧 pending 在核心重新打开数据库时改为 interrupted/core_interrupted，交付结果 unknown；NORMAL WAL 在突然断电时可能丢失最近批次，不承诺断电零损失。

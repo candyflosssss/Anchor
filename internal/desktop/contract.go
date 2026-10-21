@@ -141,6 +141,7 @@ type LogCostAdjustment = logbook.CostAdjustment
 type LogCostPart = logbook.CostPart
 type LogMetrics = logbook.Metrics
 type LogAttempt = logbook.Attempt
+type LogKnownUsage = logbook.KnownUsage
 type RequestLog = logbook.Request
 type SystemLog = logbook.Event
 type LogSuggestionsQuery = logbook.SuggestionsQuery

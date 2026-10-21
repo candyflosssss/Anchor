@@ -106,7 +106,7 @@ ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置�
 
 ## 日志桥接（2026-10-12）
 
-新增 Logs / LogDetail / LogSettings / ConfigureLogs / ExportLogs，DTO 规范源仍是 contract.go；共享样例为 desktop/contract/logs.json。 2026-10-19 后续源码增加 `ReferenceCost.adjustment` / 尝试 `cost_adjustment` 与 `CostAdjustment/CostPart` DTO：核心捕获当次供应商和分组倍率、计算最终参考额及五类 Token 乘区；列表保留根乘区汇总，详情保留逐次快照，旧记录不回填。前端只映射与格式化，不另算计费，语义见[日志设计](logging.md)。宿主连接复用现有 client 管理 API，保留鉴权和实例身份保护。列表/详情超时5秒；导出2分钟，连接核验后释放 session mutex，不占住其他桌面操作。
+新增 Logs / LogDetail / LogSettings / ConfigureLogs / ExportLogs，DTO 规范源仍是 contract.go；共享样例为 desktop/contract/logs.json。 2026-10-21 源码（未打包／未发布）新增可选 `known_usage`（输入／输出已知小计及覆盖次数），对应 LogKnownUsage 别名与自动生成 TS，共享样例 `desktop/contract/log-known-usage.json`；列表保留小计、仍省略逐次明细，根总量未知不变，旧核心无字段时仍显示未知。 2026-10-19 后续源码增加 `ReferenceCost.adjustment` / 尝试 `cost_adjustment` 与 `CostAdjustment/CostPart` DTO：核心捕获当次供应商和分组倍率、计算最终参考额及五类 Token 乘区；列表保留根乘区汇总，详情保留逐次快照，旧记录不回填。前端只映射与格式化，不另算计费，语义见[日志设计](logging.md)。宿主连接复用现有 client 管理 API，保留鉴权和实例身份保护。列表/详情超时5秒；导出2分钟，连接核验后释放 session mutex，不占住其他桌面操作。
 
 ExportLogs 的路径只来自原生 SaveFileDialog，不接受 JS 文件路径；创建目标目录的600权限 partial，流式写入、Sync/Close/Rename，失败清理任务自己的部分文件；取消返回 accepted=false。列偏好在前端保存，不送核心；缺桥接或读取失败不使用 mock。核心日志生命周期独立于窗口，宿主退出不停止日志采集。具体语义和边界见[日志实现](logging.md)。
 

@@ -59,7 +59,16 @@ type Attempt struct {
 	Input          *int64          `json:"input"`
 	Output         *int64          `json:"output"`
 }
+
+// KnownUsage is the subtotal of attempts with confirmed input and output.
+// It never replaces the root totals when another attempt's usage is unknown.
+type KnownUsage struct {
+	Input    int64 `json:"input"`
+	Output   int64 `json:"output"`
+	Attempts int   `json:"attempts"`
+}
 type Request struct {
+	KnownUsage    *KnownUsage    `json:"known_usage,omitempty"`
 	ReferenceCost *ReferenceCost `json:"reference_cost,omitempty"`
 	// Agent and Binding come from authenticated enrollment, never caller labels.
 	Agent   string `json:"agent,omitempty"`

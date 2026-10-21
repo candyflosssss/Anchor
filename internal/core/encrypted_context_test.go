@@ -241,9 +241,19 @@ func TestGatewayEncryptedContextRecoveryAndLogs(t *testing.T) {
 				if row.Input != nil || row.Output != nil || row.Attempts[1].Input == nil && !retryFails {
 					t.Fatal("unknown first-attempt usage must not become a known total", row)
 				}
+				if retryFails {
+					if row.KnownUsage != nil {
+						t.Fatal("failed attempts without usage must not create a subtotal", row.KnownUsage)
+					}
+				} else if row.KnownUsage == nil || *row.KnownUsage != (logbook.KnownUsage{Input: 3, Output: 1, Attempts: 1}) {
+					t.Fatalf("confirmed recovery usage missing: %+v", row.KnownUsage)
+				}
 				page, err := c.Logs(t.Context(), logbook.Query{})
 				if err != nil || len(page.Requests) != 1 || page.Requests[0].Evidence["encrypted_context_recovery"] != want || len(page.Requests[0].Attempts) != 0 {
 					t.Fatal("list recovery marker missing", page, err)
+				}
+				if !retryFails && (page.Requests[0].KnownUsage == nil || *page.Requests[0].KnownUsage != *row.KnownUsage) {
+					t.Fatal("compact list lost confirmed recovery usage", page.Requests[0])
 				}
 				var exported bytes.Buffer
 				if err := c.ExportLogs(t.Context(), logbook.Query{}, &exported); err != nil {

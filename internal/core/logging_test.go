@@ -222,12 +222,36 @@ func TestRetryTraceAndNoRoute(t *testing.T) {
 	if err != nil || r.Status != "succeeded" || r.AttemptCount != 2 || r.Attempts[0].Code != "rate_limited" || r.Input != nil {
 		t.Fatal(r, err)
 	}
+	want := logbook.KnownUsage{Input: 2, Output: 3, Attempts: 1}
+	if r.KnownUsage == nil || *r.KnownUsage != want || r.Output != nil {
+		t.Fatalf("retry subtotal lost: %+v", r)
+	}
+	c := logClient(t, f)
+	p, err := c.Logs(t.Context(), logbook.Query{})
+	if err != nil || len(p.Requests) != 1 || len(p.Requests[0].Attempts) != 0 || p.Requests[0].KnownUsage == nil || *p.Requests[0].KnownUsage != want || p.Requests[0].Input != nil || p.Requests[0].Output != nil {
+		t.Fatalf("compact list lost retry usage: %+v %v", p, err)
+	}
+	var exported bytes.Buffer
+	if err := c.ExportLogs(t.Context(), logbook.Query{}, &exported); err != nil || !bytes.Contains(exported.Bytes(), []byte(`"known_usage":{"input":2,"output":3,"attempts":1}`)) {
+		t.Fatalf("export lost subtotal: %s %v", exported.Bytes(), err)
+	}
 	resp = request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"absent","input":"x"}`)
 	io.Copy(io.Discard, resp.Body)
 	f.core.logs.Flush(t.Context())
 	r, err = f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
 	if err != nil || r.Status != "failed" || r.AttemptCount != 0 || r.HTTP != nil {
 		t.Fatal(r, err)
+	}
+}
+
+func TestKnownUsageSurvivesAttemptDetailLimit(t *testing.T) {
+	tr := &requestTrace{}
+	tr.addAttempt(logbook.Attempt{Number: 1}, protocol.Usage{})
+	for i := 0; i < 65; i++ {
+		tr.addAttempt(logbook.Attempt{Number: i + 2}, protocol.Usage{Known: true, Input: 10, Output: 2})
+	}
+	if len(tr.row.Attempts) != 64 || !tr.row.AttemptsTruncated || tr.row.KnownUsage == nil || *tr.row.KnownUsage != (logbook.KnownUsage{Input: 650, Output: 130, Attempts: 65}) || tr.row.Input != nil || tr.row.Output != nil {
+		t.Fatalf("truncated details changed subtotal: %+v", tr.row)
 	}
 }
 

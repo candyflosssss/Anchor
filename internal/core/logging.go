@@ -210,6 +210,14 @@ func (t *requestTrace) addAttempt(a logbook.Attempt, u protocol.Usage) {
 		return
 	}
 	t.priceAttempt(&a, u)
+	if u.Known {
+		if t.row.KnownUsage == nil {
+			t.row.KnownUsage = &logbook.KnownUsage{}
+		}
+		t.row.KnownUsage.Input += u.Input
+		t.row.KnownUsage.Output += u.Output
+		t.row.KnownUsage.Attempts++
+	}
 	t.row.AttemptCount++
 	if len(t.row.Attempts) < 64 {
 		t.row.Attempts = append(t.row.Attempts, a)

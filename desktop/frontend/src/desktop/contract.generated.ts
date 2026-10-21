@@ -962,7 +962,13 @@ export interface Attempt {
   input: number | null;
   output: number | null;
 }
+export interface KnownUsage {
+  input: number;
+  output: number;
+  attempts: number;
+}
 export interface Request {
+  known_usage?: KnownUsage | null;
   reference_cost?: ReferenceCost | null;
   agent?: string;
   binding?: string;
