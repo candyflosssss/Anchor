@@ -5,21 +5,22 @@ import { rateFailureText, type AccountSettings } from './provider-account.model'
 import { GroupRateObservation, ProviderKeyRates } from './provider-rate.view';
 import type { ProviderController } from './use-provider-controller';
 
-/** The parent keys this form by provider and revision; the workbench isolates transports. */
-export function ProviderNewAPIAuth({ c }: { c: ProviderController }) {
+/** All platforms share cached rates; only NewAPI needs the inline user-token form. */
+export function ProviderGroupRates({ c }: { c: ProviderController }) {
   const a = c.account, s = a.settings;
-  if (!s || (s.platform !== 'newapi' && a.observedPlatform !== 'newapi')) return null;
-  return <NewAPIAuthForm key={`${s.provider_id}:${s.revision}:${s.user_id}`} c={c} settings={s} />;
+  const newAPI = s?.platform === 'newapi' || a.observedPlatform === 'newapi';
+  return <section className="detail-card" aria-label={newAPI ? 'NewAPI 用户授权' : '分组倍率'}>
+    {s && newAPI ? <NewAPIAuthForm key={`${s.provider_id}:${s.revision}:${s.user_id}`} c={c} settings={s} /> : <h2>分组倍率</h2>}
+    <ProviderRateContent c={c} />
+  </section>;
 }
 function NewAPIAuthForm({ c, settings: s }: { c: ProviderController; settings: AccountSettings }) {
   const a = c.account;
-  const workspace = c.features.data;
-  const w = workspace?.provider_id === s.provider_id && workspace.revision === s.revision ? workspace : null;
   const [token, setToken] = useState('');
   const [userID, setUserID] = useState(s.user_id ? String(s.user_id) : '');
   const failure = a.rate?.failure || a.balance?.failure || '';
   const needsToken = !s.has_user_token || ['auth_required', 'authentication', 'permission_denied'].includes(failure);
-  return <section className="detail-card" aria-label="NewAPI 用户授权">
+  return <>
     {needsToken ? <>
       <h2>已识别 NewAPI · 用户令牌</h2>
       <p className="card-hint">填入该站后台「个人设置 / 安全设置 → 系统访问令牌」，保存后自动查询分组倍率。</p>
@@ -39,10 +40,16 @@ function NewAPIAuthForm({ c, settings: s }: { c: ProviderController; settings: A
         <Button type="submit" disabled={c.blocked || a.needsRead || !a.ready || !token.trim()}>{a.busy ? '正在处理…' : '保存并查询分组倍率'}</Button>
       </ImeForm>
     </> : <h2>NewAPI 分组倍率</h2>}
+  </>;
+}
+function ProviderRateContent({ c }: { c: ProviderController }) {
+  const a = c.account, workspace = c.features.data, p = c.selected;
+  const w = workspace?.provider_id === p?.id && workspace?.revision === p?.revision ? workspace : null;
+  return <>
     {a.error && <div className="feedback error-feedback" role="alert"><span>{a.error}</span>{a.needsRead && <Button variant="outline" size="sm" disabled={c.busy} onClick={() => void c.load()}>重新读取配置</Button>}</div>}
     {w?.keys.length ? <>
       <ProviderKeyRates keys={w.keys} />
       {a.rate?.failure && a.rate.failure !== 'auth_required' && <p className="feedback error-feedback" role="alert">Key {a.rate.key_id}：{rateFailureText[a.rate.failure] ?? '查询失败，分组倍率未知。'}{a.rate.http_status > 0 && `（HTTP ${a.rate.http_status}）`}</p>}
     </> : w ? <GroupRateObservation value={a.rate} /> : <p className="card-hint" role="status">{c.features.error ? 'Key 倍率读取失败。' : '正在读取 Key 倍率…'}</p>}
-  </section>;
+  </>;
 }

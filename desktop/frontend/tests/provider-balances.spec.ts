@@ -2,19 +2,26 @@ import { expect, test, type Page } from '@playwright/test';
 import fixture from '../../contract/providers.json' with { type: 'json' };
 import account from '../../contract/provider-account.json' with { type: 'json' };
 import update from '../../contract/updates.json' with { type: 'json' };
-import { CONTRACT, type AccountQuery } from '../src/desktop/contract.generated';
+import { CONTRACT, type AccountQuery, type SaveProvider } from '../src/desktop/contract.generated';
 
 declare global { interface Window { balanceTest: { queries: AccountQuery[]; active: number; peak: number; slow: boolean; hold: boolean; failure: string; value: string; revision: number; platform: string; instance: string } } }
 async function host(page: Page) {
   await page.addInitScript(({ contract, provider, account, update }) => {
     const counters = window.balanceTest = { queries: [] as AccountQuery[], active: 0, peak: 0, slow: false, hold: false, failure: '', value: '12.34567890123456789', revision: 1, platform: '', instance: 'isolated-balance-test' };
     const rows = ['wallet', 'quota', 'third', 'fourth'].map(id => ({ ...provider, id, revision: 1 }));
-    const settings = (id: string) => ({ ...account.settings, provider_id: id, platform: '', revision: counters.revision });
+    const revision = (id: string) => Math.max(rows.find(p => p.id === id)?.revision ?? 1, counters.revision);
+    const settings = (id: string) => ({ ...account.settings, provider_id: id, platform: '', revision: revision(id) });
     const ready = { contract, data: { instance_id: 'isolated-balance-test', phase: 'ready', source: 'started', can_stop: true }, problem: null };
     const api = {
       Status: async () => ({ ...ready, data: { ...ready.data, instance_id: counters.instance } }), Start: async () => ready,
-      Providers: async () => ({ contract, data: rows.map(p => ({ ...p, revision: counters.revision })), problem: null }),
-      ProviderWorkspace: async (q: { provider_id: string }) => ({ contract, data: { provider_id: q.provider_id, revision: counters.revision, strategy: 'round-robin', keys: [], models: [], prices: [], estimates: [], imported_price: null, usage: [], probe: null, deleted: false }, problem: null }),
+      Providers: async () => ({ contract, data: rows.map(p => ({ ...p, revision: revision(p.id) })), problem: null }),
+      SaveProvider: async (q: SaveProvider) => {
+        const at = rows.findIndex(p => p.id === q.provider.id);
+        if (at < 0 || q.expected_revision !== revision(q.provider.id)) return { contract, data: null, problem: { code: 'conflict' } };
+        rows[at] = { ...rows[at], ...q.provider, revision: q.expected_revision + 1 };
+        return { contract, data: rows[at], problem: null };
+      },
+      ProviderWorkspace: async (q: { provider_id: string }) => ({ contract, data: { provider_id: q.provider_id, revision: revision(q.provider_id), strategy: 'round-robin', keys: [], models: [], prices: [], estimates: [], imported_price: null, usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAccountSettings: async (q: { provider_id: string }) => ({ contract, data: settings(q.provider_id), problem: null }),
       ProviderAllowance: async (q: AccountQuery) => {
         const value = counters.value, failure = counters.failure, delay = counters.slow ? 700 : 60;
@@ -58,6 +65,45 @@ test('supplier list shows scoped balances, detects platform and refreshes with d
   await page.getByRole('tab', { name: '账户与余额' }).click();
   await expect(page.locator('#account-platform')).toHaveValue('auto');
   await expect(page.getByRole('button', { name: '刷新余额', exact: true })).toBeEnabled();
+});
+
+test('provider toggles keep cached balances and manual refresh uses the latest revision', async ({ page }) => {
+  await host(page); await page.goto('/');
+  const wallet = page.getByRole('row').filter({ has: page.getByRole('button', { name: 'wallet', exact: true }) });
+  await expect(page.getByRole('row').filter({ has: page.getByRole('button', { name: 'fourth', exact: true }) })).toContainText('USD');
+  await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(0);
+  const toggle = wallet.getByRole('switch', { name: '供应商 wallet 启用状态' });
+  await toggle.click(); await expect(toggle).not.toBeChecked();
+  await expect(wallet).toContainText('12.35 USD');
+  await toggle.click(); await expect(toggle).toBeChecked();
+  // Observe a quiet period longer than the simulated bridge query delay.
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.balanceTest.queries.length)).toBe(4);
+  await page.evaluate(() => { window.balanceTest.value = '23'; });
+  await wallet.getByRole('button', { name: '刷新 wallet 的余额', exact: true }).click();
+  await expect(wallet).toContainText('23.00 USD');
+  const queries = await page.evaluate(() => window.balanceTest.queries);
+  expect(queries).toHaveLength(5);
+  expect(queries.at(-1)?.expected_revision).toBe(3);
+});
+
+for (const id of ['wallet', 'third']) test(`toggling ${id} does not restart pending or queued balance reads`, async ({ page }) => {
+  await host(page); await page.goto('/');
+  await page.getByRole('button', { name: '概览', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(0);
+  await page.evaluate(() => { window.balanceTest.queries = []; window.balanceTest.hold = true; });
+  await page.getByRole('button', { name: '供应商', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(2);
+  const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: id, exact: true }) });
+  const toggle = row.getByRole('switch', { name: `供应商 ${id} 启用状态` });
+  await toggle.click(); await expect(toggle).not.toBeChecked();
+  await page.evaluate(() => { window.balanceTest.hold = false; window.dispatchEvent(new Event('release-balance-queries')); });
+  await expect(row).toContainText('12.35 USD');
+  await expect.poll(() => page.evaluate(() => window.balanceTest.active)).toBe(0);
+  const queries = await page.evaluate(() => window.balanceTest.queries);
+  expect(queries).toHaveLength(4);
+  expect(queries.filter(q => q.provider_id === id)).toHaveLength(1);
+  if (id === 'third') expect(queries.find(q => q.provider_id === id)?.expected_revision).toBe(2);
 });
 
 test('late results from an old revision cannot replace refreshed balances', async ({ page }) => {

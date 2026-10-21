@@ -11,13 +11,13 @@ import { CONTRACT, type AccountSettings, type DesktopBridge, type KeyRateCache, 
 
 declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | 'invalid' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 declare global { interface Window { keyCooldownTest: { saves: number } } }
-declare global { interface Window { accountTest: { saves: number; queries: number; failure: string } } }
+declare global { interface Window { accountTest: { saves: number; queries: number; rateQueries: number; failure: string } } }
 async function host(page: Page, rateMappings = false, detectedPlatform = '') {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
   await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, keyCooldown, rateMappings, detectedPlatform }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
-    window.accountTest = { saves: 0, queries: 0, failure: '' };
+    window.accountTest = { saves: 0, queries: 0, rateQueries: 0, failure: '' };
     const accounts: Record<string, AccountSettings> = {};
     const settings = (id: string): AccountSettings => ({ ...(accounts[id] ?? { ...account.settings, platform: '' }), provider_id: id, revision: providers.find(p => p.id === id)?.revision ?? 1 });
     let providers: Provider[] = rows;
@@ -67,6 +67,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
       },
       ProviderRate: async input => {
         window.accountTest.queries++;
+        window.accountTest.rateQueries++;
         await new Promise(resolve => setTimeout(resolve, 150));
         const failure = window.accountTest.failure || (detectedPlatform === 'newapi' && !settings(input.provider_id).has_user_token ? 'auth_required' : '');
         if (!input.remote_key_id) {
@@ -1243,6 +1244,47 @@ test('unknown local update outcome clears the install candidate until a fresh ch
 });
 
 
+test('sub2api shows all cached Key rates without group names and toggles do not query them again (simulated host)', async ({ page }) => {
+  await host(page, true, 'sub2api');
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
+    api.ProviderWorkspace = async input => {
+      const result = await read(input);
+      if (input.provider_id !== '摸鱼AI' || !result.data?.keys.length) return result;
+      const key = result.data.keys[0], now = new Date().toISOString();
+      const rate = { multiplier: 0.8, group: '', group_name: '', basis: 'key_billing', observed_at: now, attempted_at: now, failure: '' };
+      result.data.keys = [
+        { ...key, rate, effective_multiplier: 0.4 },
+        { ...key, id: 'disabled-zero', enabled: false, rate: { ...rate, multiplier: 0 }, effective_multiplier: 0 },
+        { ...key, id: 'unknown', rate: null, effective_multiplier: null },
+      ];
+      return result;
+    };
+  });
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  const rates = page.getByRole('region', { name: '分组倍率', exact: true });
+  await expect(rates.getByLabel('全部 Key 倍率').locator('.key-multiplier')).toHaveCount(3);
+  await expect(rates).toContainText('分组倍率 0.8×');
+  await expect(rates).toContainText('相对倍率 0.4×');
+  await expect(rates).toContainText('分组倍率 0×');
+  await expect(rates).toContainText('分组倍率 未知');
+  await expect(rates).toContainText('分组：未知');
+  await expect(page.getByLabel('NewAPI 用户令牌', { exact: true })).toHaveCount(0);
+  const toggle = page.getByRole('switch', { name: '供应商 摸鱼AI 启用状态' });
+  await expect.poll(() => page.evaluate(() => window.accountTest.rateQueries)).toBe(1);
+  await expect(toggle).toBeEnabled();
+  const before = await page.evaluate(() => window.accountTest.queries);
+  await toggle.click(); await expect(toggle).not.toBeChecked();
+  await expect(toggle).toBeEnabled();
+  await toggle.click(); await expect(toggle).toBeChecked();
+  await expect(toggle).toBeEnabled();
+  await page.waitForTimeout(300);
+  await expect(rates).toContainText('分组倍率 0.8×');
+  expect(await page.evaluate(() => window.accountTest.queries)).toBe(before);
+  expect(await page.evaluate(() => window.accountTest.rateQueries)).toBe(1);
+  await rates.screenshot({ path: test.info().outputPath('sub2api-key-rates.png') });
+});
+
 test('detected NewAPI offers a token directly and retries the rate after saving (simulated host)', async ({ page }) => {
   await host(page, true, 'newapi');
   await page.evaluate(() => {
@@ -1261,7 +1303,7 @@ test('detected NewAPI offers a token directly and retries the rate after saving 
   await auth.getByLabel('NewAPI 用户令牌', { exact: true }).fill('synthetic-inline-newapi-token');
   await auth.getByRole('button', { name: '保存并查询分组倍率' }).dblclick();
   await expect(auth.getByRole('heading', { name: 'NewAPI 分组倍率' })).toBeVisible();
-  await expect(auth.getByText(`${accountFixture.rate.rate.multiplier}×`, { exact: true })).toBeVisible();
+  await expect(auth.getByLabel('全部 Key 倍率')).toContainText('分组倍率 0.8×');
   await expect(auth.getByLabel('NewAPI 用户令牌', { exact: true })).toHaveCount(0);
   await page.getByRole('tab', { name: /^模型/ }).click();
   await expect(page.locator('.key-multiplier').first()).toContainText('0.8×');
@@ -1297,7 +1339,7 @@ test('new provider setup detects NewAPI, saves authorization and reloads its cat
   const auth = dialog.getByRole('region', { name: 'NewAPI 用户授权' });
   await auth.getByLabel('NewAPI 用户令牌', { exact: true }).fill('synthetic-new-provider-token');
   await auth.getByRole('button', { name: '保存并查询分组倍率' }).click();
-  await expect(auth.getByText(`${accountFixture.rate.rate.multiplier}×`, { exact: true })).toBeVisible();
+  await expect(auth.getByLabel('全部 Key 倍率')).toContainText('分组倍率 0.8×');
   await expect(dialog.getByRole('button', { name: '完成', exact: true })).toBeEnabled();
   await expect.poll(() => page.evaluate(() => window.desktopTest.directories)).toBe(2);
   await dialog.getByRole('button', { name: '修改配置 / Key' }).click();

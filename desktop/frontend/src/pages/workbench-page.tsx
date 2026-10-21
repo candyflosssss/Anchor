@@ -25,7 +25,7 @@ import { useProviderSummaries } from '../features/providers/use-provider-summari
 export function WorkbenchPage({ environment, balanceCache, page, navSeq, onNavigate, onActivity }: {
   environment: ProviderEnvironment; balanceCache: ProviderBalanceCache; page: Exclude<Page, 'settings' | 'logs'>; navSeq: number; onNavigate: (page: Page) => void; onActivity: (busy: boolean) => void;
 }) {
-  const c = useProviderController(environment);
+  const c = useProviderController(environment, balanceCache);
   const summaries = useProviderSummaries(c.providers, c.phase === 'ready', environment.transport, c.features.data, c.summaryVersion);
   const balances = useProviderBalances(c.providers, c.phase === 'ready' && page === 'providers' && !c.selected, environment.transport, balanceCache, c.refreshVersion);
   const rates = useMappingRates(c.providers, c.phase === 'ready' && page === 'models', environment.transport);

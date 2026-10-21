@@ -12,6 +12,23 @@ export interface ProviderBalance {
 export class ProviderBalanceCache {
   constructor(readonly instanceId: string) {}
   private readonly entries = new Map<string, { revision: number; value: ProviderBalance }>();
+  private readonly toggles = new Map<string, { revision: number; queryRevision: number }>();
+
+  /** Only a confirmed enable-only save can carry observations across revisions. */
+  retainToggle(before: Provider, after: Provider) {
+    if (before.id !== after.id || after.revision !== before.revision + 1 || before.enabled === after.enabled ||
+      before.homepage_url !== after.homepage_url || before.protocol !== after.protocol || before.has_secret !== after.has_secret ||
+      before.timeout_seconds !== after.timeout_seconds || before.max_concurrent !== after.max_concurrent ||
+      before.cost_multiplier !== after.cost_multiplier || JSON.stringify(before.base_urls) !== JSON.stringify(after.base_urls)) return;
+    this.toggles.set(after.id, { revision: after.revision, queryRevision: this.queryRevision(before) });
+    const previous = this.read(before);
+    if (previous) this.write(after, previous);
+  }
+
+  queryRevision(provider: Provider): number {
+    const toggle = this.toggles.get(provider.id);
+    return toggle?.revision === provider.revision ? toggle.queryRevision : provider.revision;
+  }
 
   read(provider: Provider): ProviderBalance | undefined {
     const cached = this.entries.get(provider.id);
@@ -35,6 +52,9 @@ export class ProviderBalanceCache {
     const revisions = new Map(providers.map(provider => [provider.id, provider.revision]));
     for (const [id, cached] of this.entries) {
       if (revisions.get(id) !== cached.revision) this.entries.delete(id);
+    }
+    for (const [id, toggle] of this.toggles) {
+      if (revisions.get(id) !== toggle.revision) this.toggles.delete(id);
     }
   }
 }

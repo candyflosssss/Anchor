@@ -6,8 +6,9 @@ import { clearDraftSecrets, clearSaveSecrets, newDraft, problemText, ProviderPro
 import type { Scenario } from './provider.mock';
 import type { DetailTab, ProviderDialog } from './provider-summary.model';
 import type { ProviderEnvironment } from '../../desktop/environment';
+import type { ProviderBalanceCache } from './provider-balance.model';
 type Phase = 'loading' | 'ready' | 'error';
-export function useProviderController(environment: ProviderEnvironment) {
+export function useProviderController(environment: ProviderEnvironment, observationCache: ProviderBalanceCache) {
   const { transport, mock } = environment;
   const [providers, setProviders] = useState<Provider[]>([]);
   const hasSnapshot = useRef(false);
@@ -124,6 +125,7 @@ export function useProviderController(environment: ProviderEnvironment) {
       clearSaveSecrets(input);
       if (abort.signal.aborted || epoch !== generation.current) return;
       if (!toggling) clearModels();
+      if (toggling && source) observationCache.retainToggle(source, saved);
       // Update existing rows in place so saving or toggling never changes their position.
       setProviders(old => old.some(p => p.id === saved.id) ? old.map(p => p.id === saved.id ? saved : p) : [...old, saved]);
       if (!source) { setSelectedId(saved.id); setDetailTab('overview'); setDialog(null); }
@@ -208,7 +210,7 @@ export function useProviderController(environment: ProviderEnvironment) {
     setNotice(`${mock ? '演示：' : ''}平台配置已保存。`);
   }, () => blocked || locked.current || features.busy || (!!editor && !editor.models) || !!dialog, readVersion,
   !blocked && !features.busy && (!editor || !!editor.models) && !dialog && !!features.data?.keys.some(k => k.enabled),
-  () => features.refresh());
+  () => features.refresh(), selected ? observationCache.queryRevision(selected) : undefined);
   const catalogAfterAuth = useRef(() => {});
   catalogAfterAuth.current = () => {
     const pending = authorizedCatalog.current;

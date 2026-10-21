@@ -3,7 +3,7 @@ import { ProviderProblem, problemText, type Provider, type ProviderTransport } f
 import { userTokenError } from './provider-account.model';
 import type { AccountSettings, AccountObservation, AccountRateObservation, SaveAccountSettings, AccountQuery } from './provider-account.model';
 
-export function useProviderAccount(p: Provider | null, transport: ProviderTransport, changed: (settings: AccountSettings) => Promise<void>, blocked: () => boolean, readVersion: number, autoQuery = false, observed?: () => Promise<void>) {
+export function useProviderAccount(p: Provider | null, transport: ProviderTransport, changed: (settings: AccountSettings) => Promise<void>, blocked: () => boolean, readVersion: number, autoQuery = false, observed?: () => Promise<void>, observationRevision = p?.revision) {
   const [settings, setSettings] = useState<AccountSettings | null>(null);
   const [observedPlatform, setObservedPlatform] = useState('');
   const [balance, setBalance] = useState<AccountObservation | null>(null);
@@ -19,14 +19,15 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
   const autoQueried = useRef(false);
   const retry = useRef<{ id: string; revision: number; key: string } | null>(null);
   const lastKey = useRef('');
-  const scope = useRef<{ id?: string; revision?: number; transport: ProviderTransport } | null>(null);
+  const scope = useRef<{ id?: string; observationRevision?: number; readVersion: number; transport: ProviderTransport } | null>(null);
   useEffect(() => {
     const abort = new AbortController(); abortRef.current?.abort(); abortRef.current = abort;
     const at = ++epoch.current;
-    const previous = scope.current; scope.current = { id, revision, transport };
+    const previous = scope.current; scope.current = { id, observationRevision, readVersion, transport };
     if (previous?.id !== id || previous?.transport !== transport) { setSettings(null); lastKey.current = ''; retry.current = null; }
-    if (previous?.id !== id || previous?.transport !== transport || previous?.revision !== revision) { setObservedPlatform(''); setBalance(null); setQuota(null); setRate(null); }
-    autoQueried.current = false;
+    const changed = previous?.id !== id || previous?.transport !== transport || previous?.observationRevision !== observationRevision;
+    if (changed) { setObservedPlatform(''); setBalance(null); setQuota(null); setRate(null); }
+    if (changed || previous?.readVersion !== readVersion) autoQueried.current = false;
     setError(''); setNeedsRead(false);
     lock.current = !!id; setBusy(!!id);
     if (id) {
@@ -45,7 +46,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
       })();
     }
     return () => { abort.abort(); abortRef.current?.abort(); epoch.current = at + 1; lock.current = false; };
-  }, [id, revision, readVersion, transport]);
+  }, [id, revision, observationRevision, readVersion, transport]);
   const matches = !!settings && settings.provider_id === id && settings.revision === revision;
   async function run(operation: 'detect-platform' | 'save' | 'balance' | 'key-quota' | 'effective-rate', input: SaveAccountSettings | AccountQuery) {
     if (!p || !matches || lock.current || blocked() || needsRead) return false;
