@@ -1,6 +1,8 @@
 # Responses → Chat Completions 兼容转换
 
-2026-10-20 当前源码，未打包／未发布。此次修复针对 Codex Responses 请求选择 Chat Completions 候选后在 `request_convert` 返回 `unsupported_conversion`；不修改用户配置、安装版本或真实聊天记录，也不承诺特定供应商已经通过实测。
+2026-10-21 当前源码，未打包／未发布。此次修复针对 Codex Responses 请求选择 Chat Completions 候选后在 `request_convert` 返回 `unsupported_conversion`；不修改用户配置、安装版本或真实聊天记录，也不承诺特定供应商已经通过实测。
+
+当前转换规则由[请求级协议翻译层](protocol-translation.md)承载：Session 保留客户端基线，每个候选创建独立 Attempt，请求与返回共用私有映射；网关不再持有 ChatMapping。原生透传、生命周期、结构化诊断与本轮兼容差异见该文档。
 
 ## 已实现范围
 

@@ -5,6 +5,8 @@
 - 范围：本机核心 / CLI、供应商第一优先工作台、三协议无状态文本/函数转换及 Codex 全局配置托管/恢复，不等于整体初版完成。
 - 总体产品边界继续以 `architecture.md` 为准；本文记录本轮已落地的决策与实际接口。
 
+2026-10-21 源码协议分层（未发布）：请求级 Session／候选级 Attempt 已接入网关；请求校验、工具映射、响应与流式语义归属独立协议层。网关保留调度、网络、重试、HTTP 交付与持久化。原生字段保留、额外工具检查、终止校验和上限变化见[协议翻译层契约](protocol-translation.md)。无新增命令或配置，不更新运行版本。
+
 ## 1. 已落地的决策
 
 | 项目 | 决策 | 理由与限制 |
@@ -81,7 +83,7 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 | `GET /control/v1/models` | 公开模型、能力与有序候选映射 |
 | `PUT /control/v1/models/{id}` | `{model, expected_revision}`，拒绝不存在的候选供应商 |
 | `GET /v1/models` | 已配置的公开模型目录；不代表真实供应商可用性 |
-| `POST /v1/responses`、`POST /v1/chat/completions`、`POST /v1/messages` | 三协议入口，无状态文本、函数工具、SSE 与用量；Responses 同协议保持原有受限透传 |
+| `POST /v1/responses`、`POST /v1/chat/completions`、`POST /v1/messages` | 三协议入口，无状态文本、函数工具、SSE 与用量；三协议同协议保持受控原生透传，跨协议受能力校验 |
 | `GET /control/v1/providers/{id}/workspace` | Key 状态、模型映射、用量、价格和当前价估算 |
 | `POST /control/v1/providers/{id}/action` | 固定动作 DTO，管理授权/实例/revision/必要确认；不开放任意 URL |
 | `GET /control/v1/usage` | 持久化的供应商/模型累计用量，包含已删除对象历史 |

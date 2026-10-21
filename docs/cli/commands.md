@@ -784,7 +784,7 @@ anchor recover [--id ID]
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
-| Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 无状态文本、函数工具、SSE、用量；不支持内容明确报错 |
+| Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 请求级协议翻译层；同协议受控原生透传、跨协议无状态文本／函数／SSE／用量及既有 Responses → Chat 桥；不支持内容明确报错，见[翻译层契约](../design/protocol-translation.md) |
 | Codex统一重试 | agent codex-settings [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
 | 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；desktop.57 已同版发布安装器／runtime／CLI feed，无数据库回滚，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
@@ -830,6 +830,8 @@ anchor [--data-dir DIR] --context SSH_NAME update upgrade --approve
 
 
 2026-10-20 协议转换增量（当前源码，未打包／未发布）：Responses → Chat 支持 `reasoning.effort`、`text.format`、明文思考历史及 function/custom/namespace 工具；Chat 返回恢复思考和工具身份，custom grammar 降为描述指令而非原生强制约束。历史密文、tool_search 和多模态仍明确拒绝，详见[协议兼容说明](../design/protocol-chat-bridge.md)。这是网关数据面修复，无新增 CLI 配置开关。`logs detail/export` 的失败详情增加安全 `conversion_target/conversion_reason` evidence，并保留未派发的路由身份；HTTP=null、attempt_count=0 保持原义。需升级处理请求的核心，不回填历史；命令、参数、退出码及列表 evidence 白名单不变。
+
+2026-10-21 协议分层核对（当前源码，未打包／未发布）：新增请求 Session 和候选 Attempt，属于内部数据面，无新增 CLI 命令、参数或开关。`logs detail REQUEST_ID` / `logs export` 的 evidence 增加 `translation_client`、`conversion_target`、`translation_stage`（request/response/stream）、`translation_category`（固定类别）、`translation_compatibility`（full/degraded/unsupported）、`translation_dispatched`、`translation_delivered`（正文已交付）及逗号分隔的固定 `translation_degradations`。原 `conversion_reason` 和错误码保留；列表白名单与历史记录不变。原生字段保留、额外工具声明校验、显式非终止响应拒绝和累计流大小限制的兼容影响见[翻译层契约](../design/protocol-translation.md)。
 
 ## 12. 请求与系统日志（当前源码；基础能力自 desktop.16 dev）
 

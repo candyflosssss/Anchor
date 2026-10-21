@@ -6,23 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/apierror"
 )
 
-// Stream incrementally forwards/converts bounded SSE events. EOF without a terminal
-// event is an error and cannot produce a successful completion or replay.
-func Stream(w http.ResponseWriter, body io.Reader, from, to, model string) (Usage, error) {
-	return StreamObserved(w, body, from, to, model, nil)
-}
-func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model string, observation *Observation) (usage Usage, streamErr error) {
-	return StreamObservedMapped(w, body, from, to, model, observation, nil)
-}
-
-func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping) (usage Usage, streamErr error) {
+// translateStream is independent of HTTP. Optional flushing is a writer capability.
+func translateStream(w io.Writer, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping, language apierror.Language) (usage Usage, streamErr error) {
 	r := Result{ID: fmt.Sprintf("resp_anchor_%d", time.Now().UnixNano()), Model: model}
 	emit := &emitter{w: w, p: to, r: &r}
 	same := from == to
@@ -32,7 +23,7 @@ func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model
 			usage = Usage{}
 		}
 		if streamErr != nil && !same {
-			_, detail := apierror.Render(apierror.UpstreamStreamIncomplete, apierror.LanguageOf(w))
+			_, detail := apierror.Render(apierror.UpstreamStreamIncomplete, language)
 			// No terminal success and no replay after downstream output has begun.
 			if to == "responses" {
 				_ = emit.send("error", Object{"code": detail.Code, "message": detail.Message, "param": nil})
@@ -48,6 +39,7 @@ func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model
 	data := ""
 	event := ""
 	size := 0
+	wireSize := 0
 	index := map[int]int{}
 	chatText := -1
 	chatReasoning := -1
@@ -93,6 +85,11 @@ func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model
 			return e
 		}
 		observation.observeServiceTier(m, from, []byte(payload))
+		if from == "responses" && (m["type"] == "response.completed" || m["type"] == "response.incomplete") {
+			if _, err := generationStatus(obj(m["response"]), from); err != nil {
+				return err
+			}
+		}
 		if m["error"] != nil || m["type"] == "error" || m["type"] == "response.failed" {
 			return errors.New("upstream stream failed")
 		}
@@ -359,6 +356,10 @@ func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model
 	}
 	for scanner.Scan() {
 		line := scanner.Text()
+		wireSize += len(line) + 1
+		if wireSize > 64<<20 {
+			return r.Usage, errors.New("stream exceeds wire limit")
+		}
 		if line == "" {
 			if e := process(); e != nil {
 				return r.Usage, e
@@ -395,13 +396,16 @@ func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model
 		return r.Usage, io.ErrUnexpectedEOF
 	}
 	if !same {
+		if from != "responses" && r.Finish != "stop" && r.Finish != "tool_calls" && r.Finish != "end_turn" && r.Finish != "tool_use" && r.Finish != "length" && r.Finish != "max_tokens" && r.Finish != "stop_sequence" {
+			return r.Usage, ErrUnsupported
+		}
 		return r.Usage, emit.done()
 	}
 	return r.Usage, nil
 }
 
 type emitter struct {
-	w       http.ResponseWriter
+	w       io.Writer
 	p       string
 	r       *Result
 	started bool
@@ -409,21 +413,18 @@ type emitter struct {
 }
 
 func (e *emitter) raw(event, data string) error {
-	c := http.NewResponseController(e.w)
-	_ = c.SetWriteDeadline(time.Now().Add(15 * time.Second))
+	frame := ""
 	if event != "" {
-		if _, err := fmt.Fprintf(e.w, "event: %s\n", event); err != nil {
-			return err
-		}
+		frame = "event: " + event + "\n"
 	}
-	if _, err := fmt.Fprintf(e.w, "data: %s\n\n", data); err != nil {
+	frame += "data: " + data + "\n\n"
+	if n, err := io.WriteString(e.w, frame); err != nil {
 		return err
+	} else if n != len(frame) {
+		return io.ErrShortWrite
 	}
-	err := c.Flush()
-	if errors.Is(err, http.ErrNotSupported) {
-		return nil
-	}
-	return err
+
+	return flushStream(e.w)
 }
 func (e *emitter) send(typ string, m Object) error {
 	event := ""

@@ -2,12 +2,12 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/apierror"
+	"github.com/candyflosssss/Anchor/internal/protocol"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
@@ -16,10 +16,10 @@ type forwardAttemptResult struct {
 	success   bool
 	status    int
 	after     string
-	opaque    *encryptedContextRecovery
+	opaque    *protocol.Recovery
 }
 
-func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string) bool {
+func (s *Server) forward(w http.ResponseWriter, r *http.Request, translation *protocol.Session, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string) bool {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.TimeoutSeconds)*time.Second)
 	defer cancel()
 	var result forwardAttemptResult
@@ -32,11 +32,11 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	// Ordinary retries belong to the caller. A definite rejection of historical
 	// reasoning permits one changed request, before any downstream output.
 	base := s.pickURL(p)
-	allowRecovery := key.EffectiveProtocol(c.Model) == "responses" && r.Context().Value(protocolKey{}) == nil && hasEncryptedReasoning(request)
+	allowRecovery := translation.CanRecover(key.EffectiveProtocol(c.Model))
 	if t := trace(r); t != nil && t.encryptedContextRetried {
 		allowRecovery = false
 	}
-	retry := s.forwardAttempt(w, r, request, public, c, p, key, stream, routeModel, affinity, base, allowRecovery, ctx, &result)
+	retry := s.forwardAttempt(w, r, translation, public, c, p, key, stream, routeModel, affinity, base, allowRecovery, ctx, &result)
 	if result.opaque == nil {
 		return retry
 	}
@@ -50,14 +50,14 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, request map[str
 	if t := trace(r); t != nil {
 		t.encryptedContextRetried = true
 		t.row.Evidence["encrypted_context_recovery"] = "pending"
-		t.row.Evidence["encrypted_context_reason"] = recovery.reason
-		t.row.Evidence["encrypted_context_removed_reasoning"] = strconv.Itoa(recovery.removed)
+		t.row.Evidence["encrypted_context_reason"] = recovery.Reason
+		t.row.Evidence["encrypted_context_removed_reasoning"] = strconv.Itoa(recovery.Removed)
 		t.row.Evidence["encrypted_context_retry_count"] = "1"
 		if s.logs != nil {
 			s.logs.Request(t.row)
 		}
 	}
-	retry = s.forwardAttempt(w, r, recovery.request, public, c, p, key, stream, routeModel, affinity, base, false, ctx, &result)
+	retry = s.forwardAttempt(w, r, recovery.Session(), public, c, p, key, stream, routeModel, affinity, base, false, ctx, &result)
 	if t := trace(r); t != nil {
 		outcome := "failed"
 		if result.success {

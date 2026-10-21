@@ -246,22 +246,6 @@ func (t *requestTrace) addAttempt(a logbook.Attempt, u protocol.Usage) {
 		*t.row.Output += u.Output
 	}
 }
-func safeGenerationStatus(m protocol.Object, p string) string {
-	if p == "responses" {
-		switch m["status"] {
-		case "completed":
-			return "completed"
-		case "incomplete":
-			return "incomplete"
-		case "failed":
-			return "failed"
-		case "in_progress":
-			return "in_progress"
-		}
-	}
-	return ""
-}
-
 func knownReasoningEffort(s string) bool {
 	switch s {
 	case "none", "minimal", "low", "medium", "high", "xhigh":

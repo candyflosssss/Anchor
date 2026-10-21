@@ -83,14 +83,30 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		fail(w, apierror.RequestTooLarge, MaxRequestBytes>>20)
 		return
 	}
-	var request map[string]json.RawMessage
-	if err = json.Unmarshal(body, &request); err != nil || request == nil {
-		fail(w, apierror.RequestObjectRequired)
+	clientProtocol, _ := r.Context().Value(protocolKey{}).(string)
+	if clientProtocol == "" {
+		clientProtocol = "responses"
+	}
+	translation, err := protocol.NewSession(body, clientProtocol)
+	if err != nil {
+		recordTranslationDiagnostics(r, protocol.ErrorDiagnostics(err), false, false)
+		if clientProtocol == "responses" {
+			fail(w, apierror.RequestObjectRequired)
+		} else {
+			fail(w, apierror.UnsupportedConversion)
+		}
 		return
 	}
+	request := translation.PolicyFields()
 	observeRequestedServiceTier(r, request)
-	var modelID string
-	if err = json.Unmarshal(request["model"], &modelID); err != nil || !state.ValidModelID(modelID) {
+	info, err := translation.RequestInfo()
+	if err != nil {
+		recordTranslationDiagnostics(r, protocol.ErrorDiagnostics(err), false, false)
+		fail(w, protocol.RequestErrorID(err))
+		return
+	}
+	modelID, stream := info.Model, info.Stream
+	if !state.ValidModelID(modelID) {
 		fail(w, apierror.ModelIDRequired)
 		return
 	}
@@ -105,37 +121,6 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	var stream bool
-	if raw, ok := request["stream"]; ok {
-		if err = json.Unmarshal(raw, &stream); err != nil {
-			fail(w, apierror.InvalidStream)
-			return
-		}
-	}
-	// Provider fallback cannot preserve server-side response IDs. Start with stateless requests.
-	if raw, ok := request["previous_response_id"]; ok && string(raw) != "null" {
-		fail(w, apierror.PreviousResponseUnsupported)
-		return
-	}
-	if raw, ok := request["conversation"]; ok && string(raw) != "null" {
-		fail(w, apierror.ConversationUnsupported)
-		return
-	}
-	if raw, ok := request["store"]; ok {
-		var store bool
-		if err = json.Unmarshal(raw, &store); err != nil || store {
-			fail(w, apierror.StoreUnsupported)
-			return
-		}
-	}
-	if raw, ok := request["background"]; ok {
-		var background bool
-		if err = json.Unmarshal(raw, &background); err != nil || background {
-			fail(w, apierror.BackgroundUnsupported)
-			return
-		}
-	}
-	request["store"] = json.RawMessage("false")
 	setLogStage(r, "route")
 	model, err := s.Store.Model(modelID)
 	if err != nil {
@@ -159,26 +144,10 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			s.logs.Request(t.row)
 		}
 	}
-	if stream && !model.Streaming {
-		fail(w, apierror.StreamingUnsupported)
+	if err := translation.CheckCapabilities(protocol.Capabilities{Streaming: model.Streaming, Tools: model.Tools}); err != nil {
+		recordTranslationDiagnostics(r, protocol.ErrorDiagnostics(err), false, false)
+		fail(w, protocol.RequestErrorID(err))
 		return
-	}
-	if raw, ok := request["tools"]; ok && string(raw) != "null" {
-		var tools []json.RawMessage
-		if err = json.Unmarshal(raw, &tools); err != nil {
-			fail(w, apierror.InvalidTools)
-			return
-		}
-		if len(tools) > 0 && !model.Tools {
-			fail(w, apierror.ToolsUnsupported)
-			return
-		}
-		for _, raw := range tools {
-			if !agentExecutedTool(raw, false) {
-				fail(w, apierror.UnsupportedTool)
-				return
-			}
-		}
 	}
 	affinity := routingAffinity(r.Header.Get("Authorization"), modelID, request)
 	candidates, err := s.routeCandidatesFor(model, affinity)
@@ -211,7 +180,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			tried[key.ID] = true
-			retry := s.forward(w, r, request, modelID, c, provider, key, stream, model, affinity)
+			retry := s.forward(w, r, translation, modelID, c, provider, key, stream, model, affinity)
 			if !retry {
 				s.release(provider.ID)
 				return
@@ -224,22 +193,6 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) protocolHandler(from string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		r.Body = http.MaxBytesReader(w, r.Body, MaxRequestBytes)
-		raw, err := io.ReadAll(r.Body)
-		if err != nil {
-			fail(w, apierror.RequestTooLarge, MaxRequestBytes>>20)
-			return
-		}
-		var fields map[string]json.RawMessage
-		if json.Unmarshal(raw, &fields) == nil && fields != nil {
-			observeRequestedServiceTier(r, fields)
-		}
-		converted, err := protocol.ConvertRequest(raw, from, "responses")
-		if err != nil {
-			fail(w, apierror.UnsupportedConversion)
-			return
-		}
-		r.Body = io.NopCloser(bytes.NewReader(converted))
 		r = r.WithContext(context.WithValue(r.Context(), protocolKey{}, from))
 		s.responses(w, r)
 	}
@@ -254,7 +207,11 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 }
-func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request map[string]json.RawMessage, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity, base string, allowRecovery bool, attemptCtx context.Context, attemptResult *forwardAttemptResult) (retry bool) {
+func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translation *protocol.Session, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity, base string, allowRecovery bool, attemptCtx context.Context, attemptResult *forwardAttemptResult) (retry bool) {
+	request := translation.PolicyFields()
+	if routeModel.ServiceTier != "" {
+		request["service_tier"], _ = json.Marshal(routeModel.ServiceTier)
+	}
 	// Resolve after key selection: the upstream model override wins over this key's default.
 	p.Protocol = key.EffectiveProtocol(c.Model)
 	costFactors := logCostFactors(p, key)
@@ -268,7 +225,10 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	observation := protocol.Observation{}
 	var upstreamHTTP *int
 	code := ""
-	var recovery *encryptedContextRecovery
+	var recovery *protocol.Recovery
+	var translationAttempt *protocol.Attempt
+	var translationFacts protocol.Diagnostics
+	delivered := false
 	setLogStage(r, "request_convert")
 	if t := trace(r); t != nil {
 		if _, exists := t.row.Evidence["model_revision"]; !exists {
@@ -286,6 +246,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		t.row.Code = ""
 	}
 	defer func() {
+		if translationFacts.Client != "" {
+			recordTranslationDiagnostics(r, translationFacts, attempted, delivered)
+		}
 		*attemptResult = forwardAttemptResult{attempted: attempted, success: success, status: status, after: after, opaque: recovery}
 		if !attempted {
 			return
@@ -346,11 +309,11 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		}
 		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "upstream_model", c.Model, "protocol", p.Protocol, "status", status, "success", success, "elapsed_ms", u.ElapsedMS, "requested_service_tier", requestedServiceTier(request), "sent_service_tier", sentTier, "fast_triggered", fastTriggered(observation.ServiceTier), "upstream_service_tier", reportedTier)
 	}()
-	request["model"], _ = json.Marshal(c.Model)
-	raw, _ := json.Marshal(request)
-	body, mapping, err := protocol.ConvertRequestMapped(raw, "responses", p.Protocol)
+	var err error
+	translationAttempt, err = translation.Prepare(protocol.AttemptOptions{Protocol: p.Protocol, Model: c.Model, PublicModel: public, ServiceTier: routeModel.ServiceTier})
 	if err != nil {
-		reason := protocol.ConversionReason(err)
+		translationFacts = protocol.ErrorDiagnostics(err)
+		reason := translationFacts.Category
 		if t := trace(r); t != nil {
 			t.row.Provider, t.row.Key, t.row.UpstreamModel = p.ID, key.ID, c.Model
 			t.row.HTTP = nil
@@ -360,7 +323,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		fail(w, apierror.CandidateConversionUnsupported, p.Protocol, reason)
 		return false
 	}
-	target := strings.TrimRight(base, "/") + protocol.Endpoint(p.Protocol)
+	translationFacts = translationAttempt.Diagnostics()
+	body := translationAttempt.RequestBody()
+	target := strings.TrimRight(base, "/") + translationAttempt.Endpoint()
 	ctx, cancel := context.WithCancel(attemptCtx)
 	defer cancel()
 	var connected atomic.Bool
@@ -426,9 +391,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 	setLogStage(r, "upstream_response")
 	if status != 200 {
 		if allowRecovery && (status == 400 || status == 422) {
-			data, readErr := io.ReadAll(io.LimitReader(resp.Body, encryptedContextPrefixLimit+1))
-			if readErr == nil && len(data) <= encryptedContextPrefixLimit {
-				recovery = recoverEncryptedContext(request, encryptedContextError(data))
+			data, readErr := io.ReadAll(io.LimitReader(resp.Body, protocol.RecoveryPrefixLimit+1))
+			if readErr == nil && len(data) <= protocol.RecoveryPrefixLimit {
+				recovery = translation.RecoverError(data)
 				if recovery != nil {
 					code = "encrypted_context_rejected"
 					return true
@@ -464,15 +429,11 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		fail(w, apierror.UpstreamContentType)
 		return false
 	}
-	to, _ := r.Context().Value(protocolKey{}).(string)
-	if to == "" {
-		to = "responses"
-	}
 	if stream {
 		if allowRecovery {
 			setLogStage(r, "stream_start")
-			var details encryptedContextStreamDetails
-			reader, reason, inspection, event := primeEncryptedContextStream(ctx, resp.Body, &details)
+			var details protocol.RecoveryStreamDetails
+			reader, reason, inspection, event := protocol.PrimeRecoveryStream(ctx, resp.Body, &details)
 			if t := trace(r); t != nil {
 				t.row.Evidence["encrypted_context_stream_inspection"] = inspection
 				t.row.Evidence["encrypted_context_stream_event"] = event
@@ -481,7 +442,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 					t.row.Evidence["encrypted_context_stream_fields"] = details.Fields
 				}
 			}
-			recovery = recoverEncryptedContext(request, reason)
+			recovery = translation.Recover(reason)
 			if recovery != nil {
 				code = "encrypted_context_rejected"
 				return true
@@ -493,7 +454,8 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		w.Header().Set("X-Accel-Buffering", "no")
 		w.WriteHeader(200)
 		setLogStage(r, "stream")
-		usage, err = protocol.StreamObservedMapped(w, resp.Body, p.Protocol, to, public, &observation, mapping)
+		result, translateErr := translationAttempt.TranslateStream(ctx, &translationDeliveryWriter{Writer: protocol.HTTPStreamWriter(w), delivered: &delivered}, resp.Body, protocol.StreamOptions{Language: apierror.LanguageOf(w)})
+		usage, observation, translationFacts, err = result.Usage, result.Observation, result.Diagnostics, translateErr
 		if err != nil {
 			code = "stream_interrupted"
 			if t := trace(r); t != nil {
@@ -504,68 +466,38 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, request 
 		success = err == nil
 		return false
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20+1))
-	if err != nil || len(data) > 16<<20 {
-		fail(w, apierror.UpstreamIncomplete)
-		return false
-	}
-	m, decodeErr := protocol.Decode(data)
-	if allowRecovery && decodeErr == nil {
-		recovery = recoverEncryptedContext(request, encryptedContextError(data))
+	// Recovery inspection is bounded and occurs before client delivery. The
+	// translator owns interpretation; the gateway alone authorizes a replay.
+	if allowRecovery {
+		data, readErr := io.ReadAll(io.LimitReader(resp.Body, protocol.MaxResponseBytes+1))
+		if readErr != nil || len(data) > protocol.MaxResponseBytes {
+			fail(w, apierror.UpstreamIncomplete)
+			return false
+		}
+		recovery = translation.RecoverError(data)
 		if recovery != nil {
 			code = "encrypted_context_rejected"
 			return true
 		}
+		resp.Body = &inferenceBody{Reader: bytes.NewReader(data), Closer: resp.Body}
 	}
-	if decodeErr == nil {
-		observation.ServiceTier = protocol.ReadServiceTier(m, p.Protocol)
-		observation.ServiceTierRaw = protocol.ReadRawServiceTier(data, p.Protocol, key.Secret)
-	}
-	if p.Protocol == to {
-		if decodeErr != nil {
-			fail(w, apierror.UpstreamInvalidJSON)
-			return false
-		}
-		usage = protocol.ReadUsage(m, p.Protocol)
-		observation.Status = safeGenerationStatus(m, p.Protocol)
-		if m["error"] != nil || m["status"] == "failed" {
-			fail(w, apierror.UpstreamFailed)
-			return false
-		}
-		setLogStage(r, "respond")
-		w.Header().Set("Content-Type", "application/json")
-		_, err = w.Write(data)
-		success = err == nil
-		return false
-	}
-	result, err := protocol.ParseResponse(data, p.Protocol)
-	if err != nil {
-		fail(w, apierror.UpstreamUnsupportedContent)
-		return false
-	}
-	usage = result.Usage
-	if to == "responses" && p.Protocol == "chat-completions" {
-		err = mapping.RestoreResult(&result)
-	}
-	if err != nil || result.CheckTarget(to) != nil {
-		fail(w, apierror.UpstreamUnsupportedContent)
-		return false
-	}
-	observation.Status = "completed"
-	if result.Finish == "length" {
-		observation.Status = "incomplete"
-	}
-	if to == "anthropic" && !usage.Known {
-		fail(w, apierror.UpstreamMissingUsage)
+	result, translateErr := translationAttempt.TranslateResponse(resp.Body)
+	usage, observation, translationFacts = result.Usage, result.Observation, result.Diagnostics
+	if translateErr != nil {
+		fail(w, protocol.ResponseErrorID(translateErr))
 		return false
 	}
 	setLogStage(r, "respond")
-	result.Model = public
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(result.JSON(to))
-	success = err == nil
+	n, writeErr := w.Write(result.Body)
+	delivered = n > 0
+	if writeErr == nil && n != len(result.Body) {
+		writeErr = io.ErrShortWrite
+	}
+	success = writeErr == nil
 	return false
 }
+
 func copyStream(w http.ResponseWriter, body io.Reader) error { return copyBody(w, body, true) }
 func copyBody(w http.ResponseWriter, body io.Reader, flush bool) error {
 	controller := http.NewResponseController(w)

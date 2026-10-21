@@ -1,10 +1,10 @@
-package core
+package protocol
 
 import "encoding/json"
 
-// agentExecutedTool permits only client-executed Responses tools. Namespaces
+// AgentExecutedTool permits only client-executed Responses tools. Namespaces
 // group function/custom tools; they do not grant hosted-tool capabilities.
-func agentExecutedTool(raw json.RawMessage, namespaced bool) bool {
+func AgentExecutedTool(raw json.RawMessage, namespaced bool) bool {
 	var tool struct {
 		Type      string            `json:"type"`
 		Name      string            `json:"name"`
@@ -24,7 +24,7 @@ func agentExecutedTool(raw json.RawMessage, namespaced bool) bool {
 			return false
 		}
 		for _, child := range tool.Tools {
-			if !agentExecutedTool(child, true) {
+			if !AgentExecutedTool(child, true) {
 				return false
 			}
 		}

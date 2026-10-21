@@ -1,4 +1,4 @@
-package core
+package protocol
 
 import (
 	"bytes"
@@ -13,15 +13,16 @@ import (
 
 // Response initialization can echo large instruction/tool schemas. Match the
 // existing protocol SSE event bound instead of committing at just 64 KiB.
-const encryptedContextPrefixLimit = 2 << 20
+const RecoveryPrefixLimit = 2 << 20
 
-type encryptedContextRecovery struct {
-	request map[string]json.RawMessage
-	reason  string
-	removed int
+type Recovery struct {
+	Request map[string]json.RawMessage
+	Reason  string
+	Removed int
+	session *Session
 }
 
-func hasEncryptedReasoning(request map[string]json.RawMessage) bool {
+func HasEncryptedReasoning(request map[string]json.RawMessage) bool {
 	var items []struct {
 		Type             string          `json:"type"`
 		EncryptedContent json.RawMessage `json:"encrypted_content"`
@@ -39,7 +40,7 @@ func hasEncryptedReasoning(request map[string]json.RawMessage) bool {
 
 // Only code-owned labels escape this function, never upstream messages or IDs.
 // Do not search arbitrary output text: only explicit error envelopes qualify.
-func encryptedContextError(data []byte) string {
+func EncryptedContextError(data []byte) string {
 	var envelope struct {
 		Type     string            `json:"type"`
 		Code     string            `json:"code"`
@@ -202,7 +203,7 @@ func encryptedContextEventLabel(kind string, item json.RawMessage) string {
 // Drop all historical reasoning only after a definite rejection; the error ID
 // does not establish which other items belong to the same encryption domain.
 // Keep messages, calls/results, compaction and encrypted agent tasks untouched.
-func recoverEncryptedContext(request map[string]json.RawMessage, reason string) *encryptedContextRecovery {
+func RecoverEncryptedContext(request map[string]json.RawMessage, reason string) *Recovery {
 	if reason == "" {
 		return nil
 	}
@@ -227,7 +228,7 @@ func recoverEncryptedContext(request map[string]json.RawMessage, reason string) 
 	}
 	cleaned := maps.Clone(request)
 	cleaned["input"], _ = json.Marshal(kept)
-	return &encryptedContextRecovery{request: cleaned, reason: reason, removed: removed}
+	return &Recovery{Request: cleaned, Reason: reason, Removed: removed}
 }
 
 type encryptedContextRead struct {
@@ -235,7 +236,7 @@ type encryptedContextRead struct {
 	err  error
 }
 
-type encryptedContextStreamDetails struct {
+type RecoveryStreamDetails struct {
 	TypeHash string
 	Fields   string
 }
@@ -270,7 +271,7 @@ func (p *encryptedContextPendingRead) Read(b []byte) (int, error) {
 // held. Actual content, tool items and unknown events commit the stream.
 // Preserve every inspected byte when declining recovery. Never replay after
 // generated output, EOF, timeout, malformed data, or an unrelated stream error.
-func primeEncryptedContextStream(ctx context.Context, body io.Reader, details ...*encryptedContextStreamDetails) (io.Reader, string, string, string) {
+func PrimeRecoveryStream(ctx context.Context, body io.Reader, details ...*RecoveryStreamDetails) (io.Reader, string, string, string) {
 	prefix := make([]byte, 0, 4096)
 	lineStart := 0
 	var data strings.Builder
@@ -280,8 +281,8 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader, details ..
 	pass := func(tail io.Reader, inspection string) (io.Reader, string, string, string) {
 		return replay(tail), "", inspection, lastEvent
 	}
-	for len(prefix) < encryptedContextPrefixLimit {
-		chunkSize := min(4096, encryptedContextPrefixLimit-len(prefix))
+	for len(prefix) < RecoveryPrefixLimit {
+		chunkSize := min(4096, RecoveryPrefixLimit-len(prefix))
 		result := make(chan encryptedContextRead, 1)
 		go func() {
 			buf := make([]byte, chunkSize)
@@ -353,7 +354,7 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader, details ..
 					}
 				}
 				if header.Type == "error" || header.Type == "response.failed" || event == "error" {
-					if reason := encryptedContextError(payload); reason != "" {
+					if reason := EncryptedContextError(payload); reason != "" {
 						return replay(body), reason, "rejected", lastEvent
 					}
 				}
@@ -403,3 +404,27 @@ func primeEncryptedContextStream(ctx context.Context, body io.Reader, details ..
 	}
 	return pass(body, "prefix_limit")
 }
+
+// CanRecover permits the existing one-shot native Responses recovery only.
+// The gateway decides whether the HTTP status and replay budget allow it.
+func (s *Session) CanRecover(upstream string) bool {
+	return s.client == "responses" && upstream == "responses" && HasEncryptedReasoning(s.PolicyFields())
+}
+func (s *Session) RecoverError(data []byte) *Recovery { return s.Recover(EncryptedContextError(data)) }
+func (s *Session) Recover(reason string) *Recovery {
+	if !s.CanRecover("responses") {
+		return nil
+	}
+	switch reason {
+	case "invalid_encrypted_content", "encrypted_content_unverifiable", "encrypted_content_caller_mismatch":
+	default:
+		return nil
+	}
+	recovery := RecoverEncryptedContext(s.PolicyFields(), reason)
+	if recovery != nil {
+		raw, _ := json.Marshal(recovery.Request)
+		recovery.session, _ = NewSession(raw, s.client)
+	}
+	return recovery
+}
+func (r *Recovery) Session() *Session { return r.session }

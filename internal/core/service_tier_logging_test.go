@@ -115,7 +115,12 @@ func TestServiceTierDiagnosticsOnConversionFailure(t *testing.T) {
 	tr := &requestTrace{row: logbook.Request{Evidence: map[string]string{"upstream_service_tier": "priority", "upstream_service_tier_raw": `"priority"`, "sent_service_tier_raw": `"priority"`, "fast_triggered": "true", "requested_service_tier": "ultrafast"}}}
 	r = r.WithContext(context.WithValue(r.Context(), requestLogKey{}, tr))
 	fields := map[string]json.RawMessage{"model": json.RawMessage(`"public"`), "input": json.RawMessage(`"hi"`), "service_tier": json.RawMessage(`"ultrafast"`)}
-	f.core.forward(httptest.NewRecorder(), r, fields, "public", state.Candidate{Model: "m"}, p, state.ProviderKey{Protocol: "anthropic"}, false, state.Model{}, "")
+	raw, _ := json.Marshal(fields)
+	translation, err := protocol.NewSession(raw, "responses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.core.forward(httptest.NewRecorder(), r, translation, "public", state.Candidate{Model: "m"}, p, state.ProviderKey{Protocol: "anthropic"}, false, state.Model{}, "")
 	if _, exists := tr.row.Evidence["upstream_service_tier"]; exists {
 		t.Fatal("previous candidate tier retained")
 	}

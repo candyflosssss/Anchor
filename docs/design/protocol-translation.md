@@ -1,0 +1,80 @@
+# 请求级协议翻译层
+
+2026-10-21 当前源码，未打包、未发布。仅处理既有 Responses、Chat Completions、Anthropic Messages，不增加第四种外部协议或运行服务。
+
+## 调用边界与文件归属
+
+```text
+HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
+        → 网关选择模型、候选和 Key
+        → Session.Prepare(AttemptOptions) → Attempt.RequestBody / Endpoint
+        → 网关认证、网络发送、期限、响应类型检查
+        → Attempt.TranslateResponse / TranslateStream
+        → 网关 HTTP 交付、重试决策、日志和用量持久化
+```
+
+| 模块 | 职责 |
+| --- | --- |
+| `internal/protocol/session.go` | 不可变的客户端原生请求与转换基线；每个候选独立 Prepare；请求编码与私有返回映射绑定 |
+| `ingress.go`、`client_tools.go` | 类型化 RequestInfo / Capabilities；无状态与工具执行边界校验；不访问模型库、不执行工具 |
+| `request.go`、`chat_request.go` | 现有协议结构适配与白名单校验；参数、输出格式、历史思考、工具身份和 custom 包装规则 |
+| `attempt_response.go`、`response.go` | 有界读取、普通响应语义校验、工具还原和客户端编码；返回 Usage、Observation、Diagnostics |
+| `stream.go` | 同步增量 SSE 解析／编码，只依赖 reader/writer；工具分片、索引、终止、内容和数量上限 |
+| `stream_http.go` | 兼容旧 Stream 入口；HTTP 写期限和刷新适配到通用 writer，不参与协议语义 |
+| `recovery.go` | 已有密文拒绝识别、恢复窗口、清理派生会话；没有自动重试或渠道选择 |
+| `diagnostics.go` | 固定阶段、错误类别、完整／降级／不支持结果，安全错误包装 |
+| `internal/core/gateway*.go`、`translation_logging.go` | 鉴权／访问范围、调度、上游认证、连接与取消、候选及恢复预算、HTTP 交付、诊断与账务持久化 |
+
+网关不再持有 `ChatMapping`，不判断何时展平或恢复工具，也不解析普通输出、思考、结束原因、用量或流式事件。协议库不依赖 core、state 或数据库；HTTP 专用兼容入口单独隔离。已有低层 ConvertRequest/Stream 入口继续共用相同规则，不建立第二套转换器。
+
+## 生命周期与内部表示
+
+Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日志／亲和性算法使用的独立 Responses 形状投影，**不是通用语义模型或可用于原生发送的请求**；改写它不能影响 Session。公共接口使用 RequestInfo、Capabilities、AttemptOptions、Response、Usage、Observation、Diagnostics 等类型；Result/Item 继续明确区分正文、明文思考、函数调用、custom 调用及其身份，不为架构形式重写既有适配器。
+
+每次 Prepare 都重新解码私有基线，设置本次上游模型及明确的模型档位策略，创建新的工具映射。请求体返回副本，映射不暴露给网关。Session 可以并发 Prepare；一个 Attempt 由一次上游尝试独占。失败或取消后，调用栈退出即可回收请求状态，无注册表或全局映射。
+
+跨协议继续使用现有 Responses 形状的内部请求桥及类型化输出；不能表达的原生字段在 Prepare 时拒绝，不把最小公共子集当成静默过滤器。下一轮工具结果通过客户端回传的声明、name/namespace、call_id 和历史调用重建映射，不依赖上次 HTTP 请求的进程内状态。碰撞、长名称与歧义身份继续由既有 Chat 适配器处理。
+
+同协议发送保留原生字段，保留原生响应字节；仅修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
+
+不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
+
+## 兼容策略与本轮实际行为变化
+
+完整转换表示本次所需语义在已有支持范围内可表达，不表示目标实现必然支持所有标准字段。原生透传不承诺上游实现本身可用。
+
+既有 Responses → Chat 降级保持默认允许，并返回固定 Degradation：
+
+- `reasoning_summary_style`：Chat 不提供摘要样式选择器。
+- `encrypted_reasoning_projection`：可选密文返回投影无法生成；不伪造密文，不丢弃非空密文历史。
+- `custom_grammar_description`：grammar 仅保留为函数描述，不保留原生强制语法约束。
+
+明确的历史密文恢复仍是原有有损例外：仅原生 Responses、明确拒绝、未交付、同渠道至多一次；清理历史 reasoning 后创建**派生 Session**，其他候选仍使用未污染的原请求。清理丢失隐藏推理连续性，沿用原恢复 evidence，不扩大触发条件。检查中已有的单次待决 Read 协程沿用原实现；取消由网关关闭响应体／取消 HTTP 请求以解除阻塞。
+
+本轮除分层外实际改变：
+
+1. Chat／Anthropic 原生请求不再强制往返 Responses；只能原生表达的字段不再在入口被无条件拒绝，选择其他协议时仍拒绝。原生工具限制不放宽。
+2. `additional_tools` 声明现在与顶层 tools 一起执行能力和托管工具检查，堵住原生透传绕过工具限制的缺口。
+3. 普通响应显式 failed、queued、in_progress 或无效结束原因不能因 HTTP 200 当作完成；跨协议不能表达的过滤／拒绝结束会失败，不合成为 completed。流式转换要求目标成功事件所需的上游终止及结束原因。
+4. 新增 64 MiB 累计 SSE 输入字节上限，连原生流也有界。原有单事件 2 MiB、转换内容 16 MiB、最多 256 转换输出项和普通响应 16 MiB 上限保持。
+5. SSE 一帧合并为一次 writer 调用，防止写出完成帧后立即取消覆盖已完成的日志状态；写入失败仍不记成功。
+
+原生 Responses 历史兼容路径仍接受没有 status 的 JSON，状态记为未知；不会因 HTTP 200 记录 generation_status=completed。原生 Chat 的 `[DONE]` 与 Anthropic `message_stop` 继续是透传终止边界；缺少可解析结束信息时不编造生成状态。传输成功与完整生成语义分开。
+
+## 流式与取消边界
+
+普通文本和函数参数按事件增量交付，不能整段读完再伪装为流。custom 包装 JSON 必须完整校验后才解包 input，以既有 16 MiB 总转换内容限制缓冲，避免破坏转义、Unicode 或泄露包装字段。Anthropic 输出要求顺序的后续内容块沿用有界缓冲，首块增量交付；并行工具参数不会以不合法的交错 Anthropic 块发出。
+
+转换器无新增后台协程或队列。通用 Stream 接口检查 context；阻塞网络 Read 的解除由拥有连接的网关负责取消和 Close。协议层不持有连接、不关闭调用者的 reader/writer。网关在开始 SSE 交付后无条件结束该尝试，不重放；缺失终止、非法／截断参数、超限、客户端写失败不会合成成功完成事件。
+
+## 安全诊断与验收
+
+Diagnostics 只含客户端／上游协议、request/response/stream 阶段、固定类别、兼容性及固定降级列表；Error() 不展开底层错误。网关补充实际派发与正文交付事实，保存至既有 evidence：`translation_client`、`conversion_target`、`translation_stage`、`translation_category`、`translation_compatibility`、`translation_dispatched`、`translation_delivered`、`translation_degradations`。预派发转换失败继续保留 `conversion_reason`、路由身份、HTTP=null、attempt_count=0。
+
+成功的 category 为空；请求类别包括 protocol、invalid_json、model、stream、stateful_request、tools、streaming_disabled、tools_disabled、hosted_tool，以及[既有请求转换类别](protocol-chat-bridge.md#错误与日志)。普通响应使用 incomplete_body、invalid_json、upstream_error、unsupported_finish、unsupported_content、missing_usage 及既有 responseValidation 固定类别（如 invalid_choices、refusal、invalid_tool_call、missing_response_id）；流式使用 invalid_stream、missing_terminal、cancelled。未知底层错误不会把原始文本当作类别。
+
+不记录正文、提示词、思考、工具参数、凭据、未知字段名或原始上游错误。API 状态／错误码继续使用既有目录；日志详情和导出包含新增 evidence，列表白名单保持原样。旧日志不补写。
+
+新增 Session 测试覆盖三协议九种组合、同协议保留、普通／流式、明确零与未知用量、并发 Prepare／候选污染、请求拒绝／降级、增量／取消／写失败、工具及事件／累计上限；既有适配器测试继续覆盖思考和输出格式、长名称、碰撞、歧义、custom 转义及密文恢复。网关用隔离 SQLite 与 httptest 上游跑普通和流式两轮并行 function/custom 工具闭环，包含候选切换、结果回传、最终答案和日志脱敏。实际执行命令与结果见本轮任务记录；没有真实供应商、Agent 配置、桌面安装或运行版本验收。
+
+跨协议的多模态、tool_search、签名思考、Responses 输出 reasoning/custom 的未实现方向，以及无法无损表示的未知字段仍不支持。详细 Responses → Chat 支持表见[现有桥接说明](protocol-chat-bridge.md)。
