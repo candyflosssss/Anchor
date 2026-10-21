@@ -848,3 +848,11 @@
 - 旧 → 新：历史 reasoning 中的 null、非字符串和空字符串 encrypted_content 原先直接转发，可能触发上游 `encrypted reasoning content must be a string`，且不匹配已有错误恢复；现在首次及后续派发均先删除这类字段和该条目的 id，避免 store=false 下孤立 ID 查找。保留摘要、其他字段、非空密文及非 reasoning 条目；缺少 encrypted_content 的条目保持原样。
 - 兼容与迁移：只修改原生 Responses 的派发副本，不改客户端历史／配置，不解析非空密文、不放宽跨协议转换；不新增请求、不消耗一次恢复预算、不添加报错后清理标记。已有明确密文拒绝后的恢复继续生效。需要升级核心，无数据库迁移；本轮未构建或替换运行版本。
 - 验证：受资源限制串行执行 `GOMAXPROCS=2 go test -p 1 -count=1 -timeout=180s ./internal/protocol ./internal/core ./internal/cli` 通过；新增隔离模拟上游验证普通／流式首次派发成功、单次尝试与日志用量，协议测试覆盖无效类型、摘要与不透明密文保留、基线隔离及重复派发。
+
+## 2026-10-21 — desktop.61 dev 在线交付
+
+- 类型：发行状态补记，无新增命令或参数。
+- 指令与参数：既有 update check/download 与桌面在线更新沿用默认 dev 源，SSH 被控机使用同版 update-cli.json。
+- 旧 → 新：本日无效加密思考字段预清理及 .60 后已提交增量现随 desktop.61 两平台安装器、runtime、独立 CLI 和更新清单发布；前述功能提交时“未构建”保留为历史事实。
+- 兼容与迁移：沿用 schema9，核心／界面配套更新；本轮未安装到真实实例、未改用户更新配置，SSH 被控机单独更新。
+- 验证：双平台生产编译／打包、11 附件 GitHub digest 和标签核对、Linux 默认源 runtime／旧客户端 deb／CLI 三条实际下载与大小／SHA256／版本验证通过。未执行系统安装器／原生窗口／真实 SSH 升级或付费推理验收。

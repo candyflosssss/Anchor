@@ -1,10 +1,15 @@
 # 在线更新 v1
 
 - 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.60](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.60)，发布于 `2026-10-21T00:11:33+08:00`；GitHub prerelease，非 latest，11项附件同版投放，构建提交 `e481ca87758d774111fea119e2070a16a983d6df`、SOURCE dirty=false。
-- 修复`codex.response.metadata`被误作输出而提前结束密文检查的问题；仅将此确切附加元信息事件列入允许列表。初始化检查上限由64 KiB提高至2 MiB，仍共享原请求期限、同渠道一次清理重试；实际内容、工具和其他未知结构不重放。日志保存metadata类别、事件类型SHA256及固定字段名存在性，不保存正文、密文或字段值。
-- 最终core/protocol/logbook回归15.503s／0.007s／0.623s通过；双平台生产编译／打包、11附件远端摘要及3条默认源实际下载通过。更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新；SSH被控机另行升级。
-- 用户确认修正探针.3已使原失败会话恢复正常；本机现已于 `2026-10-21T00:12:28.906214+08:00` 将CLI／核心／GUI换为正式`.60`。schema9、配置／凭据／托管／恢复文件及dev更新配置保持，运行摘要与ready/applied核对通过；备份 `/home/mosaki/.config/anchor/backups/pre-desktop60-20261021-001215`。未主动请求付费推理，未执行系统安装器／apply、原生窗口或跨机SSH更新验收。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.61](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.61)，发布于 `2026-10-21T12:02:05+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c6f56a407bce12608c0466abb7c67a1d7249d214`、SOURCE dirty=false。
+- 修复历史 reasoning 中 null／非字符串／空字符串 encrypted_content 导致上游 400：协议层在发送前移除无效字段及对应 id，保留摘要、非空密文和其他历史；无额外请求，既有明确密文拒绝后的恢复继续保留。
+- 同时包含 .60 后已提交的请求级协议翻译、Anthropic 顺序内容块增量输出、日志已知用量小计、连接核心版本展示及显式系统代理路由；具体契约见设计与 CLI 文档。
+- protocol／core／cli 回归、双平台生产编译／打包、11 附件远端摘要和 3 条默认源实际下载均通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
+- 本轮仅在线投放，未替换本机运行的 .60，SSH 被控机另行更新；未调用真实付费推理，未验收双平台原生窗口、系统安装器或真实 SSH 升级。
+
+## .61 在线投放（2026-10-21）
+
+同版11附件完成上传与digest核对，Linux runtime、旧客户端deb和CLI三条默认源实际下载与大小／SHA256／版本检查通过。构建tag指向 `c6f56a407bce12608c0466abb7c67a1d7249d214`，dev prerelease、非latest。本机仍运行.60，本轮未安装或改动用户更新配置。完整改动与校验表见[发行记录](../release/desktop.md#native-reasoning-61)。
 
 ## .60 在线投放与本机升级（2026-10-21）
 

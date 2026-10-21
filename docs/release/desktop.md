@@ -1,10 +1,39 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.60](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.60)，发布于 `2026-10-21T00:11:33+08:00`；GitHub prerelease，非 latest，11项附件同版投放，构建提交 `e481ca87758d774111fea119e2070a16a983d6df`、SOURCE dirty=false。
-- 修复`codex.response.metadata`被误作输出而提前结束密文检查的问题；仅将此确切附加元信息事件列入允许列表。初始化检查上限由64 KiB提高至2 MiB，仍共享原请求期限、同渠道一次清理重试；实际内容、工具和其他未知结构不重放。日志保存metadata类别、事件类型SHA256及固定字段名存在性，不保存正文、密文或字段值。
-- 最终core/protocol/logbook回归15.503s／0.007s／0.623s通过；双平台生产编译／打包、11附件远端摘要及3条默认源实际下载通过。更新入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新；SSH被控机另行升级。
-- 用户确认修正探针.3已使原失败会话恢复正常；本机现已于 `2026-10-21T00:12:28.906214+08:00` 将CLI／核心／GUI换为正式`.60`。schema9、配置／凭据／托管／恢复文件及dev更新配置保持，运行摘要与ready/applied核对通过；备份 `/home/mosaki/.config/anchor/backups/pre-desktop60-20261021-001215`。未主动请求付费推理，未执行系统安装器／apply、原生窗口或跨机SSH更新验收。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.61](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.61)，发布于 `2026-10-21T12:02:05+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c6f56a407bce12608c0466abb7c67a1d7249d214`、SOURCE dirty=false。
+- 修复历史 reasoning 中 null／非字符串／空字符串 encrypted_content 导致上游 400：协议层在发送前移除无效字段及对应 id，保留摘要、非空密文和其他历史；无额外请求，既有明确密文拒绝后的恢复继续保留。
+- 同时包含 .60 后已提交的请求级协议翻译、Anthropic 顺序内容块增量输出、日志已知用量小计、连接核心版本展示及显式系统代理路由；具体契约见设计与 CLI 文档。
+- protocol／core／cli 回归、双平台生产编译／打包、11 附件远端摘要和 3 条默认源实际下载均通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
+- 本轮仅在线投放，未替换本机运行的 .60，SSH 被控机另行更新；未调用真实付费推理，未验收双平台原生窗口、系统安装器或真实 SSH 升级。
+
+<a id="native-reasoning-61"></a>
+
+## 无效加密思考字段预清理 .61（已发布 dev）
+
+原生 Responses 的历史 reasoning 可能只有摘要而没有密文，客户端会回传 encrypted_content=null；旧版原样转发后，上游可能返回 `encrypted reasoning content must be a string`，不匹配已有密文验证失败恢复。现在每次 Session.Prepare 仅在派发副本删除显式 null、非字符串或空字符串 encrypted_content 及该条目 id，避免 store=false 下孤立 ID 查找。摘要、其他字段、非空不透明密文及全部非 reasoning 历史保留；缺少密文字段的条目保持原样，不修改客户端历史，不增加请求、不占用恢复预算，也不伪造报错后清理日志。既有明确密文拒绝后恢复继续保留。
+
+本版还包含从 .60 之后主线已经提交的显式系统代理路由、请求日志已知用量小计、连接核心版本展示、请求级协议翻译层及 Anthropic 顺序内容块流式输出。没有纳入工作区未提交的架构／恢复路线图／其他任务记录和本地产物。
+
+构建提交 `c6f56a407bce12608c0466abb7c67a1d7249d214`，输入摘要 `6369e7d7f7bf9a7876861d886333acae31646e988b98cabacb46939d2537f488`，SOURCE dirty=false；产物与证据保存在 `dist/desktop/0.1.0-dev.desktop.61/`。对应源码包括 Anchor 的 Go vendor、未修改 mihomo v1.19.32 对应源码／vendor 和固定 payload。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.61_amd64.deb` | 29138296 | `2ce527a2f52920bef01cc66b035e057516cd7737fdcf30a6eba113499f8f86ff` |
+| `Anchor-Desktop-0.1.0-dev.desktop.61-windows-amd64-setup.exe` | 31150709 | `004e436231f979da8df6c0ff17f51510e9b30ac1283b3ee693c8e848739830d0` |
+| `anchor-desktop-0.1.0-dev.desktop.61-linux-amd64` | 43078704 | `5f158313a10033b449a9415bb60a72642f1b04ec017c54d66cc15d05b66f6a43` |
+| `anchor-desktop-0.1.0-dev.desktop.61-windows-amd64.exe` | 44202496 | `7a918be6cdca072f0725f5b2250fafdcaa5be83c6fb52220f6b1bdcd9b21d6c4` |
+| `anchor-0.1.0-dev.desktop.61-linux-amd64` | 37716130 | `019de993851571241563f8b4ef8d7f389995c1214dd79ab11a3c3ad596ec4d08` |
+| `anchor-0.1.0-dev.desktop.61-windows-amd64.exe` | 37844480 | `82b86229d3906552616f8cbe2c3ce74bdcc2170b9585d784d09a5c2e88aa54f0` |
+| `update-desktop.json` | 1755 | `8b28eb947fe045a3b49056b7b76dc848bb2a5ca72ffe47fce2ca0dd3ecacad74` |
+| `update-cli.json` | 876 | `24a3eaa73804bdac07c0103d45c5bcff1fa76595570bc52f7dd941adc554695d` |
+| `anchor_0.1.0-dev.desktop.61_source.tar.gz` | 97637423 | `32eedd22f3cb2417da2fcc902e9150494bd6900b0cf6edc8f5fca4825465bc60` |
+| `anchor_0.1.0-dev.desktop.61_metadata.zip` | 122176 | `1ee5a7c67c60021948312cf269809c169e0887cd665b8bfeacaa19e2e1a27db2` |
+| `SHA256SUMS` | 1073 | `18a8a4fed57eabe29a0f391c7cdbf811e4257c9d72ee07dd7e8a3fd36665481c` |
+
+复用修复提交的定向及完整受影响包回归：protocol／core／cli 分别0.440s／16.384s／4.913s通过；普通与流式请求首次派发成功、摘要与不透明密文保留、基线隔离、重复派发及既有密文拒绝恢复均覆盖。打包完成契约比对、TypeScript／Vite和双平台生产编译。默认源真实下载Linux desktop runtime、旧客户端兼容deb和CLI，大小／SHA256与运行版本核对通过；全部11附件GitHub digest匹配，标签指向构建提交，prerelease且未替代latest。没有额外跑全量、race或浏览器套件。原始BUILD.json保留构建时未安装／未发布／未原生验收事实，发布结果另存publication证据。
+
+本轮未替换本机运行中的.60，未修改真实Agent配置或请求付费推理。未执行双平台原生窗口、系统安装器或真实跨机SSH升级验收；源码与下载校验通过不等于真实失败会话已经恢复。
 
 ## Codex元信息与密文恢复 .60（已发布 dev，本机已升级）
 

@@ -1,6 +1,6 @@
 # 请求级协议翻译层
 
-2026-10-21 当前源码，未打包、未发布。仅处理既有 Responses、Chat Completions、Anthropic Messages，不增加第四种外部协议或运行服务。
+2026-10-21 已随 desktop.61 dev 打包发布。仅处理既有 Responses、Chat Completions、Anthropic Messages，不增加第四种外部协议或运行服务。
 
 ## 调用边界与文件归属
 
@@ -52,7 +52,7 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 明确的历史密文恢复仍是原有有损例外：仅原生 Responses、明确拒绝、未交付、同渠道至多一次；清理历史 reasoning 后创建**派生 Session**，其他候选仍使用未污染的原请求。清理丢失隐藏推理连续性，沿用原恢复 evidence，不扩大触发条件。检查中已有的单次待决 Read 协程沿用原实现；取消由网关关闭响应体／取消 HTTP 请求以解除阻塞。
 
-2026-10-21 后续修复（当前源码，未打包／未发布）：原生 Responses 在每次 Prepare 时，删除 input 顶层 reasoning 条目中显式为 null、非字符串或空字符串的 encrypted_content，并删除该条目的 id，避免 store=false 下无密文的条目触发历史存储查找。保留 reasoning 条目、summary、其他字段、非空字符串密文及全部非 reasoning 条目；缺少 encrypted_content 的条目不改写，不解析或猜测非空密文格式。只改派发副本，不修改 Session 基线、客户端历史或跨协议规则；无额外请求、不消耗恢复预算，也不生成“已清理加密上下文”重试标记。已有明确密文拒绝后的恢复机制保留。
+2026-10-21 后续修复（desktop.61 dev 已发布）：原生 Responses 在每次 Prepare 时，删除 input 顶层 reasoning 条目中显式为 null、非字符串或空字符串的 encrypted_content，并删除该条目的 id，避免 store=false 下无密文的条目触发历史存储查找。保留 reasoning 条目、summary、其他字段、非空字符串密文及全部非 reasoning 条目；缺少 encrypted_content 的条目不改写，不解析或猜测非空密文格式。只改派发副本，不修改 Session 基线、客户端历史或跨协议规则；无额外请求、不消耗恢复预算，也不生成“已清理加密上下文”重试标记。已有明确密文拒绝后的恢复机制保留。
 
 本轮除分层外实际改变：
 

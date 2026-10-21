@@ -5,19 +5,19 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.60**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.61**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.60 已发布为 GitHub prerelease**，修复Codex附加元信息导致密文检查提前退出的问题，较大的初始化信息也可继续检查。用户已确认修正后的原失败会话恢复正常，本机CLI／核心／GUI已配套换为正式`.60`，配置与托管状态保持。可在「设置 → 在线更新」选择dev获取，详见[构建与发布记录](docs/release/desktop.md#codex元信息与密文恢复-60已发布-dev本机已升级)。
+**desktop.61 已发布为 GitHub prerelease**，修复空值／错误类型加密思考字段引起的上游400，发送前清理无效字段并保留摘要和其他历史；包含.60之后已提交的协议翻译、日志小计、连接核心版本与系统代理路由。设置 → 在线更新 → dev 获取。本轮未自动替换本机.60，详见[构建与发布记录](docs/release/desktop.md#native-reasoning-61)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.60/Anchor-Desktop-0.1.0-dev.desktop.60-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.60/anchor-desktop_0.1.0-dev.desktop.60_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.60)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.61/Anchor-Desktop-0.1.0-dev.desktop.61-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.61/anchor-desktop_0.1.0-dev.desktop.61_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.61)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -63,7 +63,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-以下一键安装入口用于 CLI alpha.6。Windows GUI 与 Ubuntu24.04 AMD64 安装包已随 desktop.52 发布到 dev 渠道，包含上述所有更新及既有代理、重启、Agent／Skill和日志能力。本机 CLI／核心／GUI 已配套升级为 `.52`；默认源真实下载与大小／SHA256校验通过。**升级前备份并配套升级核心与桌面：沿用schema9，旧版升级无数据库降级，SSH远端单独升级。** 实际验收与兼容边界见[桌面安装说明](docs/release/desktop.md)。
+以下一键安装入口用于 CLI alpha.6。Windows GUI 与 Ubuntu24.04 AMD64 安装包已随 desktop.61 发布到 dev 渠道；默认源真实下载与大小／SHA256校验通过。本机 CLI／核心／GUI 仍为 `.60`，本轮未自动安装。**升级前备份并配套升级核心与桌面：沿用schema9，旧版升级无数据库降级，SSH远端单独升级。** 实际验收与兼容边界见[桌面安装说明](docs/release/desktop.md)。
 
 已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux / Windows AMD64 `0.1.0-alpha.6` 已公开发布；两平台附件匿名下载与校验通过，Linux 远程一键安装已验证**。不从 Actions artifact 或草稿偷偷安装。
 
@@ -106,7 +106,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ### 在线更新（desktop.59 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认 GitHub 源已发布 `0.1.0-dev.desktop.60` 两平台安装包、runtime、独立 CLI 和同版更新清单，包含空思考容器后的密文拒绝恢复和安全事件分类，保留各Key倍率／分组展示、SSH更新提示及NewAPI缓存维护。沿用 schema9；升级前备份、配套升级核心与桌面，SSH 远端另行升级。新旧客户端真实下载与 SHA256 校验通过；本机已配套升级到 `.59`，核心与托管状态核验通过；原生窗口／系统安装器／真实 SSH 升级未验收。详见[发行记录](docs/release/desktop.md#空思考容器恢复-59已发布-dev本机已升级)。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认源已发布 `0.1.0-dev.desktop.61` 两平台安装器、runtime、CLI和更新清单，修复无效加密思考字段导致的400；三条默认源实际下载及11附件摘要核对通过。沿用schema9，配套更新核心和桌面；本机仍运行.60，SSH被控机另行更新。详见[发行记录](docs/release/desktop.md#native-reasoning-61)。
 
 **desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.59` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema9，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
 
