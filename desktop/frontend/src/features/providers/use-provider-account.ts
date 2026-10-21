@@ -36,7 +36,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
           const v = await transport.accountSettings(id, abort.signal);
           if (abort.signal.aborted || at !== epoch.current) return;
           if (v.revision !== revision) throw new ProviderProblem('conflict');
-          setSettings(v);
+          setSettings(v); setObservedPlatform(v.platform && v.platform !== 'auto' ? v.platform : v.detected_platform);
         } catch (e) {
           if (!abort.signal.aborted && at === epoch.current) {
             const code = e instanceof ProviderProblem ? e.code : 'read_error'; setError(problemText[code]); setNeedsRead(true);
@@ -47,13 +47,23 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
     return () => { abort.abort(); abortRef.current?.abort(); epoch.current = at + 1; lock.current = false; };
   }, [id, revision, readVersion, transport]);
   const matches = !!settings && settings.provider_id === id && settings.revision === revision;
-  async function run(operation: 'save' | 'balance' | 'key-quota' | 'effective-rate', input: SaveAccountSettings | AccountQuery) {
+  async function run(operation: 'detect-platform' | 'save' | 'balance' | 'key-quota' | 'effective-rate', input: SaveAccountSettings | AccountQuery) {
     if (!p || !matches || lock.current || blocked() || needsRead) return false;
     if (input.provider_id !== p.id || input.expected_revision !== p.revision) return false;
     lock.current = true; setBusy(true); setError('');
     if (operation === 'save') { setBalance(null); setQuota(null); setRate(null); }
     const at = epoch.current, abort = new AbortController(); abortRef.current = abort;
     try {
+      if (operation === 'detect-platform') {
+        if (!transport.detectPlatform) throw new ProviderProblem('invalid');
+        const v = await transport.detectPlatform(input as AccountQuery, abort.signal);
+        if (abort.signal.aborted || at !== epoch.current) return false;
+        if (v.revision !== p.revision) throw new ProviderProblem('conflict');
+        setSettings(v); setObservedPlatform(v.platform && v.platform !== 'auto' ? v.platform : v.detected_platform);
+        setBalance(null); setQuota(null); setRate(null);
+        await observed?.();
+        return true;
+      }
       if (operation === 'save') {
         if (!transport.saveAccount) throw new ProviderProblem('invalid');
         const v = await transport.saveAccount(input as SaveAccountSettings, abort.signal);
@@ -69,6 +79,14 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
       if (abort.signal.aborted || at !== epoch.current) return false;
       if (settings?.platform && settings.platform !== 'auto' && v.platform !== settings.platform) throw new ProviderProblem('read_error');
       if (['sub2api', 'newapi', 'oneapi'].includes(v.platform)) setObservedPlatform(v.platform);
+      // A legacy supplier may have been identified by this first query. Read
+      // its saved result locally; do not infer detection failure from a rate failure.
+      if (settings && !settings.detected_platform && !settings.detection_failure && (!settings.platform || settings.platform === 'auto') && transport.accountSettings) {
+        const saved = await transport.accountSettings(p.id, abort.signal);
+        if (abort.signal.aborted || at !== epoch.current) return false;
+        if (saved.revision !== p.revision) throw new ProviderProblem('conflict');
+        setSettings(saved);
+      }
       if ('rate' in v) {
         lastKey.current = (input as AccountQuery).key_id; setRate(v);
         if (!v.failure) await observed?.();
@@ -76,8 +94,9 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
       return true;
     } catch (e) {
       if (abort.signal.aborted || at !== epoch.current) return false;
-      const code = e instanceof ProviderProblem ? e.code : operation === 'save' ? 'unknown' : 'read_error';
-      setError(problemText[code]); setNeedsRead(code === 'conflict' || (operation === 'save' && code === 'unknown'));
+      const writing = operation === 'save' || operation === 'detect-platform';
+      const code = e instanceof ProviderProblem ? e.code : writing ? 'unknown' : 'read_error';
+      setError(problemText[code]); setNeedsRead(code === 'conflict' || (writing && code === 'unknown'));
       return false;
     } finally {
       if ('user_token' in input) input.user_token = null;
@@ -96,6 +115,7 @@ export function useProviderAccount(p: Provider | null, transport: ProviderTransp
   }, [id, revision, matches, autoQuery, busy, needsRead, settings, readVersion, transport]);
   return { observedPlatform: matches ? observedPlatform : '', ready: matches, settings: settings?.provider_id === id ? settings : null, balance: matches ? balance : null, quota: matches ? quota : null, rate: matches ? rate : null, busy, error, needsRead,
     isBusy: () => lock.current,
+    detectPlatform: (key = '') => p ? run('detect-platform', { provider_id: p.id, expected_revision: p.revision, operation: 'detect-platform', key_id: key, remote_key_id: 0 }) : Promise.resolve(false),
     save: (input: SaveAccountSettings) => run('save', input),
     authorizeNewAPI: async (token: string, userID: string) => {
       const uid = userID.trim() || '0';

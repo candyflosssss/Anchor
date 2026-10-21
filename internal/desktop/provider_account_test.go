@@ -48,6 +48,44 @@ func TestSharedAccountFixture(t *testing.T) {
 		t.Fatal("account fixture drift")
 	}
 }
+
+func TestDetectPlatformBridgeSavesAndReadsCachedIdentity(t *testing.T) {
+	calls := 0
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.URL.Path != "/api/status" || r.Header.Get("Authorization") != "" {
+			t.Error("unexpected detector request", r.URL.Path)
+		}
+		fmt.Fprint(w, `{"data":{"version":"1","quota_per_unit":500000,"default_use_auto_group":true,"enable_batch_update":false}}`)
+	}))
+	defer up.Close()
+	b := NewBridge(testSession(t))
+	requireReady(t, b)
+	key := "synthetic-bridge-detect"
+	saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "detected", BaseURLs: []string{up.URL + "/v1"}, Enabled: false, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
+	if saved.Problem != nil || calls != 1 {
+		t.Fatal(saved, calls)
+	}
+	settings := b.ProviderAccountSettings(WorkspaceQuery{ProviderID: "detected"})
+	if settings.Problem != nil || settings.Data.DetectedPlatform != "newapi" || calls != 1 {
+		t.Fatal(settings, calls)
+	}
+	q := AccountQuery{ProviderID: "detected", ExpectedRevision: 1, Operation: "detect-platform"}
+	detected := b.DetectProviderPlatform(q)
+	if detected.Problem != nil || detected.Data.DetectedPlatform != "newapi" || detected.Data.Revision != 1 || calls != 2 {
+		t.Fatal(detected, calls)
+	}
+	q.ExpectedRevision = 2
+	stale := b.DetectProviderPlatform(q)
+	if stale.Problem == nil || stale.Problem.Code != "conflict" || calls != 2 {
+		t.Fatal(stale, calls)
+	}
+	q.ExpectedRevision = 1
+	q.Operation = "balance"
+	if invalid := b.DetectProviderPlatform(q); invalid.Problem == nil || invalid.Problem.Code != "invalid" {
+		t.Fatal(invalid)
+	}
+}
 func TestAccountBridgeCoreUpstream(t *testing.T) {
 	for _, platform := range []string{"sub2api", "newapi", "oneapi"} {
 		t.Run(platform, func(t *testing.T) {
@@ -55,6 +93,8 @@ func TestAccountBridgeCoreUpstream(t *testing.T) {
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				switch r.URL.Path {
+				case "/proxy/v1/sub2api/billing", "/proxy/api/v1/keys", "/proxy/api/token/":
+					w.WriteHeader(404)
 				case "/proxy/v1/usage":
 					if r.Header.Get("Authorization") != "Bearer "+key {
 						t.Error("wrong inference credential")
@@ -77,6 +117,8 @@ func TestAccountBridgeCoreUpstream(t *testing.T) {
 					} else {
 						fmt.Fprint(w, `{"total_usage":100}`)
 					}
+				case "/proxy/api/v1/settings/public":
+					fmt.Fprint(w, `{"data":{"registration_enabled":true,"site_name":"fixture","version":"1","api_base_url":""}}`)
 				case "/proxy/api/status":
 					if r.Header.Get("Authorization") != "" {
 						t.Error("public credential")
@@ -95,12 +137,12 @@ func TestAccountBridgeCoreUpstream(t *testing.T) {
 			defer upstream.Close()
 			b := NewBridge(testSession(t))
 			requireReady(t, b)
-			saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "account", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
+			saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "account", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: false, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
 			if saved.Problem != nil {
 				t.Fatal(saved)
 			}
 			empty := b.ProviderAccountSettings(WorkspaceQuery{ProviderID: "account"})
-			if empty.Problem != nil || empty.Data.Platform != "" || empty.Data.Revision != 1 {
+			if empty.Problem != nil || empty.Data.Platform != "auto" || empty.Data.Revision != 1 {
 				t.Fatal(empty)
 			}
 			cfg := SaveAccountSettings{ProviderID: "account", ExpectedRevision: 1, Platform: platform, UserID: 7}
@@ -219,7 +261,7 @@ func TestAccountBridgeAutomaticallyDetectsSummary(t *testing.T) {
 	defer upstream.Close()
 	b := NewBridge(testSession(t))
 	requireReady(t, b)
-	saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "summary", BaseURLs: []string{upstream.URL + "/prefix/v1"}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
+	saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "summary", BaseURLs: []string{upstream.URL + "/prefix/v1"}, Enabled: false, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
 	if saved.Problem != nil {
 		t.Fatal(saved)
 	}
@@ -253,6 +295,14 @@ func TestRateBridgeCoreUpstream(t *testing.T) {
 			key, token := "synthetic-inference-123", "synthetic-user-jwt"
 			calls := 0
 			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/proxy/api/status" {
+					w.WriteHeader(404)
+					return
+				}
+				if r.URL.Path == "/proxy/api/v1/settings/public" {
+					fmt.Fprint(w, `{"data":{"registration_enabled":true,"site_name":"fixture","version":"1","api_base_url":""}}`)
+					return
+				}
 				calls++
 				if r.URL.Path == "/proxy/v1/sub2api/billing" {
 					if r.Header.Get("Authorization") != "Bearer "+key {
@@ -300,10 +350,11 @@ func TestRateBridgeCoreUpstream(t *testing.T) {
 			defer upstream.Close()
 			b := NewBridge(testSession(t))
 			requireReady(t, b)
-			saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "rates", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
+			saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "rates", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: false, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &key})
 			if saved.Problem != nil {
 				t.Fatal(saved)
 			}
+			calls = 0
 			cfg := SaveAccountSettings{ProviderID: "rates", ExpectedRevision: 1, Platform: tc.platform, UserID: 9}
 			if tc.authorized {
 				cfg.UserToken = &token
@@ -368,6 +419,14 @@ func TestSub2KeyBillingThroughDesktopCatalogAndAccount(t *testing.T) {
 	first, second := "synthetic-billing-first", "synthetic-billing-second"
 	billingCalls := 0
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/proxy/api/status" {
+			w.WriteHeader(404)
+			return
+		}
+		if r.URL.Path == "/proxy/api/v1/settings/public" {
+			fmt.Fprint(w, `{"data":{"registration_enabled":true,"site_name":"fixture","version":"1","api_base_url":""}}`)
+			return
+		}
 		key := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if r.Method != "GET" || (key != first && key != second) || r.URL.RawQuery != "" {
 			t.Error("invalid key-only request")
@@ -390,7 +449,7 @@ func TestSub2KeyBillingThroughDesktopCatalogAndAccount(t *testing.T) {
 	defer upstream.Close()
 	b := NewBridge(testSession(t))
 	requireReady(t, b)
-	saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "key-billing", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: true, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &first})
+	saved := b.SaveProvider(SaveProvider{Provider: Provider{ID: "key-billing", BaseURLs: []string{upstream.URL + "/proxy/v1"}, Enabled: false, TimeoutSeconds: 5, MaxConcurrent: 1}, Secret: &first})
 	if saved.Problem != nil {
 		t.Fatal(saved)
 	}

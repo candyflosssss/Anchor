@@ -12,6 +12,8 @@
 
 ## 自动缓存与失效
 
+平台识别与分组倍率是独立缓存：2026-10-21 源码在创建时保存一次识别结果（包括失败），旧供应商首次账户／目录倍率查询时补齐。后台维护只刷新已有明确平台的倍率，不启动或重试平台探测；识别失败须在账户页「重新探测」或 CLI `provider detect-platform` 后再查询。手动重探清空该供应商旧倍率，识别缓存不因倍率过期或配置编辑而清除。具体契约见[平台识别](provider-interface.md#自动探测与供应商列表余额2026-10-13当前源码未发布)。
+
 `provider models` 查询目录时逐启用 Key 抓取倍率，普通 `provider effective-rate` 在 `remote-key-id=0` 时核对本地 Key 并写入同一持久缓存。显式远端数字ID可能属于别的 Key，因此只返回观察结果，不污染本地缓存。目录列表本身仍不是持久缓存。
 
 schema8 新增 `key_rate_cache`，按供应商和 Key 隔离。`workspace.keys[]` 返回可空 `rate` 和 `effective_multiplier`；缓存包含 multiplier、group、group_name、basis、observed_at、attempted_at、failure。不含密钥或原始上游正文。缓存写入不递增配置 revision；写入事务核验抓取时的供应商 revision，拒绝配置变更后到达的旧响应。

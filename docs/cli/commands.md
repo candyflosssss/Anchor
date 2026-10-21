@@ -415,9 +415,11 @@ anchor provider effective-rate --id ID --revision N [--key KEY] [--remote-key-id
 
 这些命令使用所选 Context 的在线核心、管理授权和实例校验。`--id` 为已保存供应商，查询和配置的 `--revision` 为 `provider list` 当前版本；配置成功递增版本，后续查询须使用新版本。普通查询不改供应商、公开模型、路由倍率、本地用量或日志保留设置，不请求付费推理。可查询停用供应商；显式 `--key` 可选择停用 Key。
 
-`platform` 返回 `{provider_id, revision, config}`，配置只有平台、可选 `site_url` / `user_id` 和 `has_user_token`，不返回令牌。`platform-put` 完整替换公开配置；平台与推理协议分开，不能用 `responses` 等协议推断平台。`--site-url` 默认为空，从供应商首个请求地址去掉末尾 `/v1` 后推导后台根地址，保留真实部署前缀；若后台路径不同，显式指定 HTTP(S) 根地址，不能带查询、片段或 URL 凭据。`--user-id` 默认0，仅 NewAPI 用户接口使用，需该站点要求 `New-Api-User` 时填写。
+`platform` 返回 `{provider_id, revision, config}`，配置包含平台、可选 `site_url` / `user_id`、`has_user_token`，以及可选只读 `detected_platform` / `detection_failure`（保存的识别平台／失败分类），不返回令牌。`platform-put` 完整替换可写公开配置，保留识别缓存；平台与推理协议分开，不能用 `responses` 等协议推断平台。`--site-url` 默认为空，从供应商首个请求地址去掉末尾 `/v1` 后推导后台根地址，保留真实部署前缀；若后台路径不同，显式指定 HTTP(S) 根地址，不能带查询、片段或 URL 凭据。`--user-id` 默认0，仅 NewAPI 用户接口使用，需该站点要求 `New-Api-User` 时填写。
 
-`--platform` 默认 `auto`；既有未配置平台同样自动探测。`detect-platform` 根据公开接口和必要的 Key 接口响应重新识别 sub2api／NewAPI／OneAPI，不凭域名或站点品牌猜测，不写配置。无法确认返回 `platform_unknown`，凭据被拒绝保留分类失败。人工指定平台可覆盖自动模式。
+`--platform` 默认 `auto`；新建供应商保存后自动识别并保存结果，既有未配置平台在首次查询时补齐一次。后续查询直接使用保存的识别结果，识别失败也会缓存，不会由后台刷新反复探测。`detect-platform` 是手动重新探测，会更新保存的识别结果但不递增 provider revision；根据公开接口和必要的 Key 接口响应识别 sub2api／NewAPI／OneAPI，不凭域名或站点品牌猜测。无法确认返回 `platform_unknown`，凭据被拒绝保留分类失败。人工指定平台可覆盖自动模式。
+
+改地址、Key、用户授权或其他配置以及重启核心均不清除识别结果；需按新地址重新识别时显式执行 `detect-platform`。手动重探会切回 `auto` 并替换旧识别结果（失败也替换），清除该供应商的旧分组倍率缓存，保留独立用户授权，不递增配置 revision。复制供应商继承保存的平台身份，不复制用户授权或分组倍率观察。首次识别受8秒与供应商超时的较小值限制；探测失败不撤销已创建的供应商，可查看 `platform` 后手动重试。NewAPI 金额查询仍可读取公开 `/api/status` 换算单位，这不是重新识别平台。
 
 `balance-summary` 与 `balance` 在 NewAPI 已保存系统访问令牌时优先查询 `/api/user/self` 的账户余额（scope=account）；授权失败直接报告，不退回 Key 数值。无用户令牌时先读所选 Key 的只读 `/api/usage/token/`：站点在该 Key 允许查询账户额度时返回 `user_quota`，使用其中 `total_available` / `total_used` 作为账户余额及已用量，忽略 Key 的无限额标记。没有账户字段时，继续尝试旧 billing 的 subscription 与 usage，剩余值为 `hard_limit_usd - total_usage/100`，scope=billing 表示账户或 Key 范围由站点设置决定。billing 缺失、格式不兼容或拒绝认证／权限时，若只读 Key 查询成功则返回 scope=key 的 Key 额度；这样已耗尽／过期但仍获准只读查询的 Key 也能查看额度。限流、网络及服务错误直接报告；两个接口都失败时不伪造余额。`key-quota` 始终返回所选 Key 的额度，即使响应同时包含账户余额。
 
@@ -774,7 +776,7 @@ anchor recover [--id ID]
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；降权策略设置见 settings key-cooldown（§16） |
-| 平台自动识别与列表余额（desktop.27，缓存随desktop.52交付） | provider detect-platform/balance-summary；platform-put 默认 auto | 供应商列表自动查询；切页立即显示同实例／同配置的上次余额，后台刷新，失败保留旧值并支持单行重试。desktop.57 已包含余额显示两位小数；NewAPI 新增 Key 获准返回的账户余额与只读 Key 额度兼容，按站点公开比例换算；沿用既有命令，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
+| 平台自动识别与列表余额（首次识别持久缓存为当前源码未发布增量） | provider detect-platform/balance-summary；platform-put 默认 auto | 创建时自动识别一次并持久缓存成功或失败，旧供应商首次查询补齐；GUI「重新探测」与 detect-platform 才更新识别。余额／倍率数据按既有策略刷新，切页复用上次余额。NewAPI 金额按站点比例换算，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单由 CLI 提供，当前源码 GUI 已接入分组倍率；额度保留原始单位。desktop.57 dev GUI 已发布：供应商详情／新增模型步骤识别 NewAPI 后直接输入用户令牌，保存后自动以新 revision 查询倍率（effective-rate），无需手选平台／替换模式；沿用既有命令 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法、映射设置及显式默认值导入、日志逐请求比价与价格缓存维护已随 desktop.57 交付，详见§6、§12、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |

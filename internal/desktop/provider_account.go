@@ -55,8 +55,36 @@ func (b *Bridge) accountSettingsCall(id string, write *providerapi.Configure) Ac
 		out.Problem = &Problem{code}
 		return out
 	}
-	out.Data = &AccountSettings{ProviderID: v.ProviderID, Revision: v.Revision, Platform: v.Config.Platform, SiteURL: v.Config.SiteURL, UserID: v.Config.UserID, HasUserToken: v.Config.HasUserToken}
+	out.Data = &AccountSettings{ProviderID: v.ProviderID, Revision: v.Revision, Platform: v.Config.Platform, DetectedPlatform: v.Config.DetectedPlatform, DetectionFailure: v.Config.DetectionFailure, SiteURL: v.Config.SiteURL, UserID: v.Config.UserID, HasUserToken: v.Config.HasUserToken}
 	return out
+}
+
+// DetectProviderPlatform is an explicit action; normal reads use saved detection.
+func (b *Bridge) DetectProviderPlatform(in AccountQuery) AccountSettingsResult {
+	if !state.ValidProviderID(in.ProviderID) || in.ExpectedRevision < 1 || in.ExpectedRevision > MaxSafeRevision || (in.KeyID != "" && !state.ValidID(in.KeyID)) || in.Operation != "detect-platform" || in.RemoteKeyID != 0 {
+		return AccountSettingsResult{Contract: Contract, Problem: &Problem{"invalid"}}
+	}
+	s := b.session
+	s.mu.Lock()
+	ctx, cancel := context.WithTimeout(s.ctx, 15*time.Second)
+	cl, _, err := s.connection(ctx)
+	s.mu.Unlock()
+	defer cancel()
+	if err != nil {
+		return AccountSettingsResult{Contract: Contract, Problem: problem(err, false)}
+	}
+	defer cl.Close()
+	result, err := cl.QueryProvider(ctx, providerapi.Query{ProviderID: in.ProviderID, ExpectedRevision: in.ExpectedRevision, Operation: "detect-platform", KeyID: in.KeyID})
+	if err != nil {
+		return AccountSettingsResult{Contract: Contract, Problem: problem(err, true)}
+	}
+	if result.Failure == "busy" {
+		return AccountSettingsResult{Contract: Contract, Problem: &Problem{"conflict"}}
+	}
+	if result.ProviderID != in.ProviderID || result.Revision != in.ExpectedRevision || result.Operation != "detect-platform" {
+		return AccountSettingsResult{Contract: Contract, Problem: &Problem{"unknown"}}
+	}
+	return b.accountSettingsCall(in.ProviderID, nil)
 }
 func (b *Bridge) ProviderAllowance(in AccountQuery) AccountObservationResult {
 	out := AccountObservationResult{Contract: Contract}

@@ -16,6 +16,10 @@ import (
 
 type Config struct {
 	Platform string `json:"platform"`
+	// DetectedPlatform and DetectionFailure are cached observations for auto mode.
+	// They are separate from Platform so editing credentials cannot imply re-detection.
+	DetectedPlatform string `json:"detected_platform,omitempty"`
+	DetectionFailure string `json:"detection_failure,omitempty"`
 	// SiteURL is the dashboard deployment root, including any proxy prefix.
 	// Empty derives it by removing a final /v1 from the inference BaseURL.
 	SiteURL      string `json:"site_url,omitempty"`

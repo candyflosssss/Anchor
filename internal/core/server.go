@@ -25,6 +25,7 @@ import (
 	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/platform"
+	"github.com/candyflosssss/Anchor/internal/providerapi"
 	"github.com/candyflosssss/Anchor/internal/skills"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -45,6 +46,7 @@ type Server struct {
 	egress           *egress.Manager
 	modelCatalog     *modeldev.Client
 	keyRateRefresh   *keyRateRefresh
+	platformQueries  sync.Map
 	mu               sync.Mutex
 	active           map[string]int
 	health           map[string]*keyHealth
@@ -326,6 +328,12 @@ func (s *Server) Control() http.Handler {
 		if err != nil {
 			apiError(w, err)
 			return
+		}
+		if in.ExpectedRevision == 0 {
+			// Identify an auto platform once when the supplier is first created.
+			// The result (including a classified failure) is cached without changing
+			// the provider revision or returning credentials.
+			_, _ = s.QueryProvider(r.Context(), providerapi.Query{ProviderID: p.ID, ExpectedRevision: p.Revision, Operation: "detect-platform"})
 		}
 		s.syncAgentMappings(w)
 		writeJSON(w, 200, p)

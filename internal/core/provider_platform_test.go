@@ -160,7 +160,7 @@ func TestDefaultKeyPreferenceAndAutomaticSummary(t *testing.T) {
 	check("a")
 	after, _ := f.store.Provider("p")
 	cfg, _ := f.store.ProviderPlatform("p")
-	if after.Revision != 3 || cfg.Platform != "" {
+	if after.Revision != 3 || (cfg.Platform != "auto" || cfg.DetectedPlatform != "newapi") {
 		t.Fatal("query mutated configuration")
 	}
 }

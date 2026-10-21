@@ -54,6 +54,11 @@ export class DesktopProviderTransport implements ProviderTransport {
     try { const v = await call(() => this.getBridge().ProviderAccountSettings({ provider_id: id })); signal.throwIfAborted(); return checkedAccountSettings(v, id); }
     catch (error) { return providerError(error, false); }
   }
+  async detectPlatform(input: AccountQuery, signal: AbortSignal) {
+    signal.throwIfAborted();
+    try { const v = await call(() => this.getBridge().DetectProviderPlatform(input), true); signal.throwIfAborted(); return checkedAccountSettings(v, input.provider_id); }
+    catch (error) { return providerError(error, true); }
+  }
   async saveAccount(input: SaveAccountSettings, signal: AbortSignal) {
     signal.throwIfAborted();
     try { const v = await call(() => this.getBridge().SaveProviderAccount(input), true); signal.throwIfAborted(); return checkedAccountSettings(v, input.provider_id); }

@@ -44,6 +44,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   provider platform-put --id ID --revision N [--platform auto|sub2api|newapi|oneapi]
       [--site-url URL] [--user-id N] [--user-token-stdin | --clear-user-token]
   provider detect-platform --id ID --revision N [--key KEY]
+      Manually re-detect and save the platform; normal reads reuse the first cached result.
   provider balance-summary --id ID --revision N [--key KEY]
   provider balance|key-quota|effective-rate --id ID --revision N [--key KEY] [--remote-key-id N]
       NewAPI balance / balance-summary prefer a saved system access token for account balance.

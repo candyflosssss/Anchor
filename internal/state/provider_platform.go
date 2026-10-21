@@ -89,6 +89,7 @@ func (s *Store) ConfigureProviderPlatform(in providerapi.Configure) (providerapi
 	if oldDoc != "" && json.Unmarshal([]byte(oldDoc), &old) != nil {
 		return providerapi.Settings{}, ErrInvalid
 	}
+	c.DetectedPlatform, c.DetectionFailure = old.DetectedPlatform, old.DetectionFailure
 	if in.UserToken == nil {
 		// Changing an authorization target never silently forwards its old token.
 		if old.Platform != c.Platform || old.SiteURL != c.SiteURL || old.UserID != c.UserID {
@@ -123,4 +124,59 @@ func (s *Store) ConfigureProviderPlatform(in providerapi.Configure) (providerapi
 	}
 	c.UserToken = ""
 	return providerapi.Settings{ProviderID: in.ProviderID, Revision: rev + 1, Config: c}, nil
+}
+
+// SaveProviderPlatformDetection stores the first automatic detection (including
+// a classified failure) without changing provider revision or credentials.
+func (s *Store) SaveProviderPlatformDetection(id string, expectedRevision int64, platform, failure string, force bool) error {
+	if !ValidProviderID(id) || expectedRevision < 1 || (platform != "" && platform != "sub2api" && platform != "newapi" && platform != "oneapi") || (platform != "" && failure != "") || (platform == "" && failure == "") || len(failure) > 64 {
+		return ErrInvalid
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var rev int64
+	if err = tx.QueryRow(`SELECT revision FROM providers WHERE id=?`, id).Scan(&rev); errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	} else if err != nil {
+		return err
+	}
+	if rev != expectedRevision {
+		return ErrConflict
+	}
+	var doc, secret string
+	err = tx.QueryRow(`SELECT document,user_token FROM provider_platforms WHERE provider_id=?`, id).Scan(&doc, &secret)
+	if errors.Is(err, sql.ErrNoRows) {
+		doc = `{"platform":"auto"}`
+	} else if err != nil {
+		return err
+	}
+	var c providerapi.Config
+	if json.Unmarshal([]byte(doc), &c) != nil {
+		return ErrInvalid
+	}
+	if !force && c.Platform != "" && c.Platform != "auto" {
+		return ErrConflict
+	}
+	// Detection is write-once except for the explicit detect-platform operation.
+	if !force && (c.DetectedPlatform != "" || c.DetectionFailure != "") {
+		return tx.Commit()
+	}
+	if force {
+		c.Platform = "auto"
+		if _, err = tx.Exec(`DELETE FROM key_rate_cache WHERE provider_id=?`, id); err != nil {
+			return err
+		}
+	}
+	c.DetectedPlatform, c.DetectionFailure = platform, failure
+	b, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`INSERT INTO provider_platforms(provider_id,document,user_token) VALUES(?,?,?) ON CONFLICT(provider_id) DO UPDATE SET document=excluded.document,user_token=excluded.user_token`, id, string(b), secret); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

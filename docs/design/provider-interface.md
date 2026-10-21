@@ -138,7 +138,7 @@ records 的 history 区分近期批次 `recent` 和可分页保留记录 `pagina
 
 账户查询单次最多8个 GET、累计2 MiB响应、每页最多1000条原始记录，统一供应商超时与8秒的较小值，全局与供应商并发共用现有核心限额。禁止重定向、沿用核心不使用环境代理的上游策略，不重试；登录过期、权限不足、限流、超限、格式变化或分页失败返回分类失败。模型目录沿 §4 自身更小的响应限制。未提供本轮未勾选的用量汇总、完整分组列表、模型价格目录和订阅列表；不将站点目录声明当作推理健康或自动负载均衡依据。
 
-sub2api 所选推理 Key 的倍率查询（remote_key_id=0）优先使用 `/v1/sub2api/billing`，无需 JWT；`basis=key_billing` 的 multiplier 取服务端 `effective_rate_multiplier`，包含个人覆盖和当前高峰规则，不在客户端重算。组名与 ID 未披露则为空。正整数远端 ID 查询仍需用户授权，避免将保存 Key 的倍率误当作另一远端 Key 的倍率。仅缺接口（404/405或200 HTML）回退旧查询；格式错误、拒绝授权、限流、网络和服务错误不回退。auto 探测增加 object/schema_version/billing_scope 强识别并复用本次响应，避免重复计费接口请求。
+sub2api 所选推理 Key 的倍率查询（remote_key_id=0）优先使用 `/v1/sub2api/billing`，无需 JWT；`basis=key_billing` 的 multiplier 取服务端 `effective_rate_multiplier`，包含个人覆盖和当前高峰规则，不在客户端重算。组名与 ID 未披露则为空。正整数远端 ID 查询仍需用户授权，避免将保存 Key 的倍率误当作另一远端 Key 的倍率。仅缺接口（404/405或200 HTML）回退旧查询；格式错误、拒绝授权、限流、网络和服务错误不回退。首次平台识别可用 object/schema_version/billing_scope 强识别；已保存平台后的倍率查询直接读该接口，不再运行识别链。
 
 ### 来源与验证边界
 
@@ -163,9 +163,15 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 ### 自动探测与供应商列表余额（2026-10-13，当前源码未发布）
 
-`detect-platform` 强制重新探测，只返回观察结果，不持久化平台或递增 revision。未配置／auto 的其他查询先探测：公开 `/api/status` 以版本、quota_per_unit 和 NewAPI／OneAPI 特有字段区分；公开 `/api/v1/settings/public` 以 sub2api settings 字段识别。公开探测不发送凭据；必要时用所选推理 Key 检查 `/v1/usage` 与 `/api/usage/token/` 的结构。域名、站点名称或推理协议不作为识别依据，无法确认则 platform_unknown；网络、超时、限流和响应预算失败立即停止。沿用部署前缀、禁止重定向，全部探测与查询共享8次请求／2 MiB／8秒上限。
+`detect-platform` 是显式重新探测，会保存识别平台或失败分类，不递增 provider revision；普通查询只使用已保存结果。新建供应商在保存后自动进行首次探测；旧供应商在首次账户／目录倍率查询时补齐一次。识别失败也会缓存，后台倍率刷新不启动或重试检测，只有再次执行 `detect-platform` 才会重探。识别顺序为公开 `/api/status`（版本、quota_per_unit 和 NewAPI／OneAPI 特有字段）、公开 `/api/v1/settings/public`（sub2api settings 字段），必要时使用所选推理 Key 检查 `/v1/sub2api/billing`、`/v1/usage`、`/api/usage/token/` 的结构。识别成功即停止，公开探测不发送凭据。域名、站点名称或推理协议不作为识别依据，无法确认则 platform_unknown；网络、超时、限流和响应预算失败立即停止。沿用部署前缀、禁止重定向；普通账户查询的首次探测与数据读取共享8次请求／2 MiB／8秒上限，目录倍率逐 Key 的预算沿用既有规则。
 
-`balance-summary` 供列表自动读取；NewAPI 已保存用户授权时优先使用系统访问令牌查 `/api/user/self`，返回 scope=account，与详情 `balance` 一致。账户认证、权限或接口失败直接报告，不退回 Key 数值；没有启用推理 Key 也可用明确配置的平台和系统访问令牌查询账户。其余路径使用推理 Key。sub2api unrestricted 的明确 balance 返回 account 钱包；受限 Key 返回 key 额度及周期窗口。NewAPI 先读取只读 `/api/usage/token/`：仅当站点在 Key 允许查询用户额度时返回有效 user_quota，才标为 account，其账户字段不会继承 Key 的 unlimited_quota。若未返回账户字段，尝试 `/v1/dashboard/billing/subscription` 与 `/v1/dashboard/billing/usage`，剩余值为 `hard_limit_usd - total_usage/100`，精确十进制运算；范围由私有站点开关决定，因此 scope=billing。公开显示类型确认单位，未知为 site_unit；无限额100000000占位值仍须核对 Key，不当作钱包。billing 缺失、格式不兼容或拒绝认证／权限时，可回退本次已成功读取的 Key 额度（scope=key）；已耗尽／过期 Key 在只读接口仍获准查询时可显示额度，禁用／IP限制仍由站点执行。限流、网络及服务错误不降级吞掉；显式系统访问令牌失败不回退 Key。NewAPI balance 与 balance-summary 共用以上策略，key-quota 只返回 Key 范围。auto 探测复用 token 响应，所有请求仍共享8次／2 MiB预算。其他平台 balance 的账户钱包语义不变。用户授权可在详情配置。NewAPI 在该站后台「个人设置／安全设置 → 系统访问令牌」生成独立用户授权，与推理 API Key 分开；GUI 显示获取步骤。支持 scoped token 的上游版本，账户余额读取需 profile:read，自动核对 Key 分组还需 api_key:read、api_key:reveal；用户 ID 按站点要求填写。不同部署版本名称和权限配置以该站为准。缺失值保持 null，失败不伪造0。
+持久缓存只保存平台身份或失败分类，不保存探测响应正文；首次识别和后续数据读取是独立步骤，共用调用方的时间和请求预算。
+
+2026-10-21 当前源码使用既有 `provider_platforms.document` 中独立的只读 `detected_platform` / `detection_failure` 保存识别观察，不增加 schema 版本；省略或空表示尚未识别。首次自动写入不改变用户令牌、手动配置和 revision；Configure 忽略输入中的观察字段并保留原缓存。地址／Key／用户授权编辑以及重启不隐式重新识别。显式重探切回 auto，替换成功或失败结果，保留独立用户授权并清空旧 Key 倍率缓存。同供应商的账户／目录元数据查询串行，并发返回 busy，不影响推理请求的既有并发策略；事务核验供应商 revision，拒绝配置改变后的迟到结果。
+
+桌面 AccountSettings 同步增加两个非可空字符串字段，Bridge.DetectProviderPlatform(AccountQuery) 只接受 operation=detect-platform、remote_key_id=0，通过现有管理查询后读取脱敏设置；沿用 anchor-desktop-v1、实例与 revision 校验，前后端需配套升级。账户页展示保存的平台或失败原因；点击「重新探测」才调用此写操作，冲突／结果未知要求重读，不自动重放。CLI 等价操作为 `provider detect-platform`。NewAPI 正常金额查询读取 /api/status 以换算单位属于数据查询，不改变识别缓存。
+
+`balance-summary` 供列表自动读取；NewAPI 已保存用户授权时优先使用系统访问令牌查 `/api/user/self`，返回 scope=account，与详情 `balance` 一致。账户认证、权限或接口失败直接报告，不退回 Key 数值；没有启用推理 Key 也可用明确配置的平台和系统访问令牌查询账户。其余路径使用推理 Key。sub2api unrestricted 的明确 balance 返回 account 钱包；受限 Key 返回 key 额度及周期窗口。NewAPI 先读取只读 `/api/usage/token/`：仅当站点在 Key 允许查询用户额度时返回有效 user_quota，才标为 account，其账户字段不会继承 Key 的 unlimited_quota。若未返回账户字段，尝试 `/v1/dashboard/billing/subscription` 与 `/v1/dashboard/billing/usage`，剩余值为 `hard_limit_usd - total_usage/100`，精确十进制运算；范围由私有站点开关决定，因此 scope=billing。公开显示类型确认单位，未知为 site_unit；无限额100000000占位值仍须核对 Key，不当作钱包。billing 缺失、格式不兼容或拒绝认证／权限时，可回退本次已成功读取的 Key 额度（scope=key）；已耗尽／过期 Key 在只读接口仍获准查询时可显示额度，禁用／IP限制仍由站点执行。限流、网络及服务错误不降级吞掉；显式系统访问令牌失败不回退 Key。NewAPI balance 与 balance-summary 共用以上策略，key-quota 只返回 Key 范围；所有请求仍共享8次／2 MiB预算。其他平台 balance 的账户钱包语义不变。用户授权可在详情配置。NewAPI 在该站后台「个人设置／安全设置 → 系统访问令牌」生成独立用户授权，与推理 API Key 分开；GUI 显示获取步骤。支持 scoped token 的上游版本，账户余额读取需 profile:read，自动核对 Key 分组还需 api_key:read、api_key:reveal；用户 ID 按站点要求填写。不同部署版本名称和权限配置以该站为准。缺失值保持 null，失败不伪造0。
 
 桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。
 

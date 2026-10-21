@@ -45,6 +45,12 @@ func TestKeyRateRefreshDueAndExpiry(t *testing.T) {
 
 func installRateRefreshTransport(t *testing.T, f *fixture) (*atomic.Int32, *atomic.Bool) {
 	t.Helper()
+	p, _ := f.store.Provider("p")
+	if p.ID != "" {
+		if err := f.store.SaveProviderPlatformDetection("p", p.Revision, "sub2api", "", false); err != nil {
+			t.Fatal(err)
+		}
+	}
 	calls, fail := new(atomic.Int32), new(atomic.Bool)
 	f.core.upstream = &http.Client{Transport: modelCatalogTransport(func(r *http.Request) (*http.Response, error) {
 		calls.Add(1)
@@ -127,6 +133,9 @@ func TestKeyRateMaintenanceReadsEachEnabledKeyAndPreservesFailedObservation(t *t
 func TestKeyRateWorkerCancellationAndNoDuplicateStart(t *testing.T) {
 	f := setup(t)
 	f.add(t, "p", "http://127.0.0.1:1/v1", "synthetic-rate")
+	if err := f.store.SaveProviderPlatformDetection("p", 1, "sub2api", "", false); err != nil {
+		t.Fatal(err)
+	}
 	started, cancelled := make(chan struct{}), make(chan struct{})
 	var calls atomic.Int32
 	f.core.upstream = &http.Client{Transport: modelCatalogTransport(func(r *http.Request) (*http.Response, error) {

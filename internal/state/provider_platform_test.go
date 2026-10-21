@@ -156,3 +156,61 @@ func TestPlatformSchemaFourMigration(t *testing.T) {
 		t.Fatal(v)
 	}
 }
+
+func TestDetectionSurvivesReopenAndCredentialEdits(t *testing.T) {
+	for _, failure := range []string{"", "network"} {
+		t.Run("failure="+failure, func(t *testing.T) {
+			dir := t.TempDir()
+			s, err := Open(dir, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { s.Close() }()
+			if _, err = s.PutProvider(provider("p"), 0, nil); err != nil {
+				t.Fatal(err)
+			}
+			token := "synthetic-dashboard-token"
+			settings, err := s.ConfigureProviderPlatform(providerapi.Configure{ProviderID: "p", ExpectedRevision: 1, Config: providerapi.Config{Platform: "auto"}, UserToken: &token})
+			if err != nil {
+				t.Fatal(err)
+			}
+			platform := "sub2api"
+			if failure != "" {
+				platform = ""
+			}
+			if err = s.SaveProviderPlatformDetection("p", settings.Revision, platform, failure, false); err != nil {
+				t.Fatal(err)
+			}
+			// The automatic cache is write-once, even when another caller has a result.
+			if err = s.SaveProviderPlatformDetection("p", settings.Revision, "newapi", "", false); err != nil {
+				t.Fatal(err)
+			}
+			s.Close()
+			s, err = Open(dir, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := s.ProviderPlatform("p")
+			if err != nil || got.DetectedPlatform != platform || got.DetectionFailure != failure || got.UserToken != token {
+				t.Fatal(got, err)
+			}
+			p, _ := s.Provider("p")
+			if p.Revision != settings.Revision {
+				t.Fatal("detection changed revision", p.Revision)
+			}
+			next := "synthetic-replacement-token"
+			// Supplied observation fields are read-only and cannot overwrite the cache.
+			saved, err := s.ConfigureProviderPlatform(providerapi.Configure{ProviderID: "p", ExpectedRevision: p.Revision, Config: providerapi.Config{Platform: "auto", DetectedPlatform: "oneapi"}, UserToken: &next})
+			if err != nil || saved.Config.DetectedPlatform != platform || saved.Config.DetectionFailure != failure {
+				t.Fatal(saved, err)
+			}
+			got, _ = s.ProviderPlatform("p")
+			if got.UserToken != next {
+				t.Fatal("credential edit failed")
+			}
+			if err = s.SaveProviderPlatformDetection("p", p.Revision, "oneapi", "", true); !errors.Is(err, ErrConflict) {
+				t.Fatal("stale detection accepted", err)
+			}
+		})
+	}
+}

@@ -14,6 +14,18 @@ import (
 	"github.com/candyflosssss/Anchor/internal/catalog"
 )
 
+// savedCatalogPlatform supplies creation metadata for fixtures inserted directly
+// into Store. Tests below exercise catalog behavior without a fresh detector.
+func savedCatalogPlatform(t *testing.T, f *fixture, id string) {
+	t.Helper()
+	p, err := f.store.Provider(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = f.store.SaveProviderPlatformDetection(id, p.Revision, "sub2api", "", false); err != nil {
+		t.Fatal(err)
+	}
+}
 func discover(t *testing.T, f *fixture, id, body, token, identity string) (int, string) {
 	t.Helper()
 	req, _ := http.NewRequest("POST", f.control.URL+"/control/v1/providers/"+id+"/discover-models", strings.NewReader(body))
@@ -53,6 +65,7 @@ func TestProviderDirectoryBoundariesAndReadOnly(t *testing.T) {
 	}))
 	defer upstream.Close()
 	f.add(t, "中文供应商", upstream.URL+"/v1/", secret)
+	savedCatalogPlatform(t, f, "中文供应商")
 	p, _ := f.store.Provider("中文供应商")
 	p.Enabled = false
 	p, err := f.store.PutProvider(p, 1, nil)
@@ -123,6 +136,7 @@ func TestProviderDirectoryFailures(t *testing.T) {
 			}))
 			defer upstream.Close()
 			f.add(t, "p", upstream.URL+"/v1", "synthetic-catalog-secret")
+			savedCatalogPlatform(t, f, "p")
 			status, raw := discover(t, f, "p", `{"provider_id":"p","expected_revision":1}`, f.owner, cfg.InstanceID)
 			var result catalog.ProviderModels
 			if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != tc.failure || result.HTTPStatus != tc.status || result.Models == nil || len(result.Models) != 0 || calls.Load() != 2 {
@@ -141,6 +155,7 @@ func TestProviderDirectoryConcurrencyAndTimeout(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1); <-r.Context().Done() }))
 	defer upstream.Close()
 	f.add(t, "p", upstream.URL, "")
+	savedCatalogPlatform(t, f, "p")
 	p, _ := f.store.Provider("p")
 	p.TimeoutSeconds = 1
 	p, _ = f.store.PutProvider(p, 1, nil)
@@ -184,6 +199,7 @@ func TestProviderDirectoryNetworkFailure(t *testing.T) {
 	base := upstream.URL
 	upstream.Close()
 	f.add(t, "p", base, "synthetic-catalog-secret")
+	savedCatalogPlatform(t, f, "p")
 	status, raw := discover(t, f, "p", `{"provider_id":"p","expected_revision":1}`, f.owner, cfg.InstanceID)
 	var result catalog.ProviderModels
 	if status != 200 || json.Unmarshal([]byte(raw), &result) != nil || result.Failure != "network" || result.HTTPStatus != 0 || len(result.Models) != 0 || strings.Contains(raw, "synthetic-catalog-secret") || strings.Contains(raw, base) {

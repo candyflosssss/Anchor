@@ -60,13 +60,20 @@ export class MockProviderTransport implements ProviderTransport {
     const saved = this.accounts.get(id) ?? { ...accountFixture.settings, platform: 'auto', provider_id: id };
     return { ...saved, revision: p.revision };
   }
+  async detectPlatform(q: AccountQuery, signal: AbortSignal): Promise<AccountSettings> {
+    const settings = await this.accountSettings(q.provider_id, signal);
+    if (settings.revision !== q.expected_revision) throw new ProviderProblem('conflict');
+    const value = { ...settings, platform: 'auto', detected_platform: 'sub2api', detection_failure: '' };
+    this.accounts.set(q.provider_id, value);
+    return value;
+  }
   async saveAccount(input: SaveAccountSettings, signal: AbortSignal): Promise<AccountSettings> {
     await delay(signal);
     const p = this.rows.find(p => p.id === input.provider_id);
     if (!p || p.revision !== input.expected_revision || this.scenario === 'conflict') { this.scenario = 'normal'; throw new ProviderProblem('conflict'); }
     const old = this.accounts.get(p.id);
     const sameTarget = old && old.platform === input.platform && old.site_url === input.site_url && old.user_id === input.user_id;
-    const v: AccountSettings = { provider_id: p.id, revision: ++p.revision, platform: input.platform, site_url: input.site_url, user_id: input.user_id,
+    const v: AccountSettings = { provider_id: p.id, revision: ++p.revision, platform: input.platform, detected_platform: old?.detected_platform ?? 'sub2api', detection_failure: old?.detection_failure ?? '', site_url: input.site_url, user_id: input.user_id,
       has_user_token: input.user_token === null ? !!(sameTarget && old.has_user_token) : !!input.user_token };
     this.accounts.set(p.id, v);
     if (this.scenario === 'unknown') { this.scenario = 'normal'; throw new ProviderProblem('unknown'); }

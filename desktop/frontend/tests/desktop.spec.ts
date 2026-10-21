@@ -55,12 +55,13 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
       EstimateModelCost: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderChat: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ProviderProbe: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      DetectProviderPlatform: async input => ({ contract, data: settings(input.provider_id), problem: null }),
       ProviderAccountSettings: async input => ({ contract, data: settings(input.provider_id), problem: null }),
       SaveProviderAccount: async input => {
         window.accountTest.saves++;
         const p = providers.find(p => p.id === input.provider_id);
         if (!p || p.revision !== input.expected_revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
-        accounts[p.id] = { provider_id: p.id, revision: ++p.revision, platform: input.platform, site_url: input.site_url, user_id: input.user_id, has_user_token: input.user_token === null ? settings(p.id).has_user_token : !!input.user_token };
+        accounts[p.id] = { provider_id: p.id, revision: ++p.revision, platform: input.platform, detected_platform: '', detection_failure: '', site_url: input.site_url, user_id: input.user_id, has_user_token: input.user_token === null ? settings(p.id).has_user_token : !!input.user_token };
         if (counters.writeError === 'unknown') return { contract, data: null, problem: { code: 'unknown' } };
         return { contract, data: settings(p.id), problem: null };
       },
@@ -1318,6 +1319,36 @@ test('automatic NewAPI detection also exposes the account token without selector
   await expect(page.getByLabel('NewAPI 系统访问令牌 · 已保存', { exact: true })).toBeVisible();
   await expect(page.getByText(`${accountFixture.rate.rate.multiplier}×`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
+});
+
+test('saved platform stays cached until manual detection (simulated host)', async ({ page }) => {
+  await host(page, true, 'newapi');
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    const read = api.ProviderAccountSettings;
+    let detected = 'newapi';
+    let calls = 0;
+    api.ProviderAccountSettings = async input => {
+      const result = await read(input);
+      if (result.data) result.data = { ...result.data, platform: 'auto', detected_platform: detected, detection_failure: '' };
+      return result;
+    };
+    api.DetectProviderPlatform = async input => {
+      calls++;
+      if (calls > 1) throw Error('duplicate detector');
+      detected = 'sub2api';
+      return api.ProviderAccountSettings({ provider_id: input.provider_id });
+    };
+  });
+  await page.getByRole('button', { name: '摸鱼AI', exact: true }).click();
+  await expect(page.getByLabel('NewAPI 用户令牌', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: '账户与余额', exact: true }).click();
+  await expect(page.getByText(/已保存识别结果：NewAPI/)).toBeVisible();
+  await page.getByRole('button', { name: '重新探测', exact: true }).dblclick();
+  await expect(page.getByText(/已保存识别结果：sub2api/)).toBeVisible();
+  await page.getByRole('tab', { name: '概况', exact: true }).click();
+  await page.getByRole('tab', { name: '账户与余额', exact: true }).click();
+  await expect(page.getByText(/已保存识别结果：sub2api/)).toBeVisible();
 });
 
 

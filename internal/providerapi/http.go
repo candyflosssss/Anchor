@@ -13,6 +13,15 @@ import (
 	"unicode/utf8"
 )
 
+type requestBudget struct{ calls, bytes int }
+type requestBudgetKey struct{}
+
+// WithRequestBudget shares limits between serial first-use detection and its
+// requested operation, even when they use separate adapter instances.
+func WithRequestBudget(ctx context.Context) context.Context {
+	return context.WithValue(ctx, requestBudgetKey{}, &requestBudget{})
+}
+
 type object map[string]json.RawMessage
 
 // get never follows redirects or returns upstream error bodies. One operation
@@ -29,6 +38,13 @@ func (a *Adapter) getWithAuth(ctx context.Context, path string, user, public boo
 func (a *Adapter) read(ctx context.Context, method, path string, user, public bool, query url.Values) (object, error) {
 	a.htmlResponse = false
 	a.calls++
+	budget, _ := ctx.Value(requestBudgetKey{}).(*requestBudget)
+	if budget != nil {
+		budget.calls++
+		if budget.calls > 8 {
+			return nil, failure("too_large")
+		}
+	}
 	if a.calls > 8 {
 		return nil, failure("too_large")
 	}
@@ -84,7 +100,17 @@ func (a *Adapter) read(ctx context.Context, method, path string, user, public bo
 		}
 		return nil, failure(code)
 	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, int64((2<<20)-a.bytes+1)))
+	remaining := (2 << 20) - a.bytes
+	if budget != nil && (2<<20)-budget.bytes < remaining {
+		remaining = (2 << 20) - budget.bytes
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, int64(remaining+1)))
+	if budget != nil {
+		budget.bytes += len(raw)
+		if budget.bytes > 2<<20 {
+			return nil, failure("too_large")
+		}
+	}
 	a.bytes += len(raw)
 	if a.bytes > 2<<20 {
 		return nil, failure("too_large")

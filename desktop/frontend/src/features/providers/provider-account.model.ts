@@ -1,8 +1,9 @@
 import type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation, AccountRate, AccountRateObservation } from '../../desktop/contract.generated';
 import { ProviderProblem, requestURLError } from './provider.model';
 export type { AccountSettings, SaveAccountSettings, AccountQuery, AccountAmount, AccountAllowance, AccountObservation, AccountRate, AccountRateObservation };
-export const platformLabels: Record<string, string> = { auto: '自动探测', sub2api: 'sub2api', newapi: 'NewAPI', oneapi: 'OneAPI' };
+export const platformLabels: Record<string, string> = { auto: '自动识别（缓存结果）', sub2api: 'sub2api', newapi: 'NewAPI', oneapi: 'OneAPI' };
 export interface AccountTransport {
+  detectPlatform?(input: AccountQuery, signal: AbortSignal): Promise<AccountSettings>;
   accountSettings?(id: string, signal: AbortSignal): Promise<AccountSettings>;
   saveAccount?(input: SaveAccountSettings, signal: AbortSignal): Promise<AccountSettings>;
   allowance?(input: AccountQuery, signal: AbortSignal): Promise<AccountObservation>;
@@ -11,8 +12,9 @@ export interface AccountTransport {
 const safeID = (n: number) => Number.isSafeInteger(n) && n >= 0;
 export function checkedAccountSettings(v: AccountSettings, id: string): AccountSettings {
   if (!v || v.provider_id !== id || !safeID(v.revision) || v.revision < 1 || !['', ...Object.keys(platformLabels)].includes(v.platform) ||
+    !['', 'sub2api', 'newapi', 'oneapi'].includes(v.detected_platform) || typeof v.detection_failure !== 'string' || v.detection_failure.length > 64 || !!v.detected_platform && !!v.detection_failure ||
     typeof v.site_url !== 'string' || (v.site_url !== '' && !!requestURLError(v.site_url)) || !safeID(v.user_id) || typeof v.has_user_token !== 'boolean') throw new ProviderProblem('read_error');
-  return { provider_id: v.provider_id, revision: v.revision, platform: v.platform, site_url: v.site_url, user_id: v.user_id, has_user_token: v.has_user_token };
+  return { provider_id: v.provider_id, revision: v.revision, platform: v.platform, detected_platform: v.detected_platform, detection_failure: v.detection_failure, site_url: v.site_url, user_id: v.user_id, has_user_token: v.has_user_token };
 }
 function amount(v: AccountAmount | null): AccountAmount | null {
   if (v === null) return null;
@@ -61,7 +63,7 @@ export function allowanceScopeText(scope: string): string {
 export const billingScopeHint = '站点 billing 接口返回的余额；查询范围由站点设置决定，可能是账户或所选 Key。查询账户钱包可配置用户授权。';
 export const accountFailureText: Record<string, string> = {
   unknown: '平台没有返回明确的额度或周期窗口，当前额度未知。',
-  platform_unknown: '无法自动识别平台，可在账户页指定平台类型。',
+  platform_unknown: '平台识别失败，结果已缓存。请在账户页点击「重新探测」，或手动指定平台。',
   permission_denied: '该 Key 没有查询权限。',
   upstream_rejected: '平台拒绝了查询请求。',
   auth_required: '当前查询需要额外授权。请配置平台用户令牌，或检查所选推理 Key；Key 限额不能代表账户余额。',

@@ -74,14 +74,16 @@ function AccountContent({ c, settings: s }: { c: ProviderController; settings: A
   }
   return <>
     <section className="detail-card">
-      <h2>平台账户配置</h2>
+      <div className="card-toolbar"><h2>平台账户配置</h2><Button variant="outline" size="sm" disabled={queryDisabled} onClick={() => void a.detectPlatform(keyID)}><RefreshCw size={14} />重新探测</Button></div>
       <ImeForm className="account-form" onSubmit={e => void save(e)} autoComplete="off">
         <fieldset disabled={disabled} className="account-fields">
           <div className="field"><label htmlFor="account-platform">平台类型</label><select id="account-platform" className="select-field" value={platform} onChange={e => setPlatform(e.target.value)}>{Object.entries(platformLabels).map(([id, label]) => <option value={id} key={id}>{label}</option>)}</select></div>
           {newAPI && <div className="field"><label htmlFor="account-user-id">NewAPI 用户 ID（按站点要求填写）</label><input id="account-user-id" inputMode="numeric" value={userID} onChange={e => setUserID(e.target.value)} placeholder="可先留空；该站要求时填写数字用户 ID" /><p className="card-hint">这是该站后台的账户 ID。仅当该站要求用户 ID 时填写。</p></div>}
           <details className="pricing-details"><summary>账户接口地址（可选）</summary><div className="field"><label htmlFor="account-site-url">站点根地址</label><input id="account-site-url" value={siteURL} onChange={e => setSiteURL(e.target.value)} placeholder="留空，沿用请求地址并移除末尾 /v1" /><p className="card-hint">后台与推理 API 地址不同时填写。包含站点实际使用的部署路径前缀。</p></div></details>
           {(platform === 'sub2api' || a.observedPlatform === 'sub2api') && <p className="card-hint">sub2api 查询所选 Key 的当前计费倍率可直接使用推理 Key，无需用户 JWT。旧站缺少 Key 倍率接口，或指定后台 Key ID 时，才需要用户授权。</p>}
-          {platform === 'auto' && !a.observedPlatform && <p className="card-hint">查询会自动识别平台；识别为 NewAPI 后直接显示用户令牌输入框。</p>}
+          {platform === 'auto' && !a.observedPlatform && <p className="card-hint">首次创建时自动识别并保存；已有供应商首次查询时补充识别。之后仅手动重新探测会更新结果。</p>}
+          {platform === 'auto' && s.detected_platform && <p className="card-hint">已保存识别结果：{platformLabels[s.detected_platform]}。后续查询直接使用此结果，只有点击「重新探测」才会更新。</p>}
+          {platform === 'auto' && !s.detected_platform && s.detection_failure && <p className="card-hint">平台识别失败（{s.detection_failure}），已缓存失败结果，不会自动重复探测。修复站点或 Key 后可手动重新探测。</p>}
           {newAPI && <div className="card-hint">
             <p>登录该 NewAPI 站点后台 → 个人设置／安全设置 → 系统访问令牌，生成后粘贴到下方并保存，随后自动查询分组倍率。它与调用模型的 API Key 分开配置。</p>
             <p>支持权限选择的站点：余额查询需「个人信息读取」（profile:read）；自动核对 Key 的分组倍率还需「API Key 读取」（api_key:read）和「查看完整 API Key」（api_key:reveal）。</p>

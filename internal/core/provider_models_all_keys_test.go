@@ -166,6 +166,7 @@ func TestCatalogSkipsDisabledKeysWithoutAnonymousFallback(t *testing.T) {
 			}))
 			defer upstream.Close()
 			f.add(t, "p", upstream.URL+"/v1", tc.secret)
+			savedCatalogPlatform(t, f, "p")
 			revision := int64(1)
 			if tc.disabled {
 				if err := f.store.MutateProvider("p", revision, "key-put", "default", "", "", false, false); err != nil {

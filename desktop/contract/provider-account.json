@@ -3,6 +3,8 @@
     "provider_id": "demo",
     "revision": 3,
     "platform": "sub2api",
+    "detected_platform": "",
+    "detection_failure": "",
     "site_url": "",
     "user_id": 0,
     "has_user_token": false

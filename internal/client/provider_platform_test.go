@@ -17,6 +17,10 @@ func TestPlatformTypedClientRoundTrip(t *testing.T) {
 	c, _, _, _ := connection(t)
 	ctx := context.Background()
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/v1/settings/public" {
+			w.WriteHeader(404)
+			return
+		}
 		// NewAPI balance reads public display metadata without user authorization.
 		// This fixture intentionally omits conversion metadata to retain raw quota.
 		if r.URL.Path == "/api/status" {

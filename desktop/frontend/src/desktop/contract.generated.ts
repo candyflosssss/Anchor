@@ -474,6 +474,8 @@ export interface AccountSettings {
   provider_id: string;
   revision: number;
   platform: string;
+  detected_platform: string;
+  detection_failure: string;
   site_url: string;
   user_id: number;
   has_user_token: boolean;
@@ -1082,6 +1084,7 @@ export interface DesktopBridge {
   ConfigureModelRouting(input1: ModelRouting): Promise<ModelRoutingResult>;
   ConnectSSH(input1: SSHConnectionInput): Promise<SessionResult>;
   Connections(): Promise<ConnectionProfilesResult>;
+  DetectProviderPlatform(input1: AccountQuery): Promise<AccountSettingsResult>;
   DiscoverProviderModels(input1: DiscoverProviderModels): Promise<ProviderModelsResult>;
   DownloadUpdate(input1: string): Promise<UpdateResult>;
   EnrollAgent(input1: EnrollAgent): Promise<AgentWorkspaceResult>;

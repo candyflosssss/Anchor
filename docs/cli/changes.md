@@ -856,3 +856,10 @@
 - 旧 → 新：本日无效加密思考字段预清理及 .60 后已提交增量现随 desktop.61 两平台安装器、runtime、独立 CLI 和更新清单发布；前述功能提交时“未构建”保留为历史事实。
 - 兼容与迁移：沿用 schema9，核心／界面配套更新；本轮未安装到真实实例、未改用户更新配置，SSH 被控机单独更新。
 - 验证：双平台生产编译／打包、11 附件 GitHub digest 和标签核对、Linux 默认源 runtime／旧客户端 deb／CLI 三条实际下载与大小／SHA256／版本验证通过。未执行系统安装器／原生窗口／真实 SSH 升级或付费推理验收。
+
+## 2026-10-21 — 平台识别结果持久化（未发布）
+- 类型：修改。
+- 指令与参数：`provider detect-platform`、`provider platform` 及余额／倍率查询。
+- 旧 → 新：`auto` 查询每次临时探测；现在新建时首次探测并保存，既有供应商首次查询补齐一次，后续复用缓存。失败分类同样缓存；手动 `detect-platform` 才重新探测。
+- 兼容与迁移：已有 provider 无需迁移，首次查询会建立识别记录；provider revision、用户令牌和手动平台配置保持独立。
+- 验证：Go state/core/desktop/client/cli 定向测试通过；前端 lint、typecheck、Vitest 通过。

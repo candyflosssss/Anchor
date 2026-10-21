@@ -110,6 +110,12 @@ func (s *Server) QueryProvider(parent context.Context, in providerapi.Query) (pr
 		selected = state.ProviderKey{ID: "anonymous", Protocol: p.Protocol}
 	}
 	out.KeyID = selected.ID
+	unlock, ok := s.tryPlatformQuery(in.ProviderID)
+	if !ok {
+		out.Failure = "busy"
+		return out, nil
+	}
+	defer unlock()
 	select {
 	case s.slots <- struct{}{}:
 		defer func() { <-s.slots }()
@@ -124,7 +130,7 @@ func (s *Server) QueryProvider(parent context.Context, in providerapi.Query) (pr
 	defer s.release(p.ID)
 	ctx, cancel := context.WithTimeout(parent, min(time.Duration(p.TimeoutSeconds)*time.Second, 8*time.Second))
 	defer cancel()
-	ctx = egress.WithKeyRoute(ctx, p.ID, selected.ID, found)
+	ctx = providerapi.WithRequestBudget(egress.WithKeyRoute(ctx, p.ID, selected.ID, found))
 	if in.Operation == "models" {
 		if !found && len(keys) > 0 {
 			out.Failure = "auth_required"
@@ -136,13 +142,81 @@ func (s *Server) QueryProvider(parent context.Context, in providerapi.Query) (pr
 		out.Source = []string{"model_catalog"}
 		return out, nil
 	}
-	adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: selected.Secret}
 	in.KeyID = selected.ID
+	cfg, detection, err := s.resolveProviderPlatform(ctx, p, selected, in.Operation == "detect-platform")
+	if err != nil {
+		return out, err
+	}
+	if in.Operation == "detect-platform" {
+		return detection, nil
+	}
+	if detection.Failure != "" {
+		out.Platform, out.Failure = "", detection.Failure
+		out.Source, out.HTTPStatus = detection.Source, detection.HTTPStatus
+		if in.Operation == "effective-rate" && in.RemoteKeyID == 0 && found {
+			if err = s.cacheKeyRate(p, keys, selected.ID, &out); err != nil {
+				return out, err
+			}
+		}
+		return out, nil
+	}
+	adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: selected.Secret}
 	result := adapter.Query(ctx, in)
+	result.Source = append(detection.Source, result.Source...)
 	if in.Operation == "effective-rate" && in.RemoteKeyID == 0 && found {
 		if err = s.cacheKeyRate(p, keys, selected.ID, &result); err != nil {
 			return out, err
 		}
 	}
 	return result, nil
+}
+
+// Platform metadata operations are serialized per supplier, independently of
+// inference. A concurrent read reports busy and never starts another detector.
+func (s *Server) tryPlatformQuery(id string) (func(), bool) {
+	v, _ := s.platformQueries.LoadOrStore(id, make(chan struct{}, 1))
+	gate := v.(chan struct{})
+	select {
+	case gate <- struct{}{}:
+		return func() { <-gate }, true
+	default:
+		return nil, false
+	}
+}
+
+// resolveProviderPlatform is called under the supplier metadata gate. Empty
+// legacy configurations are initialized once on their first metadata query.
+func (s *Server) resolveProviderPlatform(ctx context.Context, p state.Provider, key state.ProviderKey, force bool) (providerapi.Config, providerapi.Result, error) {
+	cfg, err := s.Store.ProviderPlatform(p.ID)
+	out := providerapi.Result{ProviderID: p.ID, Revision: p.Revision, KeyID: key.ID, Operation: "detect-platform", ObservedAt: time.Now().UTC().Format(time.RFC3339Nano), Source: []string{}}
+	if err != nil {
+		return cfg, out, err
+	}
+	current, err := s.Store.Provider(p.ID)
+	if err != nil {
+		return cfg, out, err
+	}
+	if current.Revision != p.Revision {
+		return cfg, out, state.ErrConflict
+	}
+	if !force {
+		if cfg.Platform != "" && cfg.Platform != "auto" {
+			return cfg, out, nil
+		}
+		if cfg.DetectedPlatform != "" {
+			cfg.Platform = cfg.DetectedPlatform
+			return cfg, out, nil
+		}
+		if cfg.DetectionFailure != "" {
+			out.Failure = cfg.DetectionFailure
+			return cfg, out, nil
+		}
+	}
+	adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: key.Secret}
+	out = adapter.Query(ctx, providerapi.Query{ProviderID: p.ID, ExpectedRevision: p.Revision, Operation: "detect-platform", KeyID: key.ID})
+	if err = s.Store.SaveProviderPlatformDetection(p.ID, p.Revision, out.Platform, out.Failure, force); err != nil {
+		return cfg, out, err
+	}
+	cfg.Platform = out.Platform
+	return cfg, out, nil
 }

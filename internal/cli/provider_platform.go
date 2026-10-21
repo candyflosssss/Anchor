@@ -24,7 +24,7 @@ func (a App) providerPlatform(ctx context.Context, c *client.Client, args []stri
 	}
 	rev := f.Int64("revision", 0, "expected provider revision (required)")
 	if args[0] == "platform-put" {
-		platform := f.String("platform", "auto", "auto (default), sub2api, newapi or oneapi")
+		platform := f.String("platform", "auto", "auto (default, reuses saved detection), sub2api, newapi or oneapi")
 		site := f.String("site-url", "", "dashboard deployment root; empty derives from request URL")
 		userID := f.Int64("user-id", 0, "NewAPI user ID for deployments requiring New-Api-User")
 		stdin := f.Bool("user-token-stdin", false, "read dashboard user token from stdin (NewAPI: system access token generated in personal/security settings)")

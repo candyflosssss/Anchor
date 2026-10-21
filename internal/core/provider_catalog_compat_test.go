@@ -130,6 +130,7 @@ func TestNewAPIModelCatalogSelectedKey(t *testing.T) {
 			}))
 			defer upstream.Close()
 			f.add(t, "newapi", upstream.URL+"/newapi", "fixture-default-token")
+			savedCatalogPlatform(t, f, "newapi")
 			if err := f.store.MutateProvider("newapi", 1, "key-put", "restricted", "fixture-restricted-token", "", true, false, protocol); err != nil {
 				t.Fatal(err)
 			}

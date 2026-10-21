@@ -349,6 +349,14 @@ func TestStartupDoesNotRecreateMissingOwnerCredential(t *testing.T) {
 func TestRealCoreProviderDirectory(t *testing.T) {
 	var calls atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/status" {
+			w.WriteHeader(404)
+			return
+		}
+		if r.URL.Path == "/api/v1/settings/public" {
+			io.WriteString(w, `{"data":{"registration_enabled":true,"site_name":"fixture","version":"1","api_base_url":""}}`)
+			return
+		}
 		calls.Add(1)
 		if r.URL.Path == "/v1/sub2api/billing" {
 			w.WriteHeader(404)

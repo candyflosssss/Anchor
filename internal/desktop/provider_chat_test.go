@@ -15,6 +15,10 @@ func TestProviderChatBridge(t *testing.T) {
 	b := NewBridge(s)
 	requireReady(t, b)
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.WriteHeader(404)
+			return
+		}
 		var body struct {
 			Reasoning struct {
 				Effort string `json:"effort"`

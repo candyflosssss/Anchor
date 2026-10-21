@@ -28,6 +28,12 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		fail(w, apierror.ProviderRevisionRequired)
 		return
 	}
+	unlock, ok := s.tryPlatformQuery(in.ProviderID)
+	if !ok {
+		writeJSON(w, 200, catalog.ProviderModels{ProviderID: in.ProviderID, Revision: in.ExpectedRevision, Models: []string{}, Entries: []catalog.ModelEntry{}, Keys: []catalog.CatalogKey{}, Failure: "busy"})
+		return
+	}
+	defer unlock()
 	p, err := s.Store.Provider(in.ProviderID)
 	if err != nil {
 		apiError(w, err)
@@ -164,9 +170,23 @@ func (s *Server) discoverProviderModels(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// Read catalogs first so missing/slow billing permissions never hide models.
+	firstRateContext := providerapi.WithRequestBudget(ctx)
+	resolved, detection, resolveErr := s.resolveProviderPlatform(egress.WithKeyRoute(firstRateContext, p.ID, keys[0].ID, keys[0].Secret != ""), p, keys[0], false)
+	if resolveErr != nil {
+		cacheErr = resolveErr
+		return
+	}
 	for i, key := range keys {
-		adapter := providerapi.Adapter{HTTP: s.upstream, Config: cfg, BaseURL: p.BaseURL, Key: key.Secret}
-		rate := adapter.QueryKeyRate(egress.WithKeyRoute(ctx, p.ID, key.ID, key.Secret != ""))
+		if detection.Failure != "" {
+			out.Keys[i].RateFailure = detection.Failure
+			continue
+		}
+		adapter := providerapi.Adapter{HTTP: s.upstream, Config: resolved, BaseURL: p.BaseURL, Key: key.Secret}
+		rateContext := ctx
+		if i == 0 {
+			rateContext = firstRateContext
+		}
+		rate := adapter.QueryKeyRate(egress.WithKeyRoute(rateContext, p.ID, key.ID, key.Secret != ""))
 		if cacheErr = s.cacheKeyRate(p, allKeys, key.ID, &rate); cacheErr != nil {
 			return
 		}

@@ -129,6 +129,7 @@ func TestDirectoryUsesSelectedKeyDefaultProtocol(t *testing.T) {
 	}))
 	defer up.Close()
 	f.add(t, "p", up.URL+"/v1", "synthetic-default")
+	savedCatalogPlatform(t, f, "p")
 	if err := f.store.MutateProvider("p", 1, "key-put", "second", "synthetic-second", "", true, false, "anthropic"); err != nil {
 		t.Fatal(err)
 	}

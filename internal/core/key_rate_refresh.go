@@ -104,6 +104,11 @@ func (s *Server) refreshKeyRates(ctx context.Context, now time.Time, attempts ma
 		if !p.Enabled {
 			continue
 		}
+		cfg, err := s.Store.ProviderPlatform(p.ID)
+		if err != nil || ((cfg.Platform == "" || cfg.Platform == "auto") && cfg.DetectedPlatform == "") {
+			// Maintenance never starts or retries a platform detector.
+			continue
+		}
 		keys, err := s.Store.ProviderKeys(p.ID)
 		if err != nil {
 			continue

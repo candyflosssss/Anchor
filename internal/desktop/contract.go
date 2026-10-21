@@ -201,12 +201,14 @@ type AgentWorkspaceResult struct {
 // Account DTOs expose public configuration and decimal strings only. Credentials
 // are write-only; account wallets and inference-key caps retain distinct scopes.
 type AccountSettings struct {
-	ProviderID   string `json:"provider_id"`
-	Revision     int64  `json:"revision"`
-	Platform     string `json:"platform"`
-	SiteURL      string `json:"site_url"`
-	UserID       int64  `json:"user_id"`
-	HasUserToken bool   `json:"has_user_token"`
+	ProviderID       string `json:"provider_id"`
+	Revision         int64  `json:"revision"`
+	Platform         string `json:"platform"`
+	DetectedPlatform string `json:"detected_platform"`
+	DetectionFailure string `json:"detection_failure"`
+	SiteURL          string `json:"site_url"`
+	UserID           int64  `json:"user_id"`
+	HasUserToken     bool   `json:"has_user_token"`
 }
 type SaveAccountSettings struct {
 	ProviderID       string  `json:"provider_id"`
@@ -219,7 +221,8 @@ type SaveAccountSettings struct {
 type AccountQuery struct {
 	ProviderID       string `json:"provider_id"`
 	ExpectedRevision int64  `json:"expected_revision"`
-	// Operation is balance, key-quota, balance-summary, or effective-rate (via ProviderRate).
+	// Operation is balance, key-quota, balance-summary, effective-rate (ProviderRate),
+	// or detect-platform (DetectProviderPlatform).
 	Operation   string `json:"operation"`
 	KeyID       string `json:"key_id"`
 	RemoteKeyID int64  `json:"remote_key_id"`

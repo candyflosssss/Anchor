@@ -7,6 +7,25 @@ const balanceQuery = { provider_id: 'demo', expected_revision: 3, operation: 'ba
 const signal = () => new AbortController().signal;
 
 describe('account contract and precision', () => {
+  it('retains saved detection and validates its state', () => {
+    const saved = { ...fixture.settings, platform: 'auto', detected_platform: 'newapi' };
+    expect(checkedAccountSettings(saved, 'demo')).toEqual(saved);
+    const failed = { ...saved, detected_platform: '', detection_failure: 'network' };
+    expect(checkedAccountSettings(failed, 'demo')).toEqual(failed);
+    expect(() => checkedAccountSettings({ ...saved, detection_failure: 'network' }, 'demo')).toThrow('read_error');
+    expect(() => checkedAccountSettings({ ...saved, detected_platform: 'guessed' }, 'demo')).toThrow('read_error');
+  });
+  it('uses an explicit typed write for manual detection', async () => {
+    const q = { ...balanceQuery, operation: 'detect-platform' };
+    const detected = { ...fixture.settings, platform: 'auto', detected_platform: 'newapi' };
+    let received: unknown;
+    const bridge = { DetectProviderPlatform: async (v: typeof q) => { received = v; return { contract: CONTRACT, data: detected, problem: null }; } } as unknown as DesktopBridge;
+    const transport = new DesktopProviderTransport(() => bridge);
+    expect(await transport.detectPlatform(q, signal())).toEqual(detected);
+    expect(received).toEqual(q);
+    const broken = new DesktopProviderTransport(() => ({ DetectProviderPlatform: async () => { throw Error('network'); } }) as unknown as DesktopBridge);
+    await expect(broken.detectPlatform(q, signal())).rejects.toThrow('unknown');
+  });
   it('uses shared public settings, decimal strings, unknown fields and a separate unlimited key', () => {
     expect(checkedAccountSettings({ ...fixture.settings, user_token: 'synthetic-token' } as typeof fixture.settings, 'demo')).toEqual(fixture.settings);
     const v = checkedAccountObservation(fixture.balance, balanceQuery);
