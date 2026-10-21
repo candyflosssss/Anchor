@@ -1,11 +1,36 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.61](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.61)，发布于 `2026-10-21T12:02:05+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c6f56a407bce12608c0466abb7c67a1d7249d214`、SOURCE dirty=false。
-- 修复历史 reasoning 中 null／非字符串／空字符串 encrypted_content 导致上游 400：协议层在发送前移除无效字段及对应 id，保留摘要、非空密文和其他历史；无额外请求，既有明确密文拒绝后的恢复继续保留。
-- 同时包含 .60 后已提交的请求级协议翻译、Anthropic 顺序内容块增量输出、日志已知用量小计、连接核心版本展示及显式系统代理路由；具体契约见设计与 CLI 文档。
-- protocol／core／cli 回归、双平台生产编译／打包、11 附件远端摘要和 3 条默认源实际下载均通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本轮仅在线投放，未替换本机运行的 .60，SSH 被控机另行更新；未调用真实付费推理，未验收双平台原生窗口、系统安装器或真实 SSH 升级。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.62](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.62)，发布于 `2026-10-21T15:57:28+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `6d981b8ad34ac447fe6b43e4ea0780e2f02256de`、SOURCE dirty=false。
+- 日志趋势采用严格经过采样点的 PCHIP 保形曲线；错误率图改为成功绿色在下、错误红色在上的次数堆叠柱，零色段不绘制，纵轴使用整数次数；汇总卡片保留百分比。
+- 复用图表定向测试结果，完成双平台生产编译／打包、11 附件远端摘要及三条默认源实际下载校验。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
+- 本轮仅在线投放，未安装或改动真实实例／Agent配置；未验收双平台原生窗口、系统安装器或真实SSH升级，未请求付费上游。
+
+<a id="log-charts-62"></a>
+
+## 日志保形曲线与红绿堆叠柱 .62（已发布 dev）
+
+趋势采用 PCHIP 保形三次插值，严格经过原始时间坐标的每个统计点，支持非等距末桶，连续零值保持基线，不制造点间额外峰谷。错误率卡片继续显示汇总百分比，图内改为按次数计量的堆叠柱：成功为 `completed - errors`，绿色在下；错误为 `errors`（失败＋中断），红色在上；色段为0不生成柱，整桶为0留空。pending／客户端取消不算成功；图例、鼠标与键盘读数同步显示成功／错误次数，纵轴为整数。纯展示变化，无新增CLI或桥接契约。
+
+构建提交 `6d981b8ad34ac447fe6b43e4ea0780e2f02256de`，输入摘要 `87d31cf136d6bea30f4fdf14e6e2c8abf454dd3750ce04d272eeded08ac1c2e1`，SOURCE dirty=false。仅包含图表提交及其基线，未包含后续 `91cd6cb` 的供应商平台探测缓存提交，也未混入未提交架构／路线图／其他任务记录。产物与证据位于 `dist/desktop/0.1.0-dev.desktop.62/`，对应源码含 Anchor Go vendor、未修改 mihomo v1.19.32 对应源码／vendor和固定payload。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.62_amd64.deb` | 29138880 | `474a6a8d96deae10cea84d581cc91db93059750d35785887d2ab7dacaeefb185` |
+| `Anchor-Desktop-0.1.0-dev.desktop.62-windows-amd64-setup.exe` | 31153908 | `caf269206d5bdfc9dc1faa7134ea8fb342381bb041ff8f06c3d843b61b1b6ad2` |
+| `anchor-desktop-0.1.0-dev.desktop.62-linux-amd64` | 43078704 | `80265303b9b8245cc02f374650f07e5f38d788dc601ac00e113e6dec07291769` |
+| `anchor-desktop-0.1.0-dev.desktop.62-windows-amd64.exe` | 44204032 | `4cf9730e63c804bd9caaa2fe08690591000fb4996533c0fcfa977efe09b21141` |
+| `anchor-0.1.0-dev.desktop.62-linux-amd64` | 37716130 | `0ae4c3efeb90d07d4fbaff0327fc14d68fc65a3c4cc67dd1a191b72418a0cdc5` |
+| `anchor-0.1.0-dev.desktop.62-windows-amd64.exe` | 37844480 | `472c9545c44d18a202fdcd6756d5ee1539cf3a739d6667d150232b524912fd53` |
+| `update-desktop.json` | 1755 | `ffe35c65547b1095ce20e061cac9f6a3578bd8445ebff5a800614b9672e41291` |
+| `update-cli.json` | 876 | `436c903a75715b3010a7607fe992b74702051bb3231807672bbd25c7123a4fe6` |
+| `anchor_0.1.0-dev.desktop.62_source.tar.gz` | 97650069 | `52ada6d7674ddeb43dbb5336d1816ee42a597afdbc0c5efaf9100e5cc9750120` |
+| `anchor_0.1.0-dev.desktop.62_metadata.zip` | 122177 | `66f77d968bbf2d0a9b14381d31463405d0474448db3008d13eab893cd7a92539` |
+| `SHA256SUMS` | 1073 | `f996bbca6448d6f677ba61bc3f5a7ec57af02513937e8dfaf0fffdc9616f2787` |
+
+复用功能提交的6项趋势单测、5项定向浏览器回归、整数纵轴2项补验、TypeScript与定向lint结果。本轮从干净快照完成契约比对、TypeScript／Vite、Windows和Ubuntu24.04 AMD64生产编译及安装包构建；验证嵌入前端／固定mihomo、deb载荷与runtime一致、源码输入摘要一致。默认dev源实际发现并下载Linux desktop runtime、旧客户端deb和CLI，大小／SHA256／运行版本校验通过；全部11附件GitHub digest与本地匹配，tag指向构建提交，prerelease且未替代latest。未额外运行全量、race或浏览器套件；BUILD.json保留构建时未安装／未发布／未原生验收事实，实际投放结果另存publication证据。
+
+沿用schema9，本轮不安装或重启真实本机／远端实例，不修改用户更新配置或Agent配置，不主动发起付费推理。双平台原生窗口、系统安装器和真实SSH升级尚未验收；下载成功不代表系统安装已完成。
 
 <a id="native-reasoning-61"></a>
 
