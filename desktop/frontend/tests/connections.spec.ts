@@ -5,7 +5,7 @@ import type { DesktopBridge, SSHConnectionInput, SessionInfo } from '../src/desk
 test('UI enrolls, switches and preserves current device after failure', async ({ page }) => {
   await page.addInitScript(({ fixture }) => {
     const contract = fixture.contract;
-    let current: SessionInfo = { instance_id: 'local-fixture', profile_name: '@local', transport: 'local', target: '本机', source: 'reused', phase: 'ready', can_stop: true };
+    let current: SessionInfo = { instance_id: 'local-fixture', profile_name: '@local', transport: 'local', target: '本机', version: '0.1.0-dev.desktop.58', source: 'reused', phase: 'ready', can_stop: true };
     let added = false;
     const calls: SSHConnectionInput[] = [];
     Object.assign(window, { connectionTest: { calls } });
@@ -22,7 +22,7 @@ test('UI enrolls, switches and preserves current device after failure', async ({
         return { contract, data: current, problem: null };
       },
       UseConnection: async ({ name }: { name: string }) => {
-        current = name === '@local' ? { ...current, profile_name: '@local', instance_id: 'local-fixture', target: '本机', transport: 'local', source: 'reused' } : fixture.session.data;
+        current = name === '@local' ? { ...current, profile_name: '@local', instance_id: 'local-fixture', target: '本机', transport: 'local', version: '0.1.0-dev.desktop.58', source: 'reused' } : fixture.session.data;
         return { contract, data: current, problem: null };
       },
     };
@@ -67,7 +67,7 @@ test('connection screen is usable when local core is offline', async ({ page }) 
 async function quickSwitchHost(page: import('@playwright/test').Page, authentication = 'key') {
   await page.addInitScript(({ fixture, authentication }) => {
     const contract = fixture.contract;
-    let current: SessionInfo = { ...fixture.session.data, profile_name: '@local', instance_id: 'local-fixture', transport: 'local', target: '本机', source: 'reused' };
+    let current: SessionInfo = { ...fixture.session.data, profile_name: '@local', instance_id: 'local-fixture', transport: 'local', target: '本机', version: '0.1.0-dev.desktop.58', source: 'reused' };
     const state = { calls: [] as { name: string; password: string }[], fail: false, listFail: false };
     Object.assign(window, { quickSwitchTest: state });
     const api = {
@@ -79,7 +79,7 @@ async function quickSwitchHost(page: import('@playwright/test').Page, authentica
         state.calls.push(input);
         await new Promise(resolve => setTimeout(resolve, 350));
         if (state.fail || (authentication === 'password' && input.name !== '@local' && input.password !== 'quick-switch-test-password')) return { contract, data: null, problem: { code: 'ssh_auth' } };
-        current = input.name === '@local' ? { ...current, profile_name: '@local', instance_id: 'local-fixture', transport: 'local', target: '本机', source: 'reused' } : fixture.session.data;
+        current = input.name === '@local' ? { ...current, profile_name: '@local', instance_id: 'local-fixture', transport: 'local', target: '本机', version: '0.1.0-dev.desktop.58', source: 'reused' } : fixture.session.data;
         return { contract, data: current, problem: null };
       },
     };
@@ -92,6 +92,7 @@ test('header switches devices in place, hides instance IDs and refreshes the con
   await quickSwitchHost(page);
   await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();
   const panel = page.getByRole('dialog', { name: '切换设备' });
+  await expect(panel).toContainText('核心版本：0.1.0-dev.desktop.58');
   await expect(panel).not.toContainText('local-fixture');
   await expect(panel).not.toContainText('remote-fixture');
   await expect(panel.getByRole('button', { name: '切换到本机', exact: true })).toHaveAttribute('aria-pressed', 'true');
@@ -100,9 +101,12 @@ test('header switches devices in place, hides instance IDs and refreshes the con
   await expect(panel.getByRole('button', { name: '停止核心', exact: true })).toBeDisabled();
   await expect(panel).toBeHidden();
   await expect(page.getByRole('button', { name: /dev-server · 已连接/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /dev-server · 已连接/ })).toContainText(fixture.session.data.version);
   await expect(page.getByRole('heading', { name: '供应商', exact: true })).toBeVisible();
   await page.getByRole('button', { name: /dev-server · 已连接/ }).click();
   await expect(panel.getByRole('button', { name: '切换到dev-server' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(panel.getByRole('button', { name: '切换到dev-server' })).toContainText(`核心版本：${fixture.session.data.version}`);
+  await expect(panel).not.toContainText('0.1.0-dev.desktop.58');
   await panel.getByRole('button', { name: '管理设备连接' }).click();
   await expect(page.getByRole('heading', { name: '设备连接' })).toBeVisible();
   await page.getByRole('button', { name: /dev-server · 已连接/ }).click();

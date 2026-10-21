@@ -253,7 +253,7 @@ func TestSSHDesktopEnrollmentSelectionAndIsolation(t *testing.T) {
 		t.Fatalf("first contact: %+v", r.Problem)
 	}
 	result := b.ConnectSSH(input)
-	if result.Problem != nil || result.Data == nil || result.Data.Transport != "ssh" || result.Data.Source != "remote" {
+	if result.Problem != nil || result.Data == nil || result.Data.Transport != "ssh" || result.Data.Source != "remote" || result.Data.Version != core.Version {
 		t.Fatalf("enroll: %+v", result)
 	}
 	remoteCfg, _ := remote.Settings()
@@ -264,7 +264,7 @@ func TestSSHDesktopEnrollmentSelectionAndIsolation(t *testing.T) {
 	if profiles.Problem != nil || len(profiles.Data) != 2 || !profiles.Data[1].Active {
 		t.Fatalf("profiles: %+v", profiles)
 	}
-	if r := b.Status(); r.Problem != nil || r.Data.InstanceID != remoteCfg.InstanceID {
+	if r := b.Status(); r.Problem != nil || r.Data.InstanceID != remoteCfg.InstanceID || r.Data.Version != core.Version {
 		t.Fatalf("status: %+v", r)
 	}
 	token, _ := local.ContextCredential(input.Name)

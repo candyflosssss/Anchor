@@ -9,8 +9,8 @@ import type { ConnectionProfile } from './connection.model';
 import { cn } from '../../lib/utils';
 
 type Switcher = ReturnType<typeof useDeviceSwitcher>;
-export function DeviceSwitcher({ controller: c, current, connected, disabled, onManage, close }: {
-  controller: Switcher; current?: string; connected: boolean; disabled: boolean; onManage: () => void; close: () => void;
+export function DeviceSwitcher({ controller: c, current, connected, version, disabled, onManage, close }: {
+  controller: Switcher; current?: string; connected: boolean; version?: string; disabled: boolean; onManage: () => void; close: () => void;
 }) {
   const [passwordProfile, setPasswordProfile] = useState<ConnectionProfile | null>(null);
   const [password, setPassword] = useState('');
@@ -36,7 +36,7 @@ export function DeviceSwitcher({ controller: c, current, connected, disabled, on
           className={cn('flex min-h-12 w-full items-center gap-3 rounded-md px-2 py-2 text-left text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50', active && 'bg-accent')}
           onClick={() => select(profile)}>
           {profile.transport === 'local' ? <Monitor size={16} className="shrink-0" /> : <Server size={16} className="shrink-0" />}
-          <span className="min-w-0 flex-1"><span className="block truncate font-medium">{profile.transport === 'local' ? '本机' : profile.name}</span><span className="block truncate text-xs text-muted-foreground">{profile.transport === 'local' ? '本机 Anchor 核心' : profile.target}</span></span>
+          <span className="min-w-0 flex-1"><span className="block truncate font-medium">{profile.transport === 'local' ? '本机' : profile.name}</span><span className="block truncate text-xs text-muted-foreground">{profile.transport === 'local' ? '本机 Anchor 核心' : profile.target}</span>{active && <span className="block break-all text-xs text-muted-foreground">核心版本：{version || '未提供'}</span>}</span>
           {c.pending === profile.name ? <LoaderCircle size={16} className="shrink-0 animate-spin motion-reduce:animate-none" /> : active && <><span className="text-xs text-muted-foreground">当前</span><Check size={16} className="shrink-0" /></>}
         </button>;
       })}

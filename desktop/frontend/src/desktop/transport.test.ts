@@ -7,7 +7,7 @@ import { bridge, call, checkedProvider, checkedSession, DesktopProviderTransport
 
 const signal = () => new AbortController().signal;
 const publicRow = fixture.providers[0];
-const session = { instance_id: 'synthetic-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
+const session = { version: '0.1.0-dev.desktop.58', instance_id: 'synthetic-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
 const input = { provider: publicRow, expected_revision: publicRow.revision, secret: 'synthetic-secret' };
 function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   return {
@@ -44,6 +44,11 @@ describe('restricted desktop transport (not a native Wails test)', () => {
     expect(await transport.list(signal())).toEqual(fixture.providers);
     expect(checkedProvider({ ...publicRow, secret: 'never-return-this' } as Provider)).toEqual(publicRow);
     expect(checkedSession({ ...session, token: 'never-return-this' } as typeof session)).toEqual(session);
+  });
+  it('accepts older hosts without a version and rejects malformed versions', () => {
+    const legacy = { ...session, version: undefined };
+    expect(checkedSession(legacy)).toEqual(legacy);
+    expect(() => checkedSession({ ...session, version: 58 } as unknown as typeof session)).toThrow('read_error');
   });
   it('does not fallback to mock without host bindings', async () => {
     vi.stubGlobal('window', {});

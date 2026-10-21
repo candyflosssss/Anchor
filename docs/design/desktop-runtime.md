@@ -149,7 +149,7 @@ ProviderAllowance 增量接受 balance-summary，返回 account 或 key scope �
 
 ## SSH 会话与设备切换（2026-10-14）
 
-Connections 仅返回公开档案（name、transport、authentication、target、instance_id、active），包括内置 @local。ConnectSSH 输入安全连接字段和可选瞬时 password；UseConnection 输入名称与可选本次密码。SessionInfo 增加 profile_name、transport、target。规范 DTO 由 Go 生成 TS，共享样例为 desktop/contract/connections.json。
+Connections 仅返回公开档案（name、transport、authentication、target、instance_id、active），包括内置 @local。ConnectSSH 输入安全连接字段和可选瞬时 password；UseConnection 输入名称与可选本次密码。SessionInfo 增加 profile_name、transport、target。2026-10-21 源码新增可选 `version`，来自已认证连接的核心 Instance.Version，随 Start／Status／切换／重启返回，不使用宿主版本替代。旧宿主缺失或核心未提供时显示“未提供”；不为未连接档案探测或缓存版本。规范 DTO 由 Go 生成 TS，共享样例为 desktop/contract/connections.json。
 
 宿主复用 internal/connection 与 CLI 相同的身份／授权／连接策略。密钥模式使用受限 OpenSSH 的 stdio 转发（ssh -W），不开放临时本机管理端口；密码模式使用内置 SSH 通道，首次明确同意后保存公开主机密钥，变化即拒绝。固定 bootstrap 命令只允许已验证 executable／端口；默认在 SSH 非交互 PATH 中查找，缺失时依次检查该账户的 ~/.local/bin/anchor、~/bin/anchor 和系统常见路径，指定路径不回退并支持 ~/。在不加载登录脚本的 POSIX shell 内执行，先检查 bootstrap --help，密钥和密码模式共用此策略；管理令牌保存在受权限保护 SQLite 凭据表，密码不保存。认证错误只返回白名单 code，不暴露 stderr／令牌。程序缺失（remote_anchor_missing）、引导不支持（remote_anchor_unsupported）、管理端口不匹配（remote_control_port）、核心未就绪（remote_core_not_ready）分别展示；其余引导失败／响应无效保留 remote_anchor。旧远端未提供细分诊断时保留通用错误。
 

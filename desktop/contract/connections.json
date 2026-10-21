@@ -41,7 +41,8 @@
       "instance_id": "remote-fixture",
       "phase": "ready",
       "source": "remote",
-      "can_stop": true
+      "can_stop": true,
+      "version": "0.1.0-dev.desktop.57"
     },
     "problem": null
   }

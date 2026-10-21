@@ -620,6 +620,7 @@ export interface SaveProvider {
   initial_keys?: InitialProviderKey[];
 }
 export interface SessionInfo {
+  version?: string;
   profile_name: string;
   transport: string;
   target: string;

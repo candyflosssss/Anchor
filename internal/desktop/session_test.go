@@ -129,7 +129,7 @@ func TestRealCoreLifecycleAndProviders(t *testing.T) {
 	s := testSession(t)
 	b := NewBridge(s)
 	info := requireReady(t, b)
-	if info.Source != "started" || !info.CanStop {
+	if info.Source != "started" || !info.CanStop || info.Version != core.Version {
 		t.Fatalf("info: %+v", info)
 	}
 	if r := b.Providers(); r.Problem != nil || r.Data == nil || len(r.Data) != 0 {

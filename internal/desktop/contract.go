@@ -43,6 +43,7 @@ type SaveProvider struct {
 	InitialKeys      []InitialProviderKey `json:"initial_keys,omitempty"`
 }
 type SessionInfo struct {
+	Version     string `json:"version,omitempty"`
 	ProfileName string `json:"profile_name"`
 	Transport   string `json:"transport"`
 	Target      string `json:"target"`

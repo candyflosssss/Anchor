@@ -324,7 +324,7 @@ func (s *Session) startLocal() SessionResult {
 }
 
 func (s *Session) sessionInfo(info client.Instance) *SessionInfo {
-	out := &SessionInfo{InstanceID: info.InstanceID, Phase: "ready", Source: s.source(info), CanStop: slices.Contains(info.Capabilities, "graceful_stop"), ProfileName: "@local", Transport: "local", Target: "本机"}
+	out := &SessionInfo{Version: info.Version, InstanceID: info.InstanceID, Phase: "ready", Source: s.source(info), CanStop: slices.Contains(info.Capabilities, "graceful_stop"), ProfileName: "@local", Transport: "local", Target: "本机"}
 	if s.remote != nil {
 		out.ProfileName = s.remote.Profile.Name
 		out.Transport = "ssh"

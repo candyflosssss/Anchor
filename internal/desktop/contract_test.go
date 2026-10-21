@@ -88,7 +88,11 @@ func TestCoreSourceRequiresSpawnedProcessIdentity(t *testing.T) {
 		{41, 41, "started"},
 	} {
 		s := &Session{launchedPID: tc.launched}
-		if got := s.source(client.Instance{ProcessID: tc.responding}); got != tc.source {
+		info := client.Instance{ProcessID: tc.responding, Version: "0.1.0-dev.desktop.123"}
+		if s.sessionInfo(info).Version != info.Version {
+			t.Fatal("session must report the connected core version")
+		}
+		if got := s.source(info); got != tc.source {
 			t.Fatalf("launch=%d responding=%d: %s, want %s", tc.launched, tc.responding, got, tc.source)
 		}
 	}

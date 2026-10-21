@@ -24,10 +24,11 @@ function DesktopCoreStatus({ session, busy, onExit, onStop, onRestart, onManage,
   const label = session.restarting ? `${name} · 重启中` : session.phase === 'starting' || switcher.pending ? `${name} · 连接中` : session.phase === 'ready' ? `${name} · 已连接` : `${name} · 未连接`;
   const info = session.info;
   return <Popover label="切换设备" className="core-popover !w-[min(340px,calc(100vw-16px))] max-h-[calc(100dvh-64px)] overflow-y-auto" trigger={props => <button type="button" className={cn('connection-label core-trigger', session.phase === 'ready' && 'is-ready')} {...props}>
-    <span className="mini-dot" /><span>{label}</span><ChevronDown size={13} aria-hidden="true" />
+    <span className="mini-dot" /><span className="max-w-[min(24rem,40vw)] truncate" title={info?.version ? `${label} · ${info.version}` : label}>{label}{info?.version && ` · ${info.version}`}</span><ChevronDown size={13} aria-hidden="true" />
   </button>}>
     {close => <div className="core-panel">
-      <DeviceSwitcher controller={switcher} current={target?.profile_name} connected={session.phase === 'ready'} disabled={blocked} onManage={onManage} close={close} />
+      <p className="break-all text-xs text-muted-foreground">核心版本：{info ? info.version || '未提供' : '未连接'}</p>
+      <DeviceSwitcher controller={switcher} current={target?.profile_name} connected={session.phase === 'ready'} version={info?.version} disabled={blocked} onManage={onManage} close={close} />
       <div className="core-actions flex-wrap border-t pt-2">
         <Button variant="ghost" size="sm" disabled={blocked || !!switcher.pending} onClick={() => { close(); onExit(); }}><LogOut />退出界面</Button>
         {target && <Button variant="outline" size="sm" disabled={blocked || !!switcher.pending || session.error === 'unknown' || (target.transport === 'ssh' && session.phase !== 'ready')} title={target.transport === 'ssh' && session.phase !== 'ready' ? '请先重新连接远程设备，再重启核心' : undefined} onClick={() => { close(); onRestart(); }}><RotateCw />{session.phase === 'ready' || target.transport === 'ssh' ? '重启核心' : '恢复本机核心'}</Button>}

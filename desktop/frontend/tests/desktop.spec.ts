@@ -23,7 +23,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
     let providers: Provider[] = rows;
     if (rateMappings) providers = providers.map(p => p.id === '摸鱼AI' ? { ...p, cost_multiplier: 0.5 } : p);
     const rateCache: Record<string, KeyRateCache> = {};
-    const data = { instance_id: 'test-local-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
+    const data = { version: '0.1.0-dev.desktop.58', instance_id: 'test-local-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
     window.routingTest = { calls: [] };
     const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const modelStates: Record<string, ModelSettingsState> = {};
@@ -1189,7 +1189,7 @@ test('SSH update pins the target, disables duplicate submission and requires a f
   await page.evaluate(({ checked, confirmation, applied }) => {
     const api = window.go!.desktop!.Bridge!;
     const status = api.Status;
-    api.Status = async () => { const r = await status(); return { ...r, data: r.data && { ...r.data, instance_id: confirmation.instance_id, transport: 'ssh', target: 'fixture@remote', profile_name: 'remote' } }; };
+    api.Status = async () => { const r = await status(); return { ...r, data: r.data && { ...r.data, instance_id: confirmation.instance_id, transport: 'ssh', target: 'fixture@remote', profile_name: 'remote', version: checked.current_version } }; };
     let attempts = 0;
     api.CheckRemoteUpdate = async instance => {
       if (instance !== confirmation.instance_id) throw new Error('wrong check target');
@@ -1205,6 +1205,8 @@ test('SSH update pins the target, disables duplicate submission and requires a f
   await expect(page.getByRole('button', { name: /remote.*已连接/ })).toBeVisible({ timeout: 10_000 });
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
   await expect(page.getByRole('heading', { name: '本机桌面在线更新', exact: true })).toBeVisible();
+  const remoteSection = page.getByRole('region', { name: /SSH 被控机更新/ });
+  await expect(remoteSection).toContainText(`被控机当前版本${updateFixture.remote_checked.current_version}`);
   await page.getByRole('button', { name: '检查被控机更新', exact: true }).click();
   await page.getByRole('button', { name: '更新这台被控机…', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toContainText('本机服务继续运行');
@@ -1216,6 +1218,7 @@ test('SSH update pins the target, disables duplicate submission and requires a f
   await page.getByRole('button', { name: '更新这台被控机…', exact: true }).click();
   await page.getByRole('button', { name: '确认变更', exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: '服务已恢复' })).toBeVisible();
+  await expect(remoteSection).toContainText(`被控机当前版本${updateFixture.remote_applied.current_version}`);
   expect(await page.evaluate(() => window.desktopTest.installs)).toBe(2);
 });
 
@@ -1315,4 +1318,27 @@ test('automatic NewAPI detection also exposes the account token without selector
   await expect(page.getByLabel('NewAPI 系统访问令牌 · 已保存', { exact: true })).toBeVisible();
   await expect(page.getByText(`${accountFixture.rate.rate.multiplier}×`, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => window.accountTest.saves)).toBe(1);
+});
+
+
+test('remote version stays visible when an older CLI cannot check updates', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    const status = api.Status;
+    api.Status = async () => { const r = await status(); return { ...r, data: r.data && { ...r.data, instance_id: 'old-remote', transport: 'ssh', target: 'fixture@old', profile_name: 'old-server', version: '0.1.0-alpha.6' } }; };
+    api.CheckRemoteUpdate = async () => ({ contract: 'anchor-desktop-v1', data: null, problem: { code: 'remote_anchor_unsupported' } });
+  });
+  const trigger = page.getByRole('button', { name: /old-server.*已连接/ });
+  await expect(trigger).toContainText('0.1.0-alpha.6', { timeout: 8000 });
+  await trigger.click();
+  await expect(page.getByRole('dialog', { name: '切换设备' })).toContainText('核心版本：0.1.0-alpha.6');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  const remote = page.getByRole('region', { name: /SSH 被控机更新/ });
+  await expect(remote).toContainText('被控机当前版本0.1.0-alpha.6');
+  await remote.getByRole('button', { name: '检查被控机更新', exact: true }).click();
+  await expect(remote.getByRole('alert')).toContainText('被控机 Anchor CLI 版本不支持');
+  await expect(remote).toContainText('被控机当前版本0.1.0-alpha.6');
+  await expect(page.getByRole('region', { name: '本机桌面在线更新', exact: true })).toContainText(updateFixture.downloaded.current_version);
 });

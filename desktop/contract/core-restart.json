@@ -13,7 +13,8 @@
       "instance_id": "fixture-local",
       "phase": "ready",
       "source": "started",
-      "can_stop": true
+      "can_stop": true,
+      "version": "0.1.0-dev.desktop.58"
     },
     "problem": null
   },
@@ -46,7 +47,8 @@
       "instance_id": "fixture-local",
       "phase": "ready",
       "source": "remote",
-      "can_stop": true
+      "can_stop": true,
+      "version": "0.1.0-dev.desktop.57"
     },
     "problem": null
   }
