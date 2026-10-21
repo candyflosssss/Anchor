@@ -361,10 +361,15 @@ for (const width of [1440, 390]) {
     expect((await chart.boundingBox())!.y).toBe(before.y);
     await page.mouse.move(before.x + before.width / 240, before.y + 2);
     await expect(tooltip).toBeVisible();
-    // Hover the tooltip itself; it must not intercept the pointer or dismiss itself.
+    // The fixed readout sits below the plot and keeps its values when the pointer leaves.
     const tip = (await tooltip.boundingBox())!;
+    expect(tip.y).toBeGreaterThanOrEqual(before.y + before.height);
+    const reading = trends.locator('.log-chart-tooltip');
+    const previousReadings = await reading.locator('strong').allTextContents();
     await page.mouse.move(tip.x + 3, tip.y + 3);
-    await expect(tooltip).toBeVisible();
+    await expect(tooltip).toHaveCount(0);
+    await expect(reading).toBeVisible();
+    await expect(reading.locator('strong')).toHaveText(previousReadings);
     for (const theme of ['light', 'dark']) {
       await page.evaluate(dark => document.documentElement.classList.toggle('dark', dark), theme === 'dark');
       // Element screenshots can scroll the page; compare layout offsets, not stale viewport coordinates.
@@ -374,8 +379,10 @@ for (const width of [1440, 390]) {
         await expect(chart).toHaveAttribute('aria-valuenow', String(fraction === 0 ? 0 : fraction === 0.5 ? 60 : 119));
         await expect(tooltip).toBeVisible();
         const bounds = (await tooltip.boundingBox())!;
-        expect(bounds.x).toBeGreaterThanOrEqual(plot.x - 1);
-        expect(bounds.x + bounds.width).toBeLessThanOrEqual(plot.x + plot.width + 1);
+        const panel = (await trends.boundingBox())!;
+        expect(bounds.x).toBeGreaterThanOrEqual(panel.x);
+        expect(bounds.x + bounds.width).toBeLessThanOrEqual(panel.x + panel.width);
+        expect(bounds.y).toBeGreaterThanOrEqual(plot.y + plot.height);
         expect(await chart.evaluate(el => (el as HTMLElement).offsetTop)).toBe(plotOffset);
       }
       await expect(chart).toHaveAttribute('aria-valuenow', '119');
@@ -630,6 +637,8 @@ test('error chart stacks successful and failed counts, omits zeros and supports 
   await expect(trends.locator('.log-chart-line')).toHaveCount(0);
   await expect(trends.locator('.log-chart-legend')).toHaveText('次成功次数错误次数');
   await expect(trends.locator('.log-chart-y span')).toHaveText(['2', '1', '0']);
+  await expect(page.getByLabel('趋势统计粒度')).toContainText('自动 · 5 分钟');
+  expect(await trends.locator('g[data-bucket]').count()).toBeLessThanOrEqual(48);
   const mixed = trends.locator('g[data-bucket="0"]');
   const green = mixed.locator('rect[data-tone="success"]');
   const red = mixed.locator('rect[data-tone="errors"]');
@@ -665,9 +674,15 @@ test('error chart stacks successful and failed counts, omits zeros and supports 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(chart).toBeVisible();
   if (capture) await trends.screenshot({ path: resolve(capture, 'logs-stacked-narrow.png') });
+  // Explicit fine granularity stays available, including after viewport changes.
+  await page.getByLabel('趋势统计粒度').selectOption('10000');
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.interval_ms)).toBe(10000);
+  await expect(trends.locator('g[data-bucket]')).toHaveCount(360);
+  await page.getByLabel('趋势统计粒度').selectOption('0');
   await trends.getByRole('button', { name: /已知用量/ }).click();
   await expect(trends.locator('.log-chart-bar')).toHaveCount(0);
   await expect(trends.locator('.log-chart-line')).toHaveCount(3);
+  await expect.poll(() => page.evaluate(() => window.logTest.statsQueries.at(-1)?.interval_ms)).toBe(0);
   if (capture) {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await trends.screenshot({ path: resolve(capture, 'logs-pchip-dark.png') });

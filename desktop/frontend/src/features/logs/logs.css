@@ -220,17 +220,21 @@
 .log-chart-y { display: flex; flex-direction: column; justify-content: space-between; width: 44px; flex-shrink: 0; font-size: 10px; color: hsl(var(--muted-foreground)); text-align: right; }
 .log-chart-plot { position: relative; height: 192px; flex: 1; min-width: 0; border-radius: 4px; }
 .log-chart-plot svg { width: 100%; height: 100%; overflow: visible; }
-.log-chart-tooltip { position: absolute; top: 8px; z-index: 1; width: 244px; max-width: 100%; padding: 10px 12px; border: 1px solid hsl(var(--border)); border-radius: 7px; background: hsl(var(--popover)); color: hsl(var(--muted-foreground)); box-shadow: 0 4px 12px hsl(var(--foreground) / .1); font-size: 11px; pointer-events: none; transition: none; }
-.log-chart-tooltip-time { display: flex; flex-wrap: wrap; gap: 0 4px; margin-bottom: 8px; color: hsl(var(--popover-foreground)); line-height: 1.6; }
+.log-chart-tooltip { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 24px; min-height: 74px; margin-top: 14px; padding: 12px 0 0; border-top: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: 12px; font-variant-numeric: tabular-nums; }
+.log-chart-tooltip-time { display: flex; flex-wrap: wrap; gap: 0 6px; color: hsl(var(--foreground)); line-height: 1.6; }
 .log-chart-tooltip-time time { white-space: nowrap; }
-.log-chart-tooltip-value { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 5px; }
+.log-chart-reading-values { display: flex; align-items: center; gap: 24px; }
+.log-chart-tooltip-value { display: grid; gap: 4px; min-width: 64px; }
 .log-chart-tooltip-value > span { display: inline-flex; align-items: center; gap: 6px; }
-.log-chart-tooltip strong { color: hsl(var(--foreground)); font-size: 11px; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+.log-chart-tooltip strong { color: hsl(var(--foreground)); font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .log-chart-grid { stroke: hsl(var(--border)); stroke-dasharray: 3 5; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .log-chart-line { fill: none; stroke: var(--trend-color); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
-.log-chart-bar { fill: var(--trend-color); }
-.log-chart-observation { margin-bottom: 6px; }
-.log-chart-dot { fill: var(--trend-color); }
+.log-chart-bar { fill: var(--trend-color); opacity: .82; }
+.log-chart-plot[data-inspecting=true] [data-bucket]:not([data-selected=true]) .log-chart-bar { opacity: .48; }
+.log-chart-plot [data-selected=true] .log-chart-bar { opacity: 1; }
+.log-chart-selection { fill: hsl(var(--foreground) / .035); }
+.log-chart-observation { min-height: 20px; margin-top: 2px; font-size: 11px; }
+.log-chart-dot { fill: var(--trend-color); stroke: hsl(var(--background)); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
 .log-chart-cursor { stroke: hsl(var(--muted-foreground)); stroke-dasharray: 4; vector-effect: non-scaling-stroke; }
 .log-chart-x { display: flex; justify-content: space-between; gap: 8px; padding: 10px 0 0 56px; color: hsl(var(--muted-foreground)); font-size: 10px; }
 .log-stats-placeholder { min-height: 254px; display: grid; place-items: center; font-size: 13px; color: hsl(var(--muted-foreground)); }
@@ -242,6 +246,9 @@
   .log-stats-header label { gap: 6px; }
   .log-chart-x > span:nth-child(2) { display: none; }
   .log-chart-legend { gap: 8px; padding: 10px 0; }
+  .log-chart-tooltip { grid-template-columns: minmax(0, 1fr); min-height: 120px; gap: 10px; }
+  .log-chart-reading-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .log-chart-tooltip-value { min-width: 0; }
 }
 
 /* Local overlays stay in the filter bar; values wrap instead of widening it. */

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/log-stats.json';
-import { chartPaths, checkedStats, formatStat, statsQuery, validInterval } from './log-stats.model';
+import { chartInterval, chartPaths, checkedStats, formatStat, statsQuery, validInterval } from './log-stats.model';
 import { initialFilters } from './log.model';
 import { logService } from './log.service';
 afterEach(() => vi.unstubAllGlobals());
@@ -18,6 +18,15 @@ it('mirrors all request filters but not pagination and snapshots', () => {
   expect(validInterval('129600', 10000)).toBe(false);
   expect(validInterval('129600', 86400000)).toBe(true);
   expect(validInterval('129600', 0)).toBe(true);
+});
+it('uses readable server bucket sizes for automatic bars without overriding manual granularity', () => {
+  expect(chartInterval('60', 0, 'errors', false)).toBe(300000);
+  expect(chartInterval('15', 0, 'errors', false)).toBe(30000);
+  expect(chartInterval('15', 0, 'errors', true)).toBe(60000);
+  expect(chartInterval('129600', 0, 'errors', false)).toBe(86400000);
+  expect(chartInterval('60', 10000, 'errors', true)).toBe(10000);
+  expect(chartInterval('129600', 10000, 'errors', true)).toBe(86400000);
+  expect(chartInterval('60', 0, 'tokens', false)).toBe(0);
 });
 // Read the actual SVG Bézier segments and evaluate them independently of PCHIP.
 function curveSegments(values: (number | null)[], positions?: number[]) {

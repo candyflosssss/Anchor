@@ -25,6 +25,12 @@ export function statsQuery(filters: LogFilters, interval: number, now = Date.now
   } };
 }
 export function validInterval(window: string, interval: number) { return interval === 0 || Math.ceil(Number(window) * 60000 / interval) <= 600; }
+export function chartInterval(window: string, requested: number, metric: MetricID, compact: boolean) {
+  if (requested && validInterval(window, requested)) return requested;
+  if (metric !== 'errors') return 0;
+  const limit = compact ? 24 : 48;
+  return (intervals.find(i => Math.ceil(Number(window) * 60000 / i.ms) <= limit) ?? intervals.at(-1)!).ms;
+}
 export function checkedStats(value: Stats): Stats {
   if (!value || !Number.isSafeInteger(value.since_ms) || !Number.isSafeInteger(value.before_ms) || value.before_ms <= value.since_ms
     || !intervals.some(i => i.ms === value.interval_ms) || !Array.isArray(value.buckets) || value.buckets.length < 1 || value.buckets.length > 600

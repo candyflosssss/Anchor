@@ -9,6 +9,7 @@ import { useLogStatsController } from './use-log-stats-controller';
 const width = 1000, height = 180, insetX = 4;
 function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
   const [active, setActive] = useState<number | null>(null);
+  const [lastInspected, setLastInspected] = useState<number | null>(null);
   const tooltipId = useId();
   const spec = metrics.find(m => m.id === metric)!;
   const stacked = metric === 'errors';
@@ -24,7 +25,7 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
   const known = series.flatMap(s => s.values.filter((v): v is number => v !== null));
   const max = stacked ? Math.max(2, Math.ceil(Math.max(...data.buckets.map(b => b.values.completed)) / 2) * 2)
     : metric === 'cache' ? 100 : Math.max(1, ...known) * 1.1;
-  const index = active === null ? data.buckets.length - 1 : Math.min(active, data.buckets.length - 1);
+  const index = Math.min(active ?? lastInspected ?? data.buckets.length - 1, data.buckets.length - 1);
   const point = data.buckets[index];
   const span = data.before_ms - data.since_ms;
   const positions = data.buckets.map(b => (b.at_ms - data.since_ms + Math.min(data.interval_ms, data.before_ms - b.at_ms) / 2) / span * width);
@@ -33,13 +34,13 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
   const time = (at: number, detailed = false) => new Date(at).toLocaleString('zh-CN', { ...(data.before_ms - data.since_ms > 86400000 || detailed ? { month: '2-digit', day: '2-digit' } : {}), hour: '2-digit', minute: '2-digit', ...(data.interval_ms < 60000 ? { second: '2-digit' } : {}), hour12: false });
   const end = Math.min(point.at_ms + data.interval_ms, data.before_ms);
   const timeRange = `${time(point.at_ms, true)} – ${time(end, true)}`;
-  const anchor = (positions[index] + insetX) / (width + insetX * 2) * 100;
+  const inspect = (next: number) => { setActive(next); setLastInspected(next); };
   const inspectPointer = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (rect.width <= 0) return;
     // Match the SVG viewBox padding so the cursor selects the bucket beneath it.
     const x = ((event.clientX - rect.left) / rect.width * (width + insetX * 2) - insetX) / width;
-    setActive(Math.max(0, Math.min(data.buckets.length - 1, Math.floor(x * span / data.interval_ms))));
+    inspect(Math.max(0, Math.min(data.buckets.length - 1, Math.floor(x * span / data.interval_ms))));
   };
   return <>
     <div className="log-chart-legend"><span className="mono">{unit}</span>
@@ -47,41 +48,50 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
     </div>
     <div className="log-chart-body">
       <div className="log-chart-y mono">{[max, max / 2, 0].map((v, i) => <span key={i}>{formatStat(v, true)}</span>)}</div>
-      <div className="log-chart-plot" role="slider" tabIndex={0} aria-label={`${spec.label}趋势，左右方向键查看时间点`} aria-valuemin={0} aria-valuemax={data.buckets.length - 1} aria-valuenow={index}
+      <div className="log-chart-plot" data-inspecting={active !== null} role="slider" tabIndex={0} aria-label={`${spec.label}趋势，左右方向键查看时间点`} aria-valuemin={0} aria-valuemax={data.buckets.length - 1} aria-valuenow={index}
         aria-valuetext={`${timeRange}，${observation}，${series.map(s => `${s.label} ${formatStat(s.values[index] ?? 0)} ${unit}`).join('，')}`}
-        aria-describedby={active !== null ? tooltipId : undefined}
+        aria-describedby={tooltipId}
         onPointerEnter={inspectPointer} onPointerMove={inspectPointer}
-        onPointerLeave={() => setActive(null)} onFocus={() => setActive(current => current ?? data.buckets.length - 1)} onBlur={() => setActive(null)}
+        onPointerLeave={() => setActive(null)} onFocus={() => inspect(index)} onBlur={() => setActive(null)}
         onKeyDown={e => {
           if (e.key === 'Escape') { e.preventDefault(); setActive(null); }
-          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); setActive(e.key === 'Home' ? 0 : e.key === 'End' ? data.buckets.length - 1 : Math.max(0, Math.min(data.buckets.length - 1, index + (e.key === 'ArrowLeft' ? -1 : 1)))); }
+          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); inspect(e.key === 'Home' ? 0 : e.key === 'End' ? data.buckets.length - 1 : Math.max(0, Math.min(data.buckets.length - 1, index + (e.key === 'ArrowLeft' ? -1 : 1)))); }
         }}>
         <svg viewBox={`${-insetX} -6 ${width + insetX * 2} ${height + 12}`} preserveAspectRatio="none" aria-hidden="true">
           {[0, height / 2, height].map(y => <line key={y} x1="0" x2={width} y1={y} y2={y} className="log-chart-grid" />)}
+          {active !== null && <rect className="log-chart-selection" x={(point.at_ms - data.since_ms) / span * width} y="0" width={Math.min(data.interval_ms, data.before_ms - point.at_ms) / span * width} height={height} />}
+          {stacked && <defs>{data.buckets.map((bucket, i) => {
+            const totalHeight = bucket.values.completed / max * height;
+            const slotWidth = Math.min(data.interval_ms, data.before_ms - bucket.at_ms) / span * width;
+            const barWidth = Math.min(40, slotWidth * .6);
+            return <clipPath key={bucket.at_ms} id={`${tooltipId}-bar-${i}`}><rect x={positions[i] - barWidth / 2} y={height - totalHeight} width={barWidth} height={totalHeight} rx={Math.min(3, barWidth / 4, totalHeight / 2)} /></clipPath>;
+          })}</defs>}
           {stacked ? data.buckets.map((bucket, i) => {
             const success = series[0].values[i]!;
             const errors = series[1].values[i]!;
             const slotWidth = Math.min(data.interval_ms, data.before_ms - bucket.at_ms) / span * width;
-            const barWidth = Math.min(36, slotWidth * .72);
+            const barWidth = Math.min(40, slotWidth * .6);
             const x = positions[i] - barWidth / 2;
-            return <g key={bucket.at_ms} data-bucket={i}>
+            return <g key={bucket.at_ms} data-bucket={i} data-selected={active !== null && index === i} clipPath={`url(#${tooltipId}-bar-${i})`}>
               {success > 0 && <rect className="log-chart-bar" data-tone="success" x={x} y={height - success / max * height} width={barWidth} height={success / max * height} />}
               {errors > 0 && <rect className="log-chart-bar" data-tone="errors" x={x} y={height - (success + errors) / max * height} width={barWidth} height={errors / max * height} />}
             </g>;
           }) : series.map(s => <g key={s.label} data-tone={s.tone}>
             {chartPaths(s.values, max, width, height, positions).map((d, i) => <path key={i} d={d} className="log-chart-line" />)}
-            {s.values.length === 1 && <circle cx={positions[0]} cy={height - (s.values[0] ?? 0) / max * height} r="3" className="log-chart-dot" />}
+            {(active !== null || s.values.length === 1) && <circle cx={positions[active !== null ? index : 0]} cy={height - (s.values[active !== null ? index : 0] ?? 0) / max * height} r="3" className="log-chart-dot" />}
           </g>)}
-          {active !== null && <line x1={positions[index]} x2={positions[index]} y1="0" y2={height} className="log-chart-cursor" />}
+          {!stacked && active !== null && <line x1={positions[index]} x2={positions[index]} y1="0" y2={height} className="log-chart-cursor" />}
         </svg>
-        {active !== null && <div id={tooltipId} role="tooltip" className="log-chart-tooltip" style={{ left: `${anchor}%`, transform: `translateX(-${anchor}%)` }}>
-          <div className="log-chart-tooltip-time mono"><time dateTime={new Date(point.at_ms).toISOString()}>{time(point.at_ms, true)}</time><span>–</span><time dateTime={new Date(end).toISOString()}>{time(end, true)}</time></div>
-          <div className="log-chart-observation">{observation}</div>
-          {series.map(s => <div key={s.label} className="log-chart-tooltip-value" data-tone={s.tone}><span><i />{s.label}</span><strong className="mono">{formatStat(s.values[index] ?? 0)} {unit}</strong></div>)}
-        </div>}
       </div>
     </div>
     <div className="log-chart-x mono"><span>{time(data.since_ms)}</span><span>{time(data.since_ms + (data.before_ms - data.since_ms) / 2)}</span><span>{time(data.before_ms)}</span></div>
+    <div id={tooltipId} role={active !== null ? 'tooltip' : undefined} className="log-chart-tooltip" aria-label="趋势读数">
+      <div className="log-chart-reading-time">
+        <div className="log-chart-tooltip-time mono"><time dateTime={new Date(point.at_ms).toISOString()}>{time(point.at_ms, true)}</time><span>–</span><time dateTime={new Date(end).toISOString()}>{time(end, true)}</time></div>
+        <div className="log-chart-observation">{observation}</div>
+      </div>
+      <div className="log-chart-reading-values">{series.map(s => <div key={s.label} className="log-chart-tooltip-value" data-tone={s.tone}><span><i />{s.label}</span><strong className="mono">{formatStat(s.values[index] ?? 0)} {unit}</strong></div>)}</div>
+    </div>
   </>;
 }
 export function LogStatsView({ filters, paused, revision, onGroupSelect }: { filters: LogFilters; paused: boolean; revision: number; onGroupSelect: (dimension: LogDimension, value: string) => void }) {
