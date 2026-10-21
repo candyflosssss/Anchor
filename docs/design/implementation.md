@@ -117,6 +117,8 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 ### 历史加密推理恢复（desktop.60已发布）
 
+**发送前兼容修复（2026-10-21，当前源码，未打包／未发布）**：原生 Responses 派发时先移除 input 中 reasoning 条目显式为 null、非字符串或空字符串的 encrypted_content 及该条目的 id，保留摘要、其他字段、非空密文和全部其他历史条目。缺少 encrypted_content 的条目保持原样；不判断非空密文是否有效。该步骤只修改本次派发副本，不修改客户端历史，无需等待上游报错、无额外重试、不消耗恢复预算，也不记录为报错后的清理恢复。此前仅识别明确密文拒绝，不能覆盖 `encrypted reasoning content must be a string` 这类类型错误。详细边界见[协议翻译层](protocol-translation.md)。
+
 **后续诊断与针对性修复（desktop.60已发布并配套更新本机）**：用户确认.59仍报同错。临时探针识别首个未知事件为`codex.response.metadata`，类型SHA256为`4928dcffeb7ec6134a0662ac1a91cbdbe737af8d60c407fc34e0245b540c3c28`，并核对[官方Codex SSE处理](https://github.com/openai/codex/blob/main/codex-rs/codex-api/src/sse/responses.rs)，其视为附加元信息而不产生输出。现仅将该确切类型加入可暂存列表，未知事件仍退出，不采用“所有未知都跳过”。新增类型哈希与固定字段名存在性诊断，不保存未知原名／字段值；临时探针2曾仅采集80字符以内小写字母／点／下划线格式的协议名用于确认，最终源码移除此临时原名采集。明确错误中的传输包装前缀不再妨碍识别。用户在修正探针.3安装后确认原失败会话已恢复正常。当前源码将检查前缀上限由64 KiB提升至2 MiB（与既有SSE事件上限一致），覆盖较大instructions/tools初始化信息；仍共享原请求期限与一次清理预算。
 
 **后续修复（desktop.59 已发布并更新本机）**：`.58` 仍把空 reasoning/message 容器当作已输出而退出检查；23:01及23:25失败日志均为 non_lifecycle_event、单次尝试，有思考结构观察但无正文首字，旧日志不能区分空壳与实际思考内容。本轮允许严格验证的空 reasoning/message 条目、空 summary/text part 继续等待明确拒绝，保持64 KiB及原请求期限；未知字段、工具项、真实思考／正文／密文输出仍退出。`response.failed` 内仅含空壳 output 也可识别；SSE仅event行提供类型时同样识别。新增安全事件类别日志用于补齐诊断，不把本地模拟视作真实失败会话已恢复。

@@ -17,4 +17,7 @@ func TestHelpDocumentsUnifiedCodexRetries(t *testing.T) {
 			t.Fatalf("help missing %q", want)
 		}
 	}
+	if !strings.Contains(out.String(), "Native Responses remove null, non-string or empty encrypted reasoning fields and their orphan IDs before dispatch") {
+		t.Fatal("help missing pre-dispatch reasoning sanitization")
+	}
 }

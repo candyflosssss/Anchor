@@ -148,6 +148,11 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 	}
 	if o.Protocol == "responses" {
 		fields["store"] = json.RawMessage("false")
+		if native {
+			if input, exists := fields["input"]; exists {
+				fields["input"] = sanitizeNativeReasoningInput(input)
+			}
+		}
 	}
 	raw, _ = json.Marshal(fields)
 	a := &Attempt{client: s.client, upstream: o.Protocol, public: o.PublicModel,

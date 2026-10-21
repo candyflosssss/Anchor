@@ -22,6 +22,7 @@ HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
 | `stream.go` | 同步增量 SSE 解析／编码，只依赖 reader/writer；工具分片、索引、终止、内容和数量上限 |
 | `stream_http.go` | 兼容旧 Stream 入口；HTTP 写期限和刷新适配到通用 writer，不参与协议语义 |
 | `recovery.go` | 已有密文拒绝识别、恢复窗口、清理派生会话；没有自动重试或渠道选择 |
+| `native_reasoning.go` | 原生 Responses 派发副本中无效加密推理字段的预清理；不修改客户端基线 |
 | `diagnostics.go` | 固定阶段、错误类别、完整／降级／不支持结果，安全错误包装 |
 | `internal/core/gateway*.go`、`translation_logging.go` | 鉴权／访问范围、调度、上游认证、连接与取消、候选及恢复预算、HTTP 交付、诊断与账务持久化 |
 
@@ -35,7 +36,7 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 跨协议继续使用现有 Responses 形状的内部请求桥及类型化输出；不能表达的原生字段在 Prepare 时拒绝，不把最小公共子集当成静默过滤器。下一轮工具结果通过客户端回传的声明、name/namespace、call_id 和历史调用重建映射，不依赖上次 HTTP 请求的进程内状态。碰撞、长名称与歧义身份继续由既有 Chat 适配器处理。
 
-同协议发送保留原生字段，保留原生响应字节；仅修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
+同协议发送保留原生字段，保留原生响应字节；修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false，并应用下述原生 Responses 无效密文字段预清理；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
 
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
 
@@ -50,6 +51,8 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 - `custom_grammar_description`：grammar 仅保留为函数描述，不保留原生强制语法约束。
 
 明确的历史密文恢复仍是原有有损例外：仅原生 Responses、明确拒绝、未交付、同渠道至多一次；清理历史 reasoning 后创建**派生 Session**，其他候选仍使用未污染的原请求。清理丢失隐藏推理连续性，沿用原恢复 evidence，不扩大触发条件。检查中已有的单次待决 Read 协程沿用原实现；取消由网关关闭响应体／取消 HTTP 请求以解除阻塞。
+
+2026-10-21 后续修复（当前源码，未打包／未发布）：原生 Responses 在每次 Prepare 时，删除 input 顶层 reasoning 条目中显式为 null、非字符串或空字符串的 encrypted_content，并删除该条目的 id，避免 store=false 下无密文的条目触发历史存储查找。保留 reasoning 条目、summary、其他字段、非空字符串密文及全部非 reasoning 条目；缺少 encrypted_content 的条目不改写，不解析或猜测非空密文格式。只改派发副本，不修改 Session 基线、客户端历史或跨协议规则；无额外请求、不消耗恢复预算，也不生成“已清理加密上下文”重试标记。已有明确密文拒绝后的恢复机制保留。
 
 本轮除分层外实际改变：
 

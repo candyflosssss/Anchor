@@ -145,6 +145,7 @@ Attempts retain reference_usd and cost_adjustment snapshots. Missing prices are 
 Logs retain optional known_usage {input, output, attempts} subtotals across retries; unknown root totals stay null.
 Logs include safe raw service-tier evidence; fast_triggered is true/false/unknown from upstream reports, not measured speed.
 Logs mark encrypted-context cleanup, removed reasoning count and recovery outcome; native Responses may retry once before output after a definite encrypted-content rejection.
+Native Responses remove null, non-string or empty encrypted reasoning fields and their orphan IDs before dispatch; summaries and nonempty ciphertext are preserved.
 Stream inspection shares the upstream deadline and logs a safe inspection outcome, including when no cleanup occurs.
 Diagnostics and service logs go to stderr.
 Agent failures distinguish revision conflicts, external configuration edits, unsafe configuration, unavailable default models and invalid catalogs; unclassified failures remain agent_operation_failed.
