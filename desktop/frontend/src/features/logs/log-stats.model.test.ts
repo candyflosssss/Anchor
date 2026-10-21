@@ -1,9 +1,28 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/log-stats.json';
-import { chartInterval, chartPaths, checkedStats, formatStat, statsQuery, validInterval } from './log-stats.model';
+import { bucketRange, chartInterval, chartPaths, checkedStats, errorStatsQuery, formatStat, statsQuery, validInterval } from './log-stats.model';
 import { initialFilters } from './log.model';
 import { logService } from './log.service';
 afterEach(() => vi.unstubAllGlobals());
+it('selects complete buckets in either direction and clips the final bucket', () => {
+  const stats = structuredClone(fixture.stats);
+  expect(bucketRange(stats, 2, 0)).toEqual({ since: stats.since_ms, before: stats.before_ms });
+  stats.before_ms -= 1000;
+  expect(bucketRange(stats, 999)).toEqual({ since: stats.buckets[2].at_ms, before: stats.before_ms });
+  expect(errorStatsQuery({ ...initialFilters, status: 'errors' }, { since: 1000, before: 2000 })).toMatchObject({ include_errors: true, filter: { since_ms: 1000, before_ms: 2000, errors_only: true, status: '', cursor: 0, until: 0 } });
+  expect(statsQuery(initialFilters, 0).filter).not.toHaveProperty('errors_only');
+});
+it('validates full-range error totals, unique groups, boundaries and optional capability', () => {
+  for (const mutate of [
+    (v: typeof fixture.stats) => { v.error_summary.total++; },
+    (v: typeof fixture.stats) => { v.error_summary.groups[0].last_ms = v.before_ms; },
+    (v: typeof fixture.stats) => { v.error_summary.groups[0].first_ms = v.since_ms - 1; },
+    (v: typeof fixture.stats) => { v.error_summary.groups[0].count = 0; },
+    (v: typeof fixture.stats) => { v.error_summary.groups[0].request_id = ''; },
+    (v: typeof fixture.stats) => { v.error_summary.groups.push(v.error_summary.groups[0]); v.error_summary.group_count++; },
+  ]) { const value = structuredClone(fixture.stats); mutate(value); expect(() => checkedStats(value)).toThrow(); }
+  const old = structuredClone(fixture.stats); Reflect.deleteProperty(old, 'error_summary'); expect(checkedStats(old).error_summary).toBeUndefined();
+});
 it('shares canonical bucket, summary, zero and null observations', () => {
   const value = checkedStats(structuredClone(fixture.stats));
   expect(value.summary).toMatchObject({ requests: 3, total_tokens: 600, usage_samples: 2, tps: 50, cache_hit_rate: 20 });

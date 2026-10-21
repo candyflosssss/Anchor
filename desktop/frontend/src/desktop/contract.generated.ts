@@ -853,6 +853,7 @@ export interface LogSuggestionsResult {
   problem: Problem | null;
 }
 export interface StatsQuery {
+  include_errors?: boolean;
   group_by?: string;
   filter: Query;
   interval_ms: number;
@@ -879,11 +880,26 @@ export interface StatsGroup {
   value: string;
   values: StatsValues;
 }
+export interface StatsErrors {
+  groups: StatsErrorGroup[];
+  group_count: number;
+  total: number;
+}
+export interface StatsErrorGroup {
+  code: string;
+  stage: string;
+  http: number | null;
+  count: number;
+  first_ms: number;
+  last_ms: number;
+  request_id: string;
+}
 export interface StatsBucket {
   at_ms: number;
   values: StatsValues;
 }
 export interface Stats {
+  error_summary?: StatsErrors | null;
   group_by?: string;
   groups?: StatsGroup[];
   group_count?: number;
@@ -1014,6 +1030,7 @@ export interface Event {
   fields: Record<string, string>;
 }
 export interface Query {
+  errors_only?: boolean;
   agent?: string | null;
   binding?: string | null;
   project?: string | null;

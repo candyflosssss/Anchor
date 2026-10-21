@@ -1,19 +1,21 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Input } from '../../components/ui/input';
+import type { LogTimeRange } from './log.model';
 import { useLogSuggestions, type SuggestionField } from './use-log-suggestions';
 
 type Props = {
   label: string; placeholder: string; field: SuggestionField; value: string;
   kind: 'requests' | 'system'; window: string; revision: number;
+  range?: LogTimeRange | null;
   onChange: (value: string) => void;
 };
 
-export function LogFilterInput({ label, placeholder, field, value, kind, window, revision, onChange }: Props) {
+export function LogFilterInput({ label, placeholder, field, value, kind, window, revision, range, onChange }: Props) {
   const id = useId(), list = useRef<HTMLUListElement>(null);
   const [open, setOpen] = useState(false), [active, setActive] = useState(-1);
   const [composing, setComposing] = useState(false), [draft, setDraft] = useState('');
-  const suggestions = useLogSuggestions(kind, window, field, value, open && !composing, revision);
+  const suggestions = useLogSuggestions(kind, window, field, value, open && !composing, revision, range);
   function choose(next: string) { onChange(next); setOpen(false); setActive(-1); }
   useEffect(() => { list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' }); }, [active]);
   return <div className="log-filter-input" onBlur={() => { setOpen(false); setActive(-1); }}>

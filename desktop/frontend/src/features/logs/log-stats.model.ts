@@ -1,6 +1,6 @@
 import type { Stats, StatsQuery, StatsValues } from '../../desktop/contract.generated';
 import { DesktopProblem } from '../../desktop/transport';
-import { identityQuery, type LogDimension, type LogFilters } from './log.model';
+import { identityQuery, type LogDimension, type LogFilters, type LogTimeRange } from './log.model';
 export type MetricID = 'requests' | 'tokens' | 'tps' | 'errors' | 'cache' | 'latency' | 'first';
 export const intervals = [
   { ms: 10000, label: '10 秒' }, { ms: 30000, label: '30 秒' }, { ms: 60000, label: '1 分钟' },
@@ -19,7 +19,7 @@ export const metrics: { id: MetricID; label: string; unit: string; field: keyof 
 export function statsQuery(filters: LogFilters, interval: number, now = Date.now(), groupBy: LogDimension | '' = ''): StatsQuery {
   return { ...(groupBy ? { group_by: groupBy } : {}), interval_ms: interval, filter: { ...identityQuery(filters),
     kind: 'requests', limit: 50, cursor: 0, until: 0, since_ms: now - Number(filters.window) * 60000, before_ms: now,
-    status: filters.status === 'all' ? '' : filters.status, source: filters.source === 'all' ? '' : filters.source,
+    ...(filters.status === 'errors' ? { errors_only: true } : {}), status: ['all', 'errors'].includes(filters.status) ? '' : filters.status, source: filters.source === 'all' ? '' : filters.source,
     provider: filters.provider === 'all' ? '' : filters.provider, model: filters.model, key: filters.key,
     http: filters.http ? Number(filters.http) : null, code: filters.code, stage: filters.stage, level: '', search: filters.query.trim(),
   } };
@@ -56,8 +56,44 @@ export function checkedStats(value: Stats): Stats {
     }
   }
   check(value.summary);
+  if (value.error_summary != null) {
+    const e = value.error_summary;
+    if (!Array.isArray(e.groups) || e.groups.length > 100 || !Number.isSafeInteger(e.total) || e.total !== value.summary.errors
+      || !Number.isSafeInteger(e.group_count) || e.group_count < e.groups.length || e.group_count > e.total || e.groups.length !== Math.min(100, e.group_count)) throw new DesktopProblem('read_error');
+    const seen = new Set<string>();
+    let count = 0;
+    for (const g of e.groups) {
+      const key = JSON.stringify([g.code, g.stage, g.http]);
+      if (typeof g.code !== 'string' || typeof g.stage !== 'string' || typeof g.request_id !== 'string' || !g.request_id || seen.has(key)
+        || (g.http !== null && (!Number.isInteger(g.http) || g.http < 100 || g.http > 599))
+        || !Number.isSafeInteger(g.count) || g.count <= 0 || !Number.isSafeInteger(g.first_ms) || !Number.isSafeInteger(g.last_ms)
+        || g.first_ms < value.since_ms || g.last_ms < g.first_ms || g.last_ms >= value.before_ms) throw new DesktopProblem('read_error');
+      seen.add(key); count += g.count;
+    }
+    if (count + e.group_count - e.groups.length > e.total || (e.group_count <= 100 && count !== e.total)) throw new DesktopProblem('read_error');
+  }
   value.buckets.forEach((b, i) => { if (b.at_ms !== value.since_ms + i * value.interval_ms) throw new DesktopProblem('read_error'); check(b.values); });
   return value;
+}
+export function errorStatsQuery(filters: LogFilters, range: LogTimeRange): StatsQuery {
+  const query = statsQuery(filters, 0, range.before);
+  query.filter.since_ms = range.since;
+  query.include_errors = true;
+  return query;
+}
+export function bucketRange(data: Stats, first: number, last = first): LogTimeRange {
+  const clamp = (index: number) => Math.max(0, Math.min(data.buckets.length - 1, index));
+  return { since: data.buckets[clamp(Math.min(first, last))].at_ms,
+    before: Math.min(data.before_ms, data.buckets[clamp(Math.max(first, last))].at_ms + data.interval_ms) };
+}
+export function errorExplanation(code: string) {
+  const labels: Record<string, string> = { invalid_response: '响应校验失败', unexpected_html: '上游返回了 HTML 页面',
+    upstream_timeout: '上游响应超时', upstream_connect: '无法连接上游', upstream_failed: '上游请求失败',
+    upstream_unavailable: '上游服务不可用', rate_limited: '请求受到限流', authentication: '上游身份验证失败',
+    proxy_unavailable: '代理连接不可用', encrypted_context_rejected: '上游拒绝了历史加密上下文',
+    stream_interrupted: '响应流中断', request_interrupted: '请求被中断', core_interrupted: '核心退出导致请求中断',
+    client_write_failed: '向客户端写入响应失败', no_available_key: '没有可用的 Key' };
+  return labels[code] ?? (code ? '查看请求详情中的错误码、阶段与证据' : '日志未记录具体错误码');
 }
 export function formatStat(value: number | null, compact = false) {
   if (value === null) return '—';

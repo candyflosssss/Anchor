@@ -6,6 +6,10 @@ export type LogDimension = 'agent' | 'binding' | 'project' | 'session';
 export const dimensionLabels: Record<LogDimension, string> = { agent: 'Agent', binding: 'Agent 绑定', project: '项目', session: '会话' };
 export type LogStatus = 'succeeded' | 'failed' | 'cancelled' | 'interrupted' | 'pending';
 export type LogSource = 'proxy' | 'probe';
+export interface LogTimeRange { since: number; before: number }
+export function logTimeRange(window: string, range: LogTimeRange | null = null, now = Date.now()): LogTimeRange {
+  return range ?? { since: now - Number(window) * 60000, before: now };
+}
 export interface LogAttempt {
   costAdjustment?: CostAdjustment | null;
   referenceUSD?: string | null;

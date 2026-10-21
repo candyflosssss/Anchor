@@ -76,8 +76,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
                    [--cache-read-tokens N --cache-write-tokens N --reasoning-tokens N --refresh]
   provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
   logs suggestions [--field search|provider|model|key|http|code|stage|agent|binding|project|session] [--prefix value] [--since 1h] [--limit 20] [--kind requests|system]
-  logs stats [--since 1h] [--interval 1m] [--group-by agent|binding|project|session] [request filters]
-  logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
+  logs stats [--since 1h | --from RFC3339 --to RFC3339] [--interval 1m] [--group-by agent|binding|project|session] [--include-errors] [--errors-only] [request filters]
+  logs list|follow|export [--kind requests|system] [--since 1h | --from RFC3339 --to RFC3339] [--errors-only] [--limit 50]
       [--cursor N] [--until N] [--status RESULT] [--source SOURCE] [--provider ID]
       [--model MODEL] [--key ID] [--http CODE] [--code CODE] [--stage STAGE]
       [--level LEVEL] [--search PREFIX]

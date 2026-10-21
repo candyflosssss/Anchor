@@ -82,7 +82,9 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		q := logbook.Query{}
 		var interval *time.Duration
 		var groupBy string
+		var includeErrors bool
 		if args[0] == "stats" {
+			f.BoolVar(&includeErrors, "include-errors", false, "include full-range error groups (top 100, safe codes only)")
 			f.StringVar(&groupBy, "group-by", "", "agent|binding|project|session (top 100 groups)")
 			interval = f.Duration("interval", 0, "bucket interval: 10s|30s|1m|5m|15m|1h|6h|24h (default auto, max 600 buckets)")
 		}
@@ -96,6 +98,9 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		f.Int64Var(&q.Cursor, "cursor", 0, "older-page cursor")
 		f.Int64Var(&q.Until, "until", 0, "snapshot sequence upper bound")
 		since := f.Duration("since", time.Hour, "lookback duration (for example 24h)")
+		from := f.String("from", "", "fixed inclusive start (RFC3339, requires --to)")
+		to := f.String("to", "", "fixed exclusive end (RFC3339, requires --from)")
+		f.BoolVar(&q.ErrorsOnly, "errors-only", false, "only failed and interrupted requests")
 		f.StringVar(&q.Status, "status", "", "request result")
 		f.StringVar(&q.Source, "source", "", "proxy|probe or event source")
 		f.StringVar(&q.Provider, "provider", "", "provider ID")
@@ -109,13 +114,8 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		if err := parse(f, args[1:]); err != nil {
 			return err
 		}
-		if *since <= 0 || *since > 90*24*time.Hour {
-			return errors.New("since must be in (0,90d]")
-		}
-		now := time.Now()
-		q.SinceMS = now.Add(-*since).UnixMilli()
-		if args[0] == "stats" {
-			q.BeforeMS = now.UnixMilli()
+		if err := logRange(f, &q, *since, *from, *to, args[0] == "stats"); err != nil {
+			return err
 		}
 		f.Visit(func(flag *flag.Flag) {
 			switch flag.Name {
@@ -139,7 +139,7 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 			if *interval < 0 || *interval%time.Millisecond != 0 {
 				return logbook.ErrInvalid
 			}
-			query := logbook.StatsQuery{Filter: q, IntervalMS: interval.Milliseconds(), GroupBy: groupBy}
+			query := logbook.StatsQuery{Filter: q, IntervalMS: interval.Milliseconds(), GroupBy: groupBy, IncludeErrors: includeErrors}
 			if query.Validate() != nil {
 				return logbook.ErrInvalid
 			}
@@ -175,4 +175,46 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 	default:
 		return errors.New("unknown logs command")
 	}
+}
+
+func logRange(f *flag.FlagSet, q *logbook.Query, since time.Duration, from, to string, stats bool) error {
+	if from == "" && to == "" {
+		if since <= 0 || since > 90*24*time.Hour {
+			return errors.New("since must be in (0,90d]")
+		}
+		now := time.Now()
+		q.SinceMS = now.Add(-since).UnixMilli()
+		if stats {
+			q.BeforeMS = now.UnixMilli()
+		}
+		return nil
+	}
+	conflict := false
+	f.Visit(func(v *flag.Flag) {
+		if v.Name == "since" {
+			conflict = true
+		}
+	})
+	start, startErr := time.Parse(time.RFC3339Nano, from)
+	end, endErr := time.Parse(time.RFC3339Nano, to)
+	// Log timestamps are integer milliseconds. Round both boundaries up so a
+	// sub-millisecond start excludes the earlier timestamp and an exclusive end
+	// still includes the final whole-millisecond timestamp before it.
+	ceilMS := func(t time.Time) int64 {
+		ms := t.UnixMilli()
+		if t.Nanosecond()%int(time.Millisecond) != 0 {
+			ms++
+		}
+		return ms
+	}
+	startMS, endMS := ceilMS(start), ceilMS(end)
+	maxSpanMS := int64(90 * 24 * time.Hour / time.Millisecond)
+	if conflict || startErr != nil || endErr != nil || startMS <= 0 || endMS <= startMS || endMS-startMS > maxSpanMS || end.Sub(start) > 90*24*time.Hour {
+		return errors.New("from/to must form a non-empty RFC3339 range at millisecond precision of at most 90 days; do not combine with since")
+	}
+	q.SinceMS, q.BeforeMS = startMS, endMS
+	if !stats {
+		q.BeforeMS-- // Lists/exports historically use an inclusive upper bound.
+	}
+	return nil
 }

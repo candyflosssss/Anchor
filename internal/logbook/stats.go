@@ -11,9 +11,10 @@ import (
 // StatsQuery ignores pagination: statistics cover all retained matching requests.
 // The half-open time range is bounded to 90 days and at most 600 buckets.
 type StatsQuery struct {
-	GroupBy    string `json:"group_by,omitempty"`
-	Filter     Query  `json:"filter"`
-	IntervalMS int64  `json:"interval_ms"`
+	IncludeErrors bool   `json:"include_errors,omitempty"`
+	GroupBy       string `json:"group_by,omitempty"`
+	Filter        Query  `json:"filter"`
+	IntervalMS    int64  `json:"interval_ms"`
 }
 type StatsValues struct {
 	Requests           int64    `json:"requests"`
@@ -41,16 +42,31 @@ type StatsGroup struct {
 	Value  string      `json:"value"`
 	Values StatsValues `json:"values"`
 }
+type StatsErrorGroup struct {
+	Code      string `json:"code"`
+	Stage     string `json:"stage"`
+	HTTP      *int   `json:"http"`
+	Count     int64  `json:"count"`
+	FirstMS   int64  `json:"first_ms"`
+	LastMS    int64  `json:"last_ms"`
+	RequestID string `json:"request_id"`
+}
+type StatsErrors struct {
+	Groups     []StatsErrorGroup `json:"groups"`
+	GroupCount int               `json:"group_count"`
+	Total      int64             `json:"total"`
+}
 type Stats struct {
-	GroupBy    string        `json:"group_by,omitempty"`
-	Groups     []StatsGroup  `json:"groups,omitempty"`
-	GroupCount int           `json:"group_count,omitempty"`
-	SinceMS    int64         `json:"since_ms"`
-	BeforeMS   int64         `json:"before_ms"`
-	IntervalMS int64         `json:"interval_ms"`
-	Buckets    []StatsBucket `json:"buckets"`
-	Summary    StatsValues   `json:"summary"`
-	Health     Health        `json:"health"`
+	ErrorSummary *StatsErrors  `json:"error_summary,omitempty"`
+	GroupBy      string        `json:"group_by,omitempty"`
+	Groups       []StatsGroup  `json:"groups,omitempty"`
+	GroupCount   int           `json:"group_count,omitempty"`
+	SinceMS      int64         `json:"since_ms"`
+	BeforeMS     int64         `json:"before_ms"`
+	IntervalMS   int64         `json:"interval_ms"`
+	Buckets      []StatsBucket `json:"buckets"`
+	Summary      StatsValues   `json:"summary"`
+	Health       Health        `json:"health"`
 }
 
 // dimensionColumn is a whitelist, not an SQL expression supplied by the client.
@@ -166,6 +182,15 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 	if q.Validate() != nil {
 		return out, ErrInvalid
 	}
+	var reader statsReader = s.read
+	if q.IncludeErrors {
+		tx, err := s.read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+		if err != nil {
+			return out, ErrUnavailable
+		}
+		defer tx.Rollback()
+		reader = tx
+	}
 	out.SinceMS, out.BeforeMS, out.IntervalMS = q.Filter.SinceMS, q.Filter.BeforeMS, q.IntervalMS
 	count := int((out.BeforeMS - out.SinceMS + out.IntervalMS - 1) / out.IntervalMS)
 	buckets := make([]statsAccumulator, count)
@@ -181,7 +206,7 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 	where = append(where, "created_at<?")
 	args = append(args, out.BeforeMS)
 	// Extract only numeric observations, never load attempts/evidence/body documents into memory.
-	rows, err := s.read.QueryContext(ctx, `SELECT created_at,status,
+	rows, err := reader.QueryContext(ctx, `SELECT created_at,status,
  json_extract(document,'$.input'),json_extract(document,'$.output'),json_extract(document,'$.elapsed_ms'),
  json_extract(document,'$.metrics.cache_read_tokens'),
  COALESCE(json_extract(document,'$.metrics.time_to_first_output_ms'),json_extract(document,'$.metrics.time_to_first_text_ms')),
@@ -211,6 +236,15 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 	if rows.Err() != nil {
 		return out, ErrUnavailable
 	}
+	if rows.Close() != nil {
+		return out, ErrUnavailable
+	}
+	if q.IncludeErrors {
+		out.ErrorSummary, err = s.statisticsErrors(ctx, reader, q.Filter)
+		if err != nil {
+			return out, err
+		}
+	}
 	for i := range buckets {
 		out.Buckets = append(out.Buckets, StatsBucket{AtMS: out.SinceMS + int64(i)*out.IntervalMS, Values: buckets[i].values()})
 	}
@@ -229,5 +263,47 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 		out.Groups = out.Groups[:100]
 	}
 	out.Summary = total.values()
+	return out, nil
+}
+
+type statsReader interface {
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+}
+
+func (s *Store) statisticsErrors(ctx context.Context, reader statsReader, filter Query) (*StatsErrors, error) {
+	out := &StatsErrors{Groups: []StatsErrorGroup{}}
+	where, args := logWhere(filter, "requests")
+	where = append(where, "created_at<?", "status IN ('failed','interrupted')")
+	args = append(args, filter.BeforeMS)
+	// Rank only safe indexed columns; neither full documents nor raw upstream
+	// messages enter this aggregation. Window totals survive the response cap.
+	rows, err := reader.QueryContext(ctx, `WITH ranked AS (
+ SELECT error_code,stage,http,id,created_at,
+ COUNT(*) OVER (PARTITION BY error_code,stage,http) AS n,
+ MIN(created_at) OVER (PARTITION BY error_code,stage,http) AS first_ms,
+ MAX(created_at) OVER (PARTITION BY error_code,stage,http) AS last_ms,
+ ROW_NUMBER() OVER (PARTITION BY error_code,stage,http ORDER BY created_at DESC,seq DESC) AS sample
+ FROM requests WHERE `+strings.Join(where, " AND ")+`)
+ SELECT error_code,stage,http,n,first_ms,last_ms,id,COUNT(*) OVER (),SUM(n) OVER ()
+ FROM ranked WHERE sample=1 ORDER BY n DESC,error_code,stage,http LIMIT 100`, args...)
+	if err != nil {
+		return nil, ErrUnavailable
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var group StatsErrorGroup
+		var http sql.NullInt64
+		if rows.Scan(&group.Code, &group.Stage, &http, &group.Count, &group.FirstMS, &group.LastMS, &group.RequestID, &out.GroupCount, &out.Total) != nil {
+			return nil, ErrUnavailable
+		}
+		if http.Valid {
+			status := int(http.Int64)
+			group.HTTP = &status
+		}
+		out.Groups = append(out.Groups, group)
+	}
+	if rows.Err() != nil {
+		return nil, ErrUnavailable
+	}
 	return out, nil
 }

@@ -28,6 +28,13 @@ func TestSharedLogStatsContract(t *testing.T) {
 	if v := b.LogStats(LogStatsQuery{IntervalMS: 123}); v.Problem == nil || v.Problem.Code != "invalid" {
 		t.Fatal(v)
 	}
+	v = b.LogStats(LogStatsQuery{IncludeErrors: true})
+	if v.Problem != nil || v.Data == nil || v.Data.ErrorSummary == nil || v.Data.ErrorSummary.Total != 0 || len(v.Data.ErrorSummary.Groups) != 0 {
+		t.Fatal(v)
+	}
+	if !f.Query.IncludeErrors || f.Stats.ErrorSummary == nil || f.Stats.ErrorSummary.Groups[0].Code != "invalid_response" {
+		t.Fatal("error summary fixture drift")
+	}
 }
 
 func TestSharedLogDimensionsContract(t *testing.T) {

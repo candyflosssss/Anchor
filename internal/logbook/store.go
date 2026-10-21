@@ -473,6 +473,9 @@ func logWhere(q Query, table string) ([]string, []any) {
 		}
 	}
 	if table == "requests" {
+		if q.ErrorsOnly {
+			where = append(where, "status IN ('failed','interrupted')")
+		}
 		for _, v := range []struct{ col, val string }{{"status", q.Status}, {"provider", q.Provider}, {"model", q.Model}, {"key_id", q.Key}, {"error_code", q.Code}, {"stage", q.Stage}} {
 			if v.val != "" {
 				add(v.col+"=?", v.val)

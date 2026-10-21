@@ -1,6 +1,7 @@
 {
   "contract": "anchor-desktop-v1",
   "query": {
+    "include_errors": true,
     "filter": {
       "kind": "requests",
       "limit": 50,
@@ -22,6 +23,12 @@
     "interval_ms": 60000
   },
   "stats": {
+    "error_summary": {
+      "groups": [{ "code": "invalid_response", "stage": "response_validate", "http": 200, "count": 1,
+        "first_ms": 1792123201000, "last_ms": 1792123201000, "request_id": "fixture_failed" }],
+      "group_count": 1,
+      "total": 1
+    },
     "since_ms": 1792123200000,
     "before_ms": 1792123380000,
     "interval_ms": 60000,

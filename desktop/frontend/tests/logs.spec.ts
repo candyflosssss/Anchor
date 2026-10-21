@@ -20,7 +20,7 @@ async function openLogs(page: Page, data = fixture, dimensions = false, stats = 
         window.logTest.queries.push(q);
         if (window.logTest.unavailable) return { contract: f.contract, data: null, problem: { code: 'offline' } };
         if (q.kind === 'system') return result(f.system);
-        const selected = rows.filter(r => (['agent', 'binding', 'project', 'session'] as const).every(key => q[key] == null || (r[key] ?? '') === q[key]) && (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
+        const selected = rows.filter(r => (['agent', 'binding', 'project', 'session'] as const).every(key => q[key] == null || (r[key] ?? '') === q[key]) && r.started_at_ms >= q.since_ms && (!q.before_ms || r.started_at_ms <= q.before_ms) && (!q.errors_only || ['failed', 'interrupted'].includes(r.status)) && (!q.status || r.status === q.status) && (!q.code || r.code === q.code) && (!q.stage || r.stage === q.stage) && (!q.status || r.status === q.status) && (!q.source || r.source === q.source) && (!q.provider || r.provider === q.provider) && (!q.search || r.id.startsWith(q.search)));
         return result({ ...f.page, requests: selected.map(r => ({ ...r, attempts: [], evidence: Object.fromEntries(Object.entries(r.evidence).filter(([key]) => ['sent_service_tier', 'sent_service_tier_raw', 'upstream_service_tier', 'upstream_service_tier_raw', 'fast_triggered'].includes(key))) })), latest: q.cursor ? 3 : 2, has_more: window.logTest.paged && !q.cursor, next_cursor: 1 });
       },
       LogSuggestions: async (q: import('../src/desktop/contract.generated').SuggestionsQuery) => {
@@ -56,7 +56,13 @@ async function openLogs(page: Page, data = fixture, dimensions = false, stats = 
           grouped = { group_by: q.group_by, groups, group_count: groups.length };
           summary = selected.length === 2 ? df.stats.summary : selected[0]?.values ?? empty;
         }
-        return result({ ...sf.stats, ...grouped, since_ms: q.filter.since_ms, before_ms: q.filter.before_ms, interval_ms: interval, buckets, summary });
+        let error_summary: import('../src/desktop/contract.generated').StatsErrors | undefined;
+        if (q.include_errors) {
+          const failed = rows.filter(r => r.started_at_ms >= q.filter.since_ms && r.started_at_ms < q.filter.before_ms && ['failed', 'interrupted'].includes(r.status) && (!q.filter.status || q.filter.status === r.status) && (!q.filter.provider || q.filter.provider === r.provider) && (!q.filter.code || q.filter.code === r.code) && (!q.filter.stage || q.filter.stage === r.stage));
+          error_summary = { groups: failed.map(r => ({ code: r.code, stage: r.stage, http: r.http, count: 1, first_ms: r.started_at_ms, last_ms: r.started_at_ms, request_id: r.id })), total: failed.length, group_count: failed.length };
+          summary = { ...summary, errors: failed.length };
+        }
+        return result({ ...sf.stats, ...grouped, error_summary, since_ms: q.filter.since_ms, before_ms: q.filter.before_ms, interval_ms: interval, buckets, summary });
       },
       LogDetail: async (id: string) => result(rows.find(r => r.id === id)),
       LogSettings: async () => result(window.logTest.settings),
@@ -69,6 +75,68 @@ async function openLogs(page: Page, data = fixture, dimensions = false, stats = 
   await page.getByRole('button', { name: '日志', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看请求 fixture_failed' })).toBeVisible();
 }
+test('selected range scopes requests, errors, export and suggestions with clear and keyboard extension', async ({ page }) => {
+  await openLogs(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  const chart = trends.getByRole('slider');
+  await chart.focus(); await page.keyboard.press('End'); await page.keyboard.press('Enter');
+  const range = page.getByRole('region', { name: '选中区间', exact: true });
+  await expect(range).toContainText('1 次 / 1 类');
+  await expect(range).toContainText('invalid_response');
+  await expect(range).toContainText('响应校验失败');
+  await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toBeVisible();
+  const selected = await page.evaluate(() => window.logTest.queries.at(-1)!);
+  expect(selected.before_ms).toBeGreaterThan(selected.since_ms);
+  await page.getByRole('button', { name: '导出', exact: true }).click();
+  expect(await page.evaluate(() => window.logTest.exportQueries.at(-1))).toMatchObject({ since_ms: selected.since_ms, before_ms: selected.before_ms, cursor: 0 });
+  await page.getByLabel('供应商筛选', { exact: true }).focus();
+  await expect.poll(() => page.evaluate(() => window.logTest.suggestionQueries.at(-1)?.since_ms)).toBe(selected.since_ms);
+  expect(await page.evaluate(() => window.logTest.suggestionQueries.at(-1)?.before_ms)).toBe(selected.before_ms);
+  await range.getByRole('button', { name: '仅看错误', exact: true }).click();
+  await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '查看请求 fixture_failed', exact: true })).toBeVisible();
+  await range.getByRole('button', { name: /^查看错误示例/ }).click();
+  await expect(page.getByRole('dialog')).toContainText('response_validate');
+  await page.keyboard.press('Escape');
+  await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('Enter');
+  await expect(range).toContainText('此区间无失败或中断请求');
+  await page.keyboard.press('Shift+ArrowRight');
+  const first = await page.evaluate(() => window.logTest.queries.at(-1)!);
+  await expect.poll(() => page.evaluate(() => { const q = window.logTest.queries.at(-1); return q ? q.before_ms - q.since_ms : 0; })).toBeGreaterThan(first.before_ms - first.since_ms - 1);
+  await range.getByRole('button', { name: '清除区间选择' }).click();
+  await expect(range).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.logTest.queries.at(-1)?.before_ms)).toBe(0);
+});
+
+test('drag selection works in reverse, resets with window, and reports unavailable error summaries', async ({ page }) => {
+  await openLogs(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  const chart = page.getByRole('region', { name: '请求运行趋势' }).getByRole('slider');
+  const bounds = (await chart.boundingBox())!;
+  await page.mouse.move(bounds.x + bounds.width * .8, bounds.y + 40); await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * .2, bounds.y + 40, { steps: 6 }); await page.mouse.up();
+  const range = page.getByRole('region', { name: '选中区间', exact: true });
+  await expect(range).toBeVisible();
+  const q = await page.evaluate(() => window.logTest.queries.at(-1)!);
+  expect(q.before_ms - q.since_ms).toBeGreaterThan(30 * 60000);
+  await expect(range).toContainText('此区间无失败或中断请求');
+  for (const mode of ['unsupported', 'failure']) {
+    await page.evaluate(mode => {
+      const api = window.go!.desktop!.Bridge!, original = api.LogStats;
+      api.LogStats = async q => {
+        if (!q.include_errors) return original(q);
+        if (mode === 'failure') throw new Error('offline');
+        const result = await original(q); Reflect.deleteProperty(result.data!, 'error_summary'); return result;
+      };
+    }, mode);
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await expect(range).toContainText(mode === 'unsupported' ? '当前核心不支持区间错误汇总' : '区间错误汇总读取失败');
+  }
+  await page.getByLabel('日志时间范围', { exact: true }).selectOption('15');
+  await expect(range).toHaveCount(0);
+});
+
 test('real-shaped filters, HTTP 200 validation failure, attempts and keyboard focus', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
   await openLogs(page);

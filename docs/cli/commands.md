@@ -780,7 +780,7 @@ anchor recover [--id ID]
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单由 CLI 提供，当前源码 GUI 已接入分组倍率；额度保留原始单位。desktop.57 dev GUI 已发布：供应商详情／新增模型步骤识别 NewAPI 后直接输入用户令牌，保存后自动以新 revision 查询倍率（effective-rate），无需手选平台／替换模式；沿用既有命令 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法、映射设置及显式默认值导入、日志逐请求比价与价格缓存维护已随 desktop.57 交付，详见§6、§12、§13 |
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
-| 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | GUI 与 CLI 共用核心日志；显示块选择、顺序、预设与费用合块是本机外观偏好，无需 CLI，不影响后台采集保存；见[日志设计](../design/logging.md) |
+| 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | 固定区间（`--from/--to`）、仅错误（`--errors-only`）及 stats 全范围错误汇总（`--include-errors`）已加入当前源码；GUI 图表选区见[日志设计](../design/logging.md)。显示块选择、顺序、预设与费用合块是本机外观偏好，无需 CLI，不影响后台采集保存 |
 | 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；desktop.45 dev 已发布认证 Codex 原生线程及同机项目元数据关联，其他客户端仍需显式标签；历史不回填 |
 | 出站代理 / 内置 mihomo | proxy list/put/delete/bind；代理设置页及供应商详情 | Windows/Linux amd64；Key 支持继承、强制直连、指定代理；节点 YAML 导入，不含订阅刷新/测速 |
 | Skill 中心库、来源差异、固定版本链接 | skill 管理子命令（§14） | 当前源码未发布；非全盘扫描；无自动原件替换、合并或批量升级 |
@@ -841,11 +841,11 @@ anchor [--data-dir DIR] --context SSH_NAME update upgrade --approve
 需要升级并正常重启到支持日志的核心；旧版不会补采历史。使用所选 Context、owner 管理授权及实例身份核验。日志独立于累计 usage，配置日志保留不删除累计用量。
 
 ```text
-anchor logs list|follow|export [--kind requests|system] [--since 1h] [--limit 50]
+anchor logs list|follow|export [--kind requests|system] [--since 1h | --from RFC3339 --to RFC3339] [--errors-only] [--limit 50]
   [--cursor N] [--until N] [--status VALUE] [--source VALUE]
   [--provider ID] [--model NAME] [--key ID] [--http N]
   [--code VALUE] [--stage VALUE] [--level VALUE] [--search PREFIX]
-anchor logs stats [--since 1h] [--interval 0s|10s|30s|1m|5m|15m|1h|6h|24h]
+anchor logs stats [--since 1h | --from RFC3339 --to RFC3339] [--interval 0s|10s|30s|1m|5m|15m|1h|6h|24h] [--include-errors] [--errors-only]
   [--group-by agent|binding|project|session]
   [--status VALUE] [--source proxy|probe] [--provider ID] [--model NAME]
   [--key ID] [--http N] [--code VALUE] [--stage VALUE] [--search PREFIX]
@@ -863,6 +863,9 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | --- | --- |
 | kind | requests；system 查询系统事件 |
 | since | 1h，Go duration，>0 且 ≤2160h（90 天）；24h、168h 可用，不支持 `7d` |
+| from / to | 互斥于显式 `--since`；必须同时提供 RFC3339 起点和终点，表示 `[from,to)`，最长90天。以毫秒精度选择落在区间内的日志时间戳，空区间拒绝；列表／导出兼容闭区间上界，stats 保持原生半开区间 |
+| errors-only | 默认 false；仅 requests list/follow/export/stats，包含 failed 和 interrupted，不含 pending/cancelled；system 不支持 |
+| include-errors（仅 stats） | 默认 false；额外返回匹配全区间且不受分页影响的错误分组、总类型数和总错误数。按安全错误码／阶段／HTTP分组，最多返回100组；不含上游原文 |
 | limit | 50，1–200；导出内部固定每页 100 条 |
 | interval（仅 stats） | 0s（自动）；手选 10s、30s、1m、5m、15m、1h、6h、24h，最多600个桶；自动取不超过120个桶的最细粒度；不支持1ns、任意间隔或负值 |
 | group-by（仅 stats，当前源码未发布） | 默认不分类；agent/binding/project/session，按请求数排序，最多100组；summary/buckets仍为全范围，总组数由group_count提供 |
@@ -886,6 +889,7 @@ desktop.58 已发布（2026-10-20）：原生 Responses 网关在明确历史密
 2026-10-21 元信息事件修复（desktop.60已发布）：真实诊断识别流首事件为 `codex.response.metadata`（类型SHA256为4928dcffeb7ec6134a0662ac1a91cbdbe737af8d60c407fc34e0245b540c3c28）。.58/.59把此附加信息当未知事件提前结束密文检查，后续明确拒绝未被清理；现在按无正文元信息继续检查，未知类型仍退出，不扩大到任意事件。`encrypted_context_stream_event`增加固定metadata类别；新增 `encrypted_context_stream_type_hash`（有效事件类型SHA256）和 `encrypted_context_stream_fields`（固定白名单字段名存在性），列表／follow／详情／导出保留，不记录原始未知事件名、正文、密文或字段值。明确错误envelope中带传输包装前缀的密文验证消息同样识别，无新增命令／参数。官方Codex源码把codex.response.metadata作为附加事件忽略；回归含元信息→空壳→延迟2.2秒拒绝→一次恢复。当前检查前缀上限为2 MiB（旧版64 KiB）以容纳较大的初始化信息，仍共享原请求期限与一次清理预算。用户已确认本机修正探针.3使原失败会话恢复；现已从干净源码打包并将本机换为正式.60，临时探针不作为公开发行版。
 
 `stats`（2026-10-16 已随 desktop.42 dev 宿主／核心发布；命令由兼容源码 CLI 提供，独立公开 alpha.6 CLI 不含，桌面程序不提供通用 CLI）只读聚合所选 Context 的已保留请求日志，不访问供应商或修改配置；需要 owner 管理授权及实例身份。输出 `{since_ms,before_ms,interval_ms,buckets,summary,health}`；每桶为 `{at_ms,values}`，时间按开始时刻归入 `[since_ms,before_ms)`，首桶锚定 since_ms。复用请求列表筛选，忽略分页 limit/cursor/until，kind 只允许 requests、level 不适用；系统事件统计未提供。默认最近1小时，自动粒度；不匹配时仍输出零请求桶和 null 测量值。时间范围超90天、粒度不支持／超过600桶均失败；旧核心无接口、存储不可用、鉴权／身份失败沿用非零退出，不把失败当空历史。`logs stats --since 168h --interval 1h --provider PROVIDER_ID` 可查询7天小时趋势。
+当前源码新增固定区间与错误选项：`anchor logs list --from 2026-10-21T08:00:00Z --to 2026-10-21T09:00:00Z --errors-only` 查询该半开区间内失败及中断请求；`anchor logs stats --from ... --to ... --include-errors` 在统计响应增加 `{error_summary:{groups,group_count,total}}`。按安全错误码、阶段、HTTP 分组，每组含次数、首末发生时间和最近请求 ID，最多返回100组但总数完整。时间条件基于请求开始时刻，其他筛选继续生效；`--errors-only` 与显式 `--status` 交集；不保存或输出上游原始报错正文。旧核心拒绝新能力时命令失败，不伪装为空结果。
 
 desktop.44 dev 宿主／核心已发布归属筛选和 `--group-by`。示例：`anchor logs stats --since 24h --group-by agent`、`anchor logs stats --agent codex --group-by project`、`anchor logs list --session thread-1`、`anchor logs export --project ""`。分组响应额外含 `{group_by,groups:[{value,values}],group_count}`；空 value 为“未识别”，按请求量降序／同量值升序返回前100组，不截断总体统计。命令需要支持新参数的 CLI 与核心；旧核心拒绝新字段时非零退出，不静默当作成功。四维度也参与请求 search／suggestions；系统事件不接受归属筛选。
 

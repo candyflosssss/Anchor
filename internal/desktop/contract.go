@@ -160,6 +160,8 @@ type LogSettings = logbook.Settings
 type LogStatsQuery = logbook.StatsQuery
 type LogStatsValues = logbook.StatsValues
 type LogStatsGroup = logbook.StatsGroup
+type LogStatsErrors = logbook.StatsErrors
+type LogStatsErrorGroup = logbook.StatsErrorGroup
 type LogStatsBucket = logbook.StatsBucket
 type LogStats = logbook.Stats
 type LogStatsResult struct {

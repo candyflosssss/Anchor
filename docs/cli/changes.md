@@ -863,3 +863,11 @@
 - 旧 → 新：`auto` 查询每次临时探测；现在新建时首次探测并保存，既有供应商首次查询补齐一次，后续复用缓存。失败分类同样缓存；手动 `detect-platform` 才重新探测。
 - 兼容与迁移：已有 provider 无需迁移，首次查询会建立识别记录；provider revision、用户令牌和手动平台配置保持独立。
 - 验证：Go state/core/desktop/client/cli 定向测试通过；前端 lint、typecheck、Vitest 通过。
+
+## 2026-10-21 — 请求日志区间与错误筛选（当前源码，未发布）
+
+- 类型：新增参数与输出行为。
+- 指令与参数：`logs list|follow|export|stats` 增加 `--from/--to`；请求查询增加 `--errors-only`；`logs stats` 增加 `--include-errors`。
+- 旧 → 新：原仅支持滚动 `--since`；现在可查询 RFC3339 固定半开区间，列表、导出和统计可限定 failed／interrupted，stats 可选返回按安全错误码、阶段、HTTP 分组的全范围计数（前100类）。
+- 兼容与迁移：参数可选，不传时沿用原 `--since` 默认；固定区间不可与显式 `--since` 同用，按毫秒精度选择实际日志时间戳，空区间及超过90天拒绝。需要兼容版本的 CLI 与核心；原始上游错误正文不采集、不返回。
+- 验证：`GOMAXPROCS=2 go test -p=2 ./internal/logbook ./internal/cli ./internal/desktop` 通过；CLI 固定区间测试包含互斥及毫秒边界检查。

@@ -1,15 +1,17 @@
-import { useId, useState, type PointerEvent } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { useId, useRef, useState, type PointerEvent } from 'react';
+import { ChevronDown, ChevronUp, ListFilter } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import type { Stats } from '../../desktop/contract.generated';
-import { dimensionLabels, type LogDimension, type LogFilters } from './log.model';
+import { dimensionLabels, type LogDimension, type LogFilters, type LogTimeRange } from './log.model';
 import { LogGroups } from './log-groups.view';
-import { chartPaths, formatStat, intervals, metrics, validInterval, type MetricID } from './log-stats.model';
+import { bucketRange, chartPaths, formatStat, intervals, metrics, validInterval, type MetricID } from './log-stats.model';
 import { useLogStatsController } from './use-log-stats-controller';
 const width = 1000, height = 180, insetX = 4;
-function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
+function TrendChart({ data, metric, range, onRangeSelect }: { data: Stats; metric: MetricID; range: LogTimeRange | null; onRangeSelect: (range: LogTimeRange | null) => void }) {
   const [active, setActive] = useState<number | null>(null);
   const [lastInspected, setLastInspected] = useState<number | null>(null);
+  const anchor = useRef<number | null>(null), keyboardAnchor = useRef<number | null>(null);
+  const [draft, setDraft] = useState<LogTimeRange | null>(null);
   const tooltipId = useId();
   const spec = metrics.find(m => m.id === metric)!;
   const stacked = metric === 'errors';
@@ -35,30 +37,48 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
   const end = Math.min(point.at_ms + data.interval_ms, data.before_ms);
   const timeRange = `${time(point.at_ms, true)} – ${time(end, true)}`;
   const inspect = (next: number) => { setActive(next); setLastInspected(next); };
-  const inspectPointer = (event: PointerEvent<HTMLDivElement>) => {
+  const pointerIndex = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    if (rect.width <= 0) return;
+    if (rect.width <= 0) return index;
     // Match the SVG viewBox padding so the cursor selects the bucket beneath it.
     const x = ((event.clientX - rect.left) / rect.width * (width + insetX * 2) - insetX) / width;
-    inspect(Math.max(0, Math.min(data.buckets.length - 1, Math.floor(x * span / data.interval_ms))));
+    return Math.max(0, Math.min(data.buckets.length - 1, Math.floor(x * span / data.interval_ms)));
   };
+  const inspectPointer = (event: PointerEvent<HTMLDivElement>) => {
+    const next = pointerIndex(event); inspect(next);
+    if (anchor.current !== null) setDraft(bucketRange(data, anchor.current, next));
+  };
+  const selection = draft ?? range;
+  const left = selection ? Math.max(data.since_ms, selection.since) : 0;
+  const right = selection ? Math.min(data.before_ms, selection.before) : 0;
   return <>
     <div className="log-chart-legend"><span className="mono">{unit}</span>
       {series.map(s => <span key={s.label} data-tone={s.tone}><i />{s.label}</span>)}
     </div>
     <div className="log-chart-body">
       <div className="log-chart-y mono">{[max, max / 2, 0].map((v, i) => <span key={i}>{formatStat(v, true)}</span>)}</div>
-      <div className="log-chart-plot" data-inspecting={active !== null} role="slider" tabIndex={0} aria-label={`${spec.label}趋势，左右方向键查看时间点`} aria-valuemin={0} aria-valuemax={data.buckets.length - 1} aria-valuenow={index}
+      <div className="log-chart-plot" data-inspecting={active !== null} role="slider" tabIndex={0} aria-label={`${spec.label}趋势，左右方向键查看，回车选中，Shift 加方向键扩选，拖动选择区间`} aria-valuemin={0} aria-valuemax={data.buckets.length - 1} aria-valuenow={index}
         aria-valuetext={`${timeRange}，${observation}，${series.map(s => `${s.label} ${formatStat(s.values[index] ?? 0)} ${unit}`).join('，')}`}
         aria-describedby={tooltipId}
         onPointerEnter={inspectPointer} onPointerMove={inspectPointer}
+        onPointerDown={e => { if (e.button !== 0 || !e.isPrimary) return; const next = pointerIndex(e); anchor.current = next; keyboardAnchor.current = null; inspect(next); setDraft(bucketRange(data, next)); e.currentTarget.setPointerCapture(e.pointerId); }}
+        onPointerUp={e => { if (anchor.current === null) return; onRangeSelect(bucketRange(data, anchor.current, pointerIndex(e))); anchor.current = null; setDraft(null); if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
+        onPointerCancel={() => { anchor.current = null; setDraft(null); }}
+        onLostPointerCapture={() => { anchor.current = null; setDraft(null); }}
         onPointerLeave={() => setActive(null)} onFocus={() => inspect(index)} onBlur={() => setActive(null)}
         onKeyDown={e => {
-          if (e.key === 'Escape') { e.preventDefault(); setActive(null); }
-          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) { e.preventDefault(); inspect(e.key === 'Home' ? 0 : e.key === 'End' ? data.buckets.length - 1 : Math.max(0, Math.min(data.buckets.length - 1, index + (e.key === 'ArrowLeft' ? -1 : 1)))); }
+          if (e.key === 'Escape') { e.preventDefault(); setActive(null); anchor.current = null; keyboardAnchor.current = null; setDraft(null); onRangeSelect(null); }
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); keyboardAnchor.current = index; onRangeSelect(bucketRange(data, index)); }
+          if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) {
+            e.preventDefault();
+            const next = e.key === 'Home' ? 0 : e.key === 'End' ? data.buckets.length - 1 : Math.max(0, Math.min(data.buckets.length - 1, index + (e.key === 'ArrowLeft' ? -1 : 1)));
+            if (e.shiftKey) { keyboardAnchor.current ??= index; onRangeSelect(bucketRange(data, keyboardAnchor.current, next)); } else keyboardAnchor.current = null;
+            inspect(next);
+          }
         }}>
         <svg viewBox={`${-insetX} -6 ${width + insetX * 2} ${height + 12}`} preserveAspectRatio="none" aria-hidden="true">
           {[0, height / 2, height].map(y => <line key={y} x1="0" x2={width} y1={y} y2={y} className="log-chart-grid" />)}
+          {selection && right > left && <rect className="log-chart-range" x={(left - data.since_ms) / span * width} y="0" width={(right - left) / span * width} height={height} />}
           {active !== null && <rect className="log-chart-selection" x={(point.at_ms - data.since_ms) / span * width} y="0" width={Math.min(data.interval_ms, data.before_ms - point.at_ms) / span * width} height={height} />}
           {stacked && <defs>{data.buckets.map((bucket, i) => {
             const totalHeight = bucket.values.completed / max * height;
@@ -91,10 +111,11 @@ function TrendChart({ data, metric }: { data: Stats; metric: MetricID }) {
         <div className="log-chart-observation">{observation}</div>
       </div>
       <div className="log-chart-reading-values">{series.map(s => <div key={s.label} className="log-chart-tooltip-value" data-tone={s.tone}><span><i />{s.label}</span><strong className="mono">{formatStat(s.values[index] ?? 0)} {unit}</strong></div>)}</div>
+      <Button variant="outline" size="sm" onClick={() => onRangeSelect(bucketRange(data, index))}><ListFilter size={14} />查看此时段</Button>
     </div>
   </>;
 }
-export function LogStatsView({ filters, paused, revision, onGroupSelect }: { filters: LogFilters; paused: boolean; revision: number; onGroupSelect: (dimension: LogDimension, value: string) => void }) {
+export function LogStatsView({ filters, paused, revision, onGroupSelect, range, onRangeSelect }: { filters: LogFilters; paused: boolean; revision: number; onGroupSelect: (dimension: LogDimension, value: string) => void; range: LogTimeRange | null; onRangeSelect: (range: LogTimeRange | null) => void }) {
   const c = useLogStatsController(filters, paused, revision);
   const [collapsed, setCollapsed] = useState(false);
   const contentId = useId();
@@ -115,7 +136,7 @@ export function LogStatsView({ filters, paused, revision, onGroupSelect }: { fil
         <span>{m.label}</span><strong>{formatStat(c.data?.summary[m.field] ?? null, true)}<small>{m.unit}</small></strong>
       </button>)}</div>
       {error && c.data && c.data.summary.requests > 0 && <p className="px-4 text-sm text-destructive" role="status">{error}</p>}
-      {!c.data || c.data.summary.requests === 0 ? <div className="log-stats-placeholder" role="status">{error || (!c.data && c.loading ? '趋势加载中' : '所选范围内暂无请求')}</div> : <TrendChart data={c.data} metric={c.metric} />}
+      {!c.data || c.data.summary.requests === 0 ? <div className="log-stats-placeholder" role="status">{error || (!c.data && c.loading ? '趋势加载中' : '所选范围内暂无请求')}</div> : <TrendChart data={c.data} metric={c.metric} range={range} onRangeSelect={onRangeSelect} />}
       {c.groupBy && c.data && <LogGroups data={c.data} dimension={c.groupBy} onSelect={value => onGroupSelect(c.groupBy as LogDimension, value)} />}
     </div>
   </section>;

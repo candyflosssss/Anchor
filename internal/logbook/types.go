@@ -114,6 +114,7 @@ type Event struct {
 	Fields    map[string]string `json:"fields"`
 }
 type Query struct {
+	ErrorsOnly bool `json:"errors_only,omitempty"`
 	// nil means all; a pointer to an empty string selects unattributed records.
 	Agent    *string `json:"agent,omitempty"`
 	Binding  *string `json:"binding,omitempty"`
@@ -178,6 +179,9 @@ func (q *Query) Validate() error {
 		q.Kind = "requests"
 	}
 	if q.Kind != "requests" && q.Kind != "system" {
+		return ErrInvalid
+	}
+	if q.ErrorsOnly && q.Kind != "requests" {
 		return ErrInvalid
 	}
 	if q.Limit == 0 {
