@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-10-21
+- 2026-10-21 desktop.64 dev 已发布：同版 CLI／核心包含 Key 分数冷却及 `settings key-cooldown --error-window-seconds`、会话保持、`model routing` 顺序保存和首字测试结果；桌面支持拖动与快速排序。独立 alpha.6 CLI 不含这些增量；本轮仅更新交付状态，无新增命令契约。详见[发行记录](../release/desktop.md#routing-priority-64)。
 - 2026-10-21 desktop.61 dev 已发布：原生 Responses 发送前移除历史 reasoning 中显式为 null、非字符串或空字符串的 encrypted_content 及对应 id，保留摘要、非空密文及其他历史条目；只修改派发副本，不新增请求、命令或开关，不记为报错后清理重试。缺少密文字段的条目不改写，既有明确密文拒绝后恢复机制保留。需升级核心才生效，详见[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
 - 中文供应商 ID 适用于本次开发修订及 公开版 `0.1.0-alpha.6`（早期本地构建 `0.1.0-dev.provider-unicode`）；公开版 `0.1.0-alpha.3` 不支持，须同时更新 CLI 与运行中的核心服务。

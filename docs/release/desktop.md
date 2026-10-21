@@ -1,10 +1,40 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.63](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.63)，发布于 `2026-10-21T16:20:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `87f13a468dfe016aa07e28b621001db20f249df0`、SOURCE dirty=false。
-- 修正日志柱图密度与读数交互：自动选择适合窗口的真实服务端粒度，保留手选粒度；柱间留白和外轮廓圆角，当前桶高亮。悬浮卡改为图下固定、可复制且移出后保留的读数栏；继续保留过点PCHIP曲线、红绿堆叠及零色段隐藏。
-- 复用图表定向测试结果，完成双平台生产编译／打包、11 附件远端摘要及三条默认源实际下载校验。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本轮仅在线投放，未安装或改动真实实例／Agent配置；未验收双平台原生窗口、系统安装器或真实SSH升级，未请求付费上游。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.64](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.64)，发布于 `2026-10-21T20:12:39+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c667c4ea240efb0f0059d5f9e245ea2b75f24f77`、SOURCE dirty=false。
+- Key 独立错误分数与冷却、会话保持和不可用时 fallback；模型映射按模型分组，可拖动或按综合倍率／实测首字延迟排序，排序后仍可手调。包含主线日志选区与错误汇总、CC Switch 供应商导入。
+- 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
+- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="routing-priority-64"></a>
+
+## Key 冷却与模型优先级 .64（已发布 dev）
+
+Key 按错误分数进入独立冷却：默认阈值100，窗口与CD各300秒；401/403加100、429加50、408／网络／5xx加25，瞬时错误最多保留60秒。到期清分直接恢复。同一显式会话保持成功渠道，高优先恢复不回切；当前渠道不可用才重选，新会话使用当前规则。全部不可用返回503“全部渠道不可用”；已输出或结果未知的请求保持不重放边界。
+
+模型映射按模型分组，渠道直接显示顺位，支持拖动／上下移动。综合倍率排序使用供应商×Key分组×隐藏模型倍率；低延迟排序经确认逐渠道实测首字，可停止。自动与手动排序保存为priority，之后仍可手调。另包含主线日志选区查询／错误汇总和CC Switch供应商跨平台导入。
+
+构建提交 `c667c4ea240efb0f0059d5f9e245ea2b75f24f77`，输入摘要 `d3bd600a7b71adf3ab4da2a4174dbf1c7c5da68d019784b92eb67cb9a0a5d319`，SOURCE dirty=false。产物与证据：`dist/desktop/0.1.0-dev.desktop.64/`；源码包含Anchor Go vendor、未修改的mihomo v1.19.32对应源码／vendor和固定payload，未混入工作区未提交内容。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.64_amd64.deb` | 29173540 | `ae2639cc24605b30bc2d7f2da955e0ee63df0aef7fe161932d6cb1e2bda4f356` |
+| `Anchor-Desktop-0.1.0-dev.desktop.64-windows-amd64-setup.exe` | 31189371 | `cc18659a72c84608650183f52b33771208e57699e0fbbeea446dd9b6e0f3ad58` |
+| `anchor-desktop-0.1.0-dev.desktop.64-linux-amd64` | 43226192 | `9dd93d01a3d9243ff06c003ccd007faeed54350f88807e8e895c443379bc1647` |
+| `anchor-desktop-0.1.0-dev.desktop.64-windows-amd64.exe` | 44350976 | `75d581891c7a779c0df4b8159c893e13181aeab4209d5f8a881001cfe64b5816` |
+| `anchor-0.1.0-dev.desktop.64-linux-amd64` | 37830818 | `8e8035b3d926f7bc169f83bc6e34020d2921a4942fbe324eca811151defb05fe` |
+| `anchor-0.1.0-dev.desktop.64-windows-amd64.exe` | 37958144 | `8850d91e3c2c15848cfcb9d2518213bcf479c5c8085159177429e07f0ee0adef` |
+| `update-desktop.json` | 1755 | `1f46c9e0aa19271bd053c6e3273da377e43ed23954cef45ee9ac41667f29c952` |
+| `update-cli.json` | 876 | `5e17ca70d07d1d62bf848c72347e6214d634cc098ed390800b683cacbe4ccf37` |
+| `anchor_0.1.0-dev.desktop.64_source.tar.gz` | 97707088 | `10644a8a9e580e14492294e9ff207c9367cbcf9abd0edb608019c1044437629a` |
+| `anchor_0.1.0-dev.desktop.64_metadata.zip` | 122170 | `30f2fe35dd249a9d45979d83c099ea5f07b7d60f234027cbe2db50c3c71d9d53` |
+| `SHA256SUMS` | 1073 | `6921d8b25e3115281953e7f1f10f7bab7ef624862664ec0d3aeb745c263b7b5b` |
+
+复用功能阶段Go core/state/cli/desktop定向回归、66项前端单测、20项浏览器用例及typecheck/lint结果。本轮完成契约比对、TypeScript/Vite与Windows／Ubuntu24.04 AMD64生产编译打包；嵌入前端／mihomo、deb与runtime载荷、对应源码输入摘要及metadata ZIP CRC核对通过。保留非阻塞Vite大chunk警告。
+
+于 `2026-10-21T20:12:39+08:00` 公开为dev prerelease、非latest；11附件大小／GitHub digest与本地一致，tag指向实际构建提交。默认dev源真实下载Linux runtime、旧客户端deb和CLI，版本／大小／SHA256核对通过。证据见publication下preparation-verification.json、publication-verification.json、online-verification.json；原始BUILD.json保留构建时未发布／未安装／未原生验收的事实。
+
+本轮只在线投放，沿用schema9，不安装、重启或修改真实实例／Agent配置和更新设置，不请求付费上游；双平台原生窗口、系统安装器和真实SSH升级尚未验收。
 
 <a id="log-chart-ux-63"></a>
 
