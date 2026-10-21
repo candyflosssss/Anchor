@@ -2,6 +2,8 @@
 
 2026-10-21 已随 desktop.61 dev 打包发布。仅处理既有 Responses、Chat Completions、Anthropic Messages，不增加第四种外部协议或运行服务。
 
+相关设计、开发、审查和重构遵循[协议翻译架构 skill](../../.agents/skills/anchor-protocol-architecture/SKILL.md)。本文维护当前实现契约与支持范围；skill 维护职责、生命周期与实施约束。涉及架构原则、模块边界、公共接口或兼容／恢复策略的变更，必须在同一任务同步更新 skill、适用设计契约、实现和测试；纯内部实现变化须核对一致性。
+
 ## 调用边界与文件归属
 
 ```text

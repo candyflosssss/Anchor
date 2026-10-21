@@ -1,0 +1,6 @@
+interface:
+  display_name: "Anchor 协议翻译架构"
+  short_description: "约束协议翻译与网关职责、会话隔离、流式语义，并同步规范和实现"
+  default_prompt: "使用 $anchor-protocol-architecture 核对本次 Anchor 协议数据面变更的职责、生命周期、兼容边界、验证与规范同步。"
+policy:
+  allow_implicit_invocation: true

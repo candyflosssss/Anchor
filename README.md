@@ -98,6 +98,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 - [供应商第一版界面设计](docs/design/providers-v1.md)：现有 CLI 能力对应的列表、详情、编辑与风险确认；支持明确标注的[本地 Mock 原型与真实 Wails 桌面模式](desktop/frontend/README.md)，真实接口已接入；原生安装与窗口验收单独记录。
 - [前后端分离与前端 MVC skill](.agents/skills/anchor-frontend-architecture/SKILL.md)：前端及相关接口开发时遵循的分层、文档同步与验证约束。
 - [多 agent 契约协作 skill](.agents/skills/anchor-contract-collaboration/SKILL.md)：前后端并行开发的共同契约、文件归属、变更协商、共享样例和真实联调验收。
+- [协议翻译架构 skill](.agents/skills/anchor-protocol-architecture/SKILL.md)：协议层与网关的职责、会话隔离、流式与兼容边界；相关架构或接口变更须同任务同步规范。当前实现见[请求级协议翻译层](docs/design/protocol-translation.md)。
 
 
 ### runtime 与 SSH 更新能力（desktop.57 起已发布）
