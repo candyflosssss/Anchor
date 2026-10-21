@@ -418,3 +418,44 @@ func TestTranslationMissingMessagesUsageAndNativeDefaults(t *testing.T) {
 		t.Fatal(err, r)
 	}
 }
+
+type translationCheckpointReader struct {
+	chunks  []string
+	markers []string
+	index   int
+	output  *bytes.Buffer
+	t       *testing.T
+}
+
+func (r *translationCheckpointReader) Read(p []byte) (int, error) {
+	if r.index >= len(r.chunks) {
+		return 0, io.EOF
+	}
+	if r.index > 0 && !strings.Contains(r.output.String(), r.markers[r.index-1]) {
+		r.t.Errorf("block %d was buffered past its source boundary", r.index-1)
+	}
+	n := copy(p, r.chunks[r.index])
+	r.chunks[r.index] = r.chunks[r.index][n:]
+	if r.chunks[r.index] == "" {
+		r.index++
+	}
+	return n, nil
+}
+func TestTranslationSequentialAnthropicBlocksIncrementally(t *testing.T) {
+	a := prepareTestAttempt(t, newTestSession(t, sessionRequests["anthropic"], "anthropic"), "responses")
+	var out bytes.Buffer
+	input := &translationCheckpointReader{output: &out, t: t, markers: []string{"FIRST_TEXT", "SECOND_TEXT"}, chunks: []string{
+		sse(`{"type":"response.created","response":{"id":"r"}}`, `{"type":"response.output_item.added","output_index":0,"item":{"type":"message"}}`, `{"type":"response.output_text.delta","output_index":0,"delta":"FIRST_TEXT"}`, `{"type":"response.output_item.done","output_index":0}`),
+		sse(`{"type":"response.output_item.added","output_index":1,"item":{"type":"message"}}`, `{"type":"response.output_text.delta","output_index":1,"delta":"SECOND_TEXT"}`, `{"type":"response.output_item.done","output_index":1}`),
+		sse(`{"type":"response.completed","response":{"status":"completed","usage":{"input_tokens":1,"output_tokens":2}}}`),
+	}}
+	if _, err := a.TranslateStream(t.Context(), &out, input, StreamOptions{}); err != nil {
+		t.Fatal(err, out.String())
+	}
+	for _, event := range []string{"content_block_start", "content_block_stop"} {
+		// Each block is opened and closed once, including before the message terminal.
+		if strings.Count(out.String(), "event: "+event+"\n") != 2 {
+			t.Fatal(out.String())
+		}
+	}
+}

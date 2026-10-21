@@ -291,6 +291,11 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 						return e
 					}
 				}
+				if i, ok := index[int(num(m["index"]))]; ok {
+					if err := emit.closeItem(i); err != nil {
+						return err
+					}
+				}
 			case "message_delta":
 				r.Finish = str(obj(m["delta"])["stop_reason"])
 				u := obj(m["usage"])
@@ -345,7 +350,13 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 				if _, err := text([]any{m["part"]}); err != nil {
 					return err
 				}
-			case "response.created", "response.in_progress", "response.output_item.done", "response.output_text.done", "response.function_call_arguments.done":
+			case "response.output_item.done":
+				if i, ok := index[int(num(m["output_index"]))]; ok {
+					if err := emit.closeItem(i); err != nil {
+						return err
+					}
+				}
+			case "response.created", "response.in_progress", "response.output_text.done", "response.function_call_arguments.done":
 				// The preceding deltas carry supported content; these close its envelope.
 			default:
 				return ErrUnsupported
@@ -405,11 +416,14 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 }
 
 type emitter struct {
-	w       io.Writer
-	p       string
-	r       *Result
-	started bool
-	seq     int
+	w             io.Writer
+	p             string
+	r             *Result
+	started       bool
+	seq           int
+	anthropicNext int
+	anthropicOpen bool
+	anthropicDone map[int]bool
 }
 
 func (e *emitter) raw(event, data string) error {
@@ -491,9 +505,10 @@ func (e *emitter) startItem(i int) error {
 		return nil
 	}
 	if e.p == "anthropic" {
-		if i > 0 {
+		if i != e.anthropicNext || e.anthropicOpen {
 			return nil
 		}
+		e.anthropicOpen = true
 		b := Object{"type": "text", "text": ""}
 		if x.Tool {
 			b = Object{"type": "tool_use", "id": x.CallID, "name": x.Name, "input": Object{}}
@@ -535,7 +550,10 @@ func (e *emitter) delta(i int, s string, tool bool) error {
 		return e.send(typ, m)
 	}
 	if e.p == "anthropic" {
-		if i > 0 {
+		if i < e.anthropicNext {
+			return ErrUnsupported
+		}
+		if i != e.anthropicNext || !e.anthropicOpen {
 			return nil
 		}
 		d := Object{"type": "text_delta", "text": s}
@@ -549,6 +567,47 @@ func (e *emitter) delta(i int, s string, tool bool) error {
 	}
 	return e.chat(Object{"content": s}, nil, nil)
 }
+
+// closeItem releases ordered Anthropic blocks once the source has closed them.
+// Interleaved later blocks remain within Result's existing content/item bounds.
+func (e *emitter) closeItem(i int) error {
+	if e.p != "anthropic" || i < e.anthropicNext {
+		return nil
+	}
+	if e.anthropicDone == nil {
+		e.anthropicDone = make(map[int]bool)
+	}
+	e.anthropicDone[i] = true
+	for e.anthropicNext < len(e.r.Items) {
+		next := e.anthropicNext
+		if !e.anthropicOpen {
+			if err := e.startItem(next); err != nil {
+				return err
+			}
+			item := e.r.Items[next]
+			data := item.Text
+			if item.Tool {
+				data = item.Arguments
+			}
+			if data != "" {
+				if err := e.delta(next, data, item.Tool); err != nil {
+					return err
+				}
+			}
+		}
+		if !e.anthropicDone[next] {
+			return nil
+		}
+		if err := e.send("content_block_stop", Object{"index": next}); err != nil {
+			return err
+		}
+		delete(e.anthropicDone, next)
+		e.anthropicOpen = false
+		e.anthropicNext++
+	}
+	return nil
+}
+
 func (e *emitter) done() error {
 	if err := e.r.CheckTarget(e.p); err != nil {
 		return err
@@ -606,21 +665,7 @@ func (e *emitter) done() error {
 				return err
 			}
 		} else if e.p == "anthropic" {
-			if i > 0 {
-				b := Object{"type": "text", "text": ""}
-				d := Object{"type": "text_delta", "text": x.Text}
-				if x.Tool {
-					b = Object{"type": "tool_use", "id": x.CallID, "name": x.Name, "input": Object{}}
-					d = Object{"type": "input_json_delta", "partial_json": x.Arguments}
-				}
-				if err := e.send("content_block_start", Object{"index": i, "content_block": b}); err != nil {
-					return err
-				}
-				if err := e.send("content_block_delta", Object{"index": i, "delta": d}); err != nil {
-					return err
-				}
-			}
-			if err := e.send("content_block_stop", Object{"index": i}); err != nil {
+			if err := e.closeItem(i); err != nil {
 				return err
 			}
 		}
