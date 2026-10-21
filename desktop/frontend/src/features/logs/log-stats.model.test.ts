@@ -19,15 +19,48 @@ it('mirrors all request filters but not pagination and snapshots', () => {
   expect(validInterval('129600', 86400000)).toBe(true);
   expect(validInterval('129600', 0)).toBe(true);
 });
-it('returns missing chart ticks to zero at their original positions', () => {
-  expect(chartPaths([0, 5, null, 10], 10)).toEqual(['M0.00,180.00 L333.33,90.00 L666.67,180.00 L1000.00,0.00']);
-  expect(chartPaths([5, null, null, 10], 10)).toEqual(['M0.00,90.00 L333.33,180.00 L666.67,180.00 L1000.00,0.00']);
-  expect(chartPaths([null, 5, null], 10, 1000, 180, [100, 400, 900])).toEqual(['M100.00,180.00 L400.00,90.00 L900.00,180.00']);
-  expect(chartPaths([null, null], 1)).toEqual(['M0.00,180.00 L1000.00,180.00']);
-  expect(chartPaths([null], 1)).toEqual(['M500.00,180.00']);
+// Read the actual SVG Bézier segments and evaluate them independently of PCHIP.
+function curveSegments(values: (number | null)[], positions?: number[]) {
+  const path = chartPaths(values, 100, 1000, 180, positions)[0];
+  const coordinates = [...path.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(match => [Number(match[1]), Number(match[2])]);
+  return Array.from({ length: (coordinates.length - 1) / 3 }, (_, i) => coordinates.slice(i * 3, i * 3 + 4));
+}
+it('passes through every sample and stays within adjacent values on uneven time intervals', () => {
+  const values = [20, 60, 60, 15, 0, 0, 45, 25];
+  const positions = [5, 50, 120, 300, 450, 700, 950, 995];
+  const segments = curveSegments(values, positions);
+  expect(segments).toHaveLength(values.length - 1);
+  segments.forEach((points, i) => {
+    const y0 = 180 - values[i] * 1.8, y1 = 180 - values[i + 1] * 1.8;
+    expect(points[0]).toEqual([positions[i], y0]);
+    expect(points[3]).toEqual([positions[i + 1], y1]);
+    for (let sample = 0; sample <= 100; sample++) {
+      const t = sample / 100;
+      const y = (1 - t) ** 3 * points[0][1] + 3 * (1 - t) ** 2 * t * points[1][1] + 3 * (1 - t) * t ** 2 * points[2][1] + t ** 3 * points[3][1];
+      expect(y).toBeGreaterThanOrEqual(Math.min(y0, y1) - .01);
+      expect(y).toBeLessThanOrEqual(Math.max(y0, y1) + .01);
+    }
+  });
+  for (let i = 1; i < segments.length; i++) {
+    const left = segments[i - 1], right = segments[i];
+    const incoming = (left[3][1] - left[2][1]) / (left[3][0] - left[2][0]);
+    const outgoing = (right[1][1] - right[0][1]) / (right[1][0] - right[0][0]);
+    expect(incoming).toBeCloseTo(outgoing, 2);
+  }
+});
+it('keeps missing samples at zero and handles empty, single and two-point series', () => {
+  const segments = curveSegments([null, 50, null, null], [100, 400, 700, 900]);
+  expect(segments[0][0]).toEqual([100, 180]);
+  expect(segments.map(points => points[3])).toEqual([[400, 90], [700, 180], [900, 180]]);
+  expect(segments[2].every(point => point[1] === 180)).toBe(true);
   expect(chartPaths([], 1)).toEqual([]);
+  expect(chartPaths([null], 1)).toEqual(['M500.00,180.00']);
   expect(chartPaths([0], 1)).toEqual(['M500.00,180.00']);
-  expect(chartPaths([5, 10], 10, 1000, 180, [250, 750])).toEqual(['M250.00,90.00 L750.00,0.00']);
+  const [points] = curveSegments([0, 100]);
+  expect(points[0]).toEqual([0, 180]);
+  expect(points[3]).toEqual([1000, 0]);
+  expect(points[1][1]).toBe(120);
+  expect(points[2][1]).toBe(60);
 });
 it('rejects malformed, non-finite, out-of-range and missing observations', () => {
   for (const change of [

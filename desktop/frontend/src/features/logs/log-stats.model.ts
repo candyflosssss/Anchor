@@ -58,10 +58,34 @@ export function formatStat(value: number | null, compact = false) {
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1, ...(compact ? { notation: 'compact' } : {}) }).format(value);
 }
 export function chartPaths(values: (number | null)[], max: number, width = 1000, height = 180, positions?: number[]): string[] {
-  let path = '';
-  values.forEach((v, i) => {
-    const x = positions?.[i] ?? (values.length === 1 ? width / 2 : i * width / (values.length - 1)), y = height - (v ?? 0) / max * height;
-    path += `${path ? ' L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`;
+  if (!values.length) return [];
+  const points = values.map((v, i) => ({
+    x: positions?.[i] ?? (values.length === 1 ? width / 2 : i * width / (values.length - 1)),
+    y: height - (v ?? 0) / max * height,
+  }));
+  const coordinate = (x: number, y: number) => `${x.toFixed(2)},${y.toFixed(2)}`;
+  let path = `M${coordinate(points[0].x, points[0].y)}`;
+  if (points.length === 1) return [path];
+  const spans = points.slice(1).map((p, i) => p.x - points[i].x);
+  const slopes = spans.map((span, i) => (points[i + 1].y - points[i].y) / span);
+  // PCHIP uses shape-preserving derivatives, including on unequal time intervals.
+  // Flat intervals and extrema have zero slope, preventing overshoot below zero.
+  const endpoint = (h0: number, h1: number, d0: number, d1: number) => {
+    const slope = ((2 * h0 + h1) * d0 - h0 * d1) / (h0 + h1);
+    if (Math.sign(slope) !== Math.sign(d0)) return 0;
+    return Math.sign(d0) !== Math.sign(d1) && Math.abs(slope) > 3 * Math.abs(d0) ? 3 * d0 : slope;
+  };
+  const derivatives = points.map((_, i) => {
+    if (points.length === 2) return slopes[0];
+    if (i === 0) return endpoint(spans[0], spans[1], slopes[0], slopes[1]);
+    if (i === points.length - 1) return endpoint(spans[i - 1], spans[i - 2], slopes[i - 1], slopes[i - 2]);
+    if (slopes[i - 1] * slopes[i] <= 0) return 0;
+    const w1 = 2 * spans[i] + spans[i - 1], w2 = spans[i] + 2 * spans[i - 1];
+    return (w1 + w2) / (w1 / slopes[i - 1] + w2 / slopes[i]);
   });
-  return path ? [path] : [];
+  points.slice(1).forEach((p, i) => {
+    const previous = points[i], third = spans[i] / 3;
+    path += ` C${coordinate(previous.x + third, previous.y + derivatives[i] * third)} ${coordinate(p.x - third, p.y - derivatives[i + 1] * third)} ${coordinate(p.x, p.y)}`;
+  });
+  return [path];
 }

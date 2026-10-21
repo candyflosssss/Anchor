@@ -210,6 +210,7 @@
 .log-stats [data-tone=cache] { --trend-color: hsl(var(--log-cache)); }
 .log-stats [data-tone=tps] { --trend-color: hsl(var(--log-speed)); }
 .log-stats [data-tone=errors] { --trend-color: hsl(var(--destructive)); }
+.log-stats [data-tone=success] { --trend-color: hsl(var(--success)); }
 .log-stats [data-tone=latency] { --trend-color: hsl(var(--log-time)); }
 .log-chart-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; min-height: 44px; color: hsl(var(--muted-foreground)); font-size: 11px; }
 .log-chart-legend > span:first-child { margin-right: auto; }
@@ -227,6 +228,7 @@
 .log-chart-tooltip strong { color: hsl(var(--foreground)); font-size: 11px; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
 .log-chart-grid { stroke: hsl(var(--border)); stroke-dasharray: 3 5; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .log-chart-line { fill: none; stroke: var(--trend-color); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.log-chart-bar { fill: var(--trend-color); }
 .log-chart-observation { margin-bottom: 6px; }
 .log-chart-dot { fill: var(--trend-color); }
 .log-chart-cursor { stroke: hsl(var(--muted-foreground)); stroke-dasharray: 4; vector-effect: non-scaling-stroke; }

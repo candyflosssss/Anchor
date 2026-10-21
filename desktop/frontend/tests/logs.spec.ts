@@ -579,9 +579,9 @@ test('missing chart ticks return to zero with matching pointer and keyboard read
   await expect(trends.locator('.log-chart-line')).toHaveCount(3);
   await expect(trends.locator('.log-chart-bridge')).toHaveCount(0);
   for (const path of await trends.locator('.log-chart-line').evaluateAll(paths => paths.map(p => p.getAttribute('d')!))) {
-    const ticks = path.split(' ');
-    expect(ticks).toHaveLength(120);
-    expect(ticks[1]).toBe('L12.50,180.00');
+    const segments = path.split(' C');
+    expect(segments).toHaveLength(120);
+    expect(segments[1].split(' ').at(-1)).toBe('12.50,180.00');
   }
   await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight');
   const tooltip = trends.getByRole('tooltip');
@@ -601,12 +601,12 @@ test('missing chart ticks return to zero with matching pointer and keyboard read
   await page.mouse.move(bounds.x + bounds.width * (12.5 + 4) / 1008, bounds.y + 1);
   await expect(chart).toHaveAttribute('aria-valuenow', '1');
   await expect(tooltip.locator('strong')).toHaveText(['0 Token', '0 Token', '0 Token']);
-  for (const [label, unit] of [['请求量', '次'], ['总 TPS', 't/s'], ['错误率', '%'], ['缓存命中率', '%'], ['平均耗时', 'ms'], ['首字延迟', 'ms']]) {
+  for (const [label, unit] of [['请求量', '次'], ['总 TPS', 't/s'], ['缓存命中率', '%'], ['平均耗时', 'ms'], ['首字延迟', 'ms']]) {
     await trends.getByRole('button', { name: new RegExp(label) }).click();
     await chart.focus(); await page.keyboard.press('Home'); await page.keyboard.press('ArrowRight');
     await expect(tooltip.locator('strong')).toHaveText(`0 ${unit}`);
     const path = await trends.locator('.log-chart-line').getAttribute('d');
-    expect(path!.split(' ')[1]).toBe('L12.50,180.00');
+    expect(path!.split(' C')[1].split(' ').at(-1)).toBe('12.50,180.00');
   }
   await expect(tooltip).toContainText('缺失值按 0 显示');
   expect((await trends.locator('.log-chart-line').getAttribute('d'))!.split(' ').every(tick => tick.endsWith(',180.00'))).toBe(true);
@@ -620,6 +620,79 @@ test('missing chart ticks return to zero with matching pointer and keyboard read
   await expect(tooltip).not.toContainText('缺失值');
 });
 
+
+test('error chart stacks successful and failed counts, omits zeros and supports both themes', async ({ page }) => {
+  await openLogs(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  await trends.getByRole('button', { name: /错误率/ }).click();
+  await expect(trends.getByRole('button', { name: /错误率/ })).toContainText('33.3');
+  await expect(trends.locator('.log-chart-line')).toHaveCount(0);
+  await expect(trends.locator('.log-chart-legend')).toHaveText('次成功次数错误次数');
+  await expect(trends.locator('.log-chart-y span')).toHaveText(['2', '1', '0']);
+  const mixed = trends.locator('g[data-bucket="0"]');
+  const green = mixed.locator('rect[data-tone="success"]');
+  const red = mixed.locator('rect[data-tone="errors"]');
+  await expect(green).toHaveCount(1); await expect(red).toHaveCount(1);
+  const greenY = Number(await green.getAttribute('y'));
+  expect(Number(await red.getAttribute('y')) + Number(await red.getAttribute('height'))).toBeCloseTo(greenY);
+  expect(greenY + Number(await green.getAttribute('height'))).toBeCloseTo(180);
+  expect(await green.getAttribute('x')).toBe(await red.getAttribute('x'));
+  expect(await green.getAttribute('width')).toBe(await red.getAttribute('width'));
+  await expect(trends.locator('g[data-bucket="1"] rect')).toHaveCount(0);
+  await expect(trends.locator('g[data-bucket="2"] rect[data-tone="success"]')).toHaveCount(1);
+  await expect(trends.locator('g[data-bucket="2"] rect[data-tone="errors"]')).toHaveCount(0);
+  const chart = trends.getByRole('slider'), tooltip = trends.getByRole('tooltip');
+  await chart.focus(); await page.keyboard.press('Home');
+  await expect(tooltip.locator('strong')).toHaveText(['1 次', '1 次']);
+  await expect(chart).toHaveAttribute('aria-valuetext', /成功次数 1 次，错误次数 1 次/);
+  await page.keyboard.press('ArrowRight');
+  await expect(tooltip.locator('strong')).toHaveText(['0 次', '0 次']);
+  await expect(tooltip).toContainText('此时段无请求');
+  for (const theme of ['浅色', '深色']) {
+    await page.getByRole('button', { name: theme, exact: true }).click();
+    const fills = await mixed.locator('rect').evaluateAll(rects => rects.map(rect => getComputedStyle(rect).fill));
+    expect(fills[0]).toMatch(/^rgb/); expect(fills[1]).toMatch(/^rgb/);
+    expect(fills[0]).not.toBe(fills[1]);
+    await chart.scrollIntoViewIfNeeded();
+    const bounds = (await chart.boundingBox())!;
+    await page.mouse.move(bounds.x + bounds.width * (4.17 + 4) / 1008, bounds.y + 1);
+    await expect(chart).toHaveAttribute('aria-valuenow', '0');
+    await expect(tooltip.locator('strong')).toHaveText(['1 次', '1 次']);
+    if (capture) await trends.screenshot({ path: resolve(capture, `logs-stacked-${theme === '浅色' ? 'light' : 'dark'}.png`) });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect(chart).toBeVisible();
+  if (capture) await trends.screenshot({ path: resolve(capture, 'logs-stacked-narrow.png') });
+  await trends.getByRole('button', { name: /已知用量/ }).click();
+  await expect(trends.locator('.log-chart-bar')).toHaveCount(0);
+  await expect(trends.locator('.log-chart-line')).toHaveCount(3);
+  if (capture) {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await trends.screenshot({ path: resolve(capture, 'logs-pchip-dark.png') });
+  }
+});
+
+test('error-only buckets are red from baseline and pending requests are not counted as success', async ({ page }) => {
+  const stats = structuredClone(statsFixture);
+  stats.stats.buckets[0].values.errors = stats.stats.buckets[0].values.completed;
+  stats.stats.buckets[0].values.error_rate = 100;
+  stats.stats.buckets[1].values.requests = 1; // Pending/cancelled, not in the completed denominator.
+  await openLogs(page, fixture, false, stats);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  await trends.getByRole('button', { name: /错误率/ }).click();
+  await expect(trends.locator('g[data-bucket="0"] rect[data-tone="success"]')).toHaveCount(0);
+  const red = trends.locator('g[data-bucket="0"] rect[data-tone="errors"]');
+  expect(Number(await red.getAttribute('y')) + Number(await red.getAttribute('height'))).toBeCloseTo(180);
+  await expect(trends.locator('g[data-bucket="1"] rect')).toHaveCount(0);
+  const chart = trends.getByRole('slider');
+  await chart.focus(); await page.keyboard.press('Home');
+  await expect(trends.getByRole('tooltip').locator('strong')).toHaveText(['0 次', '2 次']);
+  await page.keyboard.press('ArrowRight');
+  await expect(trends.getByRole('tooltip').locator('strong')).toHaveText(['0 次', '0 次']);
+  await expect(chart).toHaveAttribute('aria-valuetext', /成功次数 0 次，错误次数 0 次/);
+});
 
 test('trend panel collapses with keyboard access and preserves choices in both themes and narrow windows', async ({ page }) => {
   await openLogs(page, fixture, true);
