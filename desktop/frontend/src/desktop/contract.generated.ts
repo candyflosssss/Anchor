@@ -2,6 +2,54 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed", "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe", "skill_unsafe", "skill_changed", "skill_limit", "skill_link_unavailable"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface CCImportRequest {
+  database_path: string;
+  fingerprint: string;
+  approved: boolean;
+}
+export interface CCImportSource {
+  platform: string;
+  name: string;
+}
+export interface CCImportKey {
+  id: string;
+  protocol: string;
+}
+export interface CCImportProvider {
+  id: string;
+  base_urls: string[];
+  sources: CCImportSource[];
+  keys: CCImportKey[];
+  status: string;
+}
+export interface CCImportModel {
+  id: string;
+  provider_id: string;
+  upstream: string;
+  key_ids: string[];
+}
+export interface CCImportIssue {
+  platform: string;
+  name: string;
+  reason: string;
+}
+export interface CCImportReport {
+  database_path: string;
+  fingerprint: string;
+  providers: CCImportProvider[];
+  models: CCImportModel[];
+  issues: CCImportIssue[];
+  failure: string;
+  applied: boolean;
+  imported_providers: number;
+  imported_keys: number;
+  imported_models: number;
+}
+export interface CCImportResult {
+  contract: string;
+  data: CCImportReport | null;
+  problem: Problem | null;
+}
 export interface ConfirmRemoteUpdate {
   instance_id: string;
   version: string;
@@ -1108,6 +1156,7 @@ export interface DesktopBridge {
   EstimateModelCost(input1: CatalogEstimateInput): Promise<CatalogEstimateResult>;
   ExitDesktop(): Promise<StopResult>;
   ExportLogs(input1: Query): Promise<StopResult>;
+  ImportCCSwitch(input1: CCImportRequest): Promise<CCImportResult>;
   InstallRemoteUpdate(input1: ConfirmRemoteUpdate): Promise<UpdateResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
   KeyCooldownSettings(): Promise<KeyCooldownSettingsResult>;

@@ -3,6 +3,7 @@ package desktop
 
 import (
 	"github.com/candyflosssss/Anchor/internal/catalog"
+	"github.com/candyflosssss/Anchor/internal/ccswitch"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
@@ -421,4 +422,18 @@ type KeyCooldownSettingsResult struct {
 	Contract string               `json:"contract"`
 	Data     *KeyCooldownSettings `json:"data"`
 	Problem  *Problem             `json:"problem"`
+}
+
+// CC Switch public reports contain no credentials or raw configuration.
+type CCImportRequest = ccswitch.Request
+type CCImportSource = ccswitch.Source
+type CCImportKey = ccswitch.Key
+type CCImportProvider = ccswitch.Provider
+type CCImportModel = ccswitch.Model
+type CCImportIssue = ccswitch.Issue
+type CCImportReport = ccswitch.Report
+type CCImportResult struct {
+	Contract string          `json:"contract"`
+	Data     *CCImportReport `json:"data"`
+	Problem  *Problem        `json:"problem"`
 }

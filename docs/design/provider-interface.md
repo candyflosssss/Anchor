@@ -257,3 +257,20 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 - 轮询将健康因子乘入调度权重，不改变计费倍率；有序规则（优先级、最低价格、最低延迟、缓存亲和）降低故障来源的首选频率并保留全部失败转移候选，相同健康因子保留原偏好。轮询的已知／免费来源优先以最高健康因子的来源为准。降权不重复请求同一 provider/key/model，不改变流式结果和未知结果的重放约束。
 - 保存与请求结果归约串行，成功保存清除失败计数／临时降权／调度债务，保留最近测试，不修改供应商 revision。关闭时所有自动降权停止；核心启动读取策略，内存保留最近成功策略，结果归约不再因读取失败启用默认策略。启动读取失败时不自动降权，设置读取仍返回真实错误。重启保留策略，清空临时健康。
 - CLI 同能力为 `settings key-cooldown`；详见[指令大全](../cli/commands.md#16-key-自动降权设置当前源码未发布)。
+
+
+## CC Switch 导入契约（2026-10-21，源码实现，未打包）
+
+`POST /control/v1/import/cc-switch` 由核心受控读取实例账户的 CC Switch SQLite，预览和写入均要求管理鉴权、`X-Anchor-Instance` 身份。输入 `ccswitch.CCImportRequest`：database_path（空为默认路径）、fingerprint（预览为空，应用必填）、approved（预览false／应用true）；批准与 fingerprint 必须同时提供。桥接 `Bridge.ImportCCSwitch` → `client.ImportCCSwitch` → 核心共用实现，15秒期限，前端不读取文件／SQL或传递供应商密钥。详细 CLI 和转换边界见[指令大全](../cli/commands.md#cc-switch-供应商导入2026-10-21当前源码未发布)。
+
+Go 公共 DTO 由 `contract.go` 引用，TS 经 `go run ./cmd/desktop-contract` 生成；共享合成样例 `desktop/contract/ccswitch-import.json`。报告提供脱敏供应商／来源平台／Key ID与协议／模型候选／issues；没有 secret、原始配置、SQL错误或认证凭据。供应商主键仅基于有序URL集合，名称在 sources 中保留；同地址不同凭据或协议保留独立 Key。模型候选严格限制来源 Key，不将某个平台的一项配置隐式扩张到所有Key。
+
+读取覆盖全部平台，兼容性按配置判断。Gemini与AGY原生协议目前不可启用；未知平台、未知协议、客户端 OAuth、请求头／请求体覆盖、完整端点或无法确认的凭据引用会明确跳过。共享供应商展开 Claude／Codex／Gemini 的协议配置，与已物化条目去重；不以 apps／is_current 限制清单。没有明确模型的供应商可启用，但报告提示随后获取目录配置映射，不能宣称已具备模型路由。
+
+预览 fingerprint 覆盖来源快照、转换计划与目标配置；应用前重读并核验，变化返回 conflict。state.ImportProviders 原子创建供应商及 Keys、按模型 revision 追加映射，任何冲突整体回滚。已有供应商主键只列为 exists，不覆盖；同名共享模型保留其他候选、能力和元数据。报告 applied 仅表示数据库已提交，现有 Agent 同步复用既有头部反馈，供应商可用性仍需用户明确测试；不注册新的 Agent Binding，也不替换 CCS 客户端文件。
+
+来源缺失／不可读／超限返回固定 `failure=source_missing|source_invalid|source_limit`，无可执行计划；应用时来源失败或 fingerprint不符返回409。前端在 conflict 或 unknown 后销毁待提交预览，要求重读；取消／卸载只丢弃迟到结果，不承诺撤销已经提交的事务。切换实例按工作台实例 key 卸载 Controller，丢弃旧计划。没有后台轮询、自动推理或自动写入重试。
+
+验证分层：合成 SQLite + 真 Go client／CLI／Bridge 管理链，及共享样例的前端模拟 Wails 测试；不访问用户真实数据库／Agent配置，不代表双平台原生 WebView 验收。
+
+来源核对：CC Switch 上游 [farion1231/cc-switch，0a41250](https://github.com/farion1231/cc-switch/tree/0a41250dc03a01dd6418ed815023fd46db9b7840) 的 `database/schema.rs`、`provider.rs`、各平台配置及预设；未引入运行时上游依赖。

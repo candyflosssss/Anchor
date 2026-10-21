@@ -40,6 +40,8 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   status                             Query selected context
   stop --approve [--for-restart]      Stop core; optional planned-restart handoff
   provider list
+  provider import-ccs [--db PATH] [--approve --fingerprint SHA256]
+      Preview all CC Switch platforms on the selected instance; apply imports and enables compatible providers atomically.
   provider platform --id ID             Read platform configuration (redacted)
   provider platform-put --id ID --revision N [--platform auto|sub2api|newapi|oneapi]
       [--site-url URL] [--user-id N] [--user-token-stdin | --clear-user-token]
@@ -608,6 +610,8 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 		return errors.New("provider requires list, models, add or put")
 	}
 	switch args[0] {
+	case "import-ccs":
+		return a.importCCSwitch(ctx, c, args[1:])
 	case "chat":
 		return a.providerChat(ctx, c, args[1:])
 	case "platform", "platform-put", "detect-platform", "balance-summary", "balance", "key-quota", "usage-records", "effective-rate":

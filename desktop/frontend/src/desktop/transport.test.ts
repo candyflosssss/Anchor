@@ -11,6 +11,7 @@ const session = { version: '0.1.0-dev.desktop.58', instance_id: 'synthetic-insta
 const input = { provider: publicRow, expected_revision: publicRow.revision, secret: 'synthetic-secret' };
 function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
   return {
+    ImportCCSwitch: vi.fn(),
     ProxyWorkspace: vi.fn(), ManageProxy: vi.fn(),
     Connections: vi.fn(), ConnectSSH: vi.fn(), UseConnection: vi.fn(),
  Start: vi.fn(async () => ({ contract: CONTRACT, data: session, problem: null })),

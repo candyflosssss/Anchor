@@ -1,0 +1,20 @@
+{
+  "database_path": "/synthetic/cc-switch.db",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "providers": [
+    {
+      "id": "ccs-demo",
+      "base_urls": ["https://upstream.example/v1"],
+      "sources": [{"platform": "claude", "name": "演示供应商"}, {"platform": "codex", "name": "演示供应商"}],
+      "keys": [{"id": "ccs-claude", "protocol": "anthropic"}, {"id": "ccs-codex", "protocol": "responses"}],
+      "status": "ready"
+    }
+  ],
+  "models": [{"id": "demo-model", "provider_id": "ccs-demo", "upstream": "demo-model", "key_ids": ["ccs-codex"]}],
+  "issues": [{"platform": "gemini", "name": "Gemini 演示", "reason": "unsupported_protocol"}],
+  "failure": "",
+  "applied": false,
+  "imported_providers": 0,
+  "imported_keys": 0,
+  "imported_models": 0
+}

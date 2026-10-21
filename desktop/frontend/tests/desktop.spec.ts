@@ -31,6 +31,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
     let cooldownState = structuredClone(keyCooldown);
     window.keyCooldownTest = { saves: 0 };
     const api: DesktopBridge = {
+      ImportCCSwitch: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       KeyCooldownSettings: async () => ({ contract, data: cooldownState, problem: null }),
       SaveKeyCooldownSettings: async input => {
         window.keyCooldownTest.saves++;

@@ -1,3 +1,5 @@
+import { CCImportDialog } from '../features/providers/ccswitch-import.view';
+import { useCCSwitchImport } from '../features/providers/use-ccswitch-import';
 import { useModelRouting } from '../features/models/use-model-routing';
 import { aggregateModels } from '../features/providers/provider-summary.model';
 import { useEffect, useRef } from 'react';
@@ -26,12 +28,13 @@ export function WorkbenchPage({ environment, balanceCache, page, navSeq, onNavig
   environment: ProviderEnvironment; balanceCache: ProviderBalanceCache; page: Exclude<Page, 'settings' | 'logs'>; navSeq: number; onNavigate: (page: Page) => void; onActivity: (busy: boolean) => void;
 }) {
   const c = useProviderController(environment, balanceCache);
+  const ccImport = useCCSwitchImport(() => c.load());
   const summaries = useProviderSummaries(c.providers, c.phase === 'ready', environment.transport, c.features.data, c.summaryVersion);
   const balances = useProviderBalances(c.providers, c.phase === 'ready' && page === 'providers' && !c.selected, environment.transport, balanceCache, c.refreshVersion);
   const rates = useMappingRates(c.providers, c.phase === 'ready' && page === 'models', environment.transport);
   const routing = useModelRouting(aggregateModels(summaries), page === 'models', environment.transport, async () => { if (!await c.load()) throw new Error('配置读取失败'); });
   const opener = useRef<HTMLElement | null>(null);
-  const busy = routing.busy || rates.busy || c.busy || !!c.editor || !!c.dialog;
+  const busy = ccImport.open || routing.busy || rates.busy || c.busy || !!c.editor || !!c.dialog;
   useEffect(() => { onActivity(busy); }, [busy, onActivity]);
   useEffect(() => () => onActivity(false), [onActivity]);
   const selectRef = useRef(c.select);
@@ -47,9 +50,10 @@ export function WorkbenchPage({ environment, balanceCache, page, navSeq, onNavig
     {page === 'overview' ? <Overview summaries={summaries} loading={loading} readFailed={c.phase === 'error'} disabled={c.blocked} onOpen={open} onCreate={() => { onNavigate('providers'); edit(); }} onShowProviders={() => onNavigate('providers')} onShowModels={() => onNavigate('models')}>{banner}</Overview>
       : page === 'models' ? <ModelsView transport={environment.transport} routing={routing} rates={rates} summaries={summaries} loading={loading} disabled={c.blocked} onOpen={open} onShowProviders={() => onNavigate('providers')}>{banner}</ModelsView>
       : c.selected && !c.quickId ? <div className="workspace">{banner}<ProviderDetail c={c} summary={summary} onEdit={() => edit(c.selected ?? undefined)} /><Notice text={c.features.notice || c.notice} /></div>
-      : <ProviderList c={c} summaries={summaries} balances={balances.entries} onRefreshBalance={balances.refresh} onEdit={edit} onCreate={() => edit()}>{banner}</ProviderList>}
+      : <ProviderList c={c} summaries={summaries} balances={balances.entries} onRefreshBalance={balances.refresh} onEdit={edit} onCreate={() => edit()} onImport={ccImport.show}>{banner}</ProviderList>}
     {prototype && c.mock && <div className="workspace pt-0"><footer className="prototype-controls mt-4"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={busy} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></footer></div>}
     {c.editor && <ProviderEditor c={c} restoreFocus={() => { requestAnimationFrame(() => { if (opener.current?.isConnected) opener.current.focus(); }); }} />}
     <ProviderDialogs c={c} />
+    <CCImportDialog c={ccImport} />
   </>;
 }

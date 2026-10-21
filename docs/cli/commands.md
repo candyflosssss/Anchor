@@ -87,6 +87,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `status` | 查询核心状态 | 所选 Context 的核心在线 |
 | `stop --approve [--for-restart]` | 默认正常停服；显式维护交接保留托管状态 | 所选 Context 在线、已核验身份及管理授权；交接要求 desktop.35／兼容源码核心的 restart_handoff 能力 |
 | `provider list` | 列出供应商 | 所选 Context 的核心在线 |
+| `provider import-ccs` | 预览／导入 CC Switch 全部平台供应商，按 Anchor 规则启用 | 所选 Context；兼容新核心；确认需预览 fingerprint，原子写入 |
 | `provider platform` / `platform-put` | 读取／配置平台身份和独立用户授权 | 核心在线；写入需当前 revision，令牌仅 stdin |
 | `provider balance` / `key-quota` | 分别读取远端账户余额、Key 额度 | 核心在线；平台已配置、当前 revision；按平台提供授权 |
 | `provider usage-records` / `effective-rate` | 读取远端逐请求账单／当前分组倍率 | 核心在线；当前 revision；部分平台需用户授权和站点 Key ID |
@@ -1047,3 +1048,19 @@ anchor settings key-cooldown --revision N [--enabled=true|false] [--weight-perce
 轮询把健康因子乘到原有调度权重上，不改计费倍率；原始权重相同时，10% 与正常 Key 的首选比例约 1:10。优先级、最低价格、最低延迟和缓存亲和保留原偏好，降权首选按其相对健康权重周期性让位，仍保留为失败转移候选。费用已知／免费优先仅由当前最高健康权重的来源决定，防止故障免费来源持续压过正常来源。关闭自动降权清除现有降权并停止新增；策略持久化，重启后临时健康重置。GUI「设置 → Key 自动降权」提供同能力，只显示名称、数值、控件和简短状态。
 
 兼容：保留 `key-cooldown` 命令、API 路径和旧时长字段名；旧设置缺失 `weight_percent` 时补 10，旧写请求省略或传 null 时保留已存比例。客户端与核心应一同更新，旧核心仍执行旧冷却规则。
+
+
+## CC Switch 供应商导入（2026-10-21，当前源码未发布）
+
+```text
+anchor [--context NAME] provider import-ccs [--db PATH]
+anchor [--context NAME] provider import-ccs [--db PATH] --approve --fingerprint SHA256
+```
+
+- 默认预览，不写入。`--db` 为空时读取**所选实例所在设备、运行账户**的 `~/.cc-switch/cc-switch.db`，支持绝对／相对路径及 `~/`；SSH Context 不上传本机数据库。需要当前管理授权与实例身份，读取失败退出1并输出固定 `failure`，不回显 SQLite 原始错误或凭据。
+- 扫描全部 `providers`，包括非 `is_current` 条目、额外请求地址及 `settings.universal_providers`；覆盖 Claude、Claude Desktop、Codex、Gemini、GrokBuild、OpenCode、OpenClaw、Hermes、Pi、MCode、AGY 的清单。按配置的实际上游协议转换，Anchor 当前只启用 Responses、Chat Completions、Anthropic。Gemini 原生协议、OAuth／客户端托管认证、自定义请求覆盖、环境变量／文件／命令凭据引用等明确列为 issues，不自动执行引用或假报兼容。
+- JSON 返回 `database_path/fingerprint/providers/models/issues/failure/applied/imported_providers/imported_keys/imported_models`，不含密钥。供应商 status 为 ready／exists；相同有序地址集合合并，凭据与协议相同的 Key 去重，其余独立保存。公开供应商 ID 由地址主机和稳定摘要组成，不依赖激活状态、供应商名称或秘密。
+- 先审阅全部平台、地址、协议、模型及跳过原因，再原样传回 fingerprint 并加 `--approve`。核心重读两端快照，变化返回 conflict；批次内供应商、Key 和模型映射在同一事务提交，失败全部回滚。已有同 ID 供应商保留，重复预览标记 exists；不覆盖或更新已有凭据。
+- 导入的供应商与 Key 按 Anchor 规则启用（供应商倍率1、超时120秒、并发4），明确模型转换为共享公开模型候选并限制来源 Key。已有同名公开模型保留元数据和候选顺序，按模型 revision 追加来源；候选满16时明确跳过。模型名不符合公开 ID 规则时生成带摘要别名。未配置明确模型时只保存供应商，之后通过目录／映射入口启用模型。
+- SQLite 以只读模式和同一事务读取已提交 WAL 内容，最多4096条供应商／16MiB配置，不迁移或修改 CC Switch。保存不等于上游连通性已验证，不发测试推理；现有已批准 Binding 使用既有同步流程，新客户端托管仍从 Agent 管理入口批准。超时／5xx等写入结果未知时先重新预览核对 exists，禁止盲目重放。
+- GUI 等价入口：供应商页「从 CC Switch 导入」，自动读取预览后点击「确认导入并启用」；原型模式禁用入口。需配套升级 CLI／GUI 与核心；旧版本没有此功能。

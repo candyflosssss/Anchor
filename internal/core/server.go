@@ -206,6 +206,7 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 func (s *Server) Control() http.Handler {
 	s.initLogs()
 	mux := http.NewServeMux()
+	s.ccSwitchRoutes(mux)
 	s.logRoutes(mux)
 	s.modelCatalogRoutes(mux)
 	s.skillRoutes(mux)

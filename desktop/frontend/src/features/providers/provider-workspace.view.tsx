@@ -1,6 +1,6 @@
 import { ProviderBalanceCell } from './provider-balance.view';
 import type { ProviderBalance } from './provider-balance.model';
-import { ChevronRight, Copy, KeyRound, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RefreshCw, Search, Server, TextCursorInput, Trash2, Unplug } from 'lucide-react';
+import { ChevronRight, Copy, Download, KeyRound, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RefreshCw, Search, Server, TextCursorInput, Trash2, Unplug } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Button } from '../../components/ui/button';
 import { Switch } from '../../components/ui/switch';
@@ -14,12 +14,12 @@ import { formatAgo, type ProviderSummary } from './provider-summary.model';
 import type { ProviderController } from './use-provider-controller';
 
 /** Provider list: health, keys, models and the last test are visible per row; one click opens the full detail page. */
-export function ProviderList({ c, summaries, balances, onRefreshBalance, onEdit, onCreate, children }: { c: ProviderController; summaries: ProviderSummary[]; balances: Record<string, ProviderBalance>; onRefreshBalance: (id: string) => void; onEdit: (p: Provider) => void; onCreate: () => void; children?: ReactNode }) {
+export function ProviderList({ c, summaries, balances, onRefreshBalance, onEdit, onCreate, onImport, children }: { c: ProviderController; summaries: ProviderSummary[]; balances: Record<string, ProviderBalance>; onRefreshBalance: (id: string) => void; onEdit: (p: Provider) => void; onCreate: () => void; onImport: () => void; children?: ReactNode }) {
   const enabled = c.providers.filter(p => p.enabled).length;
   const byId = new Map(summaries.map(s => [s.provider.id, s]));
   const rowClick = (e: MouseEvent, id: string) => { if (!(e.target as HTMLElement).closest('button, input, a, select, label')) c.openProvider(id); };
   return <div className="workspace">
-    <header className="page-header"><div><div className="eyebrow">配置管理</div><h1>供应商</h1></div><Button disabled={c.blocked} onClick={onCreate}><Plus />添加供应商</Button></header>
+    <header className="page-header"><div><div className="eyebrow">配置管理</div><h1>供应商</h1></div><div className="flex gap-2"><Button variant="outline" disabled={c.blocked || c.mock} onClick={onImport}><Download />从 CC Switch 导入</Button><Button disabled={c.blocked} onClick={onCreate}><Plus />添加供应商</Button></div></header>
     {children}
     <div className="list-toolbar"><div className="filter-tabs" role="group" aria-label="供应商状态筛选">{([['all', '全部', c.providers.length], ['enabled', '已启用', enabled], ['disabled', '已停用', c.providers.length - enabled]] as const).map(([value, label, count]) => <button key={value} aria-pressed={c.filter === value} disabled={c.busy} onClick={() => c.setFilter(value)}>{label}<span>{c.phase === 'ready' ? count : '—'}</span></button>)}</div>
       <div className="toolbar-actions"><div className="search-input"><Search size={15} /><Input disabled={c.busy} aria-label="搜索供应商名称或地址" placeholder="搜索名称或地址…" value={c.search} onChange={event => c.setSearch(event.target.value)} /></div><Button variant="outline" size="icon" disabled={c.busy || !!c.editor || c.phase === 'loading'} onClick={() => void c.load()} aria-label="刷新供应商列表"><RefreshCw className={c.refreshing ? 'animate-spin motion-reduce:animate-none' : undefined} /></Button></div>
