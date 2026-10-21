@@ -1,10 +1,40 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.62](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.62)，发布于 `2026-10-21T15:57:28+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `6d981b8ad34ac447fe6b43e4ea0780e2f02256de`、SOURCE dirty=false。
-- 日志趋势采用严格经过采样点的 PCHIP 保形曲线；错误率图改为成功绿色在下、错误红色在上的次数堆叠柱，零色段不绘制，纵轴使用整数次数；汇总卡片保留百分比。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.63](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.63)，发布于 `2026-10-21T16:20:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `87f13a468dfe016aa07e28b621001db20f249df0`、SOURCE dirty=false。
+- 修正日志柱图密度与读数交互：自动选择适合窗口的真实服务端粒度，保留手选粒度；柱间留白和外轮廓圆角，当前桶高亮。悬浮卡改为图下固定、可复制且移出后保留的读数栏；继续保留过点PCHIP曲线、红绿堆叠及零色段隐藏。
 - 复用图表定向测试结果，完成双平台生产编译／打包、11 附件远端摘要及三条默认源实际下载校验。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或改动真实实例／Agent配置；未验收双平台原生窗口、系统安装器或真实SSH升级，未请求付费上游。
+
+<a id="log-chart-ux-63"></a>
+
+## 日志柱图密度与固定读数栏 .63（已发布 dev）
+
+错误率柱图自动选择现有服务端统计粒度，桌面优先不超过48桶、窄窗口优先不超过24桶，90天受最大1天粒度限制；手选粒度保持，不在前端合并或省略采样。柱间留白、外轮廓圆角，检查时突出当前时段；成功绿色在下、错误红色在上，零色段不绘制。其他指标保留严格过点的PCHIP曲线。
+
+图内悬浮卡改为图下固定读数栏，展示实际桶起止时间、请求状态及指标值；鼠标移开仍保留最后读数，文字可复制。鼠标和键盘共用高亮，曲线显示对应采样点；Escape／离开／失焦关闭高亮。窄屏分行且读数栏预留空间，进入／移出不改变布局。无新增CLI或桥接契约。
+
+构建提交 `87f13a468dfe016aa07e28b621001db20f249df0`，输入摘要 `7eb4be360a1ea73cd4d4caae237ae10c475d93f61f5900d62e63d05030e5c987`，SOURCE dirty=false。从已提交主线的干净worktree构建，包含此前 `91cd6cb` 的供应商初始平台探测缓存及手动重新识别；不含构建后提交的 `e92de13` 供应商界面修正，也未纳入其他任务的架构／路线图／记录。产物与证据位于 `dist/desktop/0.1.0-dev.desktop.63/`，对应源码含Anchor Go vendor、未修改mihomo v1.19.32对应源码／vendor及固定payload。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.63_amd64.deb` | 29144148 | `ebe6246bee188fc4a93ca74dcf26229f662c2bd469f98594893b05a240ef8d1e` |
+| `Anchor-Desktop-0.1.0-dev.desktop.63-windows-amd64-setup.exe` | 31161599 | `398ad082e67fa5b894222137a69f946d307be0bf8d3bb0d27d4e32aeb897bf2e` |
+| `anchor-desktop-0.1.0-dev.desktop.63-linux-amd64` | 43107376 | `6cbb823e9b78f7617c0282c5168d8f13b07fb42a4e782ee014ba393639a4afc2` |
+| `anchor-desktop-0.1.0-dev.desktop.63-windows-amd64.exe` | 44228096 | `19381832a25190425c8881bc63e6ce729706819b2f56aaba356d7063e839bce4` |
+| `anchor-0.1.0-dev.desktop.63-linux-amd64` | 37736610 | `1829626546dfb3747bba9bc081c48029194a9ab5f9be149347499898ee79c0cc` |
+| `anchor-0.1.0-dev.desktop.63-windows-amd64.exe` | 37861888 | `8ac5f3f1d25bda9bea007839d2f2ac79ad9a88793a948ba1d70cc18fbf7a5d2a` |
+| `update-desktop.json` | 1755 | `af3619a5612d246ae9a834b37c1795eb0ddb5da9f43695b4ac6add2a9aa10fe7` |
+| `update-cli.json` | 876 | `590455a8ae2a7ca8d96125e8908531b5981780b433e7f30f9e15e3b1602395b2` |
+| `anchor_0.1.0-dev.desktop.63_source.tar.gz` | 97662591 | `100ff30e7a2b2cef341214545952701f67e2ffb026b1cc885c08df269f8509d1` |
+| `anchor_0.1.0-dev.desktop.63_metadata.zip` | 122177 | `68e1d8e1bf35238b7d8dc042d039a2544725028a9c96e59360183dcedbd2a9f4` |
+| `SHA256SUMS` | 1073 | `891b5820091780e456684234d814c16c521a9d92072909b20a4fd16fcdd8154b` |
+
+复用本轮TypeScript、定向ESLint、7项趋势单测与10项单worker模拟浏览器回归；浅／深主题、1440px／390px、固定读数位置与移出保留、键盘、手选细粒度、零桶／错误桶均通过。本次完成契约比对、TypeScript／Vite、Windows与Ubuntu24.04 AMD64生产编译及安装包构建；前端和固定mihomo嵌入、deb载荷与runtime一致、对应源码输入摘要及metadata ZIP CRC检查通过。保留非阻塞Vite大chunk警告。
+
+2026-10-21T16:20:18+08:00公开为dev prerelease、非latest；11附件远端大小／digest与本地一致，tag指向实际构建提交。默认dev源真实发现并下载Linux runtime、旧客户端deb及CLI，大小／SHA256和程序运行版本核对通过。证据见publication下preparation-verification.json、publication-verification.json和online-verification.json；原始BUILD.json保留构建时未发布／未安装／未原生验收的事实。
+
+本轮仅在线投放，沿用schema9，未安装、重启或修改真实实例／Agent配置和用户更新设置，未发起付费请求。未验收双平台原生窗口、系统安装器或真实SSH升级；浏览器与下载验证不等于原生安装验收。
 
 <a id="log-charts-62"></a>
 

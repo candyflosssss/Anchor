@@ -1,10 +1,14 @@
 # 在线更新 v1
 
 - 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.62](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.62)，发布于 `2026-10-21T15:57:28+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `6d981b8ad34ac447fe6b43e4ea0780e2f02256de`、SOURCE dirty=false。
-- 日志趋势采用严格经过采样点的 PCHIP 保形曲线；错误率图改为成功绿色在下、错误红色在上的次数堆叠柱，零色段不绘制，纵轴使用整数次数；汇总卡片保留百分比。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.63](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.63)，发布于 `2026-10-21T16:20:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `87f13a468dfe016aa07e28b621001db20f249df0`、SOURCE dirty=false。
+- 修正日志柱图密度与读数交互：自动选择适合窗口的真实服务端粒度，保留手选粒度；柱间留白和外轮廓圆角，当前桶高亮。悬浮卡改为图下固定、可复制且移出后保留的读数栏；继续保留过点PCHIP曲线、红绿堆叠及零色段隐藏。
 - 复用图表定向测试结果，完成双平台生产编译／打包、11 附件远端摘要及三条默认源实际下载校验。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或改动真实实例／Agent配置；未验收双平台原生窗口、系统安装器或真实SSH升级，未请求付费上游。
+
+## .63 在线投放（2026-10-21）
+
+日志柱图密度和固定读数栏修正已投放；11附件远端摘要、构建tag和非latest核对通过。默认dev源实际下载Linux runtime、旧客户端deb与CLI，大小／SHA256／运行版本验证通过。仅在线投放，未安装或改动真实实例；构建源87f13a4，不含其后e92de13的供应商界面修正。完整证据见[发行记录](../release/desktop.md#log-chart-ux-63)。
 
 ## .62 在线投放（2026-10-21）
 
