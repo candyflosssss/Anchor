@@ -11,7 +11,7 @@ func TestKeyCooldownConfiguredPolicyAndLiveDisable(t *testing.T) {
 	f := setup(t)
 	f.add(t, "p", "http://127.0.0.1:1/v1", "synthetic-key")
 	p, _ := f.store.Provider("p")
-	enabled, threshold, seconds, rate, weight := true, 2, 70, 80, 20
+	enabled, threshold, seconds, rate, weight := true, 50, 70, 80, 20
 	in := state.SaveKeyCooldownSettings{WeightPercent: &weight, Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 1}
 	if _, err := f.core.saveKeyCooldownSettings(in); err != nil {
 		t.Fatal(err)
@@ -23,15 +23,15 @@ func TestKeyCooldownConfiguredPolicyAndLiveDisable(t *testing.T) {
 	}
 	f.core.finishKey(p, "default", 500, "", false)
 	h := f.core.health[healthID(p, "default")]
-	if status() != "degraded" || time.Until(h.Until) < 68*time.Second {
+	if status() != "cooling" || time.Until(h.Until) < 68*time.Second {
 		t.Fatal(status(), h)
 	}
 	for i := 0; i < 3; i++ {
-		if _, ok := f.core.chooseKey(p, nil); !ok {
-			t.Fatal("degraded Key excluded")
+		if _, ok := f.core.chooseKey(p, nil); ok {
+			t.Fatal("cooling Key selected")
 		}
 	}
-	if _, err := f.core.saveKeyCooldownSettings(in); err != state.ErrConflict || status() != "degraded" {
+	if _, err := f.core.saveKeyCooldownSettings(in); err != state.ErrConflict || status() != "cooling" {
 		t.Fatal("conflict changed health", err)
 	}
 	h.Until = time.Now().Add(-time.Second)
@@ -45,17 +45,23 @@ func TestKeyCooldownConfiguredPolicyAndLiveDisable(t *testing.T) {
 	}
 	for _, code := range []int{401, 403, 429} {
 		f.core.finishKey(p, "default", code, "", false)
-		if status() != "degraded" {
+		if status() != "cooling" {
 			t.Fatal(code, status())
 		}
+		until := h.Until
 		f.core.finishKey(p, "default", 200, "", true)
-		if status() != "ready" || h.Failures != 0 {
-			t.Fatal("success did not recover")
+		f.core.finishKey(p, "default", 403, "", false)
+		if status() != "cooling" || h.Until != until {
+			t.Fatal("in-flight result changed cooldown")
+		}
+		h.Until = time.Now().Add(-time.Second)
+		if status() != "ready" || h.Score != 0 {
+			t.Fatal("expiry did not reset score")
 		}
 	}
 	f.core.finishKey(p, "default", 429, "12", false)
-	if time.Until(h.Until) < 11*time.Second || time.Until(h.Until) > 12*time.Second {
-		t.Fatal("Retry-After ignored", h)
+	if time.Until(h.Until) < 69*time.Second || time.Until(h.Until) > 70*time.Second {
+		t.Fatal("short Retry-After shortened cooldown", h)
 	}
 	enabled = false
 	in.ExpectedRevision = 2

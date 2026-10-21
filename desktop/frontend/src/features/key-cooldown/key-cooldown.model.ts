@@ -10,8 +10,9 @@ export function checkedKeyCooldown(value: unknown): KeyCooldownSettings {
     !Number.isInteger(v.weight_percent) || v.weight_percent < 1 || v.weight_percent > 100 ||
     !Number.isInteger(v.failure_threshold) || v.failure_threshold < 1 || v.failure_threshold > 100 ||
     !Number.isInteger(v.cooldown_seconds) || v.cooldown_seconds < 1 || v.cooldown_seconds > 3600 ||
+    !Number.isInteger(v.error_window_seconds) || v.error_window_seconds < 1 || v.error_window_seconds > 3600 ||
     !Number.isInteger(v.rate_limit_seconds) || v.rate_limit_seconds < 1 || v.rate_limit_seconds > 3600) throw new DesktopProblem('read_error');
-  return { weight_percent: v.weight_percent, enabled: v.enabled, failure_threshold: v.failure_threshold, cooldown_seconds: v.cooldown_seconds, rate_limit_seconds: v.rate_limit_seconds, revision: v.revision };
+  return { error_window_seconds: v.error_window_seconds, weight_percent: v.weight_percent, enabled: v.enabled, failure_threshold: v.failure_threshold, cooldown_seconds: v.cooldown_seconds, rate_limit_seconds: v.rate_limit_seconds, revision: v.revision };
 }
 export function createKeyCooldownService(getBridge: () => Pick<DesktopBridge, 'KeyCooldownSettings' | 'SaveKeyCooldownSettings'> = bridge) {
   return {
@@ -29,7 +30,7 @@ export function createKeyCooldownService(getBridge: () => Pick<DesktopBridge, 'K
       const raw = await call(() => api.SaveKeyCooldownSettings(input), true);
       try {
         const out = checkedKeyCooldown(raw);
-        if (out.revision !== input.expected_revision + 1 || out.enabled !== input.enabled || (input.weight_percent != null && out.weight_percent !== input.weight_percent) || out.failure_threshold !== input.failure_threshold || out.cooldown_seconds !== input.cooldown_seconds || out.rate_limit_seconds !== input.rate_limit_seconds) throw new Error();
+        if (out.revision !== input.expected_revision + 1 || out.enabled !== input.enabled || (input.weight_percent != null && out.weight_percent !== input.weight_percent) || out.failure_threshold !== input.failure_threshold || out.cooldown_seconds !== input.cooldown_seconds || out.rate_limit_seconds !== input.rate_limit_seconds || (input.error_window_seconds != null && out.error_window_seconds !== input.error_window_seconds)) throw new Error();
         return out;
       } catch { throw new DesktopProblem('unknown'); }
     },

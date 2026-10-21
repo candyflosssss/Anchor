@@ -13,9 +13,31 @@ import (
 
 type keyHealth struct {
 	Failures int
+	Score    int
+	errors   []keyError
 	Until    time.Time
-	credit   float64
 	Test     *catalog.Probe
+}
+type keyError struct {
+	score int
+	until time.Time
+}
+
+func (h *keyHealth) expire(now time.Time) {
+	if !h.Until.IsZero() && !h.Until.After(now) {
+		h.Until = time.Time{}
+		h.errors = nil
+		h.Failures = 0
+	}
+	h.Score = 0
+	retained := h.errors[:0]
+	for _, e := range h.errors {
+		if e.until.After(now) {
+			retained = append(retained, e)
+			h.Score += e.score
+		}
+	}
+	h.errors = retained
 }
 
 // Remove obsolete revisions while preserving newer snapshots used by in-flight requests.
@@ -58,6 +80,9 @@ func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed
 			continue
 		}
 		weight := s.keyWeightLocked(p, k.ID, now)
+		if weight == 0 {
+			continue
+		}
 		eligible = append(eligible, k)
 		weights = append(weights, weight)
 		maximum = max(maximum, weight)
@@ -71,19 +96,7 @@ func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed
 		}
 	}
 	if strategy == "priority" {
-		// Deferred Keys remain eligible as fallbacks. Equal penalties preserve
-		// configured priority, including when every Key is degraded.
-		for i, k := range eligible {
-			if weights[i] == maximum {
-				return k, true
-			}
-			h := s.health[healthID(p, k.ID)]
-			h.credit += weights[i] / maximum
-			if h.credit >= 1-1e-9 {
-				h.credit -= 1
-				return k, true
-			}
-		}
+		return eligible[0], true
 	} else {
 		raw, _ := json.Marshal([]any{p.Revision, eligible, weights})
 		scheduleID := "keys\x00" + p.ID
@@ -133,21 +146,34 @@ func (s *Server) finishKey(p state.Provider, k string, status int, after string,
 		h = &keyHealth{}
 		s.health[id] = h
 	}
-	if success {
-		h.Failures = 0
-		h.Until = time.Time{}
-		h.credit = 0
+	now := time.Now()
+	h.expire(now)
+	policy := s.keyPolicy
+	// In-flight successes/failures cannot reopen or extend a cooling Key.
+	if success || !policy.Enabled || h.Until.After(now) {
+		return
+	}
+	score, window := 0, policy.ErrorWindowSeconds
+	switch {
+	case status == 401 || status == 403:
+		score = 100
+	case status == 429:
+		score, window = 50, min(window, 60)
+	case status == 0 || status >= 500 || status == 408:
+		score, window = 25, min(window, 60)
+	}
+	if score == 0 {
 		return
 	}
 	h.Failures++
-	policy := s.keyPolicy
-	if !policy.Enabled {
-		return
-	}
-	if status == 429 {
-		h.Until = time.Now().Add(configuredRetryDelay(after, policy.RateLimitSeconds))
-	} else if status == 401 || status == 403 || h.Failures >= policy.FailureThreshold {
-		h.Until = time.Now().Add(time.Duration(policy.CooldownSeconds) * time.Second)
+	h.errors = append(h.errors, keyError{score: score, until: now.Add(time.Duration(window) * time.Second)})
+	h.Score += score
+	if h.Score >= policy.FailureThreshold {
+		delay := time.Duration(policy.CooldownSeconds) * time.Second
+		if status == 429 {
+			delay = max(delay, configuredRetryDelay(after, policy.RateLimitSeconds))
+		}
+		h.Until = now.Add(delay)
 	}
 }
 func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeyStatus {
@@ -158,10 +184,12 @@ func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeySta
 		out.State = "disabled"
 	}
 	if h := s.health[healthID(p, k.ID)]; h != nil {
+		h.expire(time.Now())
 		out.Failures = h.Failures
+		out.ErrorScore = h.Score
 		out.Test = h.Test
 		if s.keyWeightLocked(p, k.ID, time.Now()) < 1 {
-			out.State = "degraded"
+			out.State = "cooling"
 			out.RetryAt = h.Until.Unix()
 		}
 	}
@@ -174,8 +202,11 @@ func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeySta
 // keyWeightLocked is a scheduling factor, independent of billing multipliers.
 // Call with s.mu held. Expiry has no exclusive probe or request reservation.
 func (s *Server) keyWeightLocked(p state.Provider, key string, now time.Time) float64 {
-	if h := s.health[healthID(p, key)]; h != nil && s.keyPolicy.Enabled && h.Until.After(now) {
-		return float64(s.keyPolicy.WeightPercent) / 100
+	if h := s.health[healthID(p, key)]; h != nil {
+		h.expire(now)
+		if s.keyPolicy.Enabled && h.Until.After(now) {
+			return 0
+		}
 	}
 	return 1
 }

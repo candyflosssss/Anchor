@@ -165,7 +165,7 @@ export class MockProviderTransport implements ProviderTransport {
     if (input.action === 'start') {
       if (!input.approved || !input.model || (w.keys.length && !w.keys.some(k => k.id === input.key_id && k.enabled))) throw fixtureError('invalid');
       const value: ProbeProgress = { provider_id: p.id, revision: p.revision, run_id: `synthetic-${Date.now()}`, key_id: input.key_id, model: input.model,
-        status: 'running', phase: 'connecting', text: '', elapsed_ms: 0, result: null };
+        status: 'running', phase: 'connecting', text: '', elapsed_ms: 0, first_byte_ms: 0, result: null };
       this.probes.set(value.run_id, { value, started: Date.now() }); return structuredClone(value);
     }
     const run = this.probes.get(input.run_id);
@@ -174,6 +174,7 @@ export class MockProviderTransport implements ProviderTransport {
     if (input.action === 'cancel') value.status = 'cancelled';
     if (value.status === 'running') {
       value.phase = 'receiving'; value.text = value.elapsed_ms > 700 ? 'OK' : 'O';
+      if (!value.first_byte_ms) value.first_byte_ms = Math.max(1, value.elapsed_ms);
       if (value.elapsed_ms > 1100) value.status = 'completed';
     }
     if (value.status !== 'running') {

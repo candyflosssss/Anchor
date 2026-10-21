@@ -343,9 +343,9 @@ anchor usage
 | key-put | target 必填，最多64个 Key；新 Key 必须有非空 stdin 秘密，已有 Key 省略或空 stdin 保留秘密；默认 enabled，`--disabled` 停用；替换秘密只经 stdin，删除用 key-delete；protocol 省略/空值保留已有 Key 协议，新 Key 默认 responses；可显式选 responses / chat-completions / anthropic |
 | key-model-protocol | target 必填已存 Key，model 为实际模型名（不是公开别名，1..256 UTF-8 字节，无首尾空白/控制/格式字符）；protocol 为上述三协议；省略、空值或 inherit 删除覆盖，恢复动态继承 Key 默认值；不修改模型映射 |
 | key-delete / key-reset | target 与 approve 必填；delete 在同一事务删除指定 Key、秘密和对应模型来源：共享来源列表只移除该 Key，来源耗尽才移除候选；保留其他 Key／供应商提供的同名模型。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免意外转为匿名。仅失去全部候选时删除公开模型；已启用 Binding 默认模型引用仍返回409 referenced并整体回滚。受影响模型 revision 加一，失去本供应商候选时清理其价格，供应商 revision 加一；reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
-| strategy | 默认 round-robin，另可 priority；前者按健康权重轮询，后者按 Key ID 排序并降低故障首选频率；都跳过手动停用 Key，故障 Key 保留参与调度 |
+| strategy | 默认 round-robin，另可 priority；前者在可用 Key 中轮询，后者按 Key ID 顺序；都跳过停用或冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/降权 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
-| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段仅预留，当前不参与路由。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
+| model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段不参与运行时加权／低价策略，但参与桌面「按倍率」快速排序。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
 | model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，已启用 Binding 默认模型引用时409 referenced，事务回滚；已禁用 Binding 不阻止删除且配置保持不变 |
 | price-put | target 必须是该供应商映射的公共模型；输入/输出价格必填，USD/百万 token、范围0..1e6。缓存价格省略表示未知、0表示免费；完整替换该模型价格，来源 custom |
 | price-import | target 为待定价公共别名，catalog-provider/model 为 models.dev 精确 ID；共享 catalog 的1小时缓存与固定公开目录最多30秒/16MiB，无推理凭据或重定向，公开下载支持 HTTPS_PROXY/NO_PROXY，拒绝陈旧快照；更新时间为快照获取时间，带上下文 tiers 的条目返回 invalid，不再静默丢弃分档；改用 model-catalog model/estimate 或 model settings 参考快照；无分档条目只返回 imported_price **预览**，不保存；核对后另行 price-put |
@@ -354,11 +354,11 @@ anchor usage
 
 `provider test` 与真实模型转发先使用配置地址；若未带版本号的 API 基址返回 HTML（HTTP 200／404／405），核心保留部署前缀并追加 `/v1` 重试一次。两个请求共用原有超时与并发名额，不修改配置；已带 `/v1` 等版本路径、鉴权／限流／JSON 错误和已开始的 SSE 不触发补路径。若最终 HTTP 200 仍为 HTML，`probe.failure` 返回 `unexpected_html`，表示收到网站页面，应检查 API 基址。诊断日志的 `endpoint_resolution`、`endpoint_requests`、`initial_http`、`response_kind` 只记录结构事实。命令参数、输出字段结构与退出码保持不变；`failure` 增加上述枚举值。
 
-配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。401/403、429 和连续失败触发临时降权，不自动停用 Key；成功或到期恢复，无独占探测。自动降权开关、保留权重、失败阈值及两类时长由 `settings key-cooldown` 配置（§16）。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
+配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；model-put/delete 单独修改模型，供应商 revision 保持。test、reset、price-import 不改配置 revision。变更 revision 或重启核心后 Key 临时健康重置。错误按分数与窗口累计，达到阈值只冷却对应 Key，不自动停用；CD 到期直接恢复，无独占探测。自动冷却开关、分数阈值、错误窗口及两类时长由 `settings key-cooldown` 配置（§16）。所有存储 Key 均不可用时不退回匿名。全局 status 的 upstream_health=per_key 表示查看工作台，不宣称总体健康。
 
 当前网关每个供应商／Key／候选模型通常仅尝试一次，可安全失败时切换其他Key或候选；desktop.58 已发布明确密文校验拒绝后的单次清理重试例外，规则见下文日志章节和[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
 
-401/403/429沿用Key切换与降权；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康、日志与用量按实际渠道尝试更新，不设置半开探测预约。此处不改变 provider test 固定目标与管理写入不自动重试的规则。
+401/403/408/429/5xx沿用Key切换与错误计分；已取得连接后结果未知的超时／传输错误、无效成功响应、已提交的流式响应均不重放。显式502/503/504也不保证上游未执行或计费。健康、日志与用量按实际渠道尝试更新，不设置半开探测预约。此处不改变 provider test 固定目标与管理写入不自动重试的规则。
 
 usage/workspace.usage 按 provider_id/model 累计 requests/failures/elapsed_ms/known/input_tokens/output_tokens/cache_read/cache_write；requests 是**上游尝试数**，包含其他 Key／候选尝试、Codex 再次请求产生的上游尝试及 `test:<上游模型>` 测试行。unknown=requests-known，平均延迟=elapsed_ms/requests；缺失用量不当成0。缓存 token 包含于 input_tokens。只保存计数，不保存提示词、输出正文或秘密。workspace.estimates 为按当前价格估算的已知部分 USD；没价格、无已知用量、发生缓存用量但缺缓存单价时为 null。不是账单，不记录历史价格或包含未知请求费用。
 
@@ -776,7 +776,7 @@ anchor recover [--id ID]
 | 多轮文本对话测试（当前源码，未发布） | provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve；stdin 为完整消息数组，支持可选原生思考深度 | 共享核心与桌面 ProviderChat；CLI 输出最终 JSON，不单独提供终端交互／流式展示命令，复制和清空为页面生命周期 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
-| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／来源／Key 默认收起后置，可手动展开；待确认状态继续显示，完整路由排序须显式进入且折叠不改写配置，此展示不新增 CLI 契约；降权策略设置见 settings key-cooldown（§16） |
+| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／Key 默认收起后置，渠道始终按保存顺序展示并可拖动；快速倍率排序含隐藏模型倍率，未知后置；低延迟排序经确认对可用渠道各测一次首字时间。CLI 用 model routing 保存顺序、provider test 测试；无专用一键排序命令。冷却设置见 settings key-cooldown（§16） |
 | 平台自动识别与列表余额（首次识别持久缓存为当前源码未发布增量） | provider detect-platform/balance-summary；platform-put 默认 auto | 创建时自动识别一次并持久缓存成功或失败，旧供应商首次查询补齐；GUI「重新探测」与 detect-platform 才更新识别。余额／倍率数据按既有策略刷新，切页复用上次余额。NewAPI 金额按站点比例换算，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单由 CLI 提供，当前源码 GUI 已接入分组倍率；额度保留原始单位。desktop.57 dev GUI 已发布：供应商详情／新增模型步骤识别 NewAPI 后直接输入用户令牌，保存后自动以新 revision 查询倍率（effective-rate），无需手选平台／替换模式；沿用既有命令 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法、映射设置及显式默认值导入、日志逐请求比价与价格缓存维护已随 desktop.57 交付，详见§6、§12、§13 |
@@ -1023,31 +1023,30 @@ anchor [--context NAME] proxy bind PROVIDER [--key KEY] --mode direct|system|inh
 - 固定 mihomo v1.19.32；正式构建入口自动校验并嵌入 Windows/Linux amd64 payload。直接 `go build` 且未准备 payload 时显示未内置，选用 mihomo 报错，但外部 HTTP/SOCKS5 仍可用。构建方法和 GPLv3 通知见 [代理设计](../design/proxy-settings.md) 与 [mihomo notice](../../third_party/mihomo/NOTICE.md)。秘密依赖实例目录权限保护，**不是静态加密**。
 
 
-## 16. Key 自动降权设置（当前源码，未发布）
+## 16. Key 错误分数与冷却设置（当前源码，未发布）
 
 ```text
 anchor settings key-cooldown
-anchor settings key-cooldown --revision N [--enabled=true|false] [--weight-percent N] [--failure-threshold N] [--cooldown-seconds N] [--rate-limit-seconds N]
+anchor settings key-cooldown --revision N [--enabled=true|false] [--failure-threshold N] [--error-window-seconds N] [--cooldown-seconds N] [--rate-limit-seconds N] [--weight-percent N]
 ```
 
-| 参数 | 范围 / 默认 |
+| 参数 | 语义 |
 | --- | --- |
-| `--enabled` | 自动降权开关，初始 true；关闭使用 `--enabled=false` |
-| `--weight-percent` | 降权后保留的调度权重百分比，整数 1..100，初始 10；100 表示不降低权重 |
-| `--failure-threshold` | 连续失败次数，整数 1..100，初始 3；401/403/429 立即降权 |
-| `--cooldown-seconds` | 一般失败及 401/403 降权秒数，整数 1..3600，初始 30；沿用旧参数名 |
-| `--rate-limit-seconds` | 429 无有效 Retry-After 时的默认降权秒数，整数 1..3600，初始 30 |
-| `--revision` | 写入必填，取最近读取的 revision；仅查询时不得提供 |
+| `--enabled` | 自动冷却开关，初始 true；关闭传 false |
+| `--failure-threshold` | 错误分数阈值，整数 1..100，初始 100 |
+| `--error-window-seconds` | 错误有效期，整数 1..3600，初始 300；429／瞬时错误最多保留 60 秒 |
+| `--cooldown-seconds` | Key 冷却秒数，整数 1..3600，初始 300 |
+| `--rate-limit-seconds` | 429 缺少有效 Retry-After 的时长，整数 1..3600，初始 300；实际与冷却时长取较大值 |
+| `--weight-percent` | 已废弃的兼容字段，整数 1..100，初始 10；不参与冷却或调度 |
+| `--revision` | 保存必填当前设置 revision；不能单独传入 |
 
-前置条件：已初始化本机状态，已有可用 Context 和对应核心管理授权；沿用全局 `--context NAME`，配置作用于所选核心的全部供应商和 Key。旧核心需升级后才具有降权语义。无修改参数时只查询；提供任何修改项时条件保存，未提供项保留当前已存值，不回到初始默认。
+作用域为所选 Context 的在线核心，需管理凭据与实例身份。无修改参数时只读；保存未指定项保留当前值。读／写均输出包含上述配置及 revision 的 JSON；成功退出 0，越界、缺 revision、冲突、连接／身份／鉴权错误非零。写入不重试，结果未知先重读。成功 revision +1，清除临时分数与 CD，不修改供应商 revision、Agent 文件或请求上游。
 
-查询与保存均输出 `{enabled,weight_percent,failure_threshold,cooldown_seconds,rate_limit_seconds,revision}` JSON；成功退出 0，参数越界／缺 revision／冲突／身份不符／鉴权或连接失败非零，不自动重试写入。保存成功 revision +1，立即清除临时失败计数和降权；不修改供应商 revision，不调用上游、不改 Agent 文件。写入结果未知须重新查询。
+401/403 每次加 100 分，429 加 50 分，408／网络／5xx 加 25 分；其他错误不加分。成功不清窗口分数，分数过期自动扣除。达到阈值后该 Key 不可调度，其他 Key 正常。429 支持秒数或 HTTP 日期 Retry-After，最终冷却限制 1 秒..1 小时。CD 内在途结果不提前解除或延长，到期清分直接放开；只有一个 Key 或所有 Key 都冷却时也不会绕过。全部候选不可用返回 503 no_available_candidate（全部渠道不可用）。
 
-开启时连续失败达到阈值，或收到 401/403/429 后临时降权。429 优先有效 Retry-After（秒数或 HTTP 日期），最终限制 1 秒..1 小时；它只影响降权时长。成功或到期恢复正常权重，无永久认证封禁、硬冷却和独占半开探测。只有一个可用 Key 或全部降权时仍能调度，手动停用和并发限制继续生效。
+显式会话通过 `X-Anchor-Session` 或支持的 Codex 会话元数据识别，按调用者／公开模型隔离；成功后保持渠道，优先渠道恢复不回切。当前渠道不可用再按当前规则 fallback，新会话按当前规则选择。亲和限进程内 1024 条 LRU，重启或淘汰后重新选择，不以提示词推断会话。连接后结果未知或已开始输出的流不重放。
 
-轮询把健康因子乘到原有调度权重上，不改计费倍率；原始权重相同时，10% 与正常 Key 的首选比例约 1:10。优先级、最低价格、最低延迟和缓存亲和保留原偏好，降权首选按其相对健康权重周期性让位，仍保留为失败转移候选。费用已知／免费优先仅由当前最高健康权重的来源决定，防止故障免费来源持续压过正常来源。关闭自动降权清除现有降权并停止新增；策略持久化，重启后临时健康重置。GUI「设置 → Key 自动降权」提供同能力，只显示名称、数值、控件和简短状态。
-
-兼容：保留 `key-cooldown` 命令、API 路径和旧时长字段名；旧设置缺失 `weight_percent` 时补 10，旧写请求省略或传 null 时保留已存比例。客户端与核心应一同更新，旧核心仍执行旧冷却规则。
+兼容旧命令、路径与字段；旧持久设置没有窗口时补 300 秒，原连续失败阈值乘 25（最高 100），保留原时长和开关。客户端与核心需配套升级。GUI「设置 → Key 冷却」提供同能力；模型页拖动及两种快速排序均保存为 priority，保存后可继续手调。
 
 
 ## CC Switch 供应商导入（2026-10-21，当前源码未发布）

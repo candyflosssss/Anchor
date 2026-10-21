@@ -4,7 +4,9 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -17,8 +19,6 @@ type modelSchedule struct {
 }
 type routeAffinity struct {
 	provider, model, key string
-	revision             int64
-	providerRevision     int64
 	at                   time.Time
 }
 type routeLatency struct {
@@ -38,28 +38,22 @@ func candidateAllowsKey(ids []string, key string) bool {
 	return false
 }
 
-// Only a digest of the authenticated caller and stable request prefix is retained.
-// It is a routing hint, not a promise that the upstream will report a cache hit.
-func routingAffinity(owner, model string, request map[string]json.RawMessage) string {
-	h := sha256.New()
-	h.Write([]byte(owner))
-	h.Write([]byte{0})
-	h.Write([]byte(model))
-	appendPart := func(raw []byte) {
-		h.Write([]byte{0})
-		if len(raw) > 65536 {
-			raw = raw[:65536]
-		}
-		h.Write(raw)
+// Prompt similarity is not session identity. Retain only a caller/model/session digest.
+func routingAffinity(owner, model, session string) string {
+	if session == "" {
+		return ""
 	}
-	appendPart(request["instructions"])
-	var input []json.RawMessage
-	if json.Unmarshal(request["input"], &input) == nil && len(input) > 0 {
-		appendPart(input[0])
-	} else {
-		appendPart(request["input"])
+	raw, _ := json.Marshal([]string{owner, model, session})
+	h := sha256.Sum256(raw)
+	return hex.EncodeToString(h[:])
+}
+func requestRoutingAffinity(r *http.Request, model string) string {
+	credentials := []string{strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key")}
+	session := logIdentity(r.Header.Values("X-Anchor-Session"), credentials...)
+	if session == "" {
+		session = codexLogSession(r.Header, credentials...)
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return routingAffinity(strings.Join(credentials, "\x00"), model, session)
 }
 func latencyID(public string, revision int64, c state.Candidate, p state.Provider) string {
 	raw, _ := json.Marshal([]any{public, revision, c.ProviderID, c.Model, p.Revision})
@@ -69,8 +63,7 @@ func (s *Server) routeCandidates(m state.Model) ([]state.Candidate, error) {
 	return s.routeCandidatesFor(m, "")
 }
 
-// Health changes scheduling weight without excluding Keys. Manual availability
-// and concurrency are rechecked immediately before forwarding.
+// Cooling Keys are excluded. Availability and concurrency are rechecked before forwarding.
 func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Candidate, error) {
 	// Cost-based rules schedule actual provider/model/Key routes. The stored
 	// candidate multiplier is reserved and intentionally never used here.
@@ -91,7 +84,7 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 		if len(sourceKeys) == 0 {
 			sourceKeys = []state.ProviderKey{{ID: "anonymous", Enabled: true}}
 		}
-		if strategy == "lowest-latency" || strategy == "priority" {
+		if strategy == "lowest-latency" || strategy == "priority" || strategy == "cache-priority" {
 			routes = append(routes, c)
 			providers = append(providers, p)
 			keys = append(keys, sourceKeys)
@@ -132,9 +125,8 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 	if len(available) == 0 {
 		return []state.Candidate{}, nil
 	}
-	ordered := strategy == "priority" || strategy == "lowest-price" || strategy == "lowest-latency"
-	if strategy == "priority" {
-		// Retain configured order before applying health preference.
+	if strategy == "priority" || strategy == "cache-priority" {
+		// New sessions use saved order.
 	} else if strategy == "lowest-price" {
 		sort.SliceStable(available, func(i, j int) bool {
 			a, b := costs[available[i]], costs[available[j]]
@@ -158,22 +150,6 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 		})
 	} else {
 		preferred := -1
-		if strategy == "cache-priority" {
-			if a, ok := s.affinity[affinity]; ok && a.revision == m.Revision && now.Sub(a.at) < 10*time.Minute {
-				for _, i := range available {
-					c := m.Candidates[i]
-					if c.ProviderID == a.provider && c.Model == a.model && a.providerRevision == providers[i].Revision && candidateAllowsKey(c.KeyIDs, a.key) {
-						for _, k := range keys[i] {
-							if k.ID == a.key && k.Enabled {
-								preferred = i
-								break
-							}
-						}
-					}
-				}
-			}
-		}
-		ordered = preferred >= 0
 		if preferred < 0 {
 			// Rebuild smooth weights after cache/config/Key changes, even when the
 			// public model revision and endpoint count have not changed.
@@ -243,31 +219,24 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 			}
 		}
 	}
-	if ordered {
-		// Ordered strategies retain their normal preference for healthy routes.
-		// A degraded first choice periodically leads, otherwise moves behind
-		// healthier alternatives; it always remains in the fallback list.
-		raw, _ := json.Marshal([]any{m.Revision, m.Candidates, providers, healthWeights})
-		id := "health\x00" + m.ID
-		schedule := s.routing[id]
-		if schedule == nil || schedule.signature != string(raw) {
-			schedule = &modelSchedule{signature: string(raw), current: make([]float64, len(m.Candidates))}
-			s.routing[id] = schedule
-		}
-		maximum := 0.0
-		for _, i := range available {
-			maximum = max(maximum, healthWeights[i])
-		}
+	// Session affinity survives priority edits and higher-channel recovery.
+	if a, ok := s.affinity[affinity]; ok && affinity != "" {
+		preferred := -1
 		for pos, i := range available {
-			if healthWeights[i] < maximum {
-				schedule.current[i] += healthWeights[i] / maximum
-				if schedule.current[i] < 1-1e-9 {
-					continue
+			c := m.Candidates[i]
+			if c.ProviderID == a.provider && c.Model == a.model {
+				if preferred < 0 {
+					preferred = pos
 				}
-				schedule.current[i] -= 1
+				if candidateAllowsKey(c.KeyIDs, a.key) {
+					preferred = pos
+					break
+				}
 			}
-			available = append([]int{i}, append(available[:pos], available[pos+1:]...)...)
-			break
+		}
+		if preferred >= 0 {
+			i := available[preferred]
+			available = append([]int{i}, append(available[:preferred], available[preferred+1:]...)...)
 		}
 	}
 
@@ -278,13 +247,10 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 	return out, nil
 }
 func (s *Server) preferredRouteKey(m state.Model, c state.Candidate, p state.Provider, affinity string) string {
-	if m.RoutingStrategy() != "cache-priority" {
-		return ""
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	a, ok := s.affinity[affinity]
-	if ok && a.revision == m.Revision && a.provider == c.ProviderID && a.model == c.Model && a.providerRevision == p.Revision && time.Since(a.at) < 10*time.Minute && candidateAllowsKey(c.KeyIDs, a.key) {
+	if ok && affinity != "" && a.provider == c.ProviderID && a.model == c.Model && candidateAllowsKey(c.KeyIDs, a.key) {
 		return a.key
 	}
 	return ""
@@ -316,15 +282,10 @@ func (s *Server) rememberRoute(m state.Model, c state.Candidate, p state.Provide
 		}
 	}
 	s.latency[id] = routeLatency{ms: ms, at: now}
-	if m.RoutingStrategy() != "cache-priority" || affinity == "" {
+	if affinity == "" {
 		return
 	}
-	if len(s.affinity) >= 1024 {
-		for k, v := range s.affinity {
-			if now.Sub(v.at) >= 10*time.Minute {
-				delete(s.affinity, k)
-			}
-		}
+	if _, exists := s.affinity[affinity]; !exists && len(s.affinity) >= 1024 {
 		if len(s.affinity) >= 1024 {
 			oldest := ""
 			for k, v := range s.affinity {
@@ -335,5 +296,5 @@ func (s *Server) rememberRoute(m state.Model, c state.Candidate, p state.Provide
 			delete(s.affinity, oldest)
 		}
 	}
-	s.affinity[affinity] = routeAffinity{provider: c.ProviderID, model: c.Model, key: key, revision: m.Revision, providerRevision: p.Revision, at: now}
+	s.affinity[affinity] = routeAffinity{provider: c.ProviderID, model: c.Model, key: key, at: now}
 }

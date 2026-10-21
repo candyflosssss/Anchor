@@ -18,7 +18,7 @@ func TestKeyCooldownDefaultPersistenceAndValidation(t *testing.T) {
 	enabled, threshold, seconds, rate := false, 7, 90, 120
 	in := SaveKeyCooldownSettings{Enabled: &enabled, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &rate, ExpectedRevision: 1}
 	out, err = s.SaveKeyCooldownSettings(in)
-	if err != nil || out.Enabled || out.FailureThreshold != 7 || out.CooldownSeconds != 90 || out.RateLimitSeconds != 120 || out.Revision != 2 {
+	if err != nil || out.Enabled || out.FailureThreshold != 7 || out.CooldownSeconds != 90 || out.RateLimitSeconds != 120 || out.ErrorWindowSeconds != 300 || out.Revision != 2 {
 		t.Fatal(out, err)
 	}
 	if _, err = s.SaveKeyCooldownSettings(in); !errors.Is(err, ErrConflict) {
@@ -46,6 +46,15 @@ func TestKeyCooldownDefaultPersistenceAndValidation(t *testing.T) {
 		}
 		*target = 30
 	}
+	window := 0
+	in.ErrorWindowSeconds = &window
+	for _, n := range []int{0, 3601} {
+		window = n
+		if _, err = s.SaveKeyCooldownSettings(in); !errors.Is(err, ErrInvalid) {
+			t.Fatal(n, err)
+		}
+	}
+	in.ErrorWindowSeconds = nil
 	for _, n := range []int64{0, 9007199254740991} {
 		in.ExpectedRevision = n
 		if _, err = s.SaveKeyCooldownSettings(in); !errors.Is(err, ErrInvalid) {
@@ -63,7 +72,7 @@ func TestKeyCooldownDefaultPersistenceAndValidation(t *testing.T) {
 	}
 }
 
-func TestKeyDownweightSettingsMigrationAndWeight(t *testing.T) {
+func TestKeyCooldownSettingsMigrationAndDeprecatedWeight(t *testing.T) {
 	s, err := Open(t.TempDir(), true)
 	if err != nil {
 		t.Fatal(err)
@@ -74,13 +83,13 @@ func TestKeyDownweightSettingsMigrationAndWeight(t *testing.T) {
 		t.Fatal(err)
 	}
 	old, err := s.KeyCooldownSettings()
-	if err != nil || old.WeightPercent != 10 || old.Enabled || old.Revision != 7 {
+	if err != nil || old.WeightPercent != 10 || old.Enabled || old.Revision != 7 || old.ErrorWindowSeconds != 300 || old.FailureThreshold != 100 {
 		t.Fatal(old, err)
 	}
 	weight := 25
 	in := SaveKeyCooldownSettings{WeightPercent: &weight, Enabled: &old.Enabled, FailureThreshold: &old.FailureThreshold, CooldownSeconds: &old.CooldownSeconds, RateLimitSeconds: &old.RateLimitSeconds, ExpectedRevision: 7}
 	out, err := s.SaveKeyCooldownSettings(in)
-	if err != nil || out.WeightPercent != 25 {
+	if err != nil || out.WeightPercent != 25 || out.FailureThreshold != 100 {
 		t.Fatal(out, err)
 	}
 	in.ExpectedRevision = 8

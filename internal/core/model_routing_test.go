@@ -102,7 +102,7 @@ func TestWeightedModelGatewayDistributionAndAvailability(t *testing.T) {
 		t.Fatalf("multiplier 1:2 should yield 8:4 requests, got %d:%d", a.Load(), b.Load())
 	}
 	pa, _ := f.store.Provider("a")
-	f.core.finishKey(pa, "default", 429, "60", false)
+	f.core.finishKey(pa, "default", 403, "60", false)
 	for i := 0; i < 3; i++ {
 		send()
 	}
@@ -167,19 +167,71 @@ func TestWeightedCandidatesSkipUnavailableAndFailOver(t *testing.T) {
 	p, _ := f.store.Provider("a")
 	f.core.finishKey(p, "default", 401, "", false)
 	routes, err := f.core.routeCandidates(m)
-	if err != nil || len(routes) != 2 || routes[0].ProviderID != "b" {
+	if err != nil || len(routes) != 1 || routes[0].ProviderID != "b" {
 		t.Fatal(routes, err)
 	}
 	if err = f.store.MutateProvider("b", 1, "key-put", "default", "", "", false, false); err != nil {
 		t.Fatal(err)
 	}
 	routes, err = f.core.routeCandidates(m)
-	if err != nil || len(routes) != 1 || routes[0].ProviderID != "a" {
+	if err != nil || len(routes) != 0 {
 		t.Fatal("disabled key scheduled", routes, err)
 	}
 	r = request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hi"}`)
 	raw = text(t, r)
-	if r.StatusCode != 503 || failed.Load() < 2 {
+	if r.StatusCode != 503 || failed.Load() != 1 {
 		t.Fatal(r.StatusCode, raw)
 	}
+}
+
+func TestGatewaySessionSurvivesRecoveryAndFallsBackWhenUnavailable(t *testing.T) {
+	f := setup(t)
+	var failA, failB atomic.Bool
+	failA.Store(true)
+	upstream := func(fail *atomic.Bool, name string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if fail.Load() {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			io.WriteString(w, `{"id":"`+name+`","output":[]}`)
+		}))
+	}
+	a, b := upstream(&failA, "a"), upstream(&failB, "b")
+	defer a.Close()
+	defer b.Close()
+	f.add(t, "a", a.URL, "synthetic-a")
+	f.add(t, "b", b.URL, "synthetic-b")
+	if _, err := f.store.PutModel(state.Model{ID: "public", Strategy: "priority", Candidates: []state.Candidate{{ProviderID: "a", Model: "up-a"}, {ProviderID: "b", Model: "up-b"}}}, 0); err != nil {
+		t.Fatal(err)
+	}
+	send := func(session, want string, status int) {
+		t.Helper()
+		req, _ := http.NewRequest("POST", f.gateway.URL+"/v1/responses", strings.NewReader(`{"model":"public","input":"hi"}`))
+		req.Header.Set("Authorization", "Bearer "+f.token)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Anchor-Session", session)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		raw := text(t, resp)
+		if resp.StatusCode != status || !strings.Contains(raw, want) {
+			t.Fatal(resp.StatusCode, raw, want)
+		}
+	}
+	send("old-session", `"id":"b"`, 200)
+	failA.Store(false)
+	pa, _ := f.store.Provider("a")
+	f.core.mu.Lock()
+	f.core.health[healthID(pa, "default")].Until = time.Now().Add(-time.Second)
+	f.core.mu.Unlock()
+	send("old-session", `"id":"b"`, 200)
+	send("new-session", `"id":"a"`, 200)
+	failB.Store(true)
+	send("old-session", `"id":"a"`, 200)
+	failA.Store(true)
+	send("last-session", "no_available_candidate", 503)
+	send("new-session", "no_available_candidate", 503)
 }

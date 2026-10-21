@@ -34,7 +34,7 @@ func (s *Server) providerChat(w http.ResponseWriter, r *http.Request) {
 		}
 		progress := run.progress
 		if progress.Status == "running" {
-			progress.ElapsedMS = time.Since(run.started).Milliseconds()
+			progress.ElapsedMS = max(progress.FirstByteMS, time.Since(run.started).Milliseconds())
 		}
 		s.mu.Unlock()
 		writeJSON(w, 200, progress)
@@ -112,8 +112,13 @@ func (s *Server) providerChat(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer close(run.done)
 		defer cancel()
+		firstByteMS := int64(0)
 		result, err := s.inferenceObserved(ctx, p, in.KeyID, in.Model, in.ReasoningEffort, in.Messages, &selected, func(phase, text string) {
 			s.mu.Lock()
+			if phase == "receiving" && text != "" && run.progress.FirstByteMS == 0 {
+				firstByteMS = max(1, time.Since(run.started).Milliseconds())
+				run.progress.FirstByteMS = firstByteMS
+			}
 			run.progress.Phase = phase
 			run.progress.Text = text
 			s.mu.Unlock()
@@ -126,7 +131,8 @@ func (s *Server) providerChat(w http.ResponseWriter, r *http.Request) {
 		run.progress.Status = "completed"
 		run.progress.Phase = "complete"
 		run.progress.Result = result
-		run.progress.ElapsedMS = time.Since(run.started).Milliseconds()
+		run.progress.ElapsedMS = max(firstByteMS, time.Since(run.started).Milliseconds())
+		run.progress.FirstByteMS = firstByteMS
 		if ctx.Err() == context.Canceled {
 			run.progress.Status = "cancelled"
 		}

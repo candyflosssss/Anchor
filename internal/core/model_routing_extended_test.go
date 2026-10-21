@@ -156,16 +156,10 @@ func TestCacheAffinityCallerIsolationExpiryAndKeyFailover(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var req map[string]json.RawMessage
-	json.Unmarshal([]byte(`{"instructions":"stable","input":[{"role":"system","content":"prefix"},{"role":"user","content":"hi"}]}`), &req)
-	affinity := routingAffinity("caller-one", m.ID, req)
-	other := routingAffinity("caller-two", m.ID, req)
-	if affinity == other {
-		t.Fatal("callers not isolated")
-	}
-	req["input"] = json.RawMessage(`[{"role":"system","content":"prefix"},{"role":"user","content":"followup"}]`)
-	if routingAffinity("caller-one", m.ID, req) != affinity {
-		t.Fatal("stable prefix not reused")
+	affinity := routingAffinity("caller-one", m.ID, "session-one")
+	other := routingAffinity("caller-two", m.ID, "session-one")
+	if affinity == other || affinity == routingAffinity("caller-one", m.ID, "session-two") || routingAffinity("caller-one", m.ID, "") != "" {
+		t.Fatal("session isolation")
 	}
 	p, _ := f.store.Provider("b")
 	f.core.rememberRoute(m, m.Candidates[1], p, "source", affinity, time.Millisecond)
@@ -177,9 +171,9 @@ func TestCacheAffinityCallerIsolationExpiryAndKeyFailover(t *testing.T) {
 	if routes[0].ProviderID != "a" {
 		t.Fatal("affinity leaked to another caller")
 	}
-	f.core.finishKey(p, "source", 429, "60", false)
+	f.core.finishKey(p, "source", 403, "60", false)
 	routes, _ = f.core.routeCandidatesFor(m, affinity)
-	if len(routes) != 2 || routes[0].ProviderID != "a" {
+	if len(routes) != 1 || routes[0].ProviderID != "a" {
 		t.Fatal("degraded affinity blocked failover", routes)
 	}
 	f.core.mu.Lock()
@@ -187,14 +181,14 @@ func TestCacheAffinityCallerIsolationExpiryAndKeyFailover(t *testing.T) {
 	entry.at = time.Now().Add(-11 * time.Minute)
 	f.core.affinity[affinity] = entry
 	f.core.mu.Unlock()
-	if f.core.preferredRouteKey(m, m.Candidates[1], p, affinity) != "" {
-		t.Fatal("expired affinity reused")
+	if f.core.preferredRouteKey(m, m.Candidates[1], p, affinity) != "source" {
+		t.Fatal("idle session affinity lost")
 	}
 	entry.at = time.Now()
 	f.core.affinity[affinity] = entry
 	p.Revision++
-	if f.core.preferredRouteKey(m, m.Candidates[1], p, affinity) != "" {
-		t.Fatal("old provider revision reused")
+	if f.core.preferredRouteKey(m, m.Candidates[1], p, affinity) != "source" {
+		t.Fatal("provider revision lost session affinity")
 	}
 }
 
@@ -238,13 +232,13 @@ func TestCacheRoutingRemembersActualSuccessfulRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	send(token)
-	if counts["b"] != 1 {
+	if counts["a"] != 4 || counts["b"] != 0 {
 		t.Fatal("caller isolation", counts)
 	}
 	p, _ := f.store.Provider("a")
-	f.core.finishKey(p, "default", 429, "60", false)
+	f.core.finishKey(p, "default", 403, "60", false)
 	send(f.token)
-	if counts["b"] != 2 {
+	if counts["b"] != 1 {
 		t.Fatal("failed preferred key prevented successful failover", counts)
 	}
 }

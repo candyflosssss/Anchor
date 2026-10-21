@@ -37,7 +37,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
         window.keyCooldownTest.saves++;
         if (counters.writeError) return { contract, data: null, problem: { code: counters.writeError } };
         if (input.expected_revision !== cooldownState.revision) return { contract, data: null, problem: { code: 'conflict' } };
-        cooldownState = { weight_percent: input.weight_percent ?? cooldownState.weight_percent, enabled: input.enabled!, failure_threshold: input.failure_threshold!, cooldown_seconds: input.cooldown_seconds!, rate_limit_seconds: input.rate_limit_seconds!, revision: cooldownState.revision + 1 };
+        cooldownState = { weight_percent: input.weight_percent ?? cooldownState.weight_percent, enabled: input.enabled!, failure_threshold: input.failure_threshold!, cooldown_seconds: input.cooldown_seconds!, rate_limit_seconds: input.rate_limit_seconds!, error_window_seconds: input.error_window_seconds ?? cooldownState.error_window_seconds, revision: cooldownState.revision + 1 };
         return { contract, data: cooldownState, problem: null };
       },
       CodexSettings: async () => ({ contract, data: codexState, problem: null }),
@@ -546,10 +546,8 @@ test('group rate mappings distinguish routing and platform values and deduplicat
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'shared-one', exact: true })).toBeVisible();
   await expect(page.locator('.mapping-keys')).toHaveCount(6);
-  for (const summary of await page.locator('.model-sources > summary').all()) await summary.click();
-  for (const summary of await page.locator('.model-sources-body > .unavailable-section > summary').all()) await summary.click();
   for (const summary of await page.locator('.mapping-keys > summary').all()) await summary.click();
-  await expect(page.getByText('供应商倍率 0.5×', { exact: true })).toHaveCount(2);
+  await expect(page.locator('.mapping-effective-rate[title^="供应商 0.5×"]')).toHaveCount(2);
   const before = await page.evaluate(() => window.accountTest.queries);
   await page.getByRole('button', { name: '刷新分组倍率', exact: true }).dblclick();
   await expect(page.locator('.key-multiplier').filter({ hasText: '分组倍率 0.8×' })).toHaveCount(6);
@@ -559,7 +557,7 @@ test('group rate mappings distinguish routing and platform values and deduplicat
   await page.getByRole('button', { name: '刷新分组倍率', exact: true }).click();
   await expect(page.getByRole('alert').first()).toContainText('用户令牌');
   await expect(page.locator('.key-multiplier').filter({ hasText: '刷新失败，沿用上次成功缓存。' })).toHaveCount(6);
-  await expect(page.getByText('供应商倍率 0.5×', { exact: true })).toHaveCount(2);
+  await expect(page.locator('.mapping-effective-rate[title^="供应商 0.5×"]')).toHaveCount(2);
   await page.locator('.mapping-candidate .candidate').first().click();
   await page.getByRole('tab', { name: '账户与余额', exact: true }).click();
   await expect(page.getByRole('tab', { name: '账户与余额', exact: true })).toHaveAttribute('aria-selected', 'true');
@@ -582,7 +580,6 @@ test('group rate mappings distinguish routing and platform values and deduplicat
     await expect(page.getByRole('article', { name: '模型 claude-opus-4-6', exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1789, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
-    await page.getByRole('article', { name: '模型 claude-opus-4-6', exact: true }).locator('.model-sources > summary').click();
     await page.getByRole('button', { name: '拖动 备用供应商 claude-opus-4-6', exact: true }).hover();
     await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/model-mappings-light.png` });
     await page.setViewportSize({ width: 820, height: 1000 });
@@ -593,7 +590,7 @@ test('group rate mappings distinguish routing and platform values and deduplicat
 
 declare global { interface Window { routingTest: { calls: import('../src/desktop/contract.generated').ModelRouting[] } } }
 
-test('model cards collapse providers and Keys with a consistent default layout (simulated host)', async ({ page }) => {
+test('model cards show channels and collapse Key details with a consistent default layout (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.evaluate(() => {
     const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
@@ -605,13 +602,13 @@ test('model cards collapse providers and Keys with a consistent default layout (
   });
   await page.getByRole('button', { name: '刷新配置', exact: true }).click();
   const single = page.getByRole('article', { name: '模型 shared-two', exact: true });
-  await expect(single).toContainText('1 个来源 · 1 个 Key');
+  await expect(single).toContainText('1/1 可用');
   await expect(single.locator('.route-grip')).toHaveCount(0);
 
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await expect(card).toContainText('3 个来源 · 3 个 Key');
-  await expect(card.locator('.model-sources')).not.toHaveAttribute('open', '');
-  const shape = (node: Element) => { const style = getComputedStyle(node); return [style.padding, style.backgroundColor, style.borderRadius, node.getBoundingClientRect().height]; };
+  await expect(card).toContainText('2/3 可用');
+  await expect(card.locator('li.mapping-candidate')).toHaveCount(3);
+  const shape = (node: Element) => { const style = getComputedStyle(node); return [style.padding, style.backgroundColor, style.borderRadius]; };
   expect(await single.evaluate(shape)).toEqual(await card.evaluate(shape));
   if (process.env.ANCHOR_MAPPING_CAPTURE_DIR) {
     await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/models-default.png` });
@@ -620,18 +617,16 @@ test('model cards collapse providers and Keys with a consistent default layout (
     await page.getByRole('button', { name: '浅色', exact: true }).click();
   }
 
-  await expect(card.locator('li.mapping-candidate').first()).not.toBeVisible();
-  await card.locator('.model-sources > summary').click();
+  await expect(card.locator('li.mapping-candidate').first()).toBeVisible();
   await expect(card.locator('li.mapping-candidate').first()).toBeVisible();
   await expect(card.locator('.mapping-keys[open]')).toHaveCount(0);
   await card.locator('.mapping-keys > summary').first().click();
   await expect(card.getByLabel('来源 Key default', { exact: true }).first()).toBeVisible();
-  await card.locator('.model-sources > summary').click();
-  await expect(card.locator('li.mapping-candidate').first()).not.toBeVisible();
+  await expect(card.locator('li.mapping-candidate').first()).toBeVisible();
   await expect(card.getByRole('button', { name: '模型设置 shared-one', exact: true })).toBeVisible();
 });
 
-test('unavailable mapping sources are folded last and ordering explicitly uses saved positions (simulated host)', async ({ page }) => {
+test('unavailable channels keep saved positions and remain editable (simulated host)', async ({ page }) => {
   await host(page, true);
   await page.evaluate(() => {
     const api = window.go!.desktop!.Bridge!, read = api.Providers;
@@ -644,32 +639,17 @@ test('unavailable mapping sources are folded last and ordering explicitly uses s
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '刷新配置', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await card.locator('.model-sources > summary').click();
-  const visible = card.locator('.model-sources-body > .candidate-list > li');
-  await expect(visible).toHaveCount(2);
-  await expect(visible.first()).toContainText('备用供应商');
-  await expect(visible.first().getByLabel('第 2 位', { exact: true })).toBeVisible();
-  const folded = card.getByLabel('当前不可用的来源', { exact: true });
-  await expect(folded).not.toHaveAttribute('open');
-  await expect(folded.locator('li')).not.toBeVisible();
-  await folded.locator(':scope > summary').click();
-  await expect(folded.locator('li')).toContainText('摸鱼AI');
-  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
-  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
-  await expect(visible).toHaveCount(3);
-  await expect(visible.first()).toContainText('摸鱼AI');
+  const rows = card.locator('li.mapping-candidate');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.first()).toContainText('摸鱼AI');
+  await expect(rows.first().getByLabel('第 1 位', { exact: true })).toBeVisible();
   await expect(card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true })).toBeEnabled();
-  await card.getByRole('button', { name: '完成顺序调整', exact: true }).click();
-  await expect(visible).toHaveCount(2);
-  await expect(card.getByLabel('当前不可用的来源', { exact: true })).not.toHaveAttribute('open');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
 });
 
 test('model routing previews pointer sorting and automatically saves rules with undo (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await card.locator('.model-sources > summary').click();
-  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   const sources = card.locator('li.mapping-candidate');
   const handle = await card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true }).boundingBox();
   const target = await sources.nth(1).boundingBox();
@@ -682,26 +662,21 @@ test('model routing previews pointer sorting and automatically saves rules with 
   await expect(card.locator('.route-save-state')).toContainText('已自动保存');
   await expect(sources.nth(1)).toContainText('摸鱼AI');
   await card.getByLabel('调度规则').selectOption('lowest-price');
-  await expect(card).toContainText('倍率不等于实际单价');
   await expect(card.locator('.route-save-state')).toContainText('已自动保存');
   const calls = await page.evaluate(() => window.routingTest.calls);
   expect(calls).toHaveLength(2); expect(calls[1].expected_revision).toBe(2); expect(calls[1].strategy).toBe('lowest-price'); expect(calls[1].order[1].provider_id).toBe('摸鱼AI');
   await card.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(card.locator('.route-save-state')).toContainText('已撤销并保存');
-  await expect(card.getByLabel('调度规则')).toHaveValue('round-robin');
+  await expect(card.getByLabel('调度规则')).toHaveValue('priority');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(3);
   await page.getByRole('button', { name: '供应商', exact: true }).click();
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
-  await card.locator('.model-sources > summary').click();
-  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   await expect(card.locator('li.mapping-candidate').nth(1)).toContainText('摸鱼AI');
 });
 
 test('model routing cancels pointer sorting and supports keyboard ordering (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await card.locator('.model-sources > summary').click();
-  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   const grip = card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true });
   const box = await grip.boundingBox();
   await page.mouse.move(box!.x + 10, box!.y + 10); await page.mouse.down(); await page.mouse.move(box!.x + 10, box!.y + 130, { steps: 6 });
@@ -718,8 +693,6 @@ test('model routing cancels pointer sorting and supports keyboard ordering (simu
 for (const failure of ['conflict', 'unknown'] as const) test(`model routing ${failure} requires a read without replaying (simulated host)`, async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await card.locator('.model-sources > summary').click();
-  await card.getByRole('button', { name: '调整来源顺序', exact: true }).click();
   await page.evaluate(value => { window.desktopTest.writeError = value; }, failure);
   await card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }).click();
   await expect(card.getByRole('alert')).toContainText(failure === 'conflict' ? '未覆盖新版本' : '结果未知');
@@ -756,7 +729,6 @@ test('model settings opens from each card, saves context and reasoning and survi
 test('model routing keeps a failed draft for explicit retry or discard (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await card.locator('.model-sources > summary').click();
   await page.evaluate(() => { window.desktopTest.writeError = 'invalid'; });
   await card.getByLabel('调度规则').selectOption('priority');
   await expect(card.getByRole('button', { name: '重试保存', exact: true })).toBeVisible();
@@ -776,7 +748,6 @@ test('model routing keeps a failed draft for explicit retry or discard (simulate
 test('model routing does not retry an acknowledged write when reloading fails (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  await card.locator('.model-sources > summary').click();
   await page.evaluate(() => {
     const api = window.go!.desktop!.Bridge!, read = api.Providers;
     api.Providers = async () => ({ contract: 'anchor-desktop-v1', data: [], problem: { code: 'read_error' } });
@@ -790,7 +761,7 @@ test('model routing does not retry an acknowledged write when reloading fails (s
   await page.getByRole('button', { name: '重新读取配置', exact: true }).click();
   await expect(card).toBeVisible();
   await expect(card.locator('.route-save-state')).toContainText('已自动保存');
-  await expect(card.locator('.model-strategy')).toContainText('固定顺序');
+  await expect(card.getByLabel('调度规则')).toHaveValue('priority');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
 });
 
@@ -817,13 +788,9 @@ test('mapping availability follows scoped Keys and provider switches, not provid
   await expect(card).not.toBeVisible();
   await expect(hiddenModels).not.toHaveAttribute('open');
   await hiddenModels.locator(':scope > summary').click();
-  await expect(card).toContainText('0 / 3 个渠道当前可用');
-  await expect(card.locator('.model-unavailable-notice')).toContainText('无有效渠道');
-  await card.locator('.model-sources > summary').click();
-  await expect(card.locator('.mapping-channel-state').filter({ hasText: '供应商已停用' })).toHaveCount(1);
-  const hiddenSources = card.getByLabel('当前不可用的来源', { exact: true });
-  await expect(card.locator('li.mapping-candidate').first()).not.toBeVisible();
-  await hiddenSources.locator(':scope > summary').click();
+  await expect(card).toContainText('无有效渠道');
+  await expect(card.locator('.channel-status[title^="供应商已停用"]')).toHaveCount(1);
+  await expect(card.locator('li.mapping-candidate').first()).toBeVisible();
   await card.locator('.mapping-keys > summary').first().click();
   await card.getByLabel('当前不可用的 Key', { exact: true }).first().locator(':scope > summary').click();
   await expect(card.locator('.mapping-key-status').first()).toContainText('Key 已停用');
@@ -837,13 +804,11 @@ test('mapping availability follows scoped Keys and provider switches, not provid
     };
   });
   await page.getByRole('button', { name: '刷新配置', exact: true }).click();
-  await expect(card).toContainText('2 / 3 个渠道当前可用');
+  await expect(card).toContainText('2/3 可用');
   await expect(card.locator('.model-unavailable-notice')).toHaveCount(0);
   await expect(card).toBeVisible();
   await expect(page.getByLabel('当前不可用的模型', { exact: true })).toHaveCount(0);
-  await card.locator('.model-sources > summary').click();
-  await expect(card.locator('.model-sources-body > .candidate-list > li')).toHaveCount(2);
-  await expect(card.getByLabel('当前不可用的来源', { exact: true })).not.toHaveAttribute('open');
+  await expect(card.locator('.model-sources-body > .candidate-list > li')).toHaveCount(3);
   await card.locator('.model-sources-body > .candidate-list .mapping-keys > summary').first().click();
   await expect(card.locator('.model-sources-body > .candidate-list .mapping-key-status').first()).toContainText('Key 已启用');
   // Reading, folding and restoring availability must not save a new routing order.
@@ -1099,18 +1064,18 @@ test('model settings opens on a compact general form with a fixed footer in ligh
 test('Key cooldown settings persist, validate and lock uncertain writes (simulated host)', async ({ page }) => {
   await host(page);
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
-  const menu = page.getByRole('region', { name: 'Key 自动降权', exact: true });
-  const weight = menu.getByLabel('降权后权重（%）');
-  const threshold = menu.getByLabel('连续失败次数');
-  const seconds = menu.getByLabel('降权时长（秒）', { exact: true });
-  const rate = menu.getByLabel('429 降权时长（秒）', { exact: true });
-  const toggle = menu.getByRole('switch', { name: '自动降权', exact: true });
+  const menu = page.getByRole('region', { name: 'Key 冷却', exact: true });
+  const weight = menu.getByLabel('错误有效期（秒）');
+  const threshold = menu.getByLabel('错误分数阈值');
+  const seconds = menu.getByLabel('冷却时长（秒）', { exact: true });
+  const rate = menu.getByLabel('429 冷却时长（秒）', { exact: true });
+  const toggle = menu.getByRole('switch', { name: '自动冷却', exact: true });
   const save = menu.getByRole('button', { name: '保存', exact: true });
   const read = menu.getByRole('button', { name: '读取', exact: true });
-  await expect(weight).toHaveValue('10');
-  await expect(threshold).toHaveValue('3');
-  await expect(seconds).toHaveValue('30');
-  await expect(rate).toHaveValue('30');
+  await expect(weight).toHaveValue('300');
+  await expect(threshold).toHaveValue('100');
+  await expect(seconds).toHaveValue('300');
+  await expect(rate).toHaveValue('300');
   await expect(toggle).toBeChecked();
   await expect(menu.locator('.card-hint, [data-slot="tooltip-trigger"]')).toHaveCount(0);
   await threshold.fill('0');
@@ -1415,4 +1380,39 @@ test('remote version stays visible when an older CLI cannot check updates', asyn
   await expect(remote.getByRole('alert')).toContainText('被控机 Anchor CLI 版本不支持');
   await expect(remote).toContainText('被控机当前版本0.1.0-alpha.6');
   await expect(page.getByRole('region', { name: '本机桌面在线更新', exact: true })).toContainText(updateFixture.downloaded.current_version);
+});
+
+test('mapping quick sorts use refreshed multipliers and measured first text (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    api.ProviderProbe = async input => ({ contract: 'anchor-desktop-v1', problem: null, data: {
+      provider_id: input.provider_id, revision: input.expected_revision, run_id: `synthetic-${input.provider_id}`,
+      key_id: input.key_id, model: input.model, status: 'completed', phase: 'complete', text: 'OK', elapsed_ms: 2000,
+      first_byte_ms: input.provider_id === '摸鱼AI' ? 900 : 100,
+      result: { revision: input.expected_revision, key_id: input.key_id, model: input.model, at: 1, elapsed_ms: 2000, http_status: 200, failure: '' },
+    } });
+  });
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  const rows = card.locator('li.mapping-candidate');
+  // Before refresh all rates are unknown. After refresh, hidden model multiplier
+  // makes backup 0.96× cheaper than provider 0.5 × group 0.8 × model 2.5 = 1×.
+  await page.getByRole('button', { name: '刷新分组倍率', exact: true }).click();
+  await expect(rows.first().locator('.mapping-effective-rate')).toHaveText('1×');
+  await card.getByRole('button', { name: '按倍率', exact: true }).dblclick();
+  await expect(rows.first()).toContainText('备用供应商');
+  await expect(card).toContainText('已自动保存');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
+  await card.getByRole('button', { name: '下移 备用供应商 upstream-shared-one', exact: true }).click();
+  await expect(rows.first()).toContainText('摸鱼AI');
+  await expect(card.getByRole('button', { name: '低延迟优先', exact: true })).toBeEnabled();
+  await card.getByRole('button', { name: '低延迟优先', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(rows.first()).toContainText('备用供应商');
+  await expect(card.getByRole('button', { name: '按倍率', exact: true })).toBeEnabled();
+  const calls = await page.evaluate(() => window.routingTest.calls);
+  expect(calls).toHaveLength(3);
+  expect(calls[2].strategy).toBe('priority');
+  expect(calls[2].order.map(c => c.provider_id)).toEqual(['备用供应商', '摸鱼AI', '本地调试']);
 });

@@ -149,7 +149,7 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		fail(w, protocol.RequestErrorID(err))
 		return
 	}
-	affinity := routingAffinity(r.Header.Get("Authorization"), modelID, request)
+	affinity := requestRoutingAffinity(r, modelID)
 	candidates, err := s.routeCandidatesFor(model, affinity)
 	if err != nil {
 		apiError(w, err)
@@ -249,7 +249,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 		if translationFacts.Client != "" {
 			recordTranslationDiagnostics(r, translationFacts, attempted, delivered)
 		}
-		*attemptResult = forwardAttemptResult{attempted: attempted, success: success, status: status, after: after, opaque: recovery}
+		*attemptResult = forwardAttemptResult{attempted: attempted && code != "proxy_unavailable", success: success, status: status, after: after, opaque: recovery}
 		if !attempted {
 			return
 		}
@@ -370,18 +370,24 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 		if r.Context().Err() != nil {
 			return false
 		}
-		if !connected.Load() && ctx.Err() == nil {
-			code = "upstream_connect"
-			return true
+		if connected.Load() {
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				status = 504
+				fail(w, apierror.UpstreamTimeout)
+			} else {
+				status = 502
+				fail(w, apierror.UpstreamTransport)
+			}
+			return false
 		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			status = 504
-			fail(w, apierror.UpstreamTimeout)
+			code = "upstream_timeout"
 		} else {
 			status = 502
-			fail(w, apierror.UpstreamTransport)
+			code = "upstream_connect"
 		}
-		return false
+		return true
 	}
 	defer resp.Body.Close()
 	status = resp.StatusCode
@@ -400,8 +406,8 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 				}
 			}
 		}
-		switch status {
-		case 401, 403, 429, 502, 503, 504:
+		switch {
+		case status == 401 || status == 403 || status == 408 || status == 429 || status >= 500:
 			code = "upstream_unavailable"
 			if status == 429 {
 				code = "rate_limited"

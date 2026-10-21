@@ -71,13 +71,13 @@ func TestProviderProbeStreamsBeforeCompletion(t *testing.T) {
 	in.RunID = first.RunID
 	<-started
 	partial := awaitProbe(t, f, in, func(p catalog.ProbeProgress) bool { return p.Text == "O" })
-	if partial.Status != "running" || partial.Result != nil {
+	if partial.Status != "running" || partial.Result != nil || partial.FirstByteMS < 1 || partial.FirstByteMS > partial.ElapsedMS {
 		t.Fatalf("not live: %+v", partial)
 	}
 	// Explicitly release before awaiting final status; retain a safe cleanup path.
 	release <- struct{}{}
 	final := awaitProbe(t, f, in, func(p catalog.ProbeProgress) bool { return p.Status != "running" })
-	if final.Text != "OK" || final.Result == nil || final.Result.Failure != "" {
+	if final.Text != "OK" || final.Result == nil || final.Result.Failure != "" || final.FirstByteMS != partial.FirstByteMS || final.FirstByteMS > final.ElapsedMS {
 		t.Fatalf("final=%+v", final)
 	}
 	if err := f.core.logs.Flush(t.Context()); err != nil {

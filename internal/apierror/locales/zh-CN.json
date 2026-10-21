@@ -62,7 +62,7 @@
   "invalid_tools": "tools 必须是数组。",
   "tools_unsupported": "公开模型未声明支持工具调用。",
   "unsupported_tool": "仅支持 Agent 执行的函数／自定义工具、其命名空间及客户端 tool_search。",
-  "no_available_candidate": "没有已启用、受支持且可用的候选成功完成请求。",
+  "no_available_candidate": "全部渠道不可用。",
   "unsupported_conversion": "请求包含协议转换不支持的字段或内容。",
   "candidate_conversion_unsupported": "候选协议 %s 无法表示此请求（%s）。",
   "proxy_unavailable": "配置的代理不可用；已禁止直连回退。",

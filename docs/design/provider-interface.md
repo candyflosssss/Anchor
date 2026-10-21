@@ -69,7 +69,7 @@ Provider 公开字段为 `id`, `homepage_url`, `base_urls`, `protocol`, `enabled
 
 新增 `Bridge.ProviderWorkspace({provider_id})` 与 `Bridge.ProviderAction(Action)`，对应 GET `/control/v1/providers/{id}/workspace` 与 POST `/control/v1/providers/{id}/action`。动作白名单、默认值和 CLI 等价入口见[指令大全 §5](../cli/commands.md#5-供应商)及[实现契约](provider-priority-one.md)。`internal/catalog/workspace.go` 是核心 DTO 源，桌面规范以别名纳入生成器，共用 `desktop/contract/provider-workspace.json`。
 
-Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、连续失败次数、降权结束时间和最近测试，以及 protocol 与 model_protocols（[{model,protocol}]，始终数组），绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
+Workspace 固定返回 provider_id/revision/strategy/keys/models/usage/prices/estimates，集合始终为数组；probe 和 imported_price 可空。KeyStatus 只含 ID、enabled、状态、失败次数、可选错误分数、冷却结束时间和最近测试，以及 protocol 与 model_protocols（[{model,protocol}]，始终数组），绝不返回密钥。Probe 绑定 revision、Key ID、模型、执行时间、HTTP 状态、耗时与失败分类。Prices 表达 USD/百万 token，缓存单价与估算 USD 可以 null，不能用0替代未知。
 
 每次动作携带当前供应商 revision，模型编辑/删除还携带 model_revision。删除、改名、删 Key、重置 Key、删除模型和推理测试须 approved；复制 Key 须 copy_keys。复制返回新供应商工作台，删除返回 deleted=true，其余返回操作后的工作台。删除供应商在同一事务清理其全部模型候选及价格，保留其他供应商的同名模型、顺序和元数据，存续模型 revision 加一；失去全部候选才删除公开模型，已启用 Binding 默认模型引用仍返回 referenced 并整体回滚。停用只保留配置并暂停调度，不删除映射。模型映射修改只增加模型 revision；配置/Key/模型协议覆盖/策略/价格写入增加供应商 revision；test、key-reset、price-import 不修改配置 revision。冲突/结果未知先重读，不自动重放；取消前端消费不等于取消已发出的写入。
 
@@ -175,7 +175,7 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 桌面沿用 anchor-desktop-v1、既有 ProviderAllowance 和 AccountObservation；新增 operation 允许 account 或 key scope，不增加任意 HTTP 桥接。共享样例包含钱包与 Key 两种 summary。列表 Controller 每轮最多并发2个查询，无轮询，列表刷新触发新一轮；供应商、revision、传输实例或导航变化取消／丢弃旧观察。View 显示平台、scope、原单位与查询状态，悬浮提示含所选 Key 和时间；周期额度标注实际周期。账户页默认自动探测，可选具体平台覆盖。
 
-2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；当前源码进一步将本地 Key 自动核对查询持久缓存，按供应商倍率×分组倍率调度；显式远端数字ID不写缓存，旧模型倍率字段仅预留。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按来源 Key 逐项查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
+2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；当前源码进一步将本地 Key 自动核对查询持久缓存，按供应商倍率×分组倍率调度；显式远端数字ID不写缓存，隐藏模型倍率参与桌面快速排序，不参与运行时加权。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按来源 Key 逐项查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
 
 ### NewAPI 探测后的桌面授权入口（2026-10-20，未打包）
 
@@ -184,7 +184,7 @@ Go `internal/desktop/contract.go` 是唯一 DTO 源，生成 TS；共享样例�
 
 ## 9. 来源 Key与模型调度（2026-10-13，当前源码）
 
-模型 candidates 新增可选 key_ids：空／缺失表示所有启用 Key，非空仅允许列出的本机 Key ID。写入检查 Key 属于候选供应商，去重且最多64项；anonymous 仅能用于没有 Key 的供应商。目录导入保留实际 entries.key_ids，禁止调度到目录未报告的其他 Key。手动停用与并发门禁照常生效，故障只降权（见下方自动降权设置），指定 Key 都不可用时切换其他候选，不越过范围。删除 Key（包括清除 default 凭据）在同一事务移除该供应商候选中的对应 key_ids；仍有其他来源 Key 时保留候选，列表耗尽则移除候选，禁止将空列表写回并扩大为全部 Key。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免隐式变为匿名来源。其他供应商及其他 Key 提供的同名模型、候选元数据与顺序均保留；受影响的存续模型 revision 加一，仅当前供应商已无候选时清理其价格。公开模型失去全部候选才删除；已启用 Binding 默认模型引用仍返回 referenced 并整体回滚，已禁用 Binding 不阻止删除。该行为于 2026-10-19 在当前源码实现，尚未打包发布。schema5→6 顺序迁移保留模型、供应商与凭据，无新表；schema版本保护防止旧核心忽略 Key 限制。
+模型 candidates 新增可选 key_ids：空／缺失表示所有启用 Key，非空仅允许列出的本机 Key ID。写入检查 Key 属于候选供应商，去重且最多64项；anonymous 仅能用于没有 Key 的供应商。目录导入保留实际 entries.key_ids，禁止调度到目录未报告的其他 Key。手动停用与并发门禁照常生效，故障按错误分数触发对应 Key 冷却（见下方冷却设置），指定 Key 都不可用时切换其他候选，不越过范围。删除 Key（包括清除 default 凭据）在同一事务移除该供应商候选中的对应 key_ids；仍有其他来源 Key 时保留候选，列表耗尽则移除候选，禁止将空列表写回并扩大为全部 Key。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免隐式变为匿名来源。其他供应商及其他 Key 提供的同名模型、候选元数据与顺序均保留；受影响的存续模型 revision 加一，仅当前供应商已无候选时清理其价格。公开模型失去全部候选才删除；已启用 Binding 默认模型引用仍返回 referenced 并整体回滚，已禁用 Binding 不阻止删除。该行为于 2026-10-19 在当前源码实现，尚未打包发布。schema5→6 顺序迁移保留模型、供应商与凭据，无新表；schema版本保护防止旧核心忽略 Key 限制。
 
 Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始，核心真实顺序）；revision／strategy／candidate_count 仍描述共享公开模型。多个平台可以映射同一别名；一个候选可包含多个 Key，具体 Key 沿用该供应商的 priority／round-robin 策略。
 
@@ -194,19 +194,19 @@ Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始�
 | --- | --- | --- |
 | priority | 固定保存顺序 | 健康／并发门禁与失败切换照常 |
 | round-robin | 按供应商／模型／Key展开，权重为供应商倍率×Key缓存分组倍率的倒数，平滑加权轮询 | 跳过不可用候选，revision变化重置权重债务 |
-| cache-priority | 同一认证调用者／模型／instructions／首个input项复用最近成功供应商、上游模型和Key，TTL10分钟 | 没有有效亲和时加权轮询；降权降低亲和首选频率，配置变化或失败时切换 |
+| cache-priority | 有可信会话标识时复用最近成功渠道，不复用提示词推测会话 | 新会话按保存顺序；渠道 Key 冷却或渠道不可用时 fallback |
 | lowest-price | 按供应商倍率×Key缓存分组倍率升序，相同倍率按保存顺序 | 不推断美元单价；未知作回退，全部未知等权，零倍率优先 |
 | lowest-latency | 先按保存顺序学习无观察来源；有观察后按成功请求首字耗时的EWMA升序（旧值80%／新值20%），无首字时总耗时 | 观察TTL30分钟，过期再学习；相同耗时按保存顺序 |
 
-观测只在内存保存，重启后清空；亲和最多1024项，延迟最多4096项，按模型和供应商revision隔离，删除过期后仍满则淘汰旧项。亲和只保留SHA256摘要，包含授权调用者与最大64KiB的稳定请求片段，不保存原始令牌或正文、不额外发探测推理。只使用成功请求观测；不是上游缓存命中承诺。成功采样、不可用过滤和实际转发前的Key健康／并发复查由核心完成。
-2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；当前源码进一步将本地 Key 自动核对查询持久缓存，按供应商倍率×分组倍率调度；显式远端数字ID不写缓存，旧模型倍率字段仅预留。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按默认启用 Key 查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
+观测只在内存保存，重启后清空；亲和最多1024项，成功访问更新LRU，不因配置revision变化或闲置超时丢弃；延迟最多4096项，按模型和供应商revision隔离，满后淘汰旧项。亲和只以调用者／模型／显式会话的SHA256摘要为索引，不保存原始令牌或正文、不按提示词推测会话、不额外探测。只使用成功请求观测；不是上游缓存命中承诺。成功采样、不可用过滤和实际转发前的Key健康／并发复查由核心完成。
+2026-10-13 当前源码的普通 effective-rate 查询已复用模型目录的有界 Key 核对逻辑：最多4页、每页100条，所有列表、核对和倍率查询共用8次请求／2 MiB／核心超时预算。平台认证仍为用户授权；当前源码进一步将本地 Key 自动核对查询持久缓存，按供应商倍率×分组倍率调度；显式远端数字ID不写缓存，隐藏模型倍率参与桌面快速排序，不参与运行时加权。桌面 ProviderRate 在账户页可选 Key 查询，模型映射页按默认启用 Key 查询并标明 Key 与来源。原版 OneAPI 返回 unsupported，NewAPI auto 为 unknown，未知和失败不会填成1。
 
 ## 实时推理测试生命周期（2026-10-13，当前源码）
 
 `POST /control/v1/providers/{id}/probe` 复用管理鉴权、实例身份与 revision 校验。`catalog.ProbeRequest` / `ProbeProgress` 是核心规范源，桌面 `contract.go` 引用并由 Go 生成 TS；共享样例为 `desktop/contract/provider-probe.json`。Wails `ProviderProbe` → 类型化 client → 管理 API；没有任意 URL、临时秘密或 shell 入口。原有 `provider test` / `ProviderAction(test)` 同步契约保持兼容，异步生命周期服务于弹窗显示。
 
 - 输入固定字段为 provider_id、expected_revision、action、key_id、model、run_id、approved。`start` 要求 approved=true、非空模型和明确的启用 Key；无已存 Key 可指定 anonymous，已存 Key 全停用时禁止匿名回退。`read` / `cancel` 使用开始返回的不可猜测 run_id；仅允许同供应商及 revision 读取，冲突在操作前失败。重复 start 是另一请求，前端同步锁禁止连点，不自动重放未知开始结果。
-- 输出固定字段为 provider_id、revision、run_id、key_id、model、status、phase、text、elapsed_ms、result。status 为 running / completed / cancelled；phase 为 connecting / receiving / complete；运行中 result=null，终态 result 为原有 Probe。耗时是毫秒；输出文本累计快照至多 16 KiB。前端运行中每150ms串行读取一次，终态／关闭／卸载停止轮询；迟到的开始结果取得 run_id 后仍发取消，取消不确认时由核心硬超时兜底。
+- 输出固定字段为 provider_id、revision、run_id、key_id、model、status、phase、text、elapsed_ms、可选 first_byte_ms、result。status 为 running / completed / cancelled；phase 为 connecting / receiving / complete；运行中 result=null，终态 result 为原有 Probe。耗时是毫秒；输出文本累计快照至多 16 KiB。前端运行中每150ms串行读取一次，终态／关闭／卸载停止轮询；迟到的开始结果取得 run_id 后仍发取消，取消不确认时由核心硬超时兜底。
 - 最小请求仍是「Reply OK.」、max_output_tokens=16、store=false。异步测试增加 stream=true；使用所选 Key 的实际模型协议、已有协议流转换器，以及与同步探针相同的并发、最多10秒期限、健康和累计用量。真实 SSE 文本逐段可见；上游忽略流式并返回 JSON 时，校验后显示一次完整文本。EOF 缺终止事件、非法流和 incomplete 返回固定 invalid_response，错误正文不显示。
 - 核心最多保留64次瞬态运行，开始一分钟后删除；停止取消上游 context，核心关闭取消并等待任务退出。文本只在运行内存／当前弹窗保留，不进入日志、数据库或浏览器存储。仅提取 output_text，不展示原始事件、思考内容、请求头或上游错误；所选 Key 凭据完整回显及跨片段前缀均被过滤。保留现有 Probe DTO 字段；新增的网页响应失败分类见下方推理地址兼容说明。
 - 目录只说明 Key 可列出该模型，不保证推理或流式成功。前端目录错误／空目录禁用发起按钮；Key 切换清空选择后重新查询，不从供应商全量映射猜测 Key 权限。关闭快速测试保持列表、关闭详情测试保持详情。
@@ -245,18 +245,21 @@ Key 专用倍率接口另对照 sub2api 固定修订 `4d9ac3e482106d2da3a39fe3e5
 供应商协议、认证、模型名不包含代理实现；`internal/egress` 根据 provider ID / 实际 Key ID 解析独立绑定。Key 可以继承、直连、指定 profile。核心将路由上下文传给推理、catalog 和 providerapi 账户客户端；适配器不关心 mihomo。代理连接错误保留 fail-closed 行为，不因既有候选故障切换逻辑绕到直连。管理及桌面契约见 [代理设置](proxy-settings.md)。
 
 
-## Key 自动降权设置
+## Key 错误分数与冷却设置
 
-2026-10-19 当前源码未发布，契约沿用 `anchor-desktop-v1`。Go 规范源 `internal/desktop/contract.go`（类型别名来自 state）；共享样例 `desktop/contract/key-cooldown.json`，TS 由生成器派生。
+2026-10-21 当前源码未发布，沿用 `anchor-desktop-v1`。规范源为 `internal/desktop/contract.go`（类型来自 state）；共享样例 `desktop/contract/key-cooldown.json`，TS 由生成器派生。
 
-- `Bridge.KeyCooldownSettings()` → client → `GET /control/v1/settings/key-cooldown`；`Bridge.SaveKeyCooldownSettings(input)` → `POST` 同一路径。保留方法及路径名；沿用所选本机／SSH 核心、管理鉴权、实例核验和 15 秒桌面调用上限，不访问真实上游。
-- 返回 `KeyCooldownSettings`：`enabled` 布尔、`weight_percent` 整数 1..100、`failure_threshold` 整数 1..100、`cooldown_seconds` 整数 1..3600、`rate_limit_seconds` 整数 1..3600、`revision` 正 JS 安全整数。默认 true／10／3／30／30／1，持久化于当前核心 meta，不包含 Key 或管理令牌。旧持久设置缺少比例时补 10。
-- `SaveKeyCooldownSettings` 要求原四个非空字段及 `expected_revision`（1..MAX_SAFE_INTEGER-1）；新增可选 `weight_percent`，省略／null 保留已存比例。条件写入成功 revision +1，沿用 `{contract,data,problem}`；冲突不改设置或健康，读失败不回退 Mock，写入不自动重试。新前端总是发送比例并验证回包全部字段及 revision；无法确认时返回 unknown，先读取再操作。旧核心缺字段时显示连接异常，需同步升级。
-- 全局策略作用于所有供应商（含匿名来源）。连续失败达到阈值，或 401/403/429 后立即降至指定正权重；429 优先有效 `Retry-After`，否则用配置时长，限制 1 秒..1 小时，仅影响降权期限。成功或到期恢复；不再永久认证封禁、硬冷却或独占探测。只有一个／全部 Key 降权时仍可调度，手动停用与并发门禁保留。
-- `KeyStatus.state` 新增 `degraded`（可调度），`retry_at` 表示恢复正常权重的 Unix 秒时间。100% 不降低权重，状态为 ready。新核心不再产生 invalid/cooling/half-open；前端仍能展示旧核心的旧状态，但不假设旧核心具有新调度行为。
-- 轮询将健康因子乘入调度权重，不改变计费倍率；有序规则（优先级、最低价格、最低延迟、缓存亲和）降低故障来源的首选频率并保留全部失败转移候选，相同健康因子保留原偏好。轮询的已知／免费来源优先以最高健康因子的来源为准。降权不重复请求同一 provider/key/model，不改变流式结果和未知结果的重放约束。
-- 保存与请求结果归约串行，成功保存清除失败计数／临时降权／调度债务，保留最近测试，不修改供应商 revision。关闭时所有自动降权停止；核心启动读取策略，内存保留最近成功策略，结果归约不再因读取失败启用默认策略。启动读取失败时不自动降权，设置读取仍返回真实错误。重启保留策略，清空临时健康。
-- CLI 同能力为 `settings key-cooldown`；详见[指令大全](../cli/commands.md#16-key-自动降权设置当前源码未发布)。
+- `Bridge.KeyCooldownSettings()` / `SaveKeyCooldownSettings(input)` 经 client 对应 `GET` / `POST /control/v1/settings/key-cooldown`。使用所选核心、管理鉴权、实例核验及 15 秒桌面调用上限，不访问上游。
+- 返回 `enabled`、`weight_percent`、`failure_threshold`、`error_window_seconds`、`cooldown_seconds`、`rate_limit_seconds`、`revision`。默认分别为 true、10、100、300、300、300、1。分数阈值 1..100，窗口及两类时长 1..3600 秒。`weight_percent` 仅为兼容字段，仍校验 1..100，但不参与调度。策略存于核心 meta，不含凭据。
+- 保存要求非空 `enabled`、`failure_threshold`、`cooldown_seconds`、`rate_limit_seconds` 及 `expected_revision`；可选窗口和兼容权重省略／null 时保留。成功 revision +1；冲突不修改设置或健康；写入不自动重试。前端核对全部回包字段及 revision，结果未知须重读。旧核心缺窗口字段时新前端显示读取错误，需配套升级。
+- 旧持久设置没有窗口字段时，窗口补 300 秒，原连续失败阈值乘 25，最高 100；保留已设时长、开关、revision，缺权重补 10。下一次保存写入新格式。
+- 错误按时间窗口累计：401/403 每次加 100 分，保留配置窗口；429 加 50 分，408、网络失败和 5xx 加 25 分，这两类最多保留 60 秒；其他错误不加分。成功不抹掉尚未过期的分数。达到阈值后仅该 Key 进入硬冷却。429 时长取配置冷却与有效 Retry-After（缺失时用 rate_limit_seconds）中的较大值，上限一小时。
+- `KeyStatus.state=cooling` 表示冷却不可调度，`retry_at` 为到期 Unix 秒，`error_score` 为未过期分数。窗口分数过期不会提前解除已进入的冷却；在途结果不提前解除或延长 CD。CD 到期清分并直接恢复，无半开探测。手动停用与并发门禁仍独立生效。
+- 会话只由显式 `X-Anchor-Session` 或已支持的 Codex 会话元数据标识，并按调用者和公开模型隔离。成功后所有策略保持渠道／可用时保持 Key；优先渠道恢复不回切。当前渠道不可用时按当前规则 fallback；新会话按当前规则选择。亲和仅进程内保存，最多 1024 条，LRU 淘汰或重启后重选；不承诺上游缓存命中。
+- 连接前传输失败与明确 401/403/408/429/5xx 可继续候选；建立连接后结果未知及开始向客户端输出后不得重放。全部候选不可用返回 503 `no_available_candidate`，中文“全部渠道不可用”。代理不可用不罚 Key。
+- 策略保存与结果归约串行，保存清分／CD／调度债务，保留最近测试及会话亲和，不修改供应商 revision。关闭停止自动冷却；启动读取失败时不擅自启用默认策略，设置读取返回真实错误。策略持久化，重启清空临时健康。
+- 主动测试／对话的 `ProbeProgress.first_byte_ms` 为首次可见文本距开始的毫秒数，无文本为 0；旧回包可省略。模型页经确认对每个可用渠道选择一个可用 Key 串行测试，测得首字且成功的渠道按升序保存，失败／未知后置。停止取消当前测试并保留原顺序。前端控制单渠道约 15 秒观测期限，核心推理探测仍最多 10 秒。
+- CLI 同能力为 `settings key-cooldown`；路由顺序由 `model routing` 保存，探测由 `provider test` 复用，详见[指令大全](../cli/commands.md)。
 
 
 ## CC Switch 导入契约（2026-10-21，源码实现，未打包）

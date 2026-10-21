@@ -25,6 +25,7 @@ export class MockChatTransport implements ChatTransport {
     const text = `这是 Mock 对话预览，不会请求真实供应商。\n\n${fixture.progress.text}`;
     const out: ProbeProgress = { ...fixture.progress, provider_id: input.provider_id, revision: input.expected_revision,
       key_id: input.key_id, model: input.model, run_id: id, elapsed_ms: step * 150,
+      first_byte_ms: step ? Math.min(112, step * 150) : 0,
       text: text.slice(0, step * 10), status: cancelled ? 'cancelled' : done ? 'completed' : 'running', phase: done ? 'complete' : 'receiving',
       result: done ? { ...fixture.progress.result, revision: input.expected_revision, key_id: input.key_id, model: input.model } : null };
     return out;

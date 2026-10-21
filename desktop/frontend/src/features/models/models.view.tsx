@@ -2,13 +2,14 @@ import type { ProviderTransport } from '../providers/provider.model';
 import { useState, type ReactNode } from 'react';
 import { ArrowLeftRight, ArrowUp, ArrowDown, Check, ChevronDown, GripVertical, LoaderCircle, RefreshCw, Settings2, Undo2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
+import { ConfirmAction } from '../../components/shared/confirm-action';
 import { aggregateModels, type DetailTab, type ModelCandidate, type ModelGroup, type ProviderSummary } from '../providers/provider-summary.model';
 import { channelKeys, keyAvailability, type SourceKey } from '../providers/channel-availability.model';
 import { KeyMultiplierView } from '../providers/key-multiplier.view';
 import { rateFailureText } from '../providers/provider-account.model';
 import { rateID, type MappingRatesController, type RateTarget } from './use-mapping-rates';
-import { modelAvailability, visibleModels, visibleCandidates, visibleKeys } from './model-availability.model';
-import { routingRules, routeID, ruleLabel } from './model-routing.model';
+import { modelAvailability, visibleModels, visibleKeys } from './model-availability.model';
+import { effectiveRouteMultiplier, routingRules, routeID } from './model-routing.model';
 import type { ModelRoutingController } from './use-model-routing';
 import { useRouteDrag } from './use-route-drag';
 import { ModelSettingsDialog } from './model-settings.view';
@@ -44,53 +45,51 @@ function MappingKeys({ candidate: m, rates }: { candidate: ModelCandidate; rates
 function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Common & { group: ModelGroup; settings: () => void }) {
   const draft = routing.draft(g), status = routing.status(g);
   const candidates = draft.order.map(ref => g.candidates.find(c => candidateID(c) === routeID(ref))).filter((c): c is ModelCandidate => !!c);
-  const [expanded, setExpanded] = useState(false), [ordering, setOrdering] = useState(false);
-  const split = visibleCandidates(candidates), editingOrder = ordering || !split.unavailable.length;
+  const [confirmLatency, setConfirmLatency] = useState(false);
   const canEdit = !disabled && !routing.busy && g.complete && !routing.needsRead && status?.phase !== 'failed';
-  const drag = useRouteDrag(candidates.map(candidateID), canEdit && expanded && editingOrder && candidates.length > 1, (from, to) => { void routing.move(g, from, to); });
+  const drag = useRouteDrag(candidates.map(candidateID), canEdit && candidates.length > 1, (from, to) => { void routing.move(g, from, to); });
   const visible = drag.order.map(id => candidates.find(c => candidateID(c) === id)!);
   const dragged = drag.drag?.active ? candidates.find(c => candidateID(c) === drag.drag!.id) : null;
-  const keyCount = candidates.reduce((sum, c) => sum + channelKeys(c.key_ids, c.keys).filter(k => !k.anonymous).length, 0);
   const available = candidates.filter(c => c.availability.state === 'available').length;
   const unknown = !g.complete || candidates.some(c => c.availability.state === 'unknown');
   const availability = modelAvailability(g);
   const renderCandidate = (m: ModelCandidate) => {
     const i = visible.findIndex(c => candidateID(c) === candidateID(m));
+    const multiplier = effectiveRouteMultiplier(m);
     return <li key={candidateID(m)} className={`mapping-candidate availability-${m.availability.state}${dragged && candidateID(m) === candidateID(dragged) ? ' is-drag-placeholder' : ''}`} data-route-id={candidateID(m)}>
           <div className="mapping-source-header">
             <span className="route-position" aria-label={`第 ${i + 1} 位`}>{i + 1}</span>
-            {editingOrder && candidates.length > 1 && <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}`} aria-describedby={`sort-hint-${g.alias}`} title="拖动或用方向键调整顺序" onPointerDown={e => drag.start(e, candidateID(m))} onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}><GripVertical size={16} /></button>}
+            {candidates.length > 1 && <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}`} title="拖动或用方向键调整顺序" onPointerDown={e => drag.start(e, candidateID(m))} onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}><GripVertical size={16} /></button>}
             <button className={`candidate tone-${m.tone}`} disabled={disabled || routing.busy} title={m.label} aria-label={`${m.provider_id}（${m.label}）上游 ${m.upstream}，编辑映射`} onClick={() => onOpen(m.provider_id, 'models')}><strong>{m.provider_id}</strong><span className="mono">{m.upstream}</span></button>
-            {editingOrder && candidates.length > 1 && <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i - 1); }}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === candidates.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i + 1); }}><ArrowDown size={13} /></Button></div>}
+            <span className={`channel-status state-${m.availability.state}`} title={`${m.provider_enabled ? '供应商已启用' : '供应商已停用'} · ${m.availability.reason}`}>{m.availability.label}</span>
+            <span className="mapping-effective-rate" title={`供应商 ${m.cost_multiplier}× · 模型 ${m.multiplier}×`}>{multiplier == null ? '倍率未知' : `${Number(multiplier.toPrecision(6))}×`}</span>
+            {candidates.length > 1 && <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i - 1); }}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === candidates.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i + 1); }}><ArrowDown size={13} /></Button></div>}
           </div>
-          <div className="mapping-channel-state"><span className={`channel-status state-${m.availability.state}`}>{m.availability.label}</span><span>{m.provider_enabled ? '供应商已启用' : '供应商已停用'}</span><p>{m.availability.reason}</p></div>
-          <div className="mapping-source-meta"><span>供应商倍率 <strong>{m.cost_multiplier}×</strong></span><MappingKeys candidate={m} rates={rates} /></div>
+          <MappingKeys candidate={m} rates={rates} />
         </li>;
   };
   return <article className={`detail-card model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} aria-label={`模型 ${g.alias}`}>
-    <header><h2 className="mono">{g.alias}</h2><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="上下文、能力与速度" onClick={settings}><Settings2 size={15} /><span>设置</span></Button></header>
-    <div className="model-card-summary"><span className="model-strategy">{ruleLabel(draft.strategy)}</span><span>{candidates.length} 个来源 · {keyCount} 个 Key</span></div>
-    <div className="model-availability" role="status"><span className={`channel-status state-${availability}`}>{available ? '当前可用' : unknown ? '可用性待确认' : '当前不可用'}</span><span>{available} / {candidates.length} 个渠道当前可用</span></div>
-    {availability === 'unavailable' && <p className="model-unavailable-notice"><strong>无有效渠道</strong></p>}
-    {availability === 'unknown' && <p className="card-hint">尚未确认有效渠道，部分状态未读全或 Key 正在恢复探测；请刷新配置。</p>}
-    {!g.complete && <p className="card-hint">配置正在更新，请稍候或刷新配置。</p>}
-    <details className="model-sources" open={expanded} onToggle={e => setExpanded(e.currentTarget.open)}>
-      <summary><ChevronDown size={14} /><span>供应商与 Key</span><span className="source-count">{candidates.length}</span></summary>
+    <header><div className="model-title"><h2 className="mono">{g.alias}</h2><span className={`model-channel-count state-${availability}`} role="status" title={`${available} / ${candidates.length} 个渠道当前可用`}>{available ? `${available}/${candidates.length} 可用` : unknown ? '可用性待确认' : '无有效渠道'}</span></div><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="上下文、能力与速度" onClick={settings}><Settings2 size={15} /></Button></header>
       <div className="model-sources-body">
-        <div className="route-settings-body"><label htmlFor={`strategy-${g.alias}`}>调度规则</label><select id={`strategy-${g.alias}`} className="select-field" disabled={!canEdit} value={draft.strategy} onChange={e => { void routing.change(g, { strategy: e.target.value }); }}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select><p className="card-hint">{routingRules[draft.strategy as keyof typeof routingRules]?.hint}</p></div>
-        {split.unavailable.length > 0 && candidates.length > 1 && <Button variant="outline" size="sm" disabled={!canEdit} onClick={() => setOrdering(v => !v)}>{ordering ? '完成顺序调整' : '调整来源顺序'}</Button>}
-        {!editingOrder && <p className="card-hint">不可用来源已收起并后置；序号为保存的路由位置。</p>}
-        {editingOrder && candidates.length > 1 && <p id={`sort-hint-${g.alias}`} className="route-sort-hint">以下为完整路由顺序。拖动调整顺序，松手自动保存。也可用上下按钮，或聚焦拖柄后按 ↑ / ↓。</p>}
-        <ul className="candidate-list" onPointerMove={drag.move} onPointerUp={drag.end} onPointerCancel={drag.cancel} onLostPointerCapture={drag.cancel}>{(editingOrder ? visible : split.visible).map(renderCandidate)}</ul>
-        {!editingOrder && <UnavailableSection label="当前不可用的来源" count={split.unavailable.length}><ul className="candidate-list">{split.unavailable.map(renderCandidate)}</ul></UnavailableSection>}
+        <div className="route-toolbar"><select aria-label={`调度规则 ${g.alias}`} className="select-field" disabled={!canEdit} value={draft.strategy} onChange={e => { void routing.change(g, { strategy: e.target.value }); }}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select>
+        {candidates.length > 1 && <div className="route-quick-sort">
+          <Button variant="outline" size="sm" disabled={!canEdit} onClick={() => { void routing.sortByPrice(g); }}>按倍率</Button>
+          <Button variant="outline" size="sm" disabled={!canEdit || !routing.canProbe || candidates.every(c => c.availability.state !== 'available')} onClick={() => setConfirmLatency(true)}>低延迟优先</Button>
+          {routing.sorting?.alias === g.alias && <span role="status">{routing.sorting.complete}/{routing.sorting.total}{routing.sorting.failures ? ` · ${routing.sorting.failures} 失败` : ''}</span>}
+          {routing.sorting?.alias === g.alias && <Button variant="ghost" size="sm" onClick={routing.stopSorting}>停止</Button>}
+        </div>}
+        </div>
+        <ul className="candidate-list" onPointerMove={drag.move} onPointerUp={drag.end} onPointerCancel={drag.cancel} onLostPointerCapture={drag.cancel}>{visible.map(renderCandidate)}</ul>
       </div>
-    </details>
     {status && <div className={`route-save-state phase-${status.phase}`}>
       <span role={status.phase === 'failed' || status.phase === 'uncertain' ? 'alert' : 'status'}>{status.phase === 'saving' ? <LoaderCircle size={13} className="route-spinner" /> : status.phase === 'saved' ? <Check size={13} /> : null}{status.message}</span>
       {status.phase === 'saved' && status.undo && <Button variant="ghost" size="sm" disabled={!canEdit} onClick={() => { void routing.undo(g); }}><Undo2 size={13} />撤销</Button>}
       {status.phase === 'failed' && <><Button size="sm" variant="outline" disabled={disabled || routing.busy} onClick={() => { void routing.retry(g); }}>重试保存</Button><Button size="sm" variant="ghost" disabled={disabled || routing.busy} onClick={() => routing.discard(g)}>放弃修改</Button></>}
       {status.phase === 'uncertain' && <Button size="sm" variant="outline" disabled={disabled || routing.busy} onClick={() => { void routing.refresh(); }}>重新读取配置</Button>}
     </div>}
+    <ConfirmAction open={confirmLatency} title="测延迟并排序" busy={routing.busy} onCancel={() => setConfirmLatency(false)} onConfirm={() => { setConfirmLatency(false); void routing.sortByLatency(g); }}>
+      <p>将对 {candidates.filter(c => c.availability.state === 'available').length} 个可用渠道各发送 1 次推理请求，可能产生费用。</p>
+    </ConfirmAction>
     <span className="sr-only" role="status">{drag.announcement}</span>
     {dragged && drag.drag && <div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}><GripVertical size={16} /><strong>{dragged.provider_id}</strong><span className="mono">{dragged.upstream}</span><span>第 {drag.drag.to + 1} 位</span></div>}
   </article>;

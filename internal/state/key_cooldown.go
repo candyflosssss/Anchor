@@ -7,26 +7,31 @@ import (
 )
 
 type KeyCooldownSettings struct {
-	WeightPercent    int   `json:"weight_percent"`
-	Enabled          bool  `json:"enabled"`
-	FailureThreshold int   `json:"failure_threshold"`
-	CooldownSeconds  int   `json:"cooldown_seconds"`
-	RateLimitSeconds int   `json:"rate_limit_seconds"`
-	Revision         int64 `json:"revision"`
+	WeightPercent      int   `json:"weight_percent"`
+	Enabled            bool  `json:"enabled"`
+	FailureThreshold   int   `json:"failure_threshold"`
+	CooldownSeconds    int   `json:"cooldown_seconds"`
+	RateLimitSeconds   int   `json:"rate_limit_seconds"`
+	ErrorWindowSeconds int   `json:"error_window_seconds"`
+	Revision           int64 `json:"revision"`
 }
 type SaveKeyCooldownSettings struct {
-	WeightPercent    *int  `json:"weight_percent,omitempty"`
-	Enabled          *bool `json:"enabled"`
-	FailureThreshold *int  `json:"failure_threshold"`
-	CooldownSeconds  *int  `json:"cooldown_seconds"`
-	RateLimitSeconds *int  `json:"rate_limit_seconds"`
-	ExpectedRevision int64 `json:"expected_revision"`
+	WeightPercent      *int  `json:"weight_percent,omitempty"`
+	Enabled            *bool `json:"enabled"`
+	FailureThreshold   *int  `json:"failure_threshold"`
+	CooldownSeconds    *int  `json:"cooldown_seconds"`
+	RateLimitSeconds   *int  `json:"rate_limit_seconds"`
+	ErrorWindowSeconds *int  `json:"error_window_seconds,omitempty"`
+	ExpectedRevision   int64 `json:"expected_revision"`
 }
 
 func DefaultKeyCooldownSettings() KeyCooldownSettings {
-	return KeyCooldownSettings{WeightPercent: 10, Enabled: true, FailureThreshold: 3, CooldownSeconds: 30, RateLimitSeconds: 30, Revision: 1}
+	return KeyCooldownSettings{WeightPercent: 10, Enabled: true, FailureThreshold: 100, CooldownSeconds: 300, RateLimitSeconds: 300, ErrorWindowSeconds: 300, Revision: 1}
 }
 func (in SaveKeyCooldownSettings) Validate() error {
+	if in.ErrorWindowSeconds != nil && (*in.ErrorWindowSeconds < 1 || *in.ErrorWindowSeconds > 3600) {
+		return ErrInvalid
+	}
 	if (in.WeightPercent != nil && (*in.WeightPercent < 1 || *in.WeightPercent > 100)) || in.Enabled == nil || in.FailureThreshold == nil || *in.FailureThreshold < 1 || *in.FailureThreshold > 100 || in.CooldownSeconds == nil || *in.CooldownSeconds < 1 || *in.CooldownSeconds > 3600 || in.RateLimitSeconds == nil || *in.RateLimitSeconds < 1 || *in.RateLimitSeconds > 3600 || in.ExpectedRevision < 1 || in.ExpectedRevision >= 9007199254740991 {
 		return ErrInvalid
 	}
@@ -43,6 +48,14 @@ func readKeyCooldownSettings(q interface{ QueryRow(string, ...any) *sql.Row }) (
 		return out, err
 	}
 	if json.Unmarshal([]byte(raw), &out) != nil {
+		return KeyCooldownSettings{}, ErrInvalid
+	}
+	var fields map[string]json.RawMessage
+	_ = json.Unmarshal([]byte(raw), &fields)
+	if _, ok := fields["error_window_seconds"]; !ok {
+		out.FailureThreshold = min(100, out.FailureThreshold*25)
+	}
+	if out.ErrorWindowSeconds < 1 || out.ErrorWindowSeconds > 3600 {
 		return KeyCooldownSettings{}, ErrInvalid
 	}
 	in := SaveKeyCooldownSettings{WeightPercent: &out.WeightPercent, Enabled: &out.Enabled, FailureThreshold: &out.FailureThreshold, CooldownSeconds: &out.CooldownSeconds, RateLimitSeconds: &out.RateLimitSeconds, ExpectedRevision: min(out.Revision, 9007199254740990)}
@@ -70,7 +83,10 @@ func (s *Store) SaveKeyCooldownSettings(in SaveKeyCooldownSettings) (KeyCooldown
 	if old.Revision != in.ExpectedRevision {
 		return old, ErrConflict
 	}
-	out := KeyCooldownSettings{WeightPercent: old.WeightPercent, Enabled: *in.Enabled, FailureThreshold: *in.FailureThreshold, CooldownSeconds: *in.CooldownSeconds, RateLimitSeconds: *in.RateLimitSeconds, Revision: old.Revision + 1}
+	out := KeyCooldownSettings{WeightPercent: old.WeightPercent, Enabled: *in.Enabled, FailureThreshold: *in.FailureThreshold, CooldownSeconds: *in.CooldownSeconds, RateLimitSeconds: *in.RateLimitSeconds, ErrorWindowSeconds: old.ErrorWindowSeconds, Revision: old.Revision + 1}
+	if in.ErrorWindowSeconds != nil {
+		out.ErrorWindowSeconds = *in.ErrorWindowSeconds
+	}
 	if in.WeightPercent != nil {
 		out.WeightPercent = *in.WeightPercent
 	}

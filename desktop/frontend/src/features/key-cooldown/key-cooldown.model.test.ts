@@ -15,10 +15,10 @@ describe('Key cooldown settings contract', () => {
     const result = { ...fixture, enabled: false, revision: 2 };
     const save = vi.fn(async () => ({ contract: CONTRACT, data: result, problem: null }));
     const service = createKeyCooldownService(() => ({ KeyCooldownSettings: vi.fn(), SaveKeyCooldownSettings: save }));
-    const input = { enabled: false, weight_percent: 10, failure_threshold: 3, cooldown_seconds: 30, rate_limit_seconds: 30, expected_revision: 1 };
+    const input = { enabled: false, weight_percent: 10, failure_threshold: 100, cooldown_seconds: 300, rate_limit_seconds: 300, error_window_seconds: 300, expected_revision: 1 };
     expect(await service.save(input)).toEqual(result);
     expect(save).toHaveBeenCalledExactlyOnceWith(input);
-    for (const field of ['enabled', 'weight_percent', 'failure_threshold', 'cooldown_seconds', 'rate_limit_seconds', 'expected_revision']) await expect(service.save({ ...input, [field]: null })).rejects.toMatchObject({ code: 'invalid' });
+    for (const field of ['enabled', 'weight_percent', 'failure_threshold', 'cooldown_seconds', 'rate_limit_seconds', 'error_window_seconds', 'expected_revision']) await expect(service.save({ ...input, [field]: null })).rejects.toMatchObject({ code: 'invalid' });
     expect(save).toHaveBeenCalledTimes(1);
     for (const field of ['enabled', 'weight_percent', 'failure_threshold', 'cooldown_seconds', 'rate_limit_seconds', 'revision'] as const) {
       save.mockResolvedValue({ contract: CONTRACT, data: { ...result, [field]: field === 'enabled' ? true : 1 }, problem: null });
@@ -29,7 +29,7 @@ describe('Key cooldown settings contract', () => {
   it('does not retry writes or silently fall back on old hosts', async () => {
     const save = vi.fn(async () => ({ contract: CONTRACT, data: null, problem: { code: 'conflict' as const } }));
     const service = createKeyCooldownService(() => ({ KeyCooldownSettings: vi.fn(), SaveKeyCooldownSettings: save }));
-    await expect(service.save({ enabled: true, weight_percent: 10, failure_threshold: 3, cooldown_seconds: 30, rate_limit_seconds: 30, expected_revision: 1 })).rejects.toMatchObject({ code: 'conflict' });
+    await expect(service.save({ enabled: true, weight_percent: 10, failure_threshold: 100, cooldown_seconds: 300, rate_limit_seconds: 300, error_window_seconds: 300, expected_revision: 1 })).rejects.toMatchObject({ code: 'conflict' });
     expect(save).toHaveBeenCalledTimes(1);
     const unsupported = createKeyCooldownService(() => ({} as DesktopBridge));
     await expect(unsupported.read()).rejects.toMatchObject({ code: 'unsupported' });

@@ -46,8 +46,9 @@ func (s *Server) saveKeyCooldownSettings(in state.SaveKeyCooldownSettings) (stat
 	s.routing = map[string]*modelSchedule{}
 	for _, h := range s.health {
 		h.Failures = 0
+		h.Score = 0
+		h.errors = nil
 		h.Until = time.Time{}
-		h.credit = 0
 	}
 	return out, nil
 }

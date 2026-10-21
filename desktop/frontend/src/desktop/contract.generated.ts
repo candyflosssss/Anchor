@@ -61,6 +61,7 @@ export interface KeyCooldownSettings {
   failure_threshold: number;
   cooldown_seconds: number;
   rate_limit_seconds: number;
+  error_window_seconds: number;
   revision: number;
 }
 export interface SaveKeyCooldownSettings {
@@ -69,6 +70,7 @@ export interface SaveKeyCooldownSettings {
   failure_threshold: number | null;
   cooldown_seconds: number | null;
   rate_limit_seconds: number | null;
+  error_window_seconds?: number | null;
   expected_revision: number;
 }
 export interface KeyCooldownSettingsResult {
@@ -488,6 +490,7 @@ export interface ProbeProgress {
   phase: string;
   text: string;
   elapsed_ms: number;
+  first_byte_ms?: number;
   result: Probe | null;
 }
 export interface ProbeProgressResult {
@@ -812,6 +815,7 @@ export interface KeyRateCache {
   failure: string;
 }
 export interface KeyStatus {
+  error_score?: number;
   rate: KeyRateCache | null;
   effective_multiplier: number | null;
   protocol: string;

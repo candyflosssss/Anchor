@@ -12,7 +12,8 @@ import type { ModelRoutingController } from './use-model-routing';
 const rates: MappingRatesController = { values: {}, keys: {}, errors: {}, busy: false, pending: '', refresh: async () => {} };
 const routing: ModelRoutingController = {
   draft: g => ({ strategy: g.strategy, order: g.candidates.map(c => ({ provider_id: c.provider_id, model: c.upstream })) }),
-  status: () => undefined, busy: false, error: '', needsRead: false,
+  status: () => undefined, busy: false, error: '', needsRead: false, sorting: null, canProbe: true,
+  sortByPrice: async () => {}, sortByLatency: async () => {}, stopSorting: () => {},
   change: async () => {}, move: async () => {}, refresh: async () => {}, retry: async () => {}, undo: async () => {}, discard: () => {}, routeID: c => JSON.stringify([c.provider_id, c.model]),
 };
 const makeSummary = (enabled: boolean, state = 'ready', keyEnabled = true, candidateCount = 1) => summarize({ ...providers.providers[0], enabled }, { ...workspace, keys: [{ ...workspace.keys[0], state, enabled: keyEnabled }], models: [{ ...mapping, candidate_count: candidateCount }] });
@@ -61,18 +62,17 @@ describe('model channel availability presentation', () => {
     expect(html.indexOf('模型 z-on')).toBeLessThan(html.indexOf('当前不可用的模型'));
     expect(html.indexOf('当前不可用的模型')).toBeLessThan(html.indexOf('模型 a-off'));
   });
-  it('shows usable candidates before closed unavailable sources without changing routing indices', () => {
+  it('keeps every channel visible in saved priority order', () => {
     const off = makeSummary(false), on = makeSummary(true);
     off.provider.id = 'off'; on.provider.id = 'on';
     off.workspace!.models[0] = { ...mapping, candidate_count: 2, candidate_index: 0 };
     on.workspace!.models[0] = { ...mapping, candidate_count: 2, candidate_index: 1 };
     const html = render([off, on]);
-    expect(html).toContain('调整来源顺序');
-    const section = html.match(/<details[^>]*aria-label="当前不可用的来源"[^>]*>/)?.[0];
-    expect(section).toBeDefined(); expect(section).not.toContain('open');
-    expect(html.indexOf('第 2 位')).toBeLessThan(html.indexOf('当前不可用的来源'));
-    expect(html.indexOf('当前不可用的来源')).toBeLessThan(html.indexOf('第 1 位'));
-    expect(html).not.toContain('aria-label="下移 on');
+    expect(html).toContain('按倍率');
+    expect(html).toContain('低延迟优先');
+    expect(html).not.toContain('aria-label="当前不可用的来源"');
+    expect(html.indexOf('第 1 位')).toBeLessThan(html.indexOf('第 2 位'));
+    expect(html).toContain('aria-label="下移 off');
   });
 
 });

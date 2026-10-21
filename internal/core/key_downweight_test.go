@@ -1,13 +1,12 @@
 package core
 
 import (
+	"github.com/candyflosssss/Anchor/internal/state"
 	"testing"
 	"time"
-
-	"github.com/candyflosssss/Anchor/internal/state"
 )
 
-func TestDegradedKeyWeightedShareAndFallback(t *testing.T) {
+func TestKeyCooldownExcludesOnlyFailedKey(t *testing.T) {
 	for _, strategy := range []string{"priority", "round-robin"} {
 		t.Run(strategy, func(t *testing.T) {
 			f := setup(t)
@@ -20,68 +19,31 @@ func TestDegradedKeyWeightedShareAndFallback(t *testing.T) {
 				t.Fatal(err)
 			}
 			p, _ = f.store.Provider("p")
-			f.core.finishKey(p, "default", 401, "", false)
-			counts := map[string]int{}
-			for i := 0; i < 110; i++ {
+			f.core.finishKey(p, "default", 403, "", false)
+			for i := 0; i < 20; i++ {
 				k, ok := f.core.chooseKey(p, nil)
-				if !ok {
-					t.Fatal("no Key")
+				if !ok || k.ID != "second" {
+					t.Fatal(k, ok)
 				}
-				counts[k.ID]++
 			}
-			if counts["default"] < 9 || counts["default"] > 11 || counts["second"] < 99 {
-				t.Fatal(strategy, counts)
+			if _, ok := f.core.chooseKey(p, map[string]bool{"second": true}); ok {
+				t.Fatal("cooling Key selected")
 			}
-			// The degraded Key is still eligible when healthy Keys have been tried.
-			if k, ok := f.core.chooseKey(p, map[string]bool{"second": true}); !ok || k.ID != "default" {
-				t.Fatal(k, ok)
+			f.core.finishKey(p, "second", 403, "", false)
+			if _, ok := f.core.chooseKey(p, nil); ok {
+				t.Fatal("all cooling Keys selected")
 			}
-			f.core.finishKey(p, "second", 429, "", false)
-			if _, ok := f.core.chooseKey(p, nil); !ok {
-				t.Fatal("all degraded excluded")
-			}
-			f.core.finishKey(p, "default", 200, "", true)
-			if f.core.keyStatus(p, state.ProviderKey{ID: "default", Enabled: true}).State != "ready" {
-				t.Fatal("success did not restore")
-			}
-			// A live policy update changes the actual share and clears old penalties.
-			enabled, threshold, seconds, weight := true, 3, 30, 25
-			in := state.SaveKeyCooldownSettings{Enabled: &enabled, WeightPercent: &weight, FailureThreshold: &threshold, CooldownSeconds: &seconds, RateLimitSeconds: &seconds, ExpectedRevision: 1}
-			if _, err := f.core.saveKeyCooldownSettings(in); err != nil {
-				t.Fatal(err)
-			}
-			f.core.finishKey(p, "default", 401, "", false)
-			count := 0
-			for i := 0; i < 100; i++ {
+			f.core.health[healthID(p, "default")].Until = time.Now().Add(-time.Second)
+			for i := 0; i < 3; i++ {
 				k, ok := f.core.chooseKey(p, nil)
-				if !ok {
-					t.Fatal("no Key")
+				if !ok || k.ID != "default" {
+					t.Fatal("expiry requires probe", k, ok)
 				}
-				if k.ID == "default" {
-					count++
-				}
-			}
-			want := 25
-			if strategy == "round-robin" {
-				want = 20
-			}
-			if count != want {
-				t.Fatal("configured share", count, want)
-			}
-			weight = 100
-			in.ExpectedRevision = 2
-			if _, err := f.core.saveKeyCooldownSettings(in); err != nil {
-				t.Fatal(err)
-			}
-			f.core.finishKey(p, "default", 401, "", false)
-			if f.core.keyStatus(p, state.ProviderKey{ID: "default", Enabled: true}).State != "ready" {
-				t.Fatal("100 percent penalized Key")
 			}
 		})
 	}
 }
-
-func TestModelStrategiesDownweightWithoutExclusion(t *testing.T) {
+func TestAllStrategiesKeepSessionsAndSkipCooldown(t *testing.T) {
 	for _, strategy := range []string{"priority", "round-robin", "lowest-price", "lowest-latency", "cache-priority"} {
 		t.Run(strategy, func(t *testing.T) {
 			f := setup(t)
@@ -93,33 +55,62 @@ func TestModelStrategiesDownweightWithoutExclusion(t *testing.T) {
 			a, _ := f.store.Provider("a")
 			b, _ := f.store.Provider("b")
 			f.core.finishKey(a, "default", 403, "", false)
-			f.core.rememberRoute(m, m.Candidates[0], a, "default", "affinity", time.Millisecond)
-			f.core.rememberRoute(m, m.Candidates[1], b, "default", "other", time.Second)
-			count := 0
-			for i := 0; i < 110; i++ {
-				routes, err := f.core.routeCandidatesFor(m, "affinity")
-				if err != nil || len(routes) != 2 {
-					t.Fatal(routes, err)
+			routes, err := f.core.routeCandidatesFor(m, "session")
+			if err != nil || len(routes) != 1 || routes[0].ProviderID != "b" {
+				t.Fatal(routes, err)
+			}
+			f.core.rememberRoute(m, m.Candidates[1], b, "default", "session", time.Millisecond)
+			f.core.health[healthID(a, "default")].Until = time.Now().Add(-time.Second)
+			m.Revision++
+			routes, err = f.core.routeCandidatesFor(m, "session")
+			if err != nil || len(routes) != 2 || routes[0].ProviderID != "b" {
+				t.Fatal("session switched after recovery", routes, err)
+			}
+			if strategy == "priority" || strategy == "cache-priority" {
+				routes, _ = f.core.routeCandidatesFor(m, "new-session")
+				if routes[0].ProviderID != "a" {
+					t.Fatal("new session ignored priority", routes)
 				}
-				if routes[0].ProviderID == "a" {
-					count++
-				}
 			}
-			if count < 9 || count > 11 {
-				t.Fatalf("%s degraded first %d/110", strategy, count)
-			}
-			f.core.finishKey(b, "default", 429, "", false)
-			routes, err := f.core.routeCandidatesFor(m, "affinity")
-			if err != nil || len(routes) != 2 {
-				t.Fatal("all degraded excluded", routes, err)
-			}
-			if err := f.store.MutateProvider("b", b.Revision, "key-put", "default", "", "", false, false); err != nil {
-				t.Fatal(err)
-			}
-			routes, err = f.core.routeCandidatesFor(m, "affinity")
+			f.core.finishKey(b, "default", 403, "", false)
+			routes, err = f.core.routeCandidatesFor(m, "session")
 			if err != nil || len(routes) != 1 || routes[0].ProviderID != "a" {
-				t.Fatal("manual disable bypassed", routes, err)
+				t.Fatal("session prevented fallback", routes, err)
+			}
+			f.core.finishKey(a, "default", 403, "", false)
+			routes, err = f.core.routeCandidates(m)
+			if err != nil || len(routes) != 0 {
+				t.Fatal("all cooling routes selected", routes, err)
 			}
 		})
+	}
+}
+func TestKeyErrorScoreExpiryAndClassification(t *testing.T) {
+	f := setup(t)
+	f.add(t, "p", "http://127.0.0.1:1", "synthetic")
+	p, _ := f.store.Provider("p")
+	for _, status := range []int{400, 404, 422, 200} {
+		f.core.finishKey(p, "default", status, "", false)
+	}
+	h := f.core.health[healthID(p, "default")]
+	if h.Score != 0 {
+		t.Fatal(h)
+	}
+	f.core.finishKey(p, "default", 500, "", false)
+	if h.Score != 25 || !h.Until.IsZero() {
+		t.Fatal(h)
+	}
+	h.errors[0].until = time.Now().Add(-time.Second)
+	f.core.finishKey(p, "default", 429, "", false)
+	if h.Score != 50 || !h.Until.IsZero() {
+		t.Fatal(h)
+	}
+	f.core.finishKey(p, "default", 200, "", true)
+	if h.Score != 50 {
+		t.Fatal("success erased window")
+	}
+	f.core.finishKey(p, "default", 429, "600", false)
+	if h.Score != 100 || time.Until(h.Until) < 599*time.Second {
+		t.Fatal(h)
 	}
 }

@@ -20,13 +20,14 @@ export function checkedProgress(value: ProbeProgress, input: ProbeRequest, maxTe
     !['running', 'completed', 'cancelled'].includes(value.status) || !['connecting', 'receiving', 'complete'].includes(value.phase) ||
     typeof value.text !== 'string' || new TextEncoder().encode(value.text).length > maxTextBytes ||
     !Number.isSafeInteger(value.elapsed_ms) || value.elapsed_ms < 0 ||
+    (value.first_byte_ms !== undefined && (!Number.isSafeInteger(value.first_byte_ms) || value.first_byte_ms < 0 || value.first_byte_ms > value.elapsed_ms)) ||
     (value.status === 'running' ? value.result !== null : !value.result)) throw new ProviderProblem('read_error');
   const result = value.result;
   if (result && (result.revision !== value.revision || result.key_id !== value.key_id || result.model !== value.model ||
     ![result.at, result.elapsed_ms, result.http_status].every(n => Number.isSafeInteger(n) && n >= 0) ||
     !['', 'busy', 'authentication', 'rate_limited', 'network', 'proxy_unavailable', 'timeout', 'invalid_response', 'unexpected_html', 'http_error'].includes(result.failure))) throw new ProviderProblem('read_error');
   return { provider_id: value.provider_id, revision: value.revision, run_id: value.run_id, key_id: value.key_id,
-    model: value.model, status: value.status, phase: value.phase, text: value.text, elapsed_ms: value.elapsed_ms,
+    model: value.model, status: value.status, phase: value.phase, text: value.text, elapsed_ms: value.elapsed_ms, first_byte_ms: value.first_byte_ms ?? 0,
     result: result ? { revision: result.revision, key_id: result.key_id, model: result.model, at: result.at,
       http_status: result.http_status, elapsed_ms: result.elapsed_ms, failure: result.failure } : null };
 }

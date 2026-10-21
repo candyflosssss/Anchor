@@ -69,7 +69,7 @@ test('mapping settings directly creates speed siblings without navigating to pro
   await expect(page.getByRole('heading', { name: '模型映射', exact: true })).toBeVisible();
   for (const speed of ['fast', 'ultrafast']) {
     const sibling = page.getByRole('article', { name: `模型 coding-main(${speed})`, exact: true });
-    await expect(sibling).toContainText('1 个来源');
+    await expect(sibling).toContainText('1/1 可用');
     await sibling.getByRole('button', { name: `模型设置 coding-main(${speed})`, exact: true }).click();
     await page.getByRole('dialog').getByRole('button', { name: '速度与分身', exact: true }).click();
     await expect(dialog.getByLabel('Anchor 固定速度档位')).toHaveValue(speed === 'fast' ? 'priority' : 'ultrafast');

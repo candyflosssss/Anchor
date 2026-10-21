@@ -41,6 +41,7 @@ type KeyRateCache struct {
 }
 
 type KeyStatus struct {
+	ErrorScore          int             `json:"error_score,omitempty"`
 	Rate                *KeyRateCache   `json:"rate"`
 	EffectiveMultiplier *float64        `json:"effective_multiplier"`
 	Protocol            string          `json:"protocol"`

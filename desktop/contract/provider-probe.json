@@ -1,5 +1,5 @@
 {
   "request": {"provider_id": "demo", "expected_revision": 3, "action": "start", "key_id": "default", "model": "demo-model", "run_id": "", "approved": true},
-  "progress": {"provider_id": "demo", "revision": 3, "run_id": "synthetic-run", "key_id": "default", "model": "demo-model", "status": "running", "phase": "receiving", "text": "O", "elapsed_ms": 120, "result": null},
-  "html_failure": {"provider_id": "demo", "revision": 3, "run_id": "synthetic-run", "key_id": "default", "model": "demo-model", "status": "completed", "phase": "complete", "text": "", "elapsed_ms": 140, "result": {"revision": 3, "key_id": "default", "model": "demo-model", "at": 1791946800, "http_status": 200, "elapsed_ms": 140, "failure": "unexpected_html"}}
+  "progress": {"provider_id": "demo", "revision": 3, "run_id": "synthetic-run", "key_id": "default", "model": "demo-model", "status": "running", "phase": "receiving", "text": "O", "elapsed_ms": 120, "first_byte_ms": 112, "result": null},
+  "html_failure": {"provider_id": "demo", "revision": 3, "run_id": "synthetic-run", "key_id": "default", "model": "demo-model", "status": "completed", "phase": "complete", "text": "", "elapsed_ms": 140, "first_byte_ms": 0, "result": {"revision": 3, "key_id": "default", "model": "demo-model", "at": 1791946800, "http_status": 200, "elapsed_ms": 140, "failure": "unexpected_html"}}
 }

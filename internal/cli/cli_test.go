@@ -78,6 +78,23 @@ func TestCLIManagementWorkflow(t *testing.T) {
 	if status := run("", "status", "--json"); !strings.Contains(status, `"core":"ready"`) {
 		t.Fatal(status)
 	}
+	if value := run("", "settings", "key-cooldown"); !strings.Contains(value, `"error_window_seconds":300`) || !strings.Contains(value, `"failure_threshold":100`) {
+		t.Fatal(value)
+	}
+	if value := run("", "settings", "key-cooldown", "--revision", "1", "--error-window-seconds", "60"); !strings.Contains(value, `"error_window_seconds":60`) || !strings.Contains(value, `"revision":2`) {
+		t.Fatal(value)
+	}
+	if value := run("", "settings", "key-cooldown", "--revision", "2", "--cooldown-seconds", "180"); !strings.Contains(value, `"error_window_seconds":60`) {
+		t.Fatal("omitted window was reset", value)
+	}
+	for _, args := range [][]string{{"--revision", "3", "--error-window-seconds", "0"}, {"--revision", "3", "--error-window-seconds", "3601"}, {"--error-window-seconds", "60"}, {"--revision", "1", "--error-window-seconds", "120"}} {
+		var output bytes.Buffer
+		app := App{In: strings.NewReader(""), Out: &output, Err: io.Discard}
+		base := []string{"--data-dir", dir, "settings", "key-cooldown"}
+		if err := app.Run(context.Background(), append(base, args...)); err == nil {
+			t.Fatal("accepted invalid settings", args)
+		}
+	}
 	out := run("provider-secret\n", "provider", "add", "--id", "p", "--base-url", "https://example.invalid/v1", "--secret-stdin")
 	if strings.Contains(out, "provider-secret") {
 		t.Fatal("provider write leaked secret")

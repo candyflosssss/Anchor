@@ -62,7 +62,7 @@
   "invalid_tools": "tools must be an array",
   "tools_unsupported": "public model does not advertise tools",
   "unsupported_tool": "only Agent-executed function/custom tools, their namespaces and client tool_search are supported",
-  "no_available_candidate": "no enabled, supported and available candidate succeeded",
+  "no_available_candidate": "all channels are unavailable",
   "unsupported_conversion": "unsupported field or content for protocol conversion",
   "candidate_conversion_unsupported": "candidate protocol %s cannot represent request (%s)",
   "proxy_unavailable": "configured proxy is unavailable; direct fallback is disabled",
