@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.64](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.64)，发布于 `2026-10-21T20:12:39+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c667c4ea240efb0f0059d5f9e245ea2b75f24f77`、SOURCE dirty=false。
-- Key 独立错误分数与冷却、会话保持和不可用时 fallback；模型映射按模型分组，可拖动或按综合倍率／实测首字延迟排序，排序后仍可手调。包含主线日志选区与错误汇总、CC Switch 供应商导入。
+- 更新：2026-10-22。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.65](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.65)，发布于 `2026-10-22T12:21:24+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `0e964477895483a95217291f6e193313070aa4b0`、SOURCE dirty=false。
+- 修复 HTTP localhost 供应商地址：手动保存、CC Switch 导入与实际请求可用，直连兼容 IPv4／IPv6 回环；含 desktop.64 之后已提交的模型 Key 卡片／拖动、Skill 自动收录与原件清理、Claude CLI 模型菜单和 Desktop 独立托管。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .65 在线投放（2026-10-22）
+
+HTTP localhost 供应商可保存、导入与请求；同版包含已提交的模型 Key 卡片／拖动、Skill 自动收录与清理、Claude CLI 菜单及 Desktop 托管。11 附件远端摘要、构建 tag 与非 latest 核对通过；默认 dev 源真实下载 Linux runtime、旧客户端 deb 和 CLI，版本／目标／大小／SHA256 验证通过。仅在线投放，未安装或修改真实配置；详见[发行记录](../release/desktop.md#localhost-65)。
 
 ## .64 在线投放（2026-10-21）
 

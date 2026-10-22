@@ -1,10 +1,40 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-21。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.64](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.64)，发布于 `2026-10-21T20:12:39+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c667c4ea240efb0f0059d5f9e245ea2b75f24f77`、SOURCE dirty=false。
-- Key 独立错误分数与冷却、会话保持和不可用时 fallback；模型映射按模型分组，可拖动或按综合倍率／实测首字延迟排序，排序后仍可手调。包含主线日志选区与错误汇总、CC Switch 供应商导入。
+- 更新：2026-10-22。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.65](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.65)，发布于 `2026-10-22T12:21:24+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `0e964477895483a95217291f6e193313070aa4b0`、SOURCE dirty=false。
+- 修复 HTTP localhost 供应商地址：手动保存、CC Switch 导入与实际请求可用，直连兼容 IPv4／IPv6 回环；含 desktop.64 之后已提交的模型 Key 卡片／拖动、Skill 自动收录与原件清理、Claude CLI 模型菜单和 Desktop 独立托管。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="localhost-65"></a>
+
+## localhost 与供应商导入 .65（已发布 dev）
+
+`http://localhost[:端口]/路径` 现在可手动添加、编辑和从 CC Switch 导入；精确主机名大小写不敏感，其他普通 HTTP 域名继续拒绝。直连固定尝试 IPv4／IPv6 回环，不依赖 DNS／hosts，保留路径和 Host；显式代理沿用原路由与失败关闭规则。localhost 指核心所在机器，不一定是桌面窗口所在机器。
+
+同时交付 desktop.64 以来已提交的模型 Key 卡片与整卡拖动优化、Skill 自动收录及归档后清理、Claude CLI 模型菜单和 Claude Desktop 独立托管。CC Switch 全平台读取与 Anchor 激活规则保持；未补齐的 Key、OAuth 或不支持的协议／覆盖项仍按实际原因跳过。
+
+构建提交 `0e964477895483a95217291f6e193313070aa4b0`，输入摘要 `d1f7dc06e1c44fc55f95253e8e95d95f3124a0a08efcd49b465742d86f5d9ab7`，SOURCE dirty=false。从干净 worktree 构建，未混入原工作区未提交内容。产物和证据在 `dist/desktop/0.1.0-dev.desktop.65/`；对应源码含 Anchor Go vendor、固定 mihomo v1.19.32 对应源码／vendor与许可。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.65_amd64.deb` | 29191980 | `826af4514c4c028aba6bb603732f76f2c4edc3f4a0716f5c3bb9287db5557d5d` |
+| `Anchor-Desktop-0.1.0-dev.desktop.65-windows-amd64-setup.exe` | 31209611 | `179cb1cb4735cd0795e563690e8c3d534ad7e03427cc82ecb683fc596216ce25` |
+| `anchor-desktop-0.1.0-dev.desktop.65-linux-amd64` | 43304016 | `71dbb6d40d7ea53dc9d426e9e2e62ebe9cd84a640e011d59392398e1b9f583d1` |
+| `anchor-desktop-0.1.0-dev.desktop.65-windows-amd64.exe` | 44431360 | `2c4bf3ea9faacc2fdedebbb5a3fb7ec7b6184180472f3e4992d74c37f19648fd` |
+| `anchor-0.1.0-dev.desktop.65-linux-amd64` | 37904546 | `477e97dcc130e2a2d38ca4ab675de4638ccdbc3c5e5522ec01d4cffa0f306dc6` |
+| `anchor-0.1.0-dev.desktop.65-windows-amd64.exe` | 38036480 | `164d6084a795e252e59b02d973e9b379315a7f78dad475ebef8383a6ed4cd5e8` |
+| `update-desktop.json` | 1755 | `5bae3c76532dc1f50627aae558ec3c30dbaf2bd779a6830ec63736d99ff8a70b` |
+| `update-cli.json` | 876 | `90d593c4ec41d61cc3755a784ce5248ae13fe2747116bb33f4e5f2bbea1d2ca1` |
+| `anchor_0.1.0-dev.desktop.65_source.tar.gz` | 97754336 | `57c646cde4eaecca141af444269ef0da0b69456c4e015bc73bfec2d805d45ce4` |
+| `anchor_0.1.0-dev.desktop.65_metadata.zip` | 122169 | `841d732a4d7292cdd905c487b8645b1d38790789703b40cb928f0eb65ec7cf10` |
+| `SHA256SUMS` | 1073 | `9fd11ca7816241ea60b45e8edd36042b30024e695d27489716245b7a08a672e5` |
+
+复用 localhost 修复阶段五个 Go 包（state／ccswitch／egress／core／cli）、56 项前端单元、typecheck 与定向 ESLint 通过结果。本轮完成 Go／TS 契约比对、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译／打包；前端和 mihomo 嵌入、deb 与 runtime 载荷、对应源码输入摘要及 metadata ZIP CRC 核对通过。保留非阻塞 Vite 大 chunk 提示。
+
+于 `2026-10-22T12:21:24+09:00` 公开为 dev prerelease、非 latest；11 附件大小／GitHub digest 与本地一致，tag 指向实际构建提交。默认 dev 源实际下载 Linux runtime、旧客户端 deb 和独立 CLI，版本／目标／大小／SHA256 验证通过。证据见 publication 下 preparation-verification.json、publication-verification.json、online-verification.json；原始 BUILD.json 保留未发布／未安装／未原生验收的构建时事实。
+
+本轮仅投放，沿用 schema9；未安装、重启或修改真实实例／Agent 配置、用户更新设置，未请求付费上游。双平台原生窗口／系统安装器、真实 SSH 升级尚未验收。
 
 <a id="routing-priority-64"></a>
 
