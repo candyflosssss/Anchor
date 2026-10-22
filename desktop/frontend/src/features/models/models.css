@@ -10,7 +10,7 @@
 .route-toolbar > select { width: auto; max-width: 100%; font-size: 12px; height: 32px; }
 .route-quick-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .route-quick-sort > span { font-size: 12px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.model-card .candidate-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 10px; padding: 0; margin: 0; list-style: none; }
+.model-card .candidate-list { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 300px; gap: 10px; padding: 0; margin: 0; list-style: none; }
 /* The route wrapper owns order only. Every source Key has its own visible card. */
 .mapping-candidate { display: contents; }
 .mapping-key-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(46px, 76px) 20px; align-items: center; gap: 8px 12px; min-width: 0; width: 100%; max-width: 300px; min-height: 80px; padding: 12px 10px 12px 14px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); box-shadow: 0 1px 2px hsl(var(--foreground) / .04), inset 0 1px 0 hsl(var(--background) / .5); transition: border-color 140ms, box-shadow 140ms, background-color 140ms; }

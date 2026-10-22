@@ -658,10 +658,18 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
   await expect(model.getByRole('group', { name: '摸鱼AI · Key missing', exact: true })).toContainText('Key 不存在');
   await expect(model.getByLabel('来源 Key unrelated', { exact: true })).toHaveCount(0);
   await expect(model.locator('details')).toHaveCount(0);
-  const firstBox = await cards.first().boundingBox(), secondBox = await cards.nth(1).boundingBox();
-  expect(firstBox!.width).toBeLessThanOrEqual(300);
-  expect(secondBox!.y).toBe(firstBox!.y);
-  expect(secondBox!.x).toBeGreaterThan(firstBox!.x);
+  const expectVerticalCards = async () => {
+    const boxes = await cards.evaluateAll(nodes => nodes.map(node => {
+      const { x, y, width, height } = node.getBoundingClientRect();
+      return { x, y, width, height };
+    }));
+    for (const [i, box] of boxes.entries()) {
+      expect(box!.width).toBeLessThanOrEqual(300);
+      expect(box!.x).toBe(boxes[0]!.x);
+      if (i) expect(box!.y).toBeGreaterThanOrEqual(boxes[i - 1]!.y + boxes[i - 1]!.height);
+    }
+  };
+  await expectVerticalCards();
   // A handle on any Key moves the same existing route, preserving all Key scope.
   await model.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one Key expensive', exact: true }).press('ArrowDown');
   await expect(model).toContainText('已自动保存');
@@ -669,16 +677,20 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
   await expect(cards.first()).toContainText('备用供应商');
   expect(await page.evaluate(() => window.routingTest.calls[0].order.map(c => c.provider_id))).toEqual(['备用供应商', '摸鱼AI', '本地调试']);
   await page.setViewportSize({ width: 600, height: 850 });
+  await expectVerticalCards();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   if (process.env.ANCHOR_MAPPING_CAPTURE_DIR) {
     await page.setViewportSize({ width: 1600, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-light.png` });
-    await model.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-detail.png` });
+    await expectVerticalCards();
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-light.png` });
+    await model.locator('.candidate-list').screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-detail.png` });
     await page.getByRole('button', { name: '深色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-dark.png` });
+    await expectVerticalCards();
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-dark.png` });
     await page.setViewportSize({ width: 600, height: 850 });
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-narrow.png` });
+    await expectVerticalCards();
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-narrow.png` });
   }
 });
 
