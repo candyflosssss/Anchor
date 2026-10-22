@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -43,6 +44,8 @@ func TestCoreStartupPrefetchDoesNotBlockReadyAndStopsWithCore(t *testing.T) {
 		return nil, r.Context().Err()
 	}))
 	srv := NewWithModelCatalog(store, slog.New(slog.NewJSONHandler(io.Discard, nil)), client)
+	home := t.TempDir()
+	srv.AgentEnvironment = func() (managed.Environment, error) { return managed.Environment{Home: home}, nil }
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan error, 1)
 	go func() { done <- srv.Run(ctx) }()

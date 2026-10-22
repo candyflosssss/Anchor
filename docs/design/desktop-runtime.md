@@ -190,7 +190,7 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 ## Skill 中心库桥接（2026-10-17 源码，未发布）
 
-新增 `Bridge.SkillWorkspace()`、`Bridge.SkillDetail(SkillQuery)`、`Bridge.ManageSkill(SkillAction)`，规范 DTO 从 `internal/skills` 以别名纳入生成器，共享 `desktop/contract/skills.json`。薄桥接经认证客户端调用 `/control/v1/skills`、`/detail`、`/action`，所有写入仍在核心校验 approval / revision / hash。只读详情 POST 的传输失败不标记未知写入，实际动作不自动重试。新增错误 skill_unsafe / skill_changed / skill_limit / skill_link_unavailable。Skill 响应有独立16 MiB客户端上限，不改变其他接口1 MiB上限。发现、版本、冲突与恢复行为见 [设计](skills.md)，CLI 见 [大全 §14](../cli/commands.md#14-skill-中心库当前源码未发布)。不代表原生窗口或真实 Agent 加载已验收。
+新增 `Bridge.SkillWorkspace()`、`Bridge.SkillDetail(SkillQuery)`、`Bridge.ManageSkill(SkillAction)`，规范 DTO 从 `internal/skills` 以别名纳入生成器，共享 `desktop/contract/skills.json`。薄桥接经认证客户端调用 `/control/v1/skills`、`/detail`、`/action`，自动收录在核心启动、每分钟检查及 workspace 查询时执行，只写库不动原件；workspace 查询同时校验 owner／实例身份。手动动作仍在核心校验 approval / revision / hash，新增 cleanup 动作在核验当前原件已归档后替换为固定版本链接。只读详情 POST 的传输失败不标记未知写入，实际动作不自动重试。新增错误 skill_unsafe / skill_changed / skill_limit / skill_link_unavailable。Skill 响应有独立64 MiB客户端上限，不改变其他接口1 MiB上限。发现、版本、冲突与恢复行为见 [设计](skills.md)，CLI 见 [大全 §14](../cli/commands.md#14-skill-中心库当前源码未发布)。不代表原生窗口或真实 Agent 加载已验收。
 
 ## Agent 显式重新接管语义（2026-10-17，当前源码未发布）
 

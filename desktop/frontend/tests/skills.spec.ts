@@ -75,3 +75,29 @@ test('missing mount is not automatically recreated and unlink requires confirmat
   await page.getByRole('alertdialog').getByRole('button', { name: '确认变更' }).click();
   await expect(page.getByText('暂无 Anchor 管理的链接')).toBeVisible();
 });
+
+test('cleanup shows the exact source and archive-before-replacement promise', async ({ page }) => {
+  await page.getByRole('button', { name: '本机来源 · 1' }).click();
+  await page.getByRole('button', { name: '清理原件', exact: true }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm).toContainText(fixture.workspace.sources[0].path);
+  await expect(confirm).toContainText('完整复制到 Anchor 库并核对');
+  await expect(confirm).toContainText('不清理也能继续使用');
+  expect(await page.evaluate(() => window.skillTest.actions)).toHaveLength(0);
+  await confirm.getByRole('button', { name: '取消', exact: true }).click();
+  expect(await page.evaluate(() => window.skillTest.actions)).toHaveLength(0);
+  await page.getByRole('button', { name: '清理原件', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认变更' }).click();
+  await expect(page.getByRole('status')).toContainText('操作已完成');
+  expect(await page.evaluate(() => window.skillTest.actions)).toEqual([fixture.cleanup]);
+});
+
+test('archived sources need no import and remain optional to clean', async ({ page }) => {
+  await page.evaluate(() => { window.skillTest.data.sources[0].status = 'in_sync'; });
+  await page.getByRole('button', { name: '重新扫描' }).click();
+  await page.getByRole('button', { name: '本机来源 · 1' }).click();
+  await expect(page.getByText('已收录 · 内容一致', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: '导入修订', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '清理原件', exact: true })).toBeEnabled();
+  expect(await page.evaluate(() => window.skillTest.actions)).toHaveLength(0);
+});

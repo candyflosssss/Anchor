@@ -28,8 +28,8 @@ export function createSkillService(getBridge: () => DesktopBridge = bridge) { re
 }; }
 export const skillService = createSkillService();
 export const skillStatus: Record<string, string> = {
-  local: '本地原件', imported: '已导入', in_sync: '内容一致', source_changed: '来源已变化', library_changed: '库中有不同版本', diverged: '双方存在分歧',
-  external_link: '外部链接 · 仅登记', unsafe: '路径或文件类型不支持', unavailable: '库版本不可用', limit: '超过扫描限制',
+  local: '等待收录', excluded: '已手动移出库', imported: '已收录', in_sync: '已收录 · 内容一致', source_changed: '来源已变化', library_changed: '库中有不同版本', diverged: '双方存在分歧',
+  external_link: '外部链接 · 仅登记', unsafe: '文件无法读取、链接损坏或文件类型不支持', unavailable: '库版本不可用', limit: '单个 Skill 的文件过多或过大',
   linked: '固定版本链接', missing: '原位置已缺失', conflict: '原位置被外部修改', broken: '链接目标已缺失',
 };
 export function skillMessage(error: unknown): string {

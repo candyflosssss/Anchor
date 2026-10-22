@@ -108,5 +108,19 @@
         "delete": false
       }
     ]
+  },
+  "cleanup": {
+    "action": "cleanup",
+    "expected_revision": 3,
+    "approved": true,
+    "skill_id": "",
+    "source_id": "source-fixture",
+    "scope_id": "",
+    "mount_id": "",
+    "name": "",
+    "version": 0,
+    "project_path": "",
+    "expected_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "edits": []
   }
 }

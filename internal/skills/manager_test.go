@@ -75,10 +75,10 @@ func requireLink(t *testing.T, path, to string) {
 		t.Fatal(path, got, err)
 	}
 }
-func TestReadOnlyInventoryAndCopyImport(t *testing.T) {
+func TestAutomaticInventoryAndCopyImport(t *testing.T) {
 	f := setup(t)
-	if _, err := os.Stat(f.m.root); !os.IsNotExist(err) {
-		t.Fatal("read created state", err)
+	if _, err := os.Stat(f.m.root); err != nil {
+		t.Fatal("library not initialized", err)
 	}
 	project := temp(t)
 	original := filepath.Join(project, ".agents", "skills", "example")
@@ -218,12 +218,12 @@ func TestUnsafeTreesAndScopePaths(t *testing.T) {
 		_ = os.MkdirAll(root, 0700)
 		_ = os.Symlink(outside, filepath.Join(root, "linked"))
 		f.refresh()
-		if f.ws.Sources[0].Status != "external_link" {
+		if f.ws.Sources[0].Status != "in_sync" || len(f.ws.Library) != 1 {
 			t.Fatal(f.ws)
 		}
 		_, err := f.m.Action(f.env, SkillAction{Action: "import", SourceID: f.ws.Sources[0].ID, ExpectedHash: "no", ExpectedRevision: f.ws.Revision, Approved: true})
 		if err == nil {
-			t.Fatal("followed external symlink")
+			t.Fatal("stale hash accepted")
 		}
 	}
 }

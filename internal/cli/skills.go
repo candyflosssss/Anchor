@@ -11,7 +11,7 @@ import (
 
 func (a *App) skills(ctx context.Context, c *client.Client, args []string) error {
 	if len(args) == 0 {
-		return errors.New("skill requires scan, list, inspect, diff, register-project, import, create, save, link, update, unlink or delete")
+		return errors.New("skill requires scan, list, inspect, diff, register-project, import, cleanup, create, save, link, update, unlink or delete")
 	}
 	action := args[0]
 	if action == "scan" || action == "list" {
@@ -74,11 +74,11 @@ func (a *App) skills(ctx context.Context, c *client.Client, args []string) error
 	switch action {
 	case "register-project":
 		in.ProjectPath = target
-	case "import":
+	case "import", "cleanup":
 		in.SourceID = target
 		in.SkillID = *id
 		if *hash == "" {
-			return errors.New("skill import requires --hash from a fresh scan or detail")
+			return errors.New("skill import/cleanup requires --hash from a fresh scan or detail")
 		}
 	case "create", "save":
 		if action == "create" {

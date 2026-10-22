@@ -119,10 +119,11 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   proxy delete ID --revision N --approve
   proxy bind PROVIDER [--key KEY] --mode direct|system|inherit|proxy [--proxy ID] --revision N --approve
       direct ignores application proxies (not OS/router interception); system requires an OS/environment proxy, never falls back direct.
-  skill scan | list                  Read-only Skill inventory and immutable library
+  skill scan | list                  Discover and automatically archive new Skills; preserve originals
   skill inspect | diff [ID]           Inspect snapshots or --source ID; see CLI docs
   skill register-project PATH        Add an explicitly approved project root
   skill import SOURCE                Copy source; requires --hash, --revision, --approve
+  skill cleanup SOURCE               Archive, verify, then replace source with a link; --hash --revision --approve
   skill create NAME | save ID         Save a snapshot with --content-stdin
   skill link ID | update MOUNT        Explicitly mount a fixed --version
   skill unlink MOUNT | delete ID      Remove owned link / unreferenced library entry

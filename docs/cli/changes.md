@@ -896,3 +896,12 @@
 - 兼容：旧 claude 身份/权限范围/凭据不变，新受管字段纳入恢复日志；不自动创建或接管 Desktop。组织策略（当前含仅行为策略）、bootstrap/hybrid、损坏/不安全配置拒绝。Binding JSON 增加可选 claude_desktop_profile，未改变数据库 schema；旧二进制不支持新适配器，回退前应停用 Desktop 并恢复配置。
 - 数据面：仅原生 Anthropic Messages 转发客户端 anthropic-version 和重复 anthropic-beta，凭据仍由供应商配置替换；跨协议不转发这些客户端头。不新增 count_tokens/tool search 或错误恢复能力。
 - 验证使用隔离配置、模拟 HTTP 上游和受控桥接；实际执行结果及未验证边界见本轮任务记录。未打包、安装或请求真实付费上游。
+
+## 2026-10-22 — Skill 自动收录与手动原件清理（当前源码，未打包）
+
+- 类型：新增命令及修改发现／归档行为。
+- 指令与参数：新增 `skill cleanup SOURCE_ID --hash HASH --revision R --approve`；`scan/list`、`register-project` 自动收录可读取的新来源，原件默认保留。
+- 旧 → 新：逐个手动导入改为核心启动、每分钟检查、首次使用时自动复制收录；普通组写权限不再拦截，目录及资源软链接跟随读取，重复入口复用归档。取消共享哈希额度，失败项不占后续项额度；单树支持64 MiB／4096文件，名称支持中文和空格。已关联来源的后续改动仍需手动导入修订。
+- 原件清理：归档并从磁盘核对当前内容，暂存原件，再向空位置创建固定版本软链接；链接与索引同步后才清除已归档原件。外部来源链接只替换链接、保留真实目标。冲突保留备份，不覆盖；未清理仍可正常使用。库删除暂停对应来源自动收录，可手动 import 恢复。
+- 兼容与迁移：可读取既有格式1索引，新增可选清理日志与来源排除表；无数据库迁移。workspace 查询现在可能写 Anchor 库并要求实例身份，需配套升级客户端／核心；自动收录不要求逐项批准，手动写入沿用批准、revision 和来源 hash 校验。本轮未替换已安装程序或清理真实来源。
+- 验证：相关 Go skills/core/client/cli/desktop 包测试（含隔离真实 CLI／桌面桥接）、前端 typecheck、Skills ESLint、4项 Vitest及5项 Chromium模拟桥接测试通过；系统Chrome启动崩溃，改用已有Playwright Chromium headless shell通过。未执行两平台原生窗口／安装验收、打包或付费请求。

@@ -69,7 +69,8 @@ export function useSkillController(onActivity?: (busy: boolean) => void) {
     save: () => detail && request(skillAction('save', { skill_id: detail.skill_id, version: detail.version, edits: [{ path: filePath, content, executable: detail.files.find(f => f.path === filePath)?.executable ?? false, delete: false }] }), '保存为新版本？', '内容有变化时保存新版本；与已有版本相同时复用该版本。原版本、项目原件和现有挂载保持不变。'),
     removeFile: () => detail && request(skillAction('save', { skill_id: detail.skill_id, version: detail.version, edits: [{ path: filePath, content: '', executable: false, delete: true }] }), `在新版本中删除 ${filePath}？`, '原版本与项目原件保持不变。'),
     create: () => request(skillAction('create', { name, edits: [{ path: 'SKILL.md', content, executable: false, delete: false }] }), `创建 ${name}？`, '只创建中心库版本，不自动安装到任何项目。'),
-    register: () => request(skillAction('register-project', { project_path: project }), '登记项目？', `${project}；只读扫描项目 Skill，不替换原件。`),
+    register: () => request(skillAction('register-project', { project_path: project }), '登记项目？', `${project}；自动收录项目里的 Skill，保留原件。`),
+    cleanup: (source: SkillSource) => request(skillAction('cleanup', { source_id: source.id, expected_hash: source.hash }), `清理 ${source.name} 的原件？`, `${source.path}；先把原件当前内容完整复制到 Anchor 库并核对，再将原位置换成指向该版本的软链接。原位置若是软链接，只替换链接，保留其目标文件。不清理也能继续使用。`),
     link: () => current && detail && request(skillAction('link', { skill_id: current.id, version: detail.version, scope_id: scope, name }), `安装 ${current.name} v${detail.version}？`, `${data?.scopes.find(s => s.id === scope)?.root}；只在空位置创建软链接，已有内容不覆盖。`),
   };
 }

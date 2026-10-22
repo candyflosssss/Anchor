@@ -12,7 +12,7 @@ import (
 )
 
 func linkMatches(path, target string) bool {
-	if safeDir(filepath.Dir(path), false) != nil {
+	if sourceDir(filepath.Dir(path)) != nil {
 		return false
 	}
 	st, err := os.Lstat(path)
@@ -51,7 +51,7 @@ func (m *Manager) mountAction(v *manifest, env managed.Environment, in SkillActi
 		if !validName(name) {
 			return state.ErrInvalid
 		}
-		if len(v.Mounts) >= 256 {
+		if len(v.Mounts) >= maxInventory {
 			return ErrLimit
 		}
 		path := filepath.Join(scope.Root, name)
@@ -60,7 +60,7 @@ func (m *Manager) mountAction(v *manifest, env managed.Environment, in SkillActi
 				return state.ErrConflict
 			}
 		}
-		if safeDir(scope.Root, true) != nil {
+		if !absent(scope.Root) && sourceDir(scope.Root) != nil {
 			return ErrUnsafe
 		}
 		if !absent(path) {
@@ -69,7 +69,7 @@ func (m *Manager) mountAction(v *manifest, env managed.Environment, in SkillActi
 		if err := os.MkdirAll(scope.Root, 0700); err != nil {
 			return err
 		}
-		if safeDir(scope.Root, false) != nil {
+		if sourceDir(scope.Root) != nil {
 			return ErrUnsafe
 		}
 		after = &SkillMount{ID: key("mount-", path), SkillID: s.ID, Version: in.Version, ScopeID: scope.ID, Path: path, Target: m.versionPath(s.ID, in.Version), Status: "linked"}
@@ -141,7 +141,7 @@ func (m *Manager) recover(v *manifest) error {
 		return ErrUnsafe
 	}
 	root := filepath.Dir(mt.Path)
-	if safeDir(root, false) != nil {
+	if sourceDir(root) != nil {
 		return ErrUnsafe
 	}
 	if p.Before != nil {

@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-const maxIndexBytes = 4 << 20
+const maxIndexBytes = 32 << 20
 
 func absolutePath(p string) bool {
 	return len(p) <= 1024 && filepath.IsAbs(p) && filepath.Clean(p) == p && !strings.ContainsRune(p, 0)
@@ -26,7 +26,7 @@ func libraryID(s string) bool {
 func (m *Manager) validate(v manifest) error {
 	if v.Format != 1 || v.Revision < 1 || v.Revision >= 9007199254740991 ||
 		v.Library == nil || v.Projects == nil || v.Sources == nil || v.Mounts == nil ||
-		len(v.Library) > 64 || len(v.Projects) > 64 || len(v.Sources) > 256 || len(v.Mounts) > 256 {
+		len(v.Library) > maxInventory || len(v.Projects) > 64 || len(v.Sources) > maxInventory || len(v.Mounts) > maxInventory {
 		return ErrUnsafe
 	}
 	ids := map[string]bool{}
@@ -132,6 +132,44 @@ func (m *Manager) validate(v manifest) error {
 			if p.Before != nil && (p.Before.Path != p.After.Path || p.Before.SkillID != p.After.SkillID) {
 				return ErrUnsafe
 			}
+		}
+	}
+	if p := v.Cleanup; p != nil {
+		if v.Pending != nil || !checkMount(p.Mount) || pathsOverlap(m.root, p.Mount.Path) || !hexID(p.Hash, 32) ||
+			findVersion(findSkill(&v, p.Mount.SkillID), p.Mount.Version).Hash != p.Hash ||
+			!absolutePath(p.Backup) || filepath.Dir(p.Backup) != filepath.Dir(p.Mount.Path) ||
+			!strings.HasPrefix(filepath.Base(p.Backup), ".anchor-skills-cleanup-") ||
+			!libraryID(strings.TrimPrefix(filepath.Base(p.Backup), ".anchor-skills-cleanup-")) {
+			return ErrUnsafe
+		}
+		if paths[p.Mount.Path] != p.Published {
+			return ErrUnsafe
+		}
+		if p.Published {
+			found := false
+			for _, mt := range v.Mounts {
+				if mt == p.Mount {
+					found = true
+				}
+			}
+			if !found {
+				return ErrUnsafe
+			}
+		} else {
+			found := false
+			for _, a := range v.Sources {
+				if a.Path == p.Mount.Path && a.SkillID == p.Mount.SkillID && a.Version == p.Mount.Version {
+					found = true
+				}
+			}
+			if !found {
+				return ErrUnsafe
+			}
+		}
+	}
+	for _, path := range v.Excluded {
+		if !absolutePath(path) {
+			return ErrUnsafe
 		}
 	}
 	return nil

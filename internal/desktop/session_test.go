@@ -74,7 +74,21 @@ func TestMain(m *testing.M) {
 	if filepath.Base(os.Args[0]) == "anchor" {
 		os.Exit(cli.Main(context.Background(), os.Args[1:]))
 	}
-	os.Exit(m.Run())
+	// Real core subprocesses now collect Skills at startup. Isolate the whole
+	// suite before spawning any child, including tests unrelated to Skills.
+	home, err := os.MkdirTemp("", "anchor-desktop-test-home-")
+	if err != nil {
+		panic(err)
+	}
+	for _, name := range []string{"HOME", "USERPROFILE"} {
+		_ = os.Setenv(name, home)
+	}
+	_ = os.Setenv("CODEX_HOME", filepath.Join(home, ".codex"))
+	_ = os.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(home, ".claude"))
+	_ = os.Setenv("DSH_HOME", filepath.Join(home, ".dsh"))
+	code := m.Run()
+	_ = os.RemoveAll(home)
+	os.Exit(code)
 }
 func addresses(t *testing.T) (string, string) {
 	t.Helper()

@@ -1,5 +1,6 @@
 // Package skills owns local Skill inventory, immutable snapshots and explicit,
-// version-pinned mounts. It never executes Skill code or edits source directories.
+// version-pinned mounts. Collection preserves sources; explicit cleanup replaces
+// a verified, archived source with a managed link. Skill code is never executed.
 package skills
 
 import "errors"
@@ -11,9 +12,10 @@ var (
 	ErrLink    = errors.New("symbolic links unavailable")
 )
 
-const MaxFiles = 256
-const MaxBytes = 8 << 20
+const MaxFiles = 4096
+const MaxBytes = 64 << 20
 const MaxText = 48 << 10
+const maxInventory = 4096
 
 type SkillFile struct {
 	Path       string `json:"path"`
@@ -125,13 +127,25 @@ type association struct {
 	Version int    `json:"version"`
 }
 type manifest struct {
-	Format   int           `json:"format"`
-	Revision int64         `json:"revision"`
-	Library  []Skill       `json:"library"`
-	Projects []string      `json:"projects"`
-	Sources  []association `json:"sources"`
-	Mounts   []SkillMount  `json:"mounts"`
-	Pending  *intent       `json:"pending,omitempty"`
+	Format   int            `json:"format"`
+	Revision int64          `json:"revision"`
+	Library  []Skill        `json:"library"`
+	Projects []string       `json:"projects"`
+	Sources  []association  `json:"sources"`
+	Mounts   []SkillMount   `json:"mounts"`
+	Pending  *intent        `json:"pending,omitempty"`
+	Cleanup  *cleanupIntent `json:"cleanup,omitempty"`
+	Excluded []string       `json:"excluded,omitempty"`
+}
+
+// Cleanup is journaled separately from ordinary link installation: the original
+// is retained in Backup until the verified snapshot and new mount are durable.
+type cleanupIntent struct {
+	Mount        SkillMount `json:"mount"`
+	Backup       string     `json:"backup"`
+	Hash         string     `json:"hash"`
+	OriginalLink string     `json:"original_link"`
+	Published    bool       `json:"published"`
 }
 
 // Write-ahead intent makes crashes during link publication visible/recoverable.

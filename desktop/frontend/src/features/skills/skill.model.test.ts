@@ -11,6 +11,7 @@ describe('Skill contract and controlled transport', () => {
     expect(ws.sources[0].baseline).toBe(1);
     expect(checkedSkillDetail(fixture.detail).content).toBe('# Example\n');
     expect(skillAction('create', { ...fixture.create })).toEqual(fixture.create);
+    expect(skillAction('cleanup', { ...fixture.cleanup })).toEqual(fixture.cleanup);
   });
   it('rejects incomplete DTOs, malformed nested snapshots and unsafe revision numbers', () => {
     for (const value of [null, {}, { ...fixture.workspace, revision: Number.MAX_SAFE_INTEGER + 1 }, { ...fixture.workspace, library: [{ ...fixture.workspace.library[0], versions: null }] }]) {

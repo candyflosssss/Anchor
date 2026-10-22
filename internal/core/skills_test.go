@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/candyflosssss/Anchor/internal/managed"
 	"github.com/candyflosssss/Anchor/internal/skills"
@@ -45,5 +47,39 @@ func TestSkillManagementIsIdentityGuardedAndIsolated(t *testing.T) {
 	detail.Body.Close()
 	if d.Content != "synthetic" {
 		t.Fatal(d)
+	}
+}
+
+func TestBackgroundSkillCollectionArchivesWithoutReplacingOriginals(t *testing.T) {
+	f := setup(t)
+	home := t.TempDir()
+	source := filepath.Join(home, ".agents", "skills", "external")
+	if err := os.MkdirAll(source, 0775); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "SKILL.md"), []byte("synthetic"), 0664); err != nil {
+		t.Fatal(err)
+	}
+	f.core.AgentEnvironment = func() (managed.Environment, error) { return managed.Environment{Home: home}, nil }
+	stop := f.core.startSkillCollection()
+	t.Cleanup(stop)
+	index := filepath.Join(f.store.Dir, "skills", "index.json")
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if _, err := os.Stat(index); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("startup did not collect skills")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	info, err := os.Lstat(source)
+	if err != nil || !info.IsDir() {
+		t.Fatal("background replaced original", err)
+	}
+	ws, err := f.core.Skills.Workspace(managed.Environment{Home: home})
+	if err != nil || len(ws.Library) != 1 || len(ws.Sources) != 1 {
+		t.Fatal(ws, err)
 	}
 }

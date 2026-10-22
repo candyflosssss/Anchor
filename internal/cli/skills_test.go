@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -75,6 +78,38 @@ func TestSkillCLIUsesAuthenticatedCore(t *testing.T) {
 	}
 	if err = run("skill", "link", id, "--version", "1", "--scope", ws.Scopes[0].ID, "--revision", "2"); err == nil {
 		t.Fatal("link without approval")
+	}
+	if runtime.GOOS != "windows" {
+		source := filepath.Join(home, ".agents", "skills", "external")
+		if err = os.MkdirAll(source, 0775); err != nil {
+			t.Fatal(err)
+		}
+		if err = os.WriteFile(filepath.Join(source, "SKILL.md"), []byte("external"), 0664); err != nil {
+			t.Fatal(err)
+		}
+		if err = run("skill", "scan"); err != nil {
+			t.Fatal(err)
+		}
+		if json.Unmarshal(out.Bytes(), &ws) != nil || len(ws.Library) != 2 || len(ws.Sources) != 1 {
+			t.Fatal(out.String())
+		}
+		src := ws.Sources[0]
+		revision := strconv.FormatInt(ws.Revision, 10)
+		if err = run("skill", "cleanup", src.ID, "--revision", revision, "--approve"); err == nil {
+			t.Fatal("cleanup without hash")
+		}
+		if err = run("skill", "cleanup", src.ID, "--hash", src.Hash, "--revision", revision); err == nil {
+			t.Fatal("cleanup without approval")
+		}
+		if err = run("skill", "cleanup", src.ID, "--hash", src.Hash, "--revision", revision, "--approve"); err != nil {
+			t.Fatal(err)
+		}
+		if json.Unmarshal(out.Bytes(), &ws) != nil || len(ws.Mounts) != 1 {
+			t.Fatal(out.String())
+		}
+		if link, err := os.Readlink(source); err != nil || link != ws.Mounts[0].Target {
+			t.Fatal(link, err)
+		}
 	}
 }
 

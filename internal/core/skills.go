@@ -1,8 +1,10 @@
 package core
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/skills"
@@ -24,12 +26,15 @@ func skillError(w http.ResponseWriter, err error) {
 }
 func (s *Server) skillRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /control/v1/skills", func(w http.ResponseWriter, r *http.Request) {
+		if !s.identity(w, r) {
+			return
+		}
 		env, err := s.localAgentEnvironment()
 		if err != nil {
 			skillError(w, err)
 			return
 		}
-		data, err := s.Skills.Workspace(env)
+		data, err := s.Skills.WorkspaceContext(r.Context(), env)
 		if err != nil {
 			skillError(w, err)
 			return
@@ -76,4 +81,29 @@ func (s *Server) skillRoutes(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, data)
 	})
+}
+
+// Inventory lives with the core, so new external skills are archived even when
+// the Skills page is closed. No source is replaced by this background task.
+func (s *Server) startSkillCollection() func() {
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			if env, err := s.localAgentEnvironment(); err == nil {
+				if _, err = s.Skills.WorkspaceContext(ctx, env); err != nil && ctx.Err() == nil {
+					s.Log.Warn("skill collection unavailable")
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+	return func() { cancel(); <-done }
 }

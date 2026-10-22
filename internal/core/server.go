@@ -473,6 +473,8 @@ func (s *Server) Run(ctx context.Context) error {
 	go func() { errs <- control.Serve(cl) }()
 	go func() { errs <- gateway.Serve(gl) }()
 	s.modelCatalog.StartRefresh()
+	stopSkillCollection := s.startSkillCollection()
+	defer stopSkillCollection()
 	s.keyRateRefresh.start(s)
 	managedResults, managedErr := s.Agents.Start()
 	if managedErr != nil {

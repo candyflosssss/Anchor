@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/candyflosssss/Anchor/internal/platform"
@@ -25,11 +26,11 @@ type tree struct {
 func digest(b []byte) string         { v := sha256.Sum256(b); return hex.EncodeToString(v[:]) }
 func key(prefix, path string) string { return prefix + digest([]byte(filepath.Clean(path)))[:20] }
 func validName(s string) bool {
-	if len(s) < 1 || len(s) > 64 || s == "." || s == ".." || strings.HasSuffix(s, ".") {
+	if len(s) < 1 || len(s) > 255 || s == "." || s == ".." || strings.HasSuffix(s, ".") || strings.HasSuffix(s, " ") || !utf8.ValidString(s) {
 		return false
 	}
 	for _, c := range s {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' || c == '.') {
+		if unicode.IsControl(c) || strings.ContainsRune("/\\:*?\"<>|", c) {
 			return false
 		}
 	}
@@ -185,7 +186,16 @@ func writeTree(root string, t tree) error {
 			return ce
 		}
 	}
-	return platform.SyncManagedDir(root)
+	// Persist nested directory entries too, before cleanup may remove an original.
+	return filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return platform.SyncManagedDir(path)
+		}
+		return nil
+	})
 }
 func edited(base tree, edits []SkillEdit) (tree, error) {
 	if len(edits) == 0 || len(edits) > MaxFiles {

@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -143,7 +144,7 @@ func (m *Manager) version(s *Skill, n int) (tree, error) {
 	return t, err
 }
 func (m *Manager) addVersion(v *manifest, s *Skill, t tree, parent, baseline int, origin string) (int, error) {
-	// Reuse exact snapshots, including executable bits. No scan creates versions.
+	// Reuse exact snapshots, including executable bits.
 	for _, v := range s.Versions {
 		if v.Hash == t.Hash {
 			if _, err := m.version(s, v.Number); err != nil {
@@ -199,13 +200,48 @@ func (m *Manager) addVersion(v *manifest, s *Skill, t tree, parent, baseline int
 	return n, nil
 }
 func (m *Manager) Workspace(env managed.Environment) (SkillWorkspace, error) {
+	return m.WorkspaceContext(context.Background(), env)
+}
+
+func (m *Manager) WorkspaceContext(ctx context.Context, env managed.Environment) (SkillWorkspace, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	v, err := m.load()
 	if err != nil {
 		return SkillWorkspace{}, err
 	}
-	return m.workspace(v, env), nil
+	if v.Pending != nil || v.Cleanup != nil {
+		return m.workspaceContext(ctx, v, env), nil
+	}
+	lock, err := m.acquireWriteLock()
+	if err != nil {
+		return SkillWorkspace{}, err
+	}
+	defer lock.Close()
+	v, err = m.load()
+	if err != nil {
+		return SkillWorkspace{}, err
+	}
+	warnings := m.collect(ctx, &v, env)
+	if err := ctx.Err(); err != nil {
+		return SkillWorkspace{}, err
+	}
+	ws := m.workspaceContext(ctx, v, env)
+	ws.Warnings = append(ws.Warnings, warnings...)
+	return ws, nil
+}
+func (m *Manager) acquireWriteLock() (*platform.Lock, error) {
+	if err := platform.SecureDir(m.root); err != nil {
+		return nil, err
+	}
+	if err := platform.SecureFile(filepath.Join(m.root, "write.lock")); err != nil {
+		return nil, err
+	}
+	lock, err := platform.AcquireLock(filepath.Join(m.root, "write.lock"))
+	if err != nil {
+		return nil, state.ErrConflict
+	}
+	return lock, nil
 }
 func (m *Manager) Action(env managed.Environment, in SkillAction) (SkillWorkspace, error) {
 	m.mu.Lock()
@@ -233,13 +269,18 @@ func (m *Manager) Action(env managed.Environment, in SkillAction) (SkillWorkspac
 			return SkillWorkspace{}, err
 		}
 	}
+	if v.Cleanup != nil {
+		if err = m.recoverCleanup(&v); err != nil {
+			return SkillWorkspace{}, err
+		}
+	}
 	if v.Revision != in.ExpectedRevision {
 		return SkillWorkspace{}, state.ErrConflict
 	}
 	switch in.Action {
 	case "register-project":
 		p := filepath.Clean(in.ProjectPath)
-		if in.ProjectPath != p || safeDir(p, false) != nil || p == filepath.VolumeName(p)+string(filepath.Separator) {
+		if in.ProjectPath != p || sourceDir(p) != nil || p == filepath.VolumeName(p)+string(filepath.Separator) {
 			return SkillWorkspace{}, state.ErrInvalid
 		}
 		exists := false
@@ -266,66 +307,15 @@ func (m *Manager) Action(env managed.Environment, in SkillAction) (SkillWorkspac
 		if src == nil {
 			return SkillWorkspace{}, state.ErrNotFound
 		}
-		if len(v.Sources) >= 256 {
-			known := false
-			for _, a := range v.Sources {
-				if a.Path == src.Path {
-					known = true
-				}
-			}
-			if !known {
-				return SkillWorkspace{}, ErrLimit
-			}
-		}
-		t, e := readTree(src.Path)
+		t, e := readSource(src.Path)
 		if e != nil {
 			return SkillWorkspace{}, e
 		}
 		if in.ExpectedHash == "" || t.Hash != in.ExpectedHash {
 			return SkillWorkspace{}, ErrChanged
 		}
-		id := in.SkillID
-		if id == "" {
-			id = src.SkillID
-		}
-		s := findSkill(&v, id)
-		if s == nil {
-			if id != "" {
-				return SkillWorkspace{}, state.ErrNotFound
-			}
-			if len(v.Library) >= 64 {
-				return SkillWorkspace{}, ErrLimit
-			}
-			name := in.Name
-			if name == "" {
-				name = src.Name
-			}
-			if !validName(name) {
-				return SkillWorkspace{}, state.ErrInvalid
-			}
-			v.Library = append(v.Library, Skill{ID: randomID(), Name: name, Versions: []SkillVersion{}})
-			s = &v.Library[len(v.Library)-1]
-		}
-		if src.SkillID != "" && src.SkillID != s.ID {
-			return SkillWorkspace{}, state.ErrConflict
-		}
-		parent := 0
-		if len(s.Versions) > 0 {
-			parent = s.Versions[len(s.Versions)-1].Number
-		}
-		n, e := m.addVersion(&v, s, t, parent, src.Baseline, "import")
-		if e != nil {
+		if e = m.importTree(&v, *src, t, in.SkillID, in.Name); e != nil {
 			return SkillWorkspace{}, e
-		}
-		found := false
-		for i := range v.Sources {
-			if v.Sources[i].Path == src.Path {
-				v.Sources[i] = association{src.Path, s.ID, n}
-				found = true
-			}
-		}
-		if !found {
-			v.Sources = append(v.Sources, association{src.Path, s.ID, n})
 		}
 	case "create", "save":
 		s := findSkill(&v, in.SkillID)
@@ -335,7 +325,7 @@ func (m *Manager) Action(env managed.Environment, in SkillAction) (SkillWorkspac
 			if in.SkillID != "" || !validName(in.Name) {
 				return SkillWorkspace{}, state.ErrInvalid
 			}
-			if len(v.Library) >= 64 {
+			if len(v.Library) >= maxInventory {
 				return SkillWorkspace{}, ErrLimit
 			}
 			v.Library = append(v.Library, Skill{ID: randomID(), Name: in.Name, Versions: []SkillVersion{}})
@@ -360,6 +350,11 @@ func (m *Manager) Action(env managed.Environment, in SkillAction) (SkillWorkspac
 		if _, e = m.addVersion(&v, s, t, parent, parent, in.Action); e != nil {
 			return SkillWorkspace{}, e
 		}
+	case "cleanup":
+		if err = m.cleanupSource(&v, env, in); err != nil {
+			return SkillWorkspace{}, err
+		}
+		return m.workspace(v, env), nil
 	case "link", "update", "unlink":
 		if err = m.mountAction(&v, env, in); err != nil {
 			return SkillWorkspace{}, err
@@ -385,6 +380,9 @@ func (m *Manager) Action(env managed.Environment, in SkillAction) (SkillWorkspac
 		}
 		sources := v.Sources[:0]
 		for _, a := range v.Sources {
+			if a.SkillID == s.ID {
+				v.Excluded = append(v.Excluded, a.Path)
+			}
 			if a.SkillID != s.ID {
 				sources = append(sources, a)
 			}
@@ -397,7 +395,10 @@ func (m *Manager) Action(env managed.Environment, in SkillAction) (SkillWorkspac
 	if err = m.persist(v); err != nil {
 		return SkillWorkspace{}, err
 	}
-	return m.workspace(v, env), nil
+	warnings := m.collect(context.Background(), &v, env)
+	ws := m.workspace(v, env)
+	ws.Warnings = append(ws.Warnings, warnings...)
+	return ws, nil
 }
 func (m *Manager) Detail(env managed.Environment, in SkillQuery) (SkillDetail, error) {
 	m.mu.Lock()
@@ -421,7 +422,7 @@ func (m *Manager) Detail(env managed.Environment, in SkillQuery) (SkillDetail, e
 		if src == nil {
 			return out, state.ErrNotFound
 		}
-		current, err = readTree(src.Path)
+		current, err = readSource(src.Path)
 		if err != nil {
 			return out, err
 		}
