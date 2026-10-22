@@ -658,6 +658,10 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
   await expect(model.getByRole('group', { name: '摸鱼AI · Key missing', exact: true })).toContainText('Key 不存在');
   await expect(model.getByLabel('来源 Key unrelated', { exact: true })).toHaveCount(0);
   await expect(model.locator('details')).toHaveCount(0);
+  const firstBox = await cards.first().boundingBox(), secondBox = await cards.nth(1).boundingBox();
+  expect(firstBox!.width).toBeLessThanOrEqual(300);
+  expect(secondBox!.y).toBe(firstBox!.y);
+  expect(secondBox!.x).toBeGreaterThan(firstBox!.x);
   // A handle on any Key moves the same existing route, preserving all Key scope.
   await model.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one Key expensive', exact: true }).press('ArrowDown');
   await expect(model).toContainText('已自动保存');
@@ -669,12 +673,12 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
   if (process.env.ANCHOR_MAPPING_CAPTURE_DIR) {
     await page.setViewportSize({ width: 1600, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-light.png` });
-    await model.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-detail.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-light.png` });
+    await model.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-detail.png` });
     await page.getByRole('button', { name: '深色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-dark.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-dark.png` });
     await page.setViewportSize({ width: 600, height: 850 });
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-narrow.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-narrow.png` });
   }
 });
 
@@ -703,14 +707,16 @@ test('model routing previews pointer sorting and automatically saves rules with 
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   const sources = card.locator('li.mapping-candidate');
-  const handle = await card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true }).boundingBox();
+  const handle = await sources.first().locator('.mapping-key-name').boundingBox();
   const target = await sources.nth(1).locator('.mapping-key-card').first().boundingBox();
   expect(handle).toBeTruthy(); expect(target).toBeTruthy();
   await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
   await page.mouse.down(); await page.mouse.move(target!.x + 40, target!.y + target!.height / 2, { steps: 8 });
   await expect(card.locator('.route-drag-preview')).toBeVisible();
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
+  await expect(card.locator('.route-drag-preview .mapping-key-name')).toHaveText('default');
   await page.mouse.up();
+  await expect(card).toBeVisible();
   await expect(card.locator('.route-save-state')).toContainText('已自动保存');
   await expect(sources.nth(1)).toContainText('摸鱼AI');
   await card.getByLabel('调度规则').selectOption('lowest-price');
@@ -724,6 +730,33 @@ test('model routing previews pointer sorting and automatically saves rules with 
   await page.getByRole('button', { name: '供应商', exact: true }).click();
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await expect(card.locator('li.mapping-candidate').nth(1)).toContainText('摸鱼AI');
+});
+
+test('whole Key cards drag from supplier text without opening editing and keep ordinary clicks (simulated host)', async ({ page }) => {
+  await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  const model = page.getByRole('article', { name: '模型 shared-one', exact: true });
+  const keys = model.locator('.mapping-key-card');
+  const link = keys.first().locator('.candidate');
+  const origin = await link.boundingBox(), target = await keys.nth(1).boundingBox();
+  await page.mouse.move(origin!.x + 10, origin!.y + 8);
+  await page.mouse.down(); await page.mouse.move(origin!.x + 12, origin!.y + 9); await page.mouse.up();
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
+  // A sub-threshold movement remains an ordinary supplier click.
+  await expect(page.getByRole('tab', { name: /^模型 / })).toBeVisible();
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await expect(model).toBeVisible();
+  await page.mouse.move(origin!.x + 10, origin!.y + 8);
+  await page.mouse.down(); await page.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2, { steps: 10 });
+  await expect(model.locator('.route-drag-preview .mapping-key-card')).toBeVisible();
+  await page.mouse.up();
+  await expect(model).toBeVisible();
+  await expect(model.locator('.route-save-state')).toContainText('已自动保存');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
+  await expect(keys.nth(1)).toContainText('摸鱼AI');
+  await keys.nth(1).focus(); await page.keyboard.press('ArrowUp');
+  await expect(keys.first()).toContainText('摸鱼AI');
+  await expect(model.locator('.route-save-state')).toContainText('已自动保存');
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(2);
 });
 
 test('model routing cancels pointer sorting and supports keyboard ordering (simulated host)', async ({ page }) => {

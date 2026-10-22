@@ -1,5 +1,5 @@
 import type { ProviderTransport } from '../providers/provider.model';
-import { useState, type ReactNode } from 'react';
+import { useState, type HTMLAttributes, type ReactNode } from 'react';
 import { ArrowLeftRight, ArrowUp, ArrowDown, Check, ChevronDown, GripVertical, LoaderCircle, RefreshCw, Settings2, Undo2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ConfirmAction } from '../../components/shared/confirm-action';
@@ -24,7 +24,7 @@ function UnavailableSection({ label, count, children }: { label: string; count: 
   </details>;
 }
 
-function MappingKey({ source, candidate: m, rates, children, disabled, onOpen }: Pick<Common, 'rates' | 'disabled' | 'onOpen'> & { source: SourceKey; candidate: ModelCandidate; children: ReactNode }) {
+function MappingKey({ source, candidate: m, rates, children, disabled, onOpen, dragProps, sortable }: Pick<Common, 'rates' | 'disabled' | 'onOpen'> & { source: SourceKey; candidate: ModelCandidate; children?: ReactNode; sortable?: boolean; dragProps?: HTMLAttributes<HTMLDivElement> }) {
   const id = rateID({ provider_id: m.provider_id, key_id: source.id }), value = rates.values[id];
   const failure = rates.errors[id] || (value?.failure && (rateFailureText[value.failure] ?? '查询失败，分组倍率未知。'));
   const keyState = keyAvailability(source);
@@ -34,7 +34,7 @@ function MappingKey({ source, candidate: m, rates, children, disabled, onOpen }:
   const multiplier = effectiveRouteMultiplier({ ...m, key_ids: [source.id], keys: key ? [{ ...key, enabled: source.key?.enabled ?? false, state: source.key?.state ?? 'disabled' }] : [] });
   const rateDetail = `供应商 ${m.cost_multiplier}× · 模型 ${m.multiplier}× · 分组倍率 ${key?.rate?.multiplier == null ? '未知' : `${key.rate.multiplier}×`} · 相对倍率 ${key?.effective_multiplier == null ? '未知' : `${key.effective_multiplier}×`}${key?.rate?.failure ? key.rate.multiplier == null ? ' · 刷新失败，尚无有效缓存。' : ' · 刷新失败，沿用上次成功缓存。' : ''}`;
   const group = key?.rate?.group_name || key?.rate?.group;
-  return <div className={`mapping-key-card mapping-key-rate availability-${state.state}`} role="group" aria-label={`${m.provider_id} · ${source.anonymous ? '匿名来源' : `Key ${source.id}`}`}>
+  return <div className={`mapping-key-card mapping-key-rate availability-${state.state}`} role="group" data-source-key={source.id} data-sortable={sortable || undefined} {...dragProps} aria-label={`${m.provider_id} · ${source.anonymous ? '匿名来源' : `Key ${source.id}`}`}>
     <div className="mapping-key-identity">
       <div className="mapping-source-header">
         <span className={`channel-status state-${state.state}`} title={`${m.provider_enabled ? '供应商已启用' : '供应商已停用'} · ${state.reason}`}><span className="sr-only">{state.label}</span></span>
@@ -64,6 +64,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
   const drag = useRouteDrag(candidates.map(candidateID), canEdit && candidates.length > 1, (from, to) => { void routing.move(g, from, to); });
   const visible = drag.order.map(id => candidates.find(c => candidateID(c) === id)!);
   const dragged = drag.drag?.active ? candidates.find(c => candidateID(c) === drag.drag!.id) : null;
+  const draggedKey = dragged && drag.drag ? channelKeys(dragged.key_ids, dragged.keys).find(k => k.id === drag.drag!.keyID) : null;
   const available = candidates.filter(c => c.availability.state === 'available').length;
   const unknown = !g.complete || candidates.some(c => c.availability.state === 'unknown');
   const availability = modelAvailability(g);
@@ -73,11 +74,15 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
     return <li key={candidateID(m)} className={`mapping-candidate availability-${m.availability.state}${dragged && candidateID(m) === candidateID(dragged) ? ' is-drag-placeholder' : ''}`} data-route-id={candidateID(m)}>
       {keys.map((source, keyIndex) => {
         const suffix = keyIndex ? ` Key ${source.id}` : '';
-        return <MappingKey key={source.id} source={source} candidate={m} rates={rates} disabled={disabled || routing.busy} onOpen={onOpen}>
+        return <MappingKey key={source.id} source={source} candidate={m} rates={rates} disabled={disabled || routing.busy} onOpen={onOpen} sortable={canEdit && candidates.length > 1} dragProps={{
+          tabIndex: canEdit && candidates.length > 1 ? 0 : undefined,
+          onPointerDown: e => drag.start(e, candidateID(m)),
+          onKeyDown: e => { if (e.target === e.currentTarget && canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } },
+        }}>
           <div className="mapping-route-controls" title={`渠道优先级；调整 ${m.provider_id} 的全部 ${keys.length} 个来源 Key`}>
             <span className="sr-only" aria-label={`第 ${i + 1} 位`}>渠道 {i + 1}</span>
             {candidates.length > 1 && <>
-              <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}${suffix}`} title="拖动或用方向键调整整个渠道" onPointerDown={e => drag.start(e, candidateID(m))} onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}><GripVertical size={16} /></button>
+              <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}${suffix}`} title="拖动或用方向键调整整个渠道" onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}><GripVertical size={16} /></button>
               <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => { void routing.move(g, i, i - 1); }}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === candidates.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => { void routing.move(g, i, i + 1); }}><ArrowDown size={13} /></Button></div>
             </>}
           </div>
@@ -97,7 +102,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
         </div>
       <Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="上下文、能力与速度" onClick={settings}><Settings2 size={15} /></Button></header>
       <div className="model-sources-body">
-        <ul className="candidate-list" onPointerMove={drag.move} onPointerUp={drag.end} onPointerCancel={drag.cancel} onLostPointerCapture={drag.cancel}>{visible.map(renderCandidate)}</ul>
+        <ul className="candidate-list" onPointerMove={drag.move} onPointerUp={drag.end} onPointerCancel={drag.cancel} onLostPointerCapture={e => { if (e.target === e.currentTarget) drag.cancel(); }} onClickCapture={drag.click}>{visible.map(renderCandidate)}</ul>
       </div>
     {status && <div className={`route-save-state phase-${status.phase}`}>
       <span role={status.phase === 'failed' || status.phase === 'uncertain' ? 'alert' : 'status'}>{status.phase === 'saving' ? <LoaderCircle size={13} className="route-spinner" /> : status.phase === 'saved' ? <Check size={13} /> : null}{status.message}</span>
@@ -109,7 +114,9 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
       <p>将对 {candidates.filter(c => c.availability.state === 'available').length} 个可用渠道各发送 1 次推理请求，可能产生费用。</p>
     </ConfirmAction>
     <span className="sr-only" role="status">{drag.announcement}</span>
-    {dragged && drag.drag && <div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}><GripVertical size={16} /><strong>{dragged.provider_id}</strong><span className="mono">{dragged.upstream}</span><span>第 {drag.drag.to + 1} 位</span></div>}
+    {dragged && draggedKey && drag.drag && <div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}>
+      <MappingKey source={draggedKey} candidate={dragged} rates={rates} disabled onOpen={onOpen}><div className="mapping-route-controls"><GripVertical size={16} /></div></MappingKey>
+    </div>}
   </article>;
 }
 
