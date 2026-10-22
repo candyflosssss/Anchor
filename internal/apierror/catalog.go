@@ -65,6 +65,8 @@ const (
 	RequestObjectRequired          ID = "request_object_required"
 	ModelIDRequired                ID = "model_id_required"
 	BindingModelDenied             ID = "binding_model_denied"
+	ModelNoEnabledProvider         ID = "model_no_enabled_provider"
+	UpstreamHeaderTimeout          ID = "upstream_header_timeout"
 	InvalidStream                  ID = "invalid_stream"
 	PreviousResponseUnsupported    ID = "previous_response_unsupported"
 	ConversationUnsupported        ID = "conversation_unsupported"
@@ -153,6 +155,8 @@ var definitions = map[ID]definition{
 	RequestObjectRequired:          {400, "invalid_json", ""},
 	ModelIDRequired:                {400, "invalid_model", ""},
 	BindingModelDenied:             {403, "binding_model_denied", ""},
+	ModelNoEnabledProvider:         {503, "model_no_enabled_provider", ""},
+	UpstreamHeaderTimeout:          {504, "upstream_header_timeout", ""},
 	InvalidStream:                  {400, "invalid_stream", ""},
 	PreviousResponseUnsupported:    {400, "unsupported_state", ""},
 	ConversationUnsupported:        {400, "unsupported_state", ""},

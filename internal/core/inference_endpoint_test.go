@@ -261,3 +261,139 @@ func TestInferenceHTMLProbeAndGateway(t *testing.T) {
 		}
 	}
 }
+
+func TestInferenceEndpointRepairIsReusedAndIsolated(t *testing.T) {
+	var mu sync.Mutex
+	var paths []string
+	broken := false
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path == "/responses" || broken {
+			w.Header().Set("Content-Type", "text/html")
+			io.WriteString(w, "<html>page</html>")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"id":"ok"}`)
+	}))
+	defer up.Close()
+	s := &Server{upstream: up.Client()}
+	defer s.upstream.CloseIdleConnections()
+	send := func(key string) map[string]string {
+		t.Helper()
+		req, _ := http.NewRequestWithContext(t.Context(), "POST", up.URL+"/responses", strings.NewReader("{}"))
+		req.Header.Set("Authorization", key)
+		evidence := map[string]string{}
+		resp, err := s.inferenceResponse(req, up.URL, "responses", evidence)
+		if err != nil {
+			t.Fatal(err)
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		return evidence
+	}
+	if e := send("first"); e["endpoint_repair"] != "learned" {
+		t.Fatal(e)
+	}
+	if e := send("first"); e["endpoint_resolution"] != "v1_cached" || e["endpoint_requests"] != "1" {
+		t.Fatal(e)
+	}
+	if e := send("second"); e["endpoint_resolution"] != "v1_fallback" {
+		t.Fatal("credential scope", e)
+	}
+	mu.Lock()
+	broken = true
+	mu.Unlock()
+	if e := send("first"); e["endpoint_resolution"] != "v1_cached" || e["endpoint_requests"] != "1" {
+		t.Fatal("replayed failed cached endpoint", e)
+	}
+	if e := send("first"); e["endpoint_resolution"] != "v1_fallback" {
+		t.Fatal("did not rediscover", e)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	want := []string{"/responses", "/v1/responses", "/v1/responses", "/responses", "/v1/responses", "/v1/responses", "/responses", "/v1/responses"}
+	if !reflect.DeepEqual(paths, want) {
+		t.Fatal(paths)
+	}
+}
+
+func TestProviderDeadlineAllowsSlowResponseHeaders(t *testing.T) {
+	if testing.Short() {
+		t.Skip("31s response-header regression")
+	}
+	f := setup(t)
+	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(31 * time.Second):
+		case <-r.Context().Done():
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		io.WriteString(w, `{"id":"r","status":"completed","output":[{"type":"message","content":[{"type":"output_text","text":"OK"}]}],"usage":{"input_tokens":3,"output_tokens":1}}`)
+	}))
+	defer up.Close()
+	f.add(t, "slow", up.URL, "synthetic-secret")
+	p, _ := f.store.Provider("slow")
+	p.TimeoutSeconds = 40
+	if _, err := f.store.PutProvider(p, p.Revision, nil); err != nil {
+		t.Fatal(err)
+	}
+	f.model(t, state.Candidate{ProviderID: "slow", Model: "actual"})
+	ctx, cancel := context.WithTimeout(t.Context(), 35*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, "POST", f.gateway.URL+"/v1/responses", strings.NewReader(`{"model":"public","input":"synthetic"}`))
+	req.Header.Set("Authorization", "Bearer "+f.token)
+	client := &http.Client{}
+	defer client.CloseIdleConnections()
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw := text(t, resp)
+	if resp.StatusCode != 200 || !strings.Contains(raw, "OK") {
+		t.Fatalf("%d %s", resp.StatusCode, raw)
+	}
+}
+
+func TestInferenceEndpointDoesNotLearnFailedRepair(t *testing.T) {
+	for _, tc := range []struct {
+		status      int
+		media, body string
+	}{
+		{401, "application/json", `{"error":{"code":"invalid_api_key"}}`},
+		{429, "application/json", `{"error":{"code":"rate_limit_exceeded"}}`},
+		{500, "application/json", `{"error":{"code":"server_error"}}`},
+		{200, "text/html", "<html>page</html>"},
+	} {
+		t.Run(tc.body, func(t *testing.T) {
+			var paths []string
+			s := &Server{upstream: &http.Client{Transport: modelCatalogTransport(func(r *http.Request) (*http.Response, error) {
+				paths = append(paths, r.URL.Path)
+				status, media, body := 200, "text/html", "<html>page</html>"
+				if r.URL.Path == "/v1/responses" {
+					status, media, body = tc.status, tc.media, tc.body
+				}
+				return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {media}}, Body: io.NopCloser(strings.NewReader(body))}, nil
+			})}}
+			for range 2 {
+				req, _ := http.NewRequestWithContext(t.Context(), "POST", "https://synthetic.invalid/responses", strings.NewReader(`{}`))
+				evidence := map[string]string{}
+				resp, err := s.inferenceResponse(req, "https://synthetic.invalid", "responses", evidence)
+				if err != nil {
+					t.Fatal(err)
+				}
+				resp.Body.Close()
+				if evidence["endpoint_repair"] != "" {
+					t.Fatal(evidence)
+				}
+			}
+			if !reflect.DeepEqual(paths, []string{"/responses", "/v1/responses", "/responses", "/v1/responses"}) {
+				t.Fatal(paths)
+			}
+		})
+	}
+}

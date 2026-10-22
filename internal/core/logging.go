@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/candyflosssss/Anchor/internal/apierror"
 	"github.com/candyflosssss/Anchor/internal/logbook"
 	"github.com/candyflosssss/Anchor/internal/protocol"
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -75,6 +76,7 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 			if r.Context().Err() != nil && (t.row.Status != "succeeded" || t.writeFailed) {
 				t.row.Status = "cancelled"
 				t.row.Code = "client_cancelled"
+				delete(t.row.Evidence, "anchor_error_id")
 			}
 			if t.row.Status == "pending" {
 				t.row.Status = "failed"
@@ -83,6 +85,7 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 			if t.writeFailed && r.Context().Err() == nil {
 				t.row.Status = "failed"
 				t.row.Code = "client_write_failed"
+				delete(t.row.Evidence, "anchor_error_id")
 			}
 			if t.row.Status == "succeeded" {
 				t.row.Stage = "respond"
@@ -130,6 +133,9 @@ func (w *logResponseWriter) Unwrap() http.ResponseWriter { return w.ResponseWrit
 func (w *logResponseWriter) logFailure(code string) {
 	w.trace.row.Status = "failed"
 	w.trace.row.Code = code
+}
+func (w *logResponseWriter) logErrorID(id apierror.ID) {
+	w.trace.row.Evidence["anchor_error_id"] = string(id)
 }
 func (s *Server) observeRequest(r *http.Request, model string, stream bool, raw map[string]json.RawMessage, mapping state.Model) {
 	if t := trace(r); t != nil {

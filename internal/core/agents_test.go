@@ -238,6 +238,10 @@ func TestMultiModelAuthorizationAndMigrationAPI(t *testing.T) {
 		want := 403
 		if id == "default" || id == "alternative" {
 			want = 200
+		} else if id == "disabled" {
+			want = 503
+		} else if id == "unknown" {
+			want = 404
 		}
 		if resp.StatusCode != want {
 			t.Fatal(id, resp.StatusCode, text(t, resp))
@@ -254,7 +258,7 @@ func TestMultiModelAuthorizationAndMigrationAPI(t *testing.T) {
 	if _, err = f.store.PutProvider(p, p.Revision, nil); err != nil {
 		t.Fatal(err)
 	}
-	if resp = request(t, "POST", f.gateway.URL+"/v1/responses", token, `{"model":"alternative"}`); resp.StatusCode != 403 {
+	if resp = request(t, "POST", f.gateway.URL+"/v1/responses", token, `{"model":"alternative"}`); resp.StatusCode != 503 {
 		t.Fatal(resp.StatusCode, text(t, resp))
 	}
 	if _, err = f.store.EnableBinding(b.ID, 2, false); err != nil {

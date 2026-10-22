@@ -86,15 +86,7 @@ export function bucketRange(data: Stats, first: number, last = first): LogTimeRa
   return { since: data.buckets[clamp(Math.min(first, last))].at_ms,
     before: Math.min(data.before_ms, data.buckets[clamp(Math.max(first, last))].at_ms + data.interval_ms) };
 }
-export function errorExplanation(code: string) {
-  const labels: Record<string, string> = { invalid_response: '响应校验失败', unexpected_html: '上游返回了 HTML 页面',
-    upstream_timeout: '上游响应超时', upstream_connect: '无法连接上游', upstream_failed: '上游请求失败',
-    upstream_unavailable: '上游服务不可用', rate_limited: '请求受到限流', authentication: '上游身份验证失败',
-    proxy_unavailable: '代理连接不可用', encrypted_context_rejected: '上游拒绝了历史加密上下文',
-    stream_interrupted: '响应流中断', request_interrupted: '请求被中断', core_interrupted: '核心退出导致请求中断',
-    client_write_failed: '向客户端写入响应失败', no_available_key: '没有可用的 Key' };
-  return labels[code] ?? (code ? '查看请求详情中的错误码、阶段与证据' : '日志未记录具体错误码');
-}
+export { errorExplanation } from './log-error.model';
 export function formatStat(value: number | null, compact = false) {
   if (value === null) return '—';
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1, ...(compact ? { notation: 'compact' } : {}) }).format(value);

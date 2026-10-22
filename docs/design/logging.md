@@ -240,3 +240,20 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 ### 分组倍率有效期与后台维护（2026-10-20 当前源码，未发布）
 
 核心启动异步检查启用供应商及启用 Key 的分组倍率，每小时更新，失败／忙碌一分钟后重试；供应商／Key／映射及平台账户配置变更后检查到期缓存，串行复用受限平台查询，不发推理。派发快照的 group_multiplier 只接受 observed_at 不足三小时的成功观测，失败保留上次值和原时间，满三小时或缺少有效时间保持未知；effective_multiplier 和倍率调度遵守同一期限。原始模型费用仍可存在，分组未知时最终费用未知，不填1或重算历史。手动查询、显式远端数字 ID 不缓存、身份核对及 revision 拒绝迟到结果的规则保持。详见[倍率设计](provider-multipliers.md)。
+
+### 错误原因与端点修复（2026-10-22，当前源码未发布）
+
+详情/导出的 evidence 增加下列安全字段；列表/follow 白名单不变，无数据库迁移，不回填历史。字段描述最后候选，不跨候选累积；每个 attempt 继续保留稳定 code/HTTP/stage。
+
+| 字段 | 语义 |
+| --- | --- |
+| anchor_error_id | Anchor 目录中的固定消息身份，用于区分相同 code 的不同错误；不保存翻译后的文案或模板参数 |
+| transport_cause | timeout/cancelled/dns/tls_certificate/connection_reset/connection_refused/broken_pipe/unexpected_eof/transport |
+| transport_phase | connect 或 response_headers，后者表示连接已取得但没有取得响应头；不等同于 TTFT |
+| provider_timeout_seconds | 当前供应商请求期限的十进制秒数，不是实测耗时 |
+| upstream_error_category | invalid_api_key/insufficient_quota/rate_limit/model_not_found/permission_denied/context_length/invalid_request/overloaded/server_error；未知不记录 |
+| endpoint_resolution | configured/v1_fallback/v1_cached |
+| endpoint_requests | 本候选实际端点请求数，1 或 2 |
+| endpoint_repair | learned 表示补 /v1 后得到 2xx 非 HTML 的 JSON/SSE 类型，缓存 10 分钟，最多 128 项；不保证生成完整 |
+
+不写原始 err.Error()、URL、远程 message、未知错误字符串或凭据。绑定拒绝前也记录请求模型，缺映射与无启用供应商分别为 unknown_model 与 model_no_enabled_provider，保持零尝试/HTTP=null。桌面日志复用核心语言目录，优先用 anchor_error_id，并结合安全类别/阶段/期限解释错误；旧记录无法恢复的原因明确保留未知，不根据 30 秒耗时反推原因。

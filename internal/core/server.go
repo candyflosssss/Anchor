@@ -47,6 +47,8 @@ type Server struct {
 	modelCatalog     *modeldev.Client
 	keyRateRefresh   *keyRateRefresh
 	platformQueries  sync.Map
+	endpointMu       sync.Mutex
+	endpoints        map[[32]byte]time.Time
 	mu               sync.Mutex
 	active           map[string]int
 	health           map[string]*keyHealth
@@ -84,7 +86,9 @@ func NewWithModelCatalog(store *state.Store, log *slog.Logger, catalogClient *mo
 	tr.DisableCompression = true
 	tr.MaxConnsPerHost = 64
 	tr.MaxIdleConns = 32
-	tr.ResponseHeaderTimeout = 30 * time.Second
+	// The per-provider request context owns the entire deadline, including
+	// waiting for response headers. A separate 30s cap truncated slow inference.
+	tr.ResponseHeaderTimeout = 0
 	outbound := egress.New(store, tr)
 	policy, err := store.KeyCooldownSettings()
 	if err != nil {
@@ -127,6 +131,9 @@ func fail(w http.ResponseWriter, id apierror.ID, args ...any) {
 	status, detail := apierror.Render(id, language, args...)
 	if recorder, ok := w.(interface{ logFailure(string) }); ok {
 		recorder.logFailure(detail.Code)
+	}
+	if recorder, ok := w.(interface{ logErrorID(apierror.ID) }); ok {
+		recorder.logErrorID(id)
 	}
 	w.Header().Set("Content-Language", string(detail.Language))
 	w.Header().Add("Vary", "Accept-Language")

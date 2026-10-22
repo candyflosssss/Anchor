@@ -110,6 +110,9 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		fail(w, apierror.ModelIDRequired)
 		return
 	}
+	if t := trace(r); t != nil {
+		t.row.Model = modelID
+	}
 	if b, ok := r.Context().Value(bindingKey{}).(state.Binding); ok {
 		allowed, err := s.Store.BindingAllows(b, modelID)
 		if err != nil {
@@ -117,6 +120,34 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !allowed {
+			if b.ModelScope == "all-mapped" || b.ModelScope == "all-compatible" {
+				m, modelErr := s.Store.Model(modelID)
+				if errors.Is(modelErr, state.ErrNotFound) {
+					fail(w, apierror.UnknownModel)
+					return
+				}
+				if modelErr != nil {
+					apiError(w, modelErr)
+					return
+				}
+				providers, providerErr := s.Store.Providers()
+				if providerErr != nil {
+					apiError(w, providerErr)
+					return
+				}
+				enabled := false
+				for _, candidate := range m.Candidates {
+					for _, provider := range providers {
+						if candidate.ProviderID == provider.ID && provider.Enabled {
+							enabled = true
+						}
+					}
+				}
+				if !enabled {
+					fail(w, apierror.ModelNoEnabledProvider)
+					return
+				}
+			}
 			fail(w, apierror.BindingModelDenied)
 			return
 		}
@@ -231,6 +262,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	delivered := false
 	setLogStage(r, "request_convert")
 	if t := trace(r); t != nil {
+		for _, name := range []string{"transport_cause", "transport_phase", "provider_timeout_seconds", "anchor_error_id", "upstream_error_category"} {
+			delete(t.row.Evidence, name)
+		}
 		if _, exists := t.row.Evidence["model_revision"]; !exists {
 			t.row.Evidence["model_revision"] = strconv.FormatInt(t.row.Revision, 10)
 		}
@@ -360,7 +394,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	resp, err := s.inferenceResponse(up, base, p.Protocol, evidence)
 	if t := trace(r); t != nil {
 		// Endpoint evidence describes the current candidate, not an earlier retry.
-		for _, name := range []string{"endpoint_resolution", "endpoint_requests", "initial_response_kind", "initial_http", "response_kind", "upstream_content_type"} {
+		for _, name := range []string{"endpoint_resolution", "endpoint_requests", "endpoint_repair", "initial_response_kind", "initial_http", "response_kind", "upstream_content_type"} {
 			delete(t.row.Evidence, name)
 		}
 		for name, value := range evidence {
@@ -369,25 +403,27 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	}
 	if err != nil {
 		if errors.Is(err, egress.ErrUnavailable) {
+			recordTransportFailure(r, err, connected.Load(), p.TimeoutSeconds)
 			code = "proxy_unavailable"
 			status = 502
 			fail(w, apierror.ProxyUnavailable)
 			return false
 		}
+		recordTransportFailure(r, err, connected.Load(), p.TimeoutSeconds)
 		if r.Context().Err() != nil {
 			return false
 		}
 		if connected.Load() {
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			if transportTimedOut(err) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				status = 504
-				fail(w, apierror.UpstreamTimeout)
+				fail(w, apierror.UpstreamHeaderTimeout)
 			} else {
 				status = 502
 				fail(w, apierror.UpstreamTransport)
 			}
 			return false
 		}
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		if transportTimedOut(err) || errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			status = 504
 			code = "upstream_timeout"
 		} else {
@@ -403,6 +439,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	after = resp.Header.Get("Retry-After")
 	setLogStage(r, "upstream_response")
 	if status != 200 {
+		if t := trace(r); t != nil {
+			captureUpstreamError(resp, t.row.Evidence)
+		}
 		if allowRecovery && (status == 400 || status == 422) {
 			data, readErr := io.ReadAll(io.LimitReader(resp.Body, protocol.RecoveryPrefixLimit+1))
 			if readErr == nil && len(data) <= protocol.RecoveryPrefixLimit {

@@ -76,5 +76,7 @@
   "upstream_failed": "upstream generation failed",
   "upstream_unsupported_content": "upstream returned unsupported content",
   "upstream_missing_usage": "upstream omitted usage required by Messages",
-  "upstream_stream_incomplete": "Upstream stream incomplete or unsupported"
+  "upstream_stream_incomplete": "Upstream stream incomplete or unsupported",
+  "model_no_enabled_provider": "model mapping has no enabled provider; add a route or enable its provider",
+  "upstream_header_timeout": "timed out waiting for upstream response headers; check provider latency or increase its request timeout"
 }

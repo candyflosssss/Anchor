@@ -76,5 +76,7 @@
   "upstream_failed": "上游生成失败。",
   "upstream_unsupported_content": "上游返回了不受支持的内容。",
   "upstream_missing_usage": "上游缺少 Messages 协议所需的用量信息。",
-  "upstream_stream_incomplete": "上游流式响应不完整或包含不受支持的内容。"
+  "upstream_stream_incomplete": "上游流式响应不完整或包含不受支持的内容。",
+  "model_no_enabled_provider": "模型映射没有启用的供应商；请添加渠道或启用对应供应商。",
+  "upstream_header_timeout": "等待上游响应头超时；尚未收到模型响应，请检查供应商响应速度或调大供应商超时。"
 }

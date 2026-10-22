@@ -97,3 +97,9 @@ Diagnostics 只含客户端／上游协议、request/response/stream 阶段、�
 AttemptOptions.ClientMetadata 只接受类型化的 AnthropicVersion/AnthropicBeta，不含认证；网关从请求头提取后交给 Prepare，协议层仅在 Anthropic → Anthropic 原生路径生成 anthropic-version/anthropic-beta。重复 beta 值和顺序保留，缺少客户端 version 时保持供应商认证层既有默认值；RequestHeaders 返回副本，每次 Attempt 独立。Anthropic 与其他协议之间转换不复制这些客户端头，避免对目标协议虚报能力。此处仅保留能力声明，不据此新增 tool search 或其他未验证语义。
 
 网关在应用供应商认证后机械写入协议层返回的固定头，不转发客户端 Authorization/x-api-key/cookie/任意 custom headers，不记录原始头值，不扩大重试预算。签名思考/cache_control 在原生请求体上继续沿用既有保留契约；跨协议仍按已有能力表拒绝或转换。新增测试覆盖原生声明/认证替换、重复 beta、跨协议隔离及请求副本，不代表真实 Claude 或付费上游验收。
+
+## 期限与自动端点修复（2026-10-22，当前源码未发布）
+
+网关请求期限由供应商 timeout_seconds 统一约束，包括等待响应头，不再叠加固定 30 秒响应头上限。连接后超时属于响应头阶段，返回 upstream_header_timeout，未确认结果不重放；连接前失败沿用既有候选切换规则。网关只持久保存固定传输类别/阶段、配置秒数和 Anchor 错误身份；非 200 错误响应前缀最多 16 KiB，仅提取已识别 code/type 的固定类别，不保存原文，读取后完整还原给既有密文恢复识别器。
+
+自动端点修复由网关 inference_endpoint 管理。没有版本路径的基址明确返回 HTML 且 HTTP 为 200/404/405 时，只允许同源补 /v1 一次，共享原期限和并发槽；保留部署前缀。补路径返回 2xx、非 HTML 且声明 JSON/SSE 后，在进程内按基址/协议/凭据摘要缓存 10 分钟，最多 128 项；后续请求直接使用修复地址，不改配置或 revision。该验证只证明响应类型，不保证生成完整；协议层继续验证内容。缓存返回 HTML/404/405 时失效，当前请求不重放，下一独立请求重新识别。重启、地址或凭据变化后重新识别，不从 JSON 错误、鉴权失败、限流、重定向或传输失败推测路径。

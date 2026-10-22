@@ -50,7 +50,7 @@ it('explains an HTML response while preserving the HTTP status and structural ev
 
 it('preserves authentication diagnostics even if an error response has HTML headers', () => {
   const row = { ...fixture.page.requests[0], code: 'authentication', evidence: { response_kind: 'html' } } as Request;
-  expect(requestLog(row).summary).toBe('authentication');
+  expect(requestLog(row).summary).toContain('身份验证');
 });
 
 it('prefers effective output timing and falls back to legacy text timing', () => {

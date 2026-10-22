@@ -69,6 +69,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
       Read a JSON user/assistant message array from stdin; print the final transient reply.
   provider test --id ID --revision N --model MODEL [--target KEY] --approve
       HTML at an unversioned base permits one /v1 fallback; still HTML returns unexpected_html.
+      A JSON/SSE 2xx fallback is reused for 10m in core memory; saved URLs are unchanged.
   provider model-put|model-delete --id ID --revision N --target ALIAS [--model MODEL] [--model-revision N] [--multiplier N] [--strategy RULE] [--source-key ID | --all-keys] [--speed-variant fast|ultrafast ...] [--service-tier TIER] [--tools] [--streaming] [--approve]
   provider price-put --id ID --revision N --target ALIAS --input-price USD --output-price USD [--cache-read-price USD] [--cache-write-price USD]
   catalog providers [--refresh]
@@ -87,6 +88,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   Authenticated Codex requests can use native thread IDs and local project metadata; explicit tags take precedence.
   Historical logs are not backfilled; session titles and conversation content are not collected.
   Conversion failures retain route IDs and safe conversion_target/conversion_reason evidence in detail/export.
+  Error detail/export includes safe anchor_error_id, transport cause/phase, provider timeout and upstream category.
   logs detail REQUEST_ID | logs settings
   logs configure [--days 7] [--system-days 7] [--max-requests 50000]
       [--request-mib 256] [--system-mib 32]

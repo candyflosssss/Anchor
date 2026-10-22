@@ -1,3 +1,4 @@
+import { errorDiagnosis } from './log-error.model';
 import type { CostAdjustment, KnownUsage, ReferenceCost } from '../../desktop/contract.generated';
 import { adjustmentValue, costMultiplier, referenceUSD } from './log-reference-cost.model';
 import { accelerationSummary, tierSnapshot } from './log-service-tier.model';
@@ -73,6 +74,7 @@ export function safeSummary(row: RequestLog): string {
     ...(row.evidence.mapping_service_tier ? [`Anchor 固定档位: ${serviceTierLabel(row.evidence.mapping_service_tier)}`] : []),
     `上游返回档位（最后候选）: ${serviceTierLabel(row.evidence.upstream_service_tier)} · 原始值 ${tierSnapshot(row.evidence, 'upstream').raw}`,
     `上游 HTTP: ${row.http ?? '未收到'}`, `阶段: ${row.stage}`, `错误代码: ${row.code ?? '无'}`,
+    ...(row.code ? [`错误说明: ${errorDiagnosis(row.code, row.evidence)}`] : []),
     `交付: ${row.delivery}`, `耗时: ${row.elapsed === null ? '未知' : `${row.elapsed} ms`}`,
     ...Object.entries(row.evidence).map(([key, value]) => `${key}: ${String(value)}`)].join('\n');
 }

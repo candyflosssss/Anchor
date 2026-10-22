@@ -775,3 +775,7 @@ SSH 更新 Controller 使用独立的远端错误映射：旧 CLI 不支持、�
 ### Claude CLI／Desktop 接入（2026-10-22，源码未打包）
 
 Agent Model 保持七个平台行，Claude CLI/Desktop 按各自 adapter_id + 根匹配绑定，发现缺失也保留恢复入口；沿用 AgentWorkspace 字符串身份，不新增任意文件/系统命令桥接。hook Controller 对首次 Desktop 开启也要求确认，取消不提交；View 说明当前本地第三方配置可能影响 Chat/Cowork/Code 的请求与计费，应用/恢复须完全退出重开。CLI 提示完整菜单需要 2.1.242+；Desktop 提示先初始化本地配置、组织策略拒绝、切换后返回原配置才可更新。模型选择和可用性继续复用核心映射，前端不推测 Claude 能力。新增 desktop_setup_required/desktop_policy_present 的只读原因展示；实际保护由核心执行。受控桥接测试不代替真实 Claude 或 Wails 原生窗口验收。
+
+### 日志错误说明（2026-10-22，当前源码未发布）
+
+日志功能 Model 直接复用 internal/apierror/locales 的中英资源；当前界面显示中文，未增加整站语言切换。列表摘要、详情错误原因、复制和区间错误汇总从相同入口解析，详情优先使用安全 anchor_error_id，并附加固定上游错误类别和传输原因/阶段/供应商期限。没有记录的历史原因不猜测，未知远程字符串不作为文案。保留稳定错误码和结构诊断供核对，日志桥接 DTO 不变。
