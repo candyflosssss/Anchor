@@ -1,10 +1,14 @@
 # 在线更新 v1
 
 - 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.65](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.65)，发布于 `2026-10-22T12:21:24+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `0e964477895483a95217291f6e193313070aa4b0`、SOURCE dirty=false。
-- 修复 HTTP localhost 供应商地址：手动保存、CC Switch 导入与实际请求可用，直连兼容 IPv4／IPv6 回环；含 desktop.64 之后已提交的模型 Key 卡片／拖动、Skill 自动收录与原件清理、Claude CLI 模型菜单和 Desktop 独立托管。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.66](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.66)，发布于 `2026-10-22T14:21:48+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `5499289f986892ae45a3c97e86b1fdbca8255b7f`、SOURCE dirty=false。
+- 模型映射按模型横向并排，每个模型内的渠道／来源 Key 纵向排列；紧凑卡片支持整卡拖拽，分组显示在倍率下方，保留已有自动保存／撤销与键盘排序。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .66 在线投放（2026-10-22）
+
+模型横向并排、模型内渠道纵向排列，紧凑Key卡片保留整卡拖拽与倍率下方分组。11附件远端摘要、构建tag与非latest核对通过；默认dev源真实下载Linux runtime、旧客户端deb及CLI，版本／目标／大小／SHA256核验通过。仅投放，未安装或改动真实配置；详见[发行记录](../release/desktop.md#model-layout-66)。
 
 ## .65 在线投放（2026-10-22）
 

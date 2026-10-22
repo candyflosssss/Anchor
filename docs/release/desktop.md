@@ -1,10 +1,38 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.65](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.65)，发布于 `2026-10-22T12:21:24+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `0e964477895483a95217291f6e193313070aa4b0`、SOURCE dirty=false。
-- 修复 HTTP localhost 供应商地址：手动保存、CC Switch 导入与实际请求可用，直连兼容 IPv4／IPv6 回环；含 desktop.64 之后已提交的模型 Key 卡片／拖动、Skill 自动收录与原件清理、Claude CLI 模型菜单和 Desktop 独立托管。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.66](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.66)，发布于 `2026-10-22T14:21:48+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `5499289f986892ae45a3c97e86b1fdbca8255b7f`、SOURCE dirty=false。
+- 模型映射按模型横向并排，每个模型内的渠道／来源 Key 纵向排列；紧凑卡片支持整卡拖拽，分组显示在倍率下方，保留已有自动保存／撤销与键盘排序。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="model-layout-66"></a>
+
+## 模型横排与渠道纵排 .66（已发布 dev）
+
+模型作为300px宽的列横向并排，空间不足时模型换行；各模型内部的渠道及来源 Key 始终纵向排列。标题与设置同一行，调度及快速排序位于下行。卡片保留细边框、轻阴影、浅深主题及整卡拖拽，分组在倍率下方；点击供应商打开编辑，拖动后不误打开，松手保存，可撤销并支持键盘排序。移动仍作用于同一渠道的全部 Key，不改路由、计费或 CLI 契约。
+
+构建提交 `5499289f986892ae45a3c97e86b1fdbca8255b7f`，输入摘要 `7d1dc4997afa1a51be7da0de10a000dd0312ef3cad77e869639e7b25449fd2f8`，SOURCE dirty=false。从干净独立worktree构建，不含原工作区未提交内容。产物和证据位于 `dist/desktop/0.1.0-dev.desktop.66/`；对应源码含 Anchor Go vendor、固定 mihomo v1.19.32 对应源码／vendor与许可。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.66_amd64.deb` | 29193952 | `db4bf0fa4b0cb85f7723b7c7a3bcdc6712481be5fa7e247aad062e7dacdf1e09` |
+| `Anchor-Desktop-0.1.0-dev.desktop.66-windows-amd64-setup.exe` | 31209990 | `d2a604670c69e7bd09486e0443cfa97c1845cf3402e95ac419f83bb73975af5f` |
+| `anchor-desktop-0.1.0-dev.desktop.66-linux-amd64` | 43304016 | `0ae34bd5d5d0006665d99930fef5bfc1e05c77f8f0a8356f44b0bf38af8cb6eb` |
+| `anchor-desktop-0.1.0-dev.desktop.66-windows-amd64.exe` | 44431360 | `244dab3540cc3fe904e887ac1b91d403e5e609da552a67b3c613d07984b56a59` |
+| `anchor-0.1.0-dev.desktop.66-linux-amd64` | 37904546 | `3158aa633972bc61a0d267b1bd0634c6c53622a1f027fab03a2c4125e0504962` |
+| `anchor-0.1.0-dev.desktop.66-windows-amd64.exe` | 38036480 | `091e0ce2255a3fe353b31fe4e580528b90debd03912c0c9c25c79555f16cf49e` |
+| `update-desktop.json` | 1755 | `29fb8a18c109b8f2ff11df62f85a593c014c8a58562c54de324704c09fd9325f` |
+| `update-cli.json` | 876 | `3b130c963bae384951dc219ac0ba3e711496c7e7f13367183448affb8c5bd4cc` |
+| `anchor_0.1.0-dev.desktop.66_source.tar.gz` | 97757543 | `62f1d3cde7103ec57d7c24b8cbe3598e0583cbd7149289cadf5aa5eca7e941e2` |
+| `anchor_0.1.0-dev.desktop.66_metadata.zip` | 122173 | `afe8ac43340bd258357a7a990d325d505bedf2d6c473f6ffd8b6fabd6f0f3b39` |
+| `SHA256SUMS` | 1073 | `55b553146ab567730d12b6d7bdfd0f66d1718e5a882f5163569e5be692e002b4` |
+
+复用最终界面代码的 typecheck、ESLint 和5项模拟桌面回归结果（外层横向、内层纵向、多Key、整卡／文字拖动、普通点击、保存、取消和键盘排序）。本轮完成契约比对、TypeScript／Vite、Windows AMD64及Ubuntu24.04 AMD64生产编译与打包。首次尝试因临时依赖软链接在容器内不可见失败，改为任务目录真实依赖后重跑成功；生成包、嵌入前端／mihomo、deb与runtime载荷、对应源码输入摘要和metadata ZIP CRC核对通过。保留非阻塞Vite大chunk提示。
+
+于 `2026-10-22T14:21:48+08:00` 公开为dev prerelease、非latest；11附件大小／GitHub digest与本地一致，tag指向实际构建提交。默认dev源真实下载Linux runtime、旧客户端deb和独立CLI，版本／目标／大小／SHA256及可执行版本核验通过。证据见publication下preparation-verification.json、publication-verification.json、online-verification.json；原始BUILD.json保留构建时未发布／未安装／未原生验收的事实。
+
+沿用schema9，本轮仅在线投放；未安装、重启或修改真实实例／Agent配置与用户更新设置，未请求付费上游。双平台原生窗口、系统安装器及真实SSH升级未验收。
 
 <a id="localhost-65"></a>
 

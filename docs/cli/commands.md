@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-10-22
+- 2026-10-22 desktop.66 dev 已发布：模型横向并排、模型内渠道纵向排列与整卡拖拽；同版CLI／核心沿用desktop.65契约，本轮无命令／参数变化。详见[发行记录](../release/desktop.md#model-layout-66)。
 - 2026-10-22 desktop.65 dev 已发布：HTTP localhost 供应商地址可保存、导入与请求；同版 CLI／核心／GUI 包含模型 Key 卡片与拖动、Skill 自动收录／清理、Claude CLI 模型菜单及 Desktop 独立托管。独立公开 alpha.6 CLI 不含这些增量；本轮仅更新交付状态，无新增命令契约。详见[发行记录](../release/desktop.md#localhost-65)。
 - 2026-10-22 Claude Desktop 独立适配器及 Claude CLI 完整映射菜单（CLI 2.1.242+）已随 desktop.65 dev 发布；desktop.64 不含这些增量，详见 §8。
 - 2026-10-21 desktop.64 dev 已发布：同版 CLI／核心包含 Key 分数冷却及 `settings key-cooldown --error-window-seconds`、会话保持、`model routing` 顺序保存和首字测试结果；桌面支持拖动与快速排序。独立 alpha.6 CLI 不含这些增量；本轮仅更新交付状态，无新增命令契约。详见[发行记录](../release/desktop.md#routing-priority-64)。
