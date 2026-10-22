@@ -887,7 +887,7 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | status / source / provider / model / key / code / stage / level | 空表示不筛选；非空按原值精确匹配；requests 与 system 适用字段不同 |
 | http | 0 表示不筛选；显式值 100–599，代表实际收到的上游状态 |
 | search | 空；区分大小写的标识前缀（请求 ID / 模型 / 供应商 / Key / 错误码；系统事件名），不搜索正文 |
-| days / system-days | 查询当前值再修改；初始均 7，范围 1–90 |
+| days / system-days | 查询当前值再修改；初始均 30（2026-10-22 当前源码，未发布），范围 1–90；已保存设置保持原值 |
 | max-requests | 初始 50,000，100–200,000 |
 | request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
 

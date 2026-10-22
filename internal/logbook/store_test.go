@@ -104,8 +104,13 @@ func TestRecoverAndKeepTerminalOrdering(t *testing.T) {
 func TestRetentionIsSeparateFromDisplayAndUsage(t *testing.T) {
 	s := openTest(t)
 	old := row("expired")
-	old.StartedAtMS = time.Now().Add(-10 * 24 * time.Hour).UnixMilli()
+	old.StartedAtMS = time.Now().Add(-31 * 24 * time.Hour).UnixMilli()
 	s.Request(old)
+	recent := row("within_month")
+	recent.StartedAtMS = time.Now().Add(-10 * 24 * time.Hour).UnixMilli()
+	s.Request(recent)
+	s.Event(Event{ID: "expired_event", AtMS: old.StartedAtMS, Level: "error", Source: "core", Event: "request.failed"})
+	s.Event(Event{ID: "within_month_event", AtMS: recent.StartedAtMS, Level: "error", Source: "core", Event: "request.failed"})
 	s.Request(row("keep"))
 	flushTest(t, s)
 	if _, e := s.Detail(context.Background(), "expired"); e != ErrNotFound {
@@ -114,7 +119,14 @@ func TestRetentionIsSeparateFromDisplayAndUsage(t *testing.T) {
 	if _, e := s.Detail(context.Background(), "keep"); e != nil {
 		t.Fatal(e)
 	}
-	if s.Health().RequestCount != 1 {
+	if _, e := s.Detail(context.Background(), "within_month"); e != nil {
+		t.Fatal(e)
+	}
+	events, e := s.List(context.Background(), Query{Kind: "system", SinceMS: old.StartedAtMS})
+	if e != nil || len(events.Events) != 1 || events.Events[0].ID != "within_month_event" {
+		t.Fatalf("system retention: %+v %v", events, e)
+	}
+	if s.Health().RequestCount != 2 {
 		t.Fatal(s.Health())
 	}
 }
