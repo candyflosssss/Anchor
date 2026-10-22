@@ -146,14 +146,14 @@ func (s *Store) Request(r Request) bool {
 	if r.Attempts == nil {
 		r.Attempts = []Attempt{}
 	}
-	raw, err := json.Marshal(r)
+	raw, err := marshalStoredRequest(r)
 	// Rich reference breakdowns may exceed the per-record budget on many retries.
 	// Preserve root totals and explicitly truncate attempt detail, never drop the
 	// entire request merely because its captured pricing snapshots grew.
 	for err == nil && len(raw) > MaxRequestSize && len(r.Attempts) > 0 && r.ReferenceCost != nil && r.ReferenceCost.Adjustment != nil {
 		r.Attempts = r.Attempts[:len(r.Attempts)-1]
 		r.AttemptsTruncated = true
-		raw, err = json.Marshal(r)
+		raw, err = marshalStoredRequest(r)
 	}
 	if err != nil || len(raw) > MaxRequestSize {
 		s.dropped.Add(1)
@@ -391,11 +391,10 @@ func (s *Store) Detail(ctx context.Context, id string) (Request, error) {
 	if err != nil {
 		return Request{}, ErrUnavailable
 	}
-	var r Request
-	if json.Unmarshal([]byte(raw), &r) != nil {
+	r, err := unmarshalStoredRequest([]byte(raw))
+	if err != nil {
 		return r, ErrUnavailable
 	}
-	r.fillKnownUsage()
 	return r, nil
 }
 func (s *Store) List(ctx context.Context, q Query) (Page, error) {
@@ -431,11 +430,10 @@ func (s *Store) List(ctx context.Context, q Query) (Page, error) {
 		}
 		out.NextCursor = seq
 		if table == "requests" {
-			var r Request
-			if json.Unmarshal([]byte(raw), &r) != nil {
+			r, err := unmarshalStoredRequest([]byte(raw))
+			if err != nil {
 				return out, ErrUnavailable
 			}
-			r.fillKnownUsage()
 			out.Requests = append(out.Requests, r)
 		} else {
 			var e Event

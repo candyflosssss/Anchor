@@ -101,6 +101,16 @@ Agent 管理接口在处理 workspace、enroll、add、inspect、plan、sync、s
 
 页面显示 dropped、write_failures 与存储错误；队列故障不得被伪装成“没有日志”。缺口计数与保留清理不同；退出/断电前未刷盘的计数可能丢失。这里没有事件订阅或精确丢失区间协议。
 
+### 单条请求日志精简（2026-10-22 当前源码，未打包／未发布）
+
+`internal/logbook/storage.go` 只改变新提交请求的数据库 JSON 表示，不改变公开 Request DTO、CLI、桌面桥接或 JSONL 导出。详情与列表通过同一解码器恢复公开字段，导出复用该列表读取路径；统计与索引所依赖的根级数值及归属路径保持不变。
+
+- 只有实际尝试总数为 1、保留一条未截断明细且根／尝试费用快照完全相同时，才省略尝试内的重复 `cost_adjustment`，保存私有 `_attempt_cost_from_root=true`；读取时恢复独立副本。多次尝试、截断或费用不同不复用，原本缺少的费用不凭空补齐。
+- `known_usage` 仅在能从已保留尝试准确重建同一小计时省略；保留明细不足以还原的完整小计仍存储，根总量未知不会因此变为零或已知。
+- 仅省略能由 Go 类型零值恢复的结构体空字符串与 nil 字段；保留非 nil 的零／空字符串指针、数字 0、false、空数组及 map 内容（包括空证据值），区分未知与明确零。公开 JSON 仍保留其原有 null／空值结构。
+
+写入时同步形成不可变快照，再按精简后的实际字节数执行 32 KiB 限制与现有明细截断，逻辑容量继续按实际 JSON 大小加每请求 1 KiB 预留开销计数。没有压缩、跨记录去重、真实数据库批量改写或自动清理历史。旧完整记录继续读取，不因查询重写；直接读取新精简记录的核心须包含本解码器，旧二进制不会还原私有费用引用。升级／回退不能把旧核心直接读库当作完整导出方式，应由配套核心先导出公开 JSONL。
+
 ### 协议转换失败诊断（2026-10-20 当前源码，未发布）
 
 `unsupported_conversion` 在尚未派发时保留所选 provider/key/upstream_model，HTTP=null、attempt_count=0 和 sent_service_tier=not_sent 不变。详情／复制／导出的 evidence 新增固定目标协议 `conversion_target` 和代码自有错误类别 `conversion_reason`；未知字段名和原始解析错误不入日志，历史记录不补写。列表沿用现有 evidence 白名单，不增加正文搜索或新的 DTO。支持范围与类别见[Chat 转换兼容说明](protocol-chat-bridge.md)。
