@@ -122,8 +122,9 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   proxy bind PROVIDER [--key KEY] --mode direct|system|inherit|proxy [--proxy ID] --revision N --approve
       direct ignores application proxies (not OS/router interception); system requires an OS/environment proxy, never falls back direct.
   skill scan | list                  Discover and automatically archive new Skills; preserve originals
+      Automatically find direct projects under ~/Projects, ~/Code and other known containers; no registration needed.
   skill inspect | diff [ID]           Inspect snapshots or --source ID; see CLI docs
-  skill register-project PATH        Add an explicitly approved project root
+  skill register-project PATH        Optionally add a project outside automatic discovery
   skill import SOURCE                Copy source; requires --hash, --revision, --approve
   skill cleanup SOURCE               Archive, verify, then replace source with a link; --hash --revision --approve
   skill create NAME | save ID         Save a snapshot with --content-stdin

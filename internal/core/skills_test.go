@@ -50,10 +50,10 @@ func TestSkillManagementIsIdentityGuardedAndIsolated(t *testing.T) {
 	}
 }
 
-func TestBackgroundSkillCollectionArchivesWithoutReplacingOriginals(t *testing.T) {
+func TestBackgroundSkillCollectionFindsProjectsWithoutReplacingOriginals(t *testing.T) {
 	f := setup(t)
 	home := t.TempDir()
-	source := filepath.Join(home, ".agents", "skills", "external")
+	source := filepath.Join(home, "Projects", "auto", ".agents", "skills", "external")
 	if err := os.MkdirAll(source, 0775); err != nil {
 		t.Fatal(err)
 	}

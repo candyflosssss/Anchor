@@ -32,6 +32,15 @@ export const skillStatus: Record<string, string> = {
   external_link: '外部链接 · 仅登记', unsafe: '文件无法读取、链接损坏或文件类型不支持', unavailable: '库版本不可用', limit: '单个 Skill 的文件过多或过大',
   linked: '固定版本链接', missing: '原位置已缺失', conflict: '原位置被外部修改', broken: '链接目标已缺失',
 };
+export function skillWarning(warning: string): string {
+  if (warning === 'pending_transaction') return '上次安装或清理尚未完成，下次手动操作会核对恢复。原件备份会保留到核对成功。';
+  if (warning === 'project_limit' || warning === 'project_search_limit') return '项目自动发现达到本次扫描上限，部分项目尚未检查；可用“补充项目”指定未发现的项目。';
+  if (warning.startsWith('unreadable_project_search:')) return '某个常见项目目录无法读取，其他项目仍会继续扫描。';
+  if (warning.startsWith('unsafe_scope:')) return '某个目录的路径或权限不支持安全扫描。';
+  if (warning.startsWith('unreadable_scope:')) return '某个目录无法读取。';
+  if (warning.startsWith('collect_')) return '部分 Skill 尚未收录，请重新扫描并查看本机来源中的状态。';
+  return '部分内容超过扫描范围限制。';
+}
 export function skillMessage(error: unknown): string {
   if (!(error instanceof DesktopProblem)) return '操作未完成，请重新读取。';
   const messages: Partial<Record<DesktopProblem['code'], string>> = {

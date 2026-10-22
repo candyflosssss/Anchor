@@ -16,6 +16,11 @@ import (
 // Directory evidence is not an assertion that an executable is installed.
 // Discovery has no dependency on model-gateway enrollment.
 func scopes(v manifest, env managed.Environment) []SkillScope {
+	out, _ := scopesContext(context.Background(), v, env)
+	return out
+}
+
+func scopesContext(ctx context.Context, v manifest, env managed.Environment) ([]SkillScope, []string) {
 	out := []SkillScope{}
 	seen := map[string]bool{}
 	add := func(agent, kind, root, project, origin string) {
@@ -27,7 +32,7 @@ func scopes(v manifest, env managed.Environment) []SkillScope {
 		out = append(out, SkillScope{key("scope-", root), agent, kind, root, project, origin})
 	}
 	if !filepath.IsAbs(env.Home) {
-		return out
+		return out, nil
 	}
 	add("shared", "global", filepath.Join(env.Home, ".agents", "skills"), "", "home")
 	codex := env.CodexHome
@@ -56,39 +61,24 @@ func scopes(v manifest, env managed.Environment) []SkillScope {
 			add(item.agent, "global", filepath.Join(root, "skills"), "", "config-directory")
 		}
 	}
-	projects := map[string]string{}
-	for _, p := range v.Projects {
-		projects[p] = "registered"
-	}
-	// Bounded project indexes only: no transcripts, auth files or recursive walk.
-	for _, root := range []string{codex, filepath.Join(env.Home, ".codex")} {
-		for _, p := range codexProjects(root) {
-			if projects[p] == "" {
-				if len(projects) < 64 {
-					projects[p] = "codex-workspace-index"
-				}
-			}
-		}
-	}
+	projects, warnings := discoverProjects(ctx, v, env)
 	paths := []string{}
 	for p := range projects {
 		paths = append(paths, p)
 	}
 	sort.Strings(paths)
-	if len(paths) > 64 {
-		paths = paths[:64]
-	}
 	for _, p := range paths {
+		if ctx.Err() != nil {
+			break
+		}
 		if sourceDir(p) != nil {
 			continue
 		}
-		add("shared", "project", filepath.Join(p, ".agents", "skills"), p, projects[p])
-		add("claude", "project", filepath.Join(p, ".claude", "skills"), p, projects[p])
-		add("codex", "project", filepath.Join(p, ".codex", "skills"), p, projects[p])
-		add("gemini", "project", filepath.Join(p, ".gemini", "skills"), p, projects[p])
-		add("opencode", "project", filepath.Join(p, ".opencode", "skills"), p, projects[p])
+		for _, item := range projectSkillDirs {
+			add(item.agent, "project", filepath.Join(p, item.dir, "skills"), p, projects[p])
+		}
 	}
-	return out
+	return out, warnings
 }
 func codexProjects(root string) []string {
 	if sourceDir(root) != nil {
@@ -116,12 +106,11 @@ func codexProjects(root string) []string {
 		return nil
 	}
 	out := []string{}
+	seen := map[string]bool{}
 	for _, p := range append(index.Roots, index.Order...) {
-		if len(out) >= 64 {
-			break
-		}
-		if filepath.IsAbs(p) && filepath.Clean(p) == p && p != filepath.VolumeName(p)+string(filepath.Separator) {
+		if absolutePath(p) && p != filepath.VolumeName(p)+string(filepath.Separator) && !seen[p] {
 			out = append(out, p)
+			seen[p] = true
 		}
 	}
 	return out
@@ -131,7 +120,8 @@ func (m *Manager) workspace(v manifest, env managed.Environment) SkillWorkspace 
 }
 
 func (m *Manager) workspaceContext(ctx context.Context, v manifest, env managed.Environment) SkillWorkspace {
-	ws := SkillWorkspace{Revision: v.Revision, Library: v.Library, Scopes: scopes(v, env), Sources: []SkillSource{}, Mounts: []SkillMount{}, Warnings: []string{}}
+	sc, warnings := scopesContext(ctx, v, env)
+	ws := SkillWorkspace{Revision: v.Revision, Library: v.Library, Scopes: sc, Sources: []SkillSource{}, Mounts: []SkillMount{}, Warnings: append([]string{}, warnings...)}
 	if v.Pending != nil || v.Cleanup != nil {
 		ws.Warnings = append(ws.Warnings, "pending_transaction")
 	}

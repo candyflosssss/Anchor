@@ -101,3 +101,13 @@ test('archived sources need no import and remain optional to clean', async ({ pa
   await expect(page.getByRole('button', { name: '清理原件', exact: true })).toBeEnabled();
   expect(await page.evaluate(() => window.skillTest.actions)).toHaveLength(0);
 });
+
+test('project discovery is automatic and manual paths are only a supplement', async ({ page }) => {
+  await expect(page.getByText(/常见项目目录会自动识别/)).toBeVisible();
+  await page.evaluate(() => { window.skillTest.data.warnings = ['project_search_limit']; });
+  await page.getByRole('button', { name: '重新扫描' }).click();
+  await expect(page.getByRole('status')).toContainText('部分项目尚未检查');
+  await page.getByRole('button', { name: '补充项目', exact: true }).click();
+  await expect(page.getByRole('dialog')).toContainText('非常用位置');
+  expect(await page.evaluate(() => window.skillTest.actions)).toHaveLength(0);
+});

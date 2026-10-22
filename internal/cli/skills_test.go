@@ -111,6 +111,24 @@ func TestSkillCLIUsesAuthenticatedCore(t *testing.T) {
 			t.Fatal(link, err)
 		}
 	}
+	count := len(ws.Library)
+	project := filepath.Join(home, "Projects", "automatically-found")
+	source := filepath.Join(project, ".codex", "skills", "project-skill")
+	if err = os.MkdirAll(source, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(source, "SKILL.md"), []byte("project skill"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = run("skill", "scan"); err != nil {
+		t.Fatal(err)
+	}
+	if json.Unmarshal(out.Bytes(), &ws) != nil || len(ws.Library) != count+1 {
+		t.Fatal("CLI required manual project registration", out.String())
+	}
+	if st, err := os.Lstat(source); err != nil || !st.IsDir() {
+		t.Fatal("CLI scan replaced a project source", err)
+	}
 }
 
 func TestSkillContentCannotShareSSHPasswordStdin(t *testing.T) {
@@ -123,5 +141,13 @@ func TestSkillContentCannotShareSSHPasswordStdin(t *testing.T) {
 	}
 	if input.Len() != len("# Do not consume\n") {
 		t.Fatal("input consumed before rejecting conflicting stdin modes")
+	}
+}
+
+func TestSkillHelpDescribesAutomaticProjectDiscovery(t *testing.T) {
+	for _, hint := range []string{"Automatically find direct projects under ~/Projects", "no registration needed", "Optionally add a project outside automatic discovery"} {
+		if !strings.Contains(help, hint) {
+			t.Fatal("missing automatic project discovery help", hint)
+		}
 	}
 }

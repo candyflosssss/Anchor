@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/skills.json';
 import { CONTRACT, type DesktopBridge } from '../../desktop/contract.generated';
-import { checkedSkillDetail, checkedSkillWorkspace, createSkillService, skillAction, skillMessage, skillQuery } from './skill.model';
+import { checkedSkillDetail, checkedSkillWorkspace, createSkillService, skillAction, skillMessage, skillQuery, skillWarning } from './skill.model';
 import { DesktopProblem } from '../../desktop/transport';
 
 describe('Skill contract and controlled transport', () => {
+  it('explains incomplete automatic project discovery without claiming a complete scan', () => {
+    expect(skillWarning('project_limit')).toContain('部分项目尚未检查');
+    expect(skillWarning('project_search_limit')).toContain('补充项目');
+    expect(skillWarning('unreadable_project_search:search-example')).toContain('其他项目仍会继续扫描');
+    expect(skillWarning('pending_transaction')).toContain('原件备份会保留');
+    expect(skillWarning('collect_failed:source-example')).toContain('部分 Skill 尚未收录');
+  });
   it('accepts the same fixture as Go and preserves version pinning and source baseline', () => {
     const ws = checkedSkillWorkspace(fixture.workspace);
     expect(ws.mounts[0].version).toBe(1);
