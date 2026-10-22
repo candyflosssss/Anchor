@@ -1,12 +1,12 @@
-.workspace .model-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; align-items: start; }
+.workspace .model-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 300px)); gap: 24px; align-items: start; }
 .model-card { min-width: 0; }
-.model-section-header { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
+.model-card > .model-section-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-bottom: 12px; }
 .model-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; min-width: 0; }
 .model-title h2 { font-size: 15px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
 .model-channel-count { font-size: 12px; color: hsl(var(--muted-foreground)); }
 .model-channel-count.state-unavailable { color: hsl(var(--destructive)); }
-.model-card .model-settings-trigger { flex-shrink: 0; height: 30px; padding: 0 8px; color: hsl(var(--muted-foreground)); }
-.route-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.model-card .model-settings-trigger { grid-column: 2; grid-row: 1; flex-shrink: 0; height: 30px; padding: 0 8px; color: hsl(var(--muted-foreground)); }
+.route-toolbar { grid-column: 1 / -1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 6px; }
 .route-toolbar > select { width: auto; max-width: 100%; font-size: 12px; height: 32px; }
 .route-quick-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .route-quick-sort > span { font-size: 12px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }

@@ -607,6 +607,19 @@ test('model sections show individual Key cards with a consistent default layout 
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await expect(card).toContainText('2/3 渠道可用');
   await expect(card.locator('li.mapping-candidate')).toHaveCount(3);
+  const modelBoxes = await page.getByRole('region', { name: '模型别名', exact: true }).locator('.model-card').evaluateAll(nodes => nodes.map(n => {
+    const { x, y, width } = n.getBoundingClientRect(); return { x, y, width };
+  }));
+  expect(modelBoxes).toHaveLength(2);
+  expect(modelBoxes[1].y).toBe(modelBoxes[0].y);
+  expect(modelBoxes[1].x).toBeGreaterThanOrEqual(modelBoxes[0].x + modelBoxes[0].width);
+  expect(modelBoxes[0].width).toBeLessThanOrEqual(300);
+  const header = await card.locator('.model-section-header').evaluate(node => {
+    const title = node.querySelector('.model-title')!.getBoundingClientRect();
+    const toolbar = node.querySelector('.route-toolbar')!.getBoundingClientRect();
+    return { titleBottom: title.bottom, toolbarTop: toolbar.top };
+  });
+  expect(header.toolbarTop).toBeGreaterThanOrEqual(header.titleBottom);
   const shape = (node: Element) => { const style = getComputedStyle(node); return [style.padding, style.backgroundColor, style.borderRadius]; };
   expect(await single.evaluate(shape)).toEqual(await card.evaluate(shape));
   if (process.env.ANCHOR_MAPPING_CAPTURE_DIR) {
@@ -683,14 +696,25 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
     await page.setViewportSize({ width: 1600, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
     await expectVerticalCards();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-light.png` });
+    const sections = page.getByRole('region', { name: '模型别名', exact: true });
+    const modelColumns = await sections.locator('.model-card').evaluateAll(nodes => nodes.map(n => {
+      const { x, y, width, height } = n.getBoundingClientRect(); return { x, y, width, height };
+    }));
+    expect(modelColumns[1].y).toBe(modelColumns[0].y);
+    expect(modelColumns[1].x).toBeGreaterThanOrEqual(modelColumns[0].x + modelColumns[0].width);
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-light.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-detail.png`, clip: {
+      x: modelColumns[0].x, y: modelColumns[0].y,
+      width: modelColumns[1].x + modelColumns[1].width - modelColumns[0].x,
+      height: Math.max(...modelColumns.map(b => b.y + b.height)) - modelColumns[0].y,
+    } });
     await model.locator('.candidate-list').screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-detail.png` });
     await page.getByRole('button', { name: '深色', exact: true }).click();
     await expectVerticalCards();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-dark.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-dark.png` });
     await page.setViewportSize({ width: 600, height: 850 });
     await expectVerticalCards();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-narrow.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-narrow.png` });
   }
 });
 
