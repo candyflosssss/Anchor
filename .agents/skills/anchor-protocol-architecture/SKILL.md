@@ -24,6 +24,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 | 网关 | 客户端鉴权与访问范围、模型／供应商／Key 选择、上游认证与网络、超时取消及连接、候选和恢复预算、HTTP 交付控制、日志用量费用持久化 | 参数改名、工具展平与还原、custom 解包、事件对应、协议结束状态或用量结构转换 |
 
 - 协议库不依赖 `core`、`state`、`logbook` 或全局可变状态。核心转换可使用 `io.Reader`／`io.Writer` 与 context；HTTP 期限和 flush 适配留在薄边界中。
+- 模型来源排序属于核心调度：逐 Key 排序身份使用供应商／上游模型／Key，保存与实际派发须一致；不得将这种排序状态或选择规则放进协议 Session／Attempt。
 - 网关只消费协议无关的准备结果、响应和诊断，不获取 `ChatMapping` 等协议专属映射并自行决定如何使用。
 - 当前入口是 `protocol.NewSession`、`Session.Prepare`、`Attempt.TranslateResponse/TranslateStream`；具体文件归属见设计契约，不把这些名字固化为禁止演进的接口。
 

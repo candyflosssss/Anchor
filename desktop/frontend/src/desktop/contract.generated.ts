@@ -435,17 +435,24 @@ export interface CatalogEstimateResult {
   data: CatalogEstimate | null;
   problem: Problem | null;
 }
+export interface SourceRoute {
+  provider_id: string;
+  model: string;
+  key_id: string;
+}
 export interface RouteCandidate {
   provider_id: string;
   model: string;
 }
 export interface ModelRouting {
+  source_order?: SourceRoute[];
   model_id: string;
   expected_revision: number;
   strategy: string;
   order: RouteCandidate[];
 }
 export interface ModelRoutingState {
+  source_order?: SourceRoute[];
   model_id: string;
   revision: number;
   strategy: string;
@@ -837,6 +844,7 @@ export interface Probe {
   failure: string;
 }
 export interface ModelMapping {
+  source_order?: SourceRoute[];
   service_tier?: string;
   key_ids: string[];
   candidate_index: number;

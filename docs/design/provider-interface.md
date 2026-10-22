@@ -190,6 +190,8 @@ Workspace.models 新增 key_ids（始终数组）和 candidate_index（0开始�
 
 新增管理 `POST /control/v1/models/{id}/routing`，复用管理鉴权与实例校验；输入为 model_id、expected_revision、strategy 和完整 order（provider_id／model）。只能排列已有候选，拒绝遗漏、重复、增加或替换成员；保留每个候选的 Key、倍率及全部模型元数据。原子提交递增模型 revision，不递增供应商 revision。响应为 ModelRoutingState；旧 revision 为 conflict，不自动重放。客户端 ConfigureModelRouting、CLI model routing 和桌面 Bridge.ConfigureModelRouting 共用此实现；共享样例 desktop/contract/model-routing.json，TS 由 Go DTO 生成。宿主15秒超时，前端取消仅丢弃结果，未知写结果必须重新读取。
 
+2026-10-22 当前源码增加可选 `source_order`（provider_id／model／key_id），Model、Workspace.models、ModelRouting/State 共用该字段。候选 `order` 仍须完整；传入 source_order 时必须是当前全部 Key 卡片的完整排列，包括停用项及显式限定但不存在的 Key，不得遗漏、重复或添加；空数组无效。匿名供应商使用 anonymous。核心保持 candidates/key_ids/倍率与模型元数据，独立保存 source_order；priority/cache-priority 使用逐 Key 顺序，每个 Key 失败后按下一张卡片切换，可以穿插同供应商的多个 Key。倍率／低延迟调度保留逐 Key 身份和稳定顺序，延迟观察按实际 Key 隔离；会话亲和继续使用实际成功来源，协议翻译与重试预算不变。新加入不限 Key 的来源追加，删除引用忽略并在删除事务中清理，供应商改名同步引用。该字段不限制 Key 成员资格，不替代 key_ids。旧客户端省略 source_order 时清除独立顺序，恢复按候选／供应商策略调度；旧核心不支持写入新字段，GUI 要求配套升级，不能将仅候选排序响应视为逐 Key 保存成功。无数据库表迁移，沿用 schema9；旧核心读取会忽略新排序，降级不保留此语义。CLI `--source PROVIDER:KEY:MODEL` 可重复设置同一排列，省略维持旧命令行为。共享样例新增 key_order，Go 生成 TS，实际验证见任务记录。
+
 | strategy | 行为 | 无观察或失败时 |
 | --- | --- | --- |
 | priority | 固定保存顺序 | 健康／并发门禁与失败切换照常 |

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { moveRoute } from './model-routing.model';
-type Drag = { id: string; keyID: string; pointer: number; from: number; to: number; x: number; y: number; startX: number; startY: number; offsetX: number; offsetY: number; width: number; targets: { index: number; x: number; y: number }[]; active: boolean; scroll: HTMLElement | null; scrollTop: number };
+type Drag = { id: string; pointer: number; from: number; to: number; x: number; y: number; startX: number; startY: number; offsetX: number; offsetY: number; width: number; targets: { index: number; x: number; y: number }[]; active: boolean; scroll: HTMLElement | null; scrollTop: number };
 const scrollParent = (node: HTMLElement): HTMLElement | null => {
   for (let p = node.parentElement; p; p = p.parentElement) if (p.scrollHeight > p.clientHeight && /auto|scroll/.test(getComputedStyle(p).overflowY)) return p;
   return null;
@@ -30,7 +30,7 @@ export function useRouteDrag(ids: string[], enabled: boolean, moved: (from: numb
     const row = e.currentTarget.closest<HTMLElement>('.mapping-key-card'), list = row?.closest<HTMLElement>('.candidate-list');
     if (!row || !list) return;
     const box = row.getBoundingClientRect(), scroll = scrollParent(row);
-    const next: Drag = { id, keyID: row.dataset.sourceKey!, pointer: e.pointerId, from: ids.indexOf(id), to: ids.indexOf(id), x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, offsetX: e.clientX - box.left, offsetY: e.clientY - box.top, width: box.width, targets: Array.from(list.querySelectorAll<HTMLElement>('.mapping-key-card')).map(n => { const b = n.getBoundingClientRect(); return { index: ids.indexOf(n.closest<HTMLElement>('.mapping-candidate')!.dataset.routeId!), x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 }; }), active: false, scroll, scrollTop: scroll?.scrollTop ?? 0 };
+    const next: Drag = { id, pointer: e.pointerId, from: ids.indexOf(id), to: ids.indexOf(id), x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY, offsetX: e.clientX - box.left, offsetY: e.clientY - box.top, width: box.width, targets: Array.from(list.querySelectorAll<HTMLElement>('.mapping-key-card')).map(n => { const b = n.getBoundingClientRect(); return { index: ids.indexOf(n.closest<HTMLElement>('.mapping-candidate')!.dataset.routeId!), x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 }; }), active: false, scroll, scrollTop: scroll?.scrollTop ?? 0 };
     origin.current = control instanceof HTMLElement ? control : row; current.current = next;
     origin.current.setPointerCapture(e.pointerId);
     // Capture on the original control so clicks still reach it and fast drags cannot escape.
@@ -47,7 +47,7 @@ export function useRouteDrag(ids: string[], enabled: boolean, moved: (from: numb
       else if (e.clientY > b.bottom - 48) v.scroll.scrollTop += 14;
     }
     const y = e.clientY + (v.scroll ? v.scroll.scrollTop - v.scrollTop : 0);
-    // Any Key card targets its containing route, including across wrapped rows.
+    // Each target is one independently ordered Key card.
     const to = v.targets.reduce((best, target) => Math.hypot(target.x - e.clientX, target.y - y) < Math.hypot(best.x - e.clientX, best.y - y) ? target : best).index;
     const next = { ...v, x: e.clientX, y: e.clientY, to, active: true }; current.current = next; setDrag(next);
   }

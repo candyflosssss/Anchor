@@ -7,7 +7,7 @@ import accountFixture from '../../contract/provider-account.json' with { type: '
 import { expect, test, type Page } from '@playwright/test';
 import fixture from '../../contract/providers.json' with { type: 'json' };
 import updateFixture from '../../contract/updates.json' with { type: 'json' };
-import { CONTRACT, type AccountSettings, type DesktopBridge, type KeyRateCache, type ModelSettingsState, type Provider } from '../src/desktop/contract.generated';
+import { CONTRACT, type AccountSettings, type DesktopBridge, type KeyRateCache, type ModelRoutingState, type ModelSettingsState, type Provider } from '../src/desktop/contract.generated';
 
 declare global { interface Window { desktopTest: { directories: number; starts: number; saves: number; stops: number; status: boolean; writeError: 'conflict' | 'unknown' | 'invalid' | null; checks: number; downloads: number; installs: number; updateError: boolean } } }
 declare global { interface Window { keyCooldownTest: { saves: number } } }
@@ -25,7 +25,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
     const rateCache: Record<string, KeyRateCache> = {};
     const data = { version: '0.1.0-dev.desktop.58', instance_id: 'test-local-instance', phase: 'ready', source: 'started', profile_name: '@local', transport: 'local', target: '本机', can_stop: true };
     window.routingTest = { calls: [] };
-    const routingState = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
+    const routingState: Record<string, Omit<ModelRoutingState, 'model_id'>> = Object.fromEntries(['shared-one', 'shared-two'].map(id => [id, { revision: 1, strategy: 'round-robin', order: providers.map(p => ({ provider_id: p.id, model: `upstream-${id}` })) }]));
     const modelStates: Record<string, ModelSettingsState> = {};
     let codexState = structuredClone(codexSettings);
     let cooldownState = structuredClone(keyCooldown);
@@ -114,7 +114,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
         const m = routingState[input.model_id];
         if (!m || input.expected_revision !== m.revision || counters.writeError === 'conflict') return { contract, data: null, problem: { code: 'conflict' } };
         if (counters.writeError === 'invalid') return { contract, data: null, problem: { code: 'invalid' } };
-        m.revision++; m.strategy = input.strategy; m.order = input.order;
+        m.revision++; m.strategy = input.strategy; m.order = input.order; m.source_order = input.source_order;
         if (counters.writeError === 'unknown') return { contract, data: null, problem: { code: 'unknown' } };
         return { contract, data: { model_id: input.model_id, ...m }, problem: null };
       },
@@ -142,7 +142,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
         if (provider?.revision !== input.expected_revision) return { contract, data: null, problem: { code: 'conflict' } };
         return { contract, data: { provider_id: provider.id, key_id: input.key_id || 'anonymous', revision: provider.revision, http_status: 200, elapsed_ms: 42, models: ['demo-model'], failure: '', partial: false, entries: [{ id: 'demo-model', key_ids: [input.key_id || 'anonymous'] }], keys: [{ id: input.key_id || 'anonymous', enabled: true, protocol: 'responses', http_status: 200, failure: '', group: '', group_name: '', multiplier: null, rate_basis: '', rate_failure: 'platform_required' }] }, problem: null };
       },
-      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ rate: rateCache[JSON.stringify([input.provider_id, 'default'])] ?? null, effective_multiplier: rateCache[JSON.stringify([input.provider_id, 'default'])]?.multiplier != null ? providers.find(p => p.id === input.provider_id)!.cost_multiplier * rateCache[JSON.stringify([input.provider_id, 'default'])].multiplier! : null, id: 'default', protocol: providers.find(p => p.id === input.provider_id)?.protocol ?? 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings && routingState['shared-one'].order.some(p => p.provider_id === input.provider_id) ? ['shared-one', 'shared-two'].map(id => ({ key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
+      ProviderWorkspace: async input => ({ contract, data: { provider_id: input.provider_id, revision: providers.find(p => p.id === input.provider_id)?.revision ?? 1, strategy: 'round-robin', prices: [], estimates: [], imported_price: null, keys: rateMappings ? [{ rate: rateCache[JSON.stringify([input.provider_id, 'default'])] ?? null, effective_multiplier: rateCache[JSON.stringify([input.provider_id, 'default'])]?.multiplier != null ? providers.find(p => p.id === input.provider_id)!.cost_multiplier * rateCache[JSON.stringify([input.provider_id, 'default'])].multiplier! : null, id: 'default', protocol: providers.find(p => p.id === input.provider_id)?.protocol ?? 'responses', model_protocols: [], enabled: true, state: 'ready', failures: 0, retry_at: 0, test: null }] : [], models: rateMappings && routingState['shared-one'].order.some(p => p.provider_id === input.provider_id) ? ['shared-one', 'shared-two'].map(id => ({ source_order: routingState[id].source_order, key_ids: ['default'], candidate_index: routingState[id].order.findIndex(p => p.provider_id === input.provider_id), id, upstream: `upstream-${id}`, display_name: id, revision: routingState[id].revision, candidate_count: 3, multiplier: input.provider_id === '摸鱼AI' ? 2.5 : 1.2, strategy: routingState[id].strategy, tools: true, streaming: true })) : [], usage: [], probe: null, deleted: false }, problem: null }),
       ProviderAction: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       Providers: async () => ({ contract, data: providers, problem: null }),
       SaveProvider: async input => {
@@ -636,7 +636,7 @@ test('model sections show individual Key cards with a consistent default layout 
   await expect(card.getByRole('button', { name: '模型设置 shared-one', exact: true })).toBeVisible();
 });
 
-test('multiple scoped Keys are separate visible cards and move together as a channel (simulated host)', async ({ page }) => {
+test('multiple scoped Keys drag independently across providers and persist after reread (simulated host)', async ({ page }) => {
   await host(page, true);
   await page.evaluate(() => {
     const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
@@ -683,12 +683,36 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
     }
   };
   await expectVerticalCards();
-  // A handle on any Key moves the same existing route, preserving all Key scope.
+  // A Key moves independently, retaining its siblings and candidate membership.
   await model.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one Key expensive', exact: true }).press('ArrowDown');
   await expect(model).toContainText('已自动保存');
-  await expect(model.locator('.mapping-candidate').nth(1).locator('.mapping-key-card')).toHaveCount(4);
-  await expect(cards.first()).toContainText('备用供应商');
-  expect(await page.evaluate(() => window.routingTest.calls[0].order.map(c => c.provider_id))).toEqual(['备用供应商', '摸鱼AI', '本地调试']);
+  await expect(cards.nth(0)).toContainText('cheap');
+  await expect(cards.nth(1)).toContainText('cooling');
+  await expect(cards.nth(2)).toContainText('expensive');
+  expect(await page.evaluate(() => window.routingTest.calls[0].source_order?.map(c => c.key_id))).toEqual(['cheap', 'cooling', 'expensive', 'missing', 'default', 'default']);
+  await expect(model.getByRole('button', { name:'按倍率', exact:true })).toBeEnabled();
+  const expensive = model.getByRole('group', {name:'摸鱼AI · Key expensive', exact:true});
+  const target = model.getByRole('group', {name:'备用供应商 · Key default', exact:true});
+  const from = await expensive.locator('.mapping-key-name').boundingBox(), to = await target.boundingBox();
+  if (!from || !to) throw Error('missing Key geometry');
+  await page.mouse.move(from.x+from.width/2,from.y+from.height/2); await page.mouse.down();
+  await page.mouse.move(to.x+to.width/2,to.y+to.height/2,{steps:8});
+  await expect(model.locator('.is-drag-placeholder')).toHaveCount(1);
+  await expect(model.getByRole('group',{name:'摸鱼AI · Key cheap',exact:true})).toHaveCSS('opacity','1');
+  await page.mouse.up();
+  await expect(model.getByRole('button', { name:'按倍率', exact:true })).toBeEnabled();
+  await expect(cards.nth(0)).toContainText('cheap');
+  await expect(cards.nth(1)).toContainText('cooling');
+  await expect(cards.nth(2)).toContainText('missing');
+  await expect(cards.nth(3)).toContainText('备用供应商');
+  await expect(cards.nth(4)).toContainText('expensive');
+  await page.getByRole('button',{name:'刷新配置',exact:true}).click();
+  await expect(cards.nth(4)).toContainText('expensive');
+  await expect(model.getByRole('button', {name:'按倍率',exact:true})).toBeEnabled();
+  await cards.nth(4).press('ArrowUp');
+  await expect(model.getByRole('button',{name:'撤销',exact:true})).toBeEnabled();
+  await model.getByRole('button',{name:'撤销',exact:true}).click();
+  await expect(cards.nth(4)).toContainText('expensive');
   await page.setViewportSize({ width: 600, height: 850 });
   await expectVerticalCards();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -735,7 +759,7 @@ test('unavailable channels keep saved positions and remain editable (simulated h
   await expect(rows).toHaveCount(3);
   await expect(rows.first()).toContainText('摸鱼AI');
   await expect(rows.first().getByLabel('第 1 位', { exact: true })).toBeVisible();
-  await expect(card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true })).toBeEnabled();
+  await expect(card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one Key default', exact: true })).toBeEnabled();
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
 });
 
@@ -758,7 +782,7 @@ test('model routing previews pointer sorting and automatically saves rules with 
   await card.getByLabel('调度规则').selectOption('lowest-price');
   await expect(card.locator('.route-save-state')).toContainText('已自动保存');
   const calls = await page.evaluate(() => window.routingTest.calls);
-  expect(calls).toHaveLength(2); expect(calls[1].expected_revision).toBe(2); expect(calls[1].strategy).toBe('lowest-price'); expect(calls[1].order[1].provider_id).toBe('摸鱼AI');
+  expect(calls).toHaveLength(2); expect(calls[1].expected_revision).toBe(2); expect(calls[1].strategy).toBe('lowest-price'); expect(calls[1].source_order![1].provider_id).toBe('摸鱼AI');
   await card.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(card.locator('.route-save-state')).toContainText('已撤销并保存');
   await expect(card.getByLabel('调度规则')).toHaveValue('priority');
@@ -798,7 +822,7 @@ test('whole Key cards drag from supplier text without opening editing and keep o
 test('model routing cancels pointer sorting and supports keyboard ordering (simulated host)', async ({ page }) => {
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
-  const grip = card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one', exact: true });
+  const grip = card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one Key default', exact: true });
   const box = await grip.boundingBox();
   await page.mouse.move(box!.x + 10, box!.y + 10); await page.mouse.down(); await page.mouse.move(box!.x + 10, box!.y + 130, { steps: 6 });
   await expect(card.locator('.route-drag-preview')).toBeVisible();
@@ -815,8 +839,8 @@ for (const failure of ['conflict', 'unknown'] as const) test(`model routing ${fa
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await page.evaluate(value => { window.desktopTest.writeError = value; }, failure);
-  await card.locator('.mapping-key-card').filter({ has: page.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }) }).hover();
-  await card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }).click();
+  await card.locator('.mapping-key-card').filter({ has: page.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one Key default', exact: true }) }).hover();
+  await card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one Key default', exact: true }).click();
   await expect(card.getByRole('alert')).toContainText(failure === 'conflict' ? '未覆盖新版本' : '结果未知');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
   await expect(card.getByLabel('调度规则')).toBeDisabled();
@@ -1523,8 +1547,8 @@ test('mapping quick sorts use refreshed multipliers and measured first text (sim
   await expect(rows.first()).toContainText('备用供应商');
   await expect(card).toContainText('已自动保存');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
-  await card.locator('.mapping-key-card').filter({ has: page.getByRole('button', { name: '下移 备用供应商 upstream-shared-one', exact: true }) }).hover();
-  await card.getByRole('button', { name: '下移 备用供应商 upstream-shared-one', exact: true }).click();
+  await card.locator('.mapping-key-card').filter({ has: page.getByRole('button', { name: '下移 备用供应商 upstream-shared-one Key default', exact: true }) }).hover();
+  await card.getByRole('button', { name: '下移 备用供应商 upstream-shared-one Key default', exact: true }).click();
   await expect(rows.first()).toContainText('摸鱼AI');
   await expect(card.getByRole('button', { name: '低延迟优先', exact: true })).toBeEnabled();
   await card.getByRole('button', { name: '低延迟优先', exact: true }).click();
@@ -1534,5 +1558,5 @@ test('mapping quick sorts use refreshed multipliers and measured first text (sim
   const calls = await page.evaluate(() => window.routingTest.calls);
   expect(calls).toHaveLength(3);
   expect(calls[2].strategy).toBe('priority');
-  expect(calls[2].order.map(c => c.provider_id)).toEqual(['备用供应商', '摸鱼AI', '本地调试']);
+  expect(calls[2].source_order!.map(c => c.provider_id)).toEqual(['备用供应商', '摸鱼AI', '本地调试']);
 });

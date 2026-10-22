@@ -96,7 +96,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
                 [--timeout 120] [--max-concurrent 4] [--cost-multiplier N] [--disabled]
   model list
   model settings --id ID [--file FILE]
-  model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL...
+  model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL... [--source PROVIDER:KEY:MODEL ...]
   RULE: priority|round-robin|cache-priority|lowest-price|lowest-latency
   model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...] [--strategy RULE] [--candidate-key INDEX:KEY] [--service-tier priority|ultrafast]
                [--display-name NAME] [--tools] [--streaming] [--revision N]
@@ -768,7 +768,8 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 		id := f.String("id", "", "public model ID (Chinese supported)")
 		revision := f.Int64("revision", 0, "expected model revision")
 		strategy := f.String("strategy", "", "priority, round-robin, cache-priority, lowest-price or lowest-latency")
-		var order repeated
+		var order, sources repeated
+		f.Var(&sources, "source", "complete ordered provider:key:model list; repeat for each Key")
 		f.Var(&order, "candidate", "complete ordered provider:model list")
 		if err := parse(f, args[1:]); err != nil {
 			return err
@@ -780,6 +781,14 @@ func (a App) models(ctx context.Context, c *client.Client, args []string) error 
 				return errors.New("candidate must be provider:model")
 			}
 			in.Order = append(in.Order, catalog.RouteCandidate{ProviderID: provider, Model: model})
+		}
+		for _, raw := range sources {
+			provider, rest, ok := strings.Cut(raw, ":")
+			key, model, hasModel := strings.Cut(rest, ":")
+			if !ok || !hasModel || provider == "" || key == "" || model == "" {
+				return errors.New("source must be provider:key:model")
+			}
+			in.SourceOrder = append(in.SourceOrder, catalog.SourceRoute{ProviderID: provider, Model: model, KeyID: key})
 		}
 		out, err := c.ConfigureModelRouting(ctx, in)
 		if err != nil {

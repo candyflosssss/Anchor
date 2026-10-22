@@ -8,7 +8,7 @@ import { channelKeys, keyAvailability, type SourceKey } from '../providers/chann
 import { rateFailureText } from '../providers/provider-account.model';
 import { rateID, type MappingRatesController, type RateTarget } from './use-mapping-rates';
 import { modelAvailability, visibleModels } from './model-availability.model';
-import { effectiveRouteMultiplier, routingRules, routeID } from './model-routing.model';
+import { effectiveRouteMultiplier, modelSources, sourceID, routingRules, routeID } from './model-routing.model';
 import type { ModelRoutingController } from './use-model-routing';
 import { useRouteDrag } from './use-route-drag';
 import { ModelSettingsDialog } from './model-settings.view';
@@ -61,39 +61,36 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
   const candidates = draft.order.map(ref => g.candidates.find(c => candidateID(c) === routeID(ref))).filter((c): c is ModelCandidate => !!c);
   const [confirmLatency, setConfirmLatency] = useState(false);
   const canEdit = !disabled && !routing.busy && g.complete && !routing.needsRead && status?.phase !== 'failed';
-  const drag = useRouteDrag(candidates.map(candidateID), canEdit && candidates.length > 1, (from, to) => { void routing.move(g, from, to); });
-  const visible = drag.order.map(id => candidates.find(c => candidateID(c) === id)!);
-  const dragged = drag.drag?.active ? candidates.find(c => candidateID(c) === drag.drag!.id) : null;
-  const draggedKey = dragged && drag.drag ? channelKeys(dragged.key_ids, dragged.keys).find(k => k.id === drag.drag!.keyID) : null;
+  const sources = modelSources(g, draft.source_order);
+  const drag = useRouteDrag(sources.map(v => sourceID(v.ref)), canEdit && sources.length > 1, (from, to) => { void routing.move(g, from, to); });
+  const visible = drag.order.map(id => sources.find(v => sourceID(v.ref) === id)!);
+  const dragged = drag.drag?.active ? sources.find(v => sourceID(v.ref) === drag.drag!.id) : null;
   const available = candidates.filter(c => c.availability.state === 'available').length;
   const unknown = !g.complete || candidates.some(c => c.availability.state === 'unknown');
   const availability = modelAvailability(g);
-  const renderCandidate = (m: ModelCandidate) => {
-    const i = visible.findIndex(c => candidateID(c) === candidateID(m));
-    const keys = channelKeys(m.key_ids, m.keys);
-    return <li key={candidateID(m)} className={`mapping-candidate availability-${m.availability.state}${dragged && candidateID(m) === candidateID(dragged) ? ' is-drag-placeholder' : ''}`} data-route-id={candidateID(m)}>
-      {keys.map((source, keyIndex) => {
-        const suffix = keyIndex ? ` Key ${source.id}` : '';
-        return <MappingKey key={source.id} source={source} candidate={m} rates={rates} disabled={disabled || routing.busy} onOpen={onOpen} sortable={canEdit && candidates.length > 1} dragProps={{
-          tabIndex: canEdit && candidates.length > 1 ? 0 : undefined,
-          onPointerDown: e => drag.start(e, candidateID(m)),
-          onKeyDown: e => { if (e.target === e.currentTarget && canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } },
-        }}>
-          <div className="mapping-route-controls" title={`渠道优先级；调整 ${m.provider_id} 的全部 ${keys.length} 个来源 Key`}>
-            <span className="sr-only" aria-label={`第 ${i + 1} 位`}>渠道 {i + 1}</span>
-            {candidates.length > 1 && <>
-              <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}${suffix}`} title="拖动或用方向键调整整个渠道" onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}><GripVertical size={16} /></button>
-              <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => { void routing.move(g, i, i - 1); }}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === candidates.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => { void routing.move(g, i, i + 1); }}><ArrowDown size={13} /></Button></div>
-            </>}
-          </div>
-        </MappingKey>;
-      })}
+  const renderSource = ({ candidate: m, source, ref }: typeof sources[number], i: number) => {
+    const id = sourceID(ref), suffix = ` Key ${source.id}`;
+    const move = (offset: number) => { void routing.move(g, i, i + offset); };
+    return <li key={id} className={`mapping-candidate${dragged && sourceID(dragged.ref) === id ? ' is-drag-placeholder' : ''}`} data-route-id={id}>
+      <MappingKey source={source} candidate={m} rates={rates} disabled={disabled || routing.busy} onOpen={onOpen} sortable={canEdit && sources.length > 1} dragProps={{
+        tabIndex: canEdit && sources.length > 1 ? 0 : undefined,
+        onPointerDown: e => drag.start(e, id),
+        onKeyDown: e => { if (e.target === e.currentTarget && canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); move(e.key === 'ArrowUp' ? -1 : 1); } },
+      }}>
+        <div className="mapping-route-controls">
+          <span className="sr-only" aria-label={`第 ${i + 1} 位`}>Key {i + 1}</span>
+          {sources.length > 1 && <>
+            <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}${suffix}`} title="拖动或用方向键调整此 Key" onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); move(e.key === 'ArrowUp' ? -1 : 1); } }}><GripVertical size={16} /></button>
+            <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => move(-1)}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === sources.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => move(1)}><ArrowDown size={13} /></Button></div>
+          </>}
+        </div>
+      </MappingKey>
     </li>;
   };
   return <article className={`model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} aria-label={`模型 ${g.alias}`}>
     <header className="model-section-header"><div className="model-title"><h2 className="mono">{g.alias}</h2><span className={`model-channel-count state-${availability}`} role="status" title={`${available} / ${candidates.length} 个渠道当前可用`}>{available ? <>{available}/{candidates.length}<span className="sr-only"> 渠道可用</span></> : unknown ? '可用性待确认' : '无有效渠道'}</span></div>
         <div className="route-toolbar"><select aria-label={`调度规则 ${g.alias}`} className="select-field" disabled={!canEdit} value={draft.strategy} onChange={e => { void routing.change(g, { strategy: e.target.value }); }}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select>
-        {candidates.length > 1 && <div className="route-quick-sort">
+        {sources.length > 1 && <div className="route-quick-sort">
           <Button variant="outline" size="sm" disabled={!canEdit} onClick={() => { void routing.sortByPrice(g); }}>按倍率</Button>
           <Button variant="outline" size="sm" disabled={!canEdit || !routing.canProbe || candidates.every(c => c.availability.state !== 'available')} onClick={() => setConfirmLatency(true)}>低延迟优先</Button>
           {routing.sorting?.alias === g.alias && <span role="status">{routing.sorting.complete}/{routing.sorting.total}{routing.sorting.failures ? ` · ${routing.sorting.failures} 失败` : ''}</span>}
@@ -102,7 +99,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
         </div>
       <Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="上下文、能力与速度" onClick={settings}><Settings2 size={15} /></Button></header>
       <div className="model-sources-body">
-        <ul className="candidate-list" onPointerMove={drag.move} onPointerUp={drag.end} onPointerCancel={drag.cancel} onLostPointerCapture={e => { if (e.target === e.currentTarget) drag.cancel(); }} onClickCapture={drag.click}>{visible.map(renderCandidate)}</ul>
+        <ul className="candidate-list" onPointerMove={drag.move} onPointerUp={drag.end} onPointerCancel={drag.cancel} onLostPointerCapture={e => { if (e.target === e.currentTarget) drag.cancel(); }} onClickCapture={drag.click}>{visible.map(renderSource)}</ul>
       </div>
     {status && <div className={`route-save-state phase-${status.phase}`}>
       <span role={status.phase === 'failed' || status.phase === 'uncertain' ? 'alert' : 'status'}>{status.phase === 'saving' ? <LoaderCircle size={13} className="route-spinner" /> : status.phase === 'saved' ? <Check size={13} /> : null}{status.message}</span>
@@ -111,11 +108,11 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
       {status.phase === 'uncertain' && <Button size="sm" variant="outline" disabled={disabled || routing.busy} onClick={() => { void routing.refresh(); }}>重新读取配置</Button>}
     </div>}
     <ConfirmAction open={confirmLatency} title="测延迟并排序" busy={routing.busy} onCancel={() => setConfirmLatency(false)} onConfirm={() => { setConfirmLatency(false); void routing.sortByLatency(g); }}>
-      <p>将对 {candidates.filter(c => c.availability.state === 'available').length} 个可用渠道各发送 1 次推理请求，可能产生费用。</p>
+      <p>将对 {sources.filter(v => v.candidate.provider_enabled && (v.source.anonymous || v.source.key?.enabled && ['ready', 'degraded'].includes(v.source.key.state))).length} 个可用 Key 各发送 1 次推理请求，可能产生费用。</p>
     </ConfirmAction>
     <span className="sr-only" role="status">{drag.announcement}</span>
-    {dragged && draggedKey && drag.drag && <div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}>
-      <MappingKey source={draggedKey} candidate={dragged} rates={rates} disabled onOpen={onOpen}><div className="mapping-route-controls"><GripVertical size={16} /></div></MappingKey>
+    {dragged && drag.drag && <div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}>
+      <MappingKey source={dragged.source} candidate={dragged.candidate} rates={rates} disabled onOpen={onOpen}><div className="mapping-route-controls"><GripVertical size={16} /></div></MappingKey>
     </div>}
   </article>;
 }

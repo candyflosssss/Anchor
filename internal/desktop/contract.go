@@ -313,6 +313,7 @@ type ProbeProgressResult struct {
 }
 
 // Model routing writes preserve candidate membership and all candidate metadata.
+type SourceRoute = catalog.SourceRoute
 type RouteCandidate = catalog.RouteCandidate
 type ModelRouting = catalog.ModelRouting
 type ModelRoutingState = catalog.ModelRoutingState

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ProbeProgress, ProbeRequest } from '../../desktop/contract.generated';
+import type { ProbeProgress, ProbeRequest, SourceRoute } from '../../desktop/contract.generated';
 import type { ModelGroup } from '../providers/provider-summary.model';
 import { ProviderProblem, problemText, type ProviderTransport } from '../providers/provider.model';
-import { checkedRouting, routeID, moveRoute, priceOrder, effectiveRouteMultiplier, type RouteCandidate } from './model-routing.model';
-type Draft = { strategy: string; order: RouteCandidate[] };
+import { checkedRouting, modelSources, sourceID, routeID, moveRoute, priceOrder, effectiveRouteMultiplier, type RouteCandidate } from './model-routing.model';
+type Draft = { strategy: string; order: RouteCandidate[]; source_order: SourceRoute[] };
 type Entry = { revision: number; value: Draft; saved: Draft; phase: 'saving' | 'saved' | 'failed' | 'uncertain'; message: string; undo?: Draft };
-const original = (g: ModelGroup): Draft => ({ strategy: g.strategy, order: g.candidates.map(c => ({ provider_id: c.provider_id, model: c.upstream })) });
+const original = (g: ModelGroup): Draft => ({ source_order: modelSources(g).map(v => v.ref), strategy: g.strategy, order: g.candidates.map(c => ({ provider_id: c.provider_id, model: c.upstream })) });
 const same = (a: Draft, b: Draft) => JSON.stringify(a) === JSON.stringify(b);
 
 /** Changes are written once, immediately; uncertain writes require an explicit read. */
@@ -44,7 +44,7 @@ export function useModelRouting(groups: ModelGroup[], active: boolean, transport
     put(g.alias, { revision, value, saved, phase: 'saving', message: '正在保存…' });
     try {
       if (!transport.routing) throw new ProviderProblem('invalid');
-      const input = { model_id: g.alias, expected_revision: revision, strategy: value.strategy, order: value.order };
+      const input = { model_id: g.alias, expected_revision: revision, strategy: value.strategy, order: value.order, source_order: value.source_order };
       const result = checkedRouting(await transport.routing(input, request.signal), input);
       if (request.signal.aborted || at !== epoch.current) return;
       put(g.alias, { revision: result.revision, value, saved: value, phase: 'saved', message: undoing ? '已撤销并保存' : '已自动保存', undo: undoing ? undefined : saved });
@@ -61,33 +61,19 @@ export function useModelRouting(groups: ModelGroup[], active: boolean, transport
   }
   function change(g: ModelGroup, value: Partial<Draft>) { return write(g, { ...draft(g), ...value }); }
   function move(g: ModelGroup, from: number, to: number) {
-    if (from === to || to < 0 || to >= draft(g).order.length) return;
-    return change(g, { strategy: 'priority', order: moveRoute(draft(g).order, from, to) });
+    if (from === to || to < 0 || to >= draft(g).source_order.length) return;
+    return change(g, { strategy: 'priority', source_order: moveRoute(draft(g).source_order, from, to) });
   }
-  function orderedCandidates(g: ModelGroup) {
-    return draft(g).order.flatMap(ref => {
-      const candidate = g.candidates.find(c => routeID({ provider_id: c.provider_id, model: c.upstream }) === routeID(ref));
-      return candidate ? [candidate] : [];
-    });
-  }
+  function orderedSources(g: ModelGroup) { return modelSources(g, draft(g).source_order); }
   function sortByPrice(g: ModelGroup) {
-    const order = priceOrder(orderedCandidates(g).map(c => ({ ...c, model: c.upstream })), effectiveRouteMultiplier).map(c => ({ provider_id: c.provider_id, model: c.upstream }));
-    return change(g, { strategy: 'priority', order });
+    const source_order = priceOrder(orderedSources(g).map(v => ({ ...v, provider_id:v.ref.provider_id, model:v.ref.model })), v => effectiveRouteMultiplier({ ...v.candidate, key_ids: [v.source.id] })).map(v => v.ref);
+    return change(g, { strategy: 'priority', source_order });
   }
   async function sortByLatency(g: ModelGroup) {
     const probe = transport.probe?.bind(transport);
     if (!active || lock.current || !g.complete || needsRead || !probe) return;
-    const baseline = orderedCandidates(g);
-    const targets = baseline.flatMap(candidate => {
-      if (candidate.availability.state !== 'available') return [];
-      const ids = candidate.key_ids.length ? candidate.key_ids : candidate.keys.length ? candidate.keys.map(k => k.id) : ['anonymous'];
-      for (const id of ids) {
-        if (id === 'anonymous' && candidate.keys.length === 0) return [{ candidate, key: id }];
-        const key = candidate.keys.find(k => k.id === id);
-        if (key?.enabled && ['ready', 'degraded'].includes(key.state)) return [{ candidate, key: id }];
-      }
-      return [];
-    });
+    const baseline = orderedSources(g);
+    const targets = baseline.filter(({ candidate, source }) => candidate.availability.state === 'available' && (source.anonymous || source.key?.enabled && ['ready', 'degraded'].includes(source.key.state))).map(v => ({ ...v, key:v.source.id }));
     if (!targets.length) return;
     lock.current = true; setBusy(true); setError('');
     const at = epoch.current, request = new AbortController(); abort.current = request;
@@ -95,7 +81,7 @@ export function useModelRouting(groups: ModelGroup[], active: boolean, transport
     setSorting({ alias: g.alias, complete: 0, total: targets.length, failures: 0 });
     try {
       for (let i = 0; i < targets.length; i++) {
-        const { candidate, key } = targets[i];
+        const { candidate, key, ref } = targets[i];
         if (request.signal.aborted || at !== epoch.current) return;
         let progress: ProbeProgress | undefined;
         let run: ProbeRequest | undefined;
@@ -116,7 +102,7 @@ export function useModelRouting(groups: ModelGroup[], active: boolean, transport
           }
           const firstByte = progress.first_byte_ms ?? 0;
           if (progress.status !== 'completed' || !progress.result || progress.result.failure || firstByte <= 0) failures++;
-          else timings.set(routeID({ provider_id: candidate.provider_id, model: candidate.upstream }), firstByte);
+          else timings.set(sourceID(ref), firstByte);
         } catch {
           failures++;
         } finally {
@@ -129,15 +115,15 @@ export function useModelRouting(groups: ModelGroup[], active: boolean, transport
       const currentGroup = current.current.find(v => v.alias === g.alias);
       if (!currentGroup?.complete || currentGroup.revision !== g.revision || g.candidates.some(c => currentGroup.candidates.find(v => v.provider_id === c.provider_id && v.upstream === c.upstream)?.provider_revision !== c.provider_revision)) { setNeedsRead(true); setError('配置已变化，请刷新后重试。'); return; }
       if (!timings.size) { setError('未测得首字延迟，顺序未修改。'); return; }
-      const order = [...baseline].sort((a, b) => {
-        const left = timings.get(routeID({ provider_id: a.provider_id, model: a.upstream }));
-        const right = timings.get(routeID({ provider_id: b.provider_id, model: b.upstream }));
+      const source_order = [...baseline].sort((a, b) => {
+        const left = timings.get(sourceID(a.ref));
+        const right = timings.get(sourceID(b.ref));
         if (left == null && right != null) return 1;
         if (left != null && right == null) return -1;
         return (left ?? 0) - (right ?? 0);
-      }).map(c => ({ provider_id: c.provider_id, model: c.upstream }));
+      }).map(v => v.ref);
       setSorting(null);
-      await write(g, { strategy: 'priority', order }, false, true);
+      await write(g, { ...draft(g), strategy: 'priority', source_order }, false, true);
     } finally {
       if (at === epoch.current) { lock.current = false; setBusy(false); setSorting(null); }
     }

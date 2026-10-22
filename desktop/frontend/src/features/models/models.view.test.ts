@@ -5,13 +5,14 @@ import providers from '../../../../contract/providers.json';
 import workspace from '../../../../contract/provider-workspace.json';
 import mapping from '../../../../contract/provider-model-mapping.json';
 import { summarize } from '../providers/provider-summary.model';
+import { modelSources } from './model-routing.model';
 import { ModelsView } from './models.view';
 import type { MappingRatesController } from './use-mapping-rates';
 import type { ModelRoutingController } from './use-model-routing';
 
 const rates: MappingRatesController = { values: {}, keys: {}, errors: {}, busy: false, pending: '', refresh: async () => {} };
 const routing: ModelRoutingController = {
-  draft: g => ({ strategy: g.strategy, order: g.candidates.map(c => ({ provider_id: c.provider_id, model: c.upstream })) }),
+  draft: g => ({ source_order: modelSources(g).map(v => v.ref), strategy: g.strategy, order: g.candidates.map(c => ({ provider_id: c.provider_id, model: c.upstream })) }),
   status: () => undefined, busy: false, error: '', needsRead: false, sorting: null, canProbe: true,
   sortByPrice: async () => {}, sortByLatency: async () => {}, stopSorting: () => {},
   change: async () => {}, move: async () => {}, refresh: async () => {}, retry: async () => {}, undo: async () => {}, discard: () => {}, routeID: c => JSON.stringify([c.provider_id, c.model]),

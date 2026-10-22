@@ -63,18 +63,19 @@ type Probe struct {
 	Failure    string `json:"failure"`
 }
 type ModelMapping struct {
-	ServiceTier    string   `json:"service_tier,omitempty"`
-	KeyIDs         []string `json:"key_ids"`
-	CandidateIndex int      `json:"candidate_index"`
-	Multiplier     float64  `json:"multiplier"`
-	Strategy       string   `json:"strategy"`
-	ID             string   `json:"id"`
-	DisplayName    string   `json:"display_name"`
-	Upstream       string   `json:"upstream"`
-	Tools          bool     `json:"tools"`
-	Streaming      bool     `json:"streaming"`
-	Revision       int64    `json:"revision"`
-	CandidateCount int      `json:"candidate_count"`
+	SourceOrder    []SourceRoute `json:"source_order,omitempty"`
+	ServiceTier    string        `json:"service_tier,omitempty"`
+	KeyIDs         []string      `json:"key_ids"`
+	CandidateIndex int           `json:"candidate_index"`
+	Multiplier     float64       `json:"multiplier"`
+	Strategy       string        `json:"strategy"`
+	ID             string        `json:"id"`
+	DisplayName    string        `json:"display_name"`
+	Upstream       string        `json:"upstream"`
+	Tools          bool          `json:"tools"`
+	Streaming      bool          `json:"streaming"`
+	Revision       int64         `json:"revision"`
+	CandidateCount int           `json:"candidate_count"`
 }
 type UsageRow struct {
 	ProviderID   string `json:"provider_id"`

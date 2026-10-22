@@ -56,7 +56,7 @@ func requestRoutingAffinity(r *http.Request, model string) string {
 	return routingAffinity(strings.Join(credentials, "\x00"), model, session)
 }
 func latencyID(public string, revision int64, c state.Candidate, p state.Provider) string {
-	raw, _ := json.Marshal([]any{public, revision, c.ProviderID, c.Model, p.Revision})
+	raw, _ := json.Marshal([]any{public, revision, c.ProviderID, c.Model, p.Revision, c.KeyIDs})
 	return string(raw)
 }
 func (s *Server) routeCandidates(m state.Model) ([]state.Candidate, error) {
@@ -84,7 +84,7 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 		if len(sourceKeys) == 0 {
 			sourceKeys = []state.ProviderKey{{ID: "anonymous", Enabled: true}}
 		}
-		if strategy == "lowest-latency" || strategy == "priority" || strategy == "cache-priority" {
+		if len(m.SourceOrder) == 0 && (strategy == "lowest-latency" || strategy == "priority" || strategy == "cache-priority") {
 			routes = append(routes, c)
 			providers = append(providers, p)
 			keys = append(keys, sourceKeys)
@@ -101,6 +101,36 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 			keys = append(keys, []state.ProviderKey{k})
 			costs = append(costs, p.EffectiveKeyMultiplier(k))
 		}
+	}
+	// Saved Key order applies to every rule's stable fallback. New Keys append
+	// naturally; deleted references are ignored, never used to broaden scope.
+	if len(m.SourceOrder) > 0 {
+		rank := map[state.SourceRoute]int{}
+		for i, ref := range m.SourceOrder {
+			rank[ref] = i
+		}
+		indices := make([]int, len(routes))
+		for i := range indices {
+			indices[i] = i
+		}
+		score := func(i int) int {
+			if v, ok := rank[state.SourceRoute{ProviderID: routes[i].ProviderID, Model: routes[i].Model, KeyID: routes[i].KeyIDs[0]}]; ok {
+				return v
+			}
+			return len(rank) + i
+		}
+		sort.SliceStable(indices, func(i, j int) bool { return score(indices[i]) < score(indices[j]) })
+		ordered := make([]state.Candidate, 0, len(routes))
+		ps := make([]state.Provider, 0, len(routes))
+		ks := make([][]state.ProviderKey, 0, len(routes))
+		cs := make([]*float64, 0, len(routes))
+		for _, i := range indices {
+			ordered = append(ordered, routes[i])
+			ps = append(ps, providers[i])
+			ks = append(ks, keys[i])
+			cs = append(cs, costs[i])
+		}
+		routes, providers, keys, costs = ordered, ps, ks, cs
 	}
 	m.Candidates = routes
 	s.mu.Lock()
@@ -259,6 +289,9 @@ func (s *Server) rememberRoute(m state.Model, c state.Candidate, p state.Provide
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
+	if len(m.SourceOrder) > 0 {
+		c.KeyIDs = []string{key}
+	}
 	id := latencyID(m.ID, m.Revision, c, p)
 	v, ok := s.latency[id]
 	ms := float64(elapsed.Microseconds()) / 1000

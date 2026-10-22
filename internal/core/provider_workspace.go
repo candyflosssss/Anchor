@@ -40,7 +40,7 @@ func (s *Server) workspace(id string) (catalog.Workspace, error) {
 	for _, m := range models {
 		for index, c := range m.Candidates {
 			if c.ProviderID == id {
-				out.Models = append(out.Models, catalog.ModelMapping{ServiceTier: m.ServiceTier, KeyIDs: append([]string{}, c.KeyIDs...), CandidateIndex: index, ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates), Multiplier: c.EffectiveMultiplier(), Strategy: m.RoutingStrategy()})
+				out.Models = append(out.Models, catalog.ModelMapping{SourceOrder: m.SourceOrder, ServiceTier: m.ServiceTier, KeyIDs: append([]string{}, c.KeyIDs...), CandidateIndex: index, ID: m.ID, DisplayName: m.DisplayName, Upstream: c.Model, Tools: m.Tools, Streaming: m.Streaming, Revision: m.Revision, CandidateCount: len(m.Candidates), Multiplier: c.EffectiveMultiplier(), Strategy: m.RoutingStrategy()})
 			}
 		}
 	}

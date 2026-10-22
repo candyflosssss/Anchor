@@ -198,9 +198,18 @@ export class MockProviderTransport implements ProviderTransport {
     if (!validRoutingRule(input.strategy) || candidates.length !== input.order.length) throw fixtureError('invalid');
     const ordered = input.order.map(ref => candidates.find(c => c.p.id === ref.provider_id && c.m.upstream === ref.model));
     if (ordered.some(c => !c) || new Set(ordered).size !== candidates.length) throw fixtureError('invalid');
-    ordered.forEach((c, i) => Object.assign(c!.m, { candidate_index: i, strategy: input.strategy, revision: input.expected_revision + 1 }));
+    if (input.source_order) {
+      const sources = candidates.flatMap(c => {
+        const keys = this.detail(c.p).keys;
+        const ids = c.m.key_ids.length ? c.m.key_ids : keys.length ? keys.map(k => k.id) : ['anonymous'];
+        return ids.map(key_id => JSON.stringify([c.p.id, c.m.upstream, key_id]));
+      });
+      const refs = input.source_order.map(c => JSON.stringify([c.provider_id,c.model,c.key_id]));
+      if (refs.length !== sources.length || new Set(refs).size !== refs.length || refs.some(ref => !sources.includes(ref))) throw fixtureError('invalid');
+    }
+    ordered.forEach((c, i) => Object.assign(c!.m, { source_order: input.source_order, candidate_index: i, strategy: input.strategy, revision: input.expected_revision + 1 }));
     if (this.scenario === 'unknown') throw fixtureError('unknown');
-    return checkedRouting({ model_id: input.model_id, revision: input.expected_revision + 1, strategy: input.strategy, order: input.order }, input);
+    return checkedRouting({ model_id: input.model_id, revision: input.expected_revision + 1, strategy: input.strategy, order: input.order, ...(input.source_order ? { source_order: input.source_order } : {}) }, input);
   }
   private deleteKey(w: Workspace, keyID: string) {
     if (!w.keys.some(k => k.id === keyID)) throw fixtureError('invalid');

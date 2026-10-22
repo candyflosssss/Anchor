@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import fixture from '../../../../contract/model-routing.json';
 import workspace from '../../../../contract/provider-workspace.json';
-import { checkedRouting, effectiveRouteMultiplier, moveRoute, priceOrder, withMappingRates } from './model-routing.model';
+import { checkedRouting, modelSources, sourceID, effectiveRouteMultiplier, moveRoute, priceOrder, withMappingRates } from './model-routing.model';
 import { aggregateModels, summarize } from '../providers/provider-summary.model';
 import providers from '../../../../contract/providers.json';
 import { MockProviderTransport } from '../providers/provider.mock';
+import { checkedWorkspace } from '../providers/provider-features.model';
 import { actionFor } from '../providers/provider-features.model';
 import { DesktopProviderTransport } from '../../desktop/transport';
 import type { DesktopBridge } from '../../desktop/contract.generated';
@@ -47,6 +48,15 @@ describe('persistent model routing contract', () => {
     await transport.routing({ model_id: m.id, expected_revision: m.revision, strategy: 'cache-priority', order: [{ provider_id: p.id, model: m.upstream }] }, signal);
     const scoped = (await transport.workspace(p.id, signal)).models.find(m => m.id === 'scoped')!;
     expect(scoped.key_ids).toEqual(['default']); expect(scoped.multiplier).toBe(.5); expect(scoped.strategy).toBe('cache-priority'); expect(scoped.tools).toBe(true);
+  });
+  it('round-trips independent Key order and rejects an old result that drops it', () => {
+    const {input, success} = fixture.key_order;
+    expect(checkedRouting(success, input)).toEqual(success);
+    expect(() => checkedRouting(fixture.success, input)).toThrow('unknown');
+    expect(sourceID(input.source_order[0])).not.toBe(sourceID(input.source_order[2]));
+    const summaries = input.order.map((ref,i) => summarize({ ...providers.providers[0], id:ref.provider_id }, { ...workspace, keys: [{...workspace.keys[0], id:'default'}, {...workspace.keys[0],id:'second'}], models:[{id:'public', display_name:'public', upstream:ref.model, tools:true, streaming:true, revision:2,candidate_count:2,candidate_index:i,multiplier:1,key_ids:ref.provider_id==='a'?['default','second']:['default'],strategy:'priority',source_order:input.source_order}]}));
+    const group = aggregateModels(summaries.map(s => summarize(s.provider, checkedWorkspace(s.workspace!))))[0];
+    expect(modelSources(group).map(v => v.ref)).toEqual(input.source_order);
   });
   it('does not retry a routing write with an unknown result', async () => {
     let calls = 0;

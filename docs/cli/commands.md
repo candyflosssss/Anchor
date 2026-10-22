@@ -377,7 +377,9 @@ GUI 在供应商详情的三个页签提供同等操作。数据库启动自动�
 
 `provider model-put` 支持可重复 `--source-key ID` 限制候选Key；省略时编辑保留原范围、新建允许所有启用Key。`--all-keys` 显式清空限制，与 source-key互斥。导入的指定来源Key参与真实调度；健康失败只切换范围内Key或其他候选，删除 Key 自动移除该供应商的对应来源，保留其他 Key 的同名模型；最后一个来源的已启用 Binding 默认模型保护仍有效。`workspace.models` 返回 key_ids／candidate_index。schema5→6自动迁移，旧核心不能打开，需同步升级CLI与核心。
 
-`model routing` 的 candidate列表必须完整且成员不变，原子修改共享模型顺序／规则、递增模型revision，保留所有来源Key、预留模型倍率、tools／streaming及Codex元数据。策略语义见[供应商接口 §9](../design/provider-interface.md#9-来源-key与模型调度2026-10-13当前源码)：缓存亲和10分钟（不保证缓存命中），低价按供应商倍率×Key缓存分组倍率，低延迟成功EWMA观察30分钟。输出JSON含model_id／revision／strategy／order。旧revision返回conflict，不自动重试写入。
+`model routing` 新增可重复 `--source PROVIDER:KEY:MODEL`（2026-10-22 当前源码）：提供全部当前来源 Key 的完整顺序，可让同供应商的 Key 穿插其他供应商。包含停用／显式缺失项，匿名来源写 anonymous；拒绝遗漏、重复及未知来源，不改 key_ids 范围。仍须提供完整 --candidate 列表。输出新增可选 source_order，GUI逐 Key拖动、撤销、倍率／延迟排序共用此语义。省略 --source 清除逐 Key 顺序、恢复旧候选／供应商调度；需配套新核心与桌面，旧核心不支持该字段。无 schema 迁移，旧核心读取会忽略新排序。
+
+`model routing` 的 candidate列表必须完整且成员不变，原子修改共享模型顺序／规则、递增模型revision，保留所有来源Key、预留模型倍率、tools／streaming及Codex元数据。策略语义见[供应商接口 §9](../design/provider-interface.md#9-来源-key与模型调度2026-10-13当前源码)：缓存亲和10分钟（不保证缓存命中），低价按供应商倍率×Key缓存分组倍率，低延迟成功EWMA观察30分钟。输出JSON含model_id／revision／strategy／order及可选source_order。旧revision返回conflict，不自动重试写入。
 
 ```bash
 anchor model routing --id coding-main --revision 3 --strategy priority \
@@ -484,7 +486,7 @@ anchor provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-e
 anchor model list
 anchor model add --id ID --candidate PROVIDER:MODEL [OPTIONS]
 anchor model put --id ID --candidate PROVIDER:MODEL --revision N [OPTIONS]
-anchor model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL [--candidate ...]
+anchor model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL [--candidate ...] [--source PROVIDER:KEY:MODEL ...]
 ```
 
 `list` 返回模型数组；add/put 返回保存后的模型对象。供应商/实际模型目录不自动探测。

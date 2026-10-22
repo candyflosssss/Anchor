@@ -13,7 +13,7 @@ test('manual order, quick sorts, cancellation and persistence', async ({ page })
   const rows = card.locator('.mapping-candidate');
   await expect(rows).toHaveCount(2);
   await rows.first().locator('.mapping-key-card').hover();
-  await card.getByRole('button', { name: '下移 摸鱼AI demo-model-mini', exact: true }).click();
+  await card.getByRole('button', { name: '下移 摸鱼AI demo-model-mini Key default', exact: true }).click();
   await expect(rows.first()).toContainText('备用供应商');
   await expect(card.getByLabel('调度规则 coding-main')).toHaveValue('priority');
   await expect(card).toContainText('已自动保存');
@@ -47,7 +47,7 @@ test('manual order, quick sorts, cancellation and persistence', async ({ page })
 
 test('pointer dragging and compact layouts in light and dark themes', async ({ page }) => {
   const card = await mappings(page);
-  const handle = card.getByRole('button', { name: '拖动 摸鱼AI demo-model-mini', exact: true });
+  const handle = card.getByRole('button', { name: '拖动 摸鱼AI demo-model-mini Key default', exact: true });
   const from = await handle.boundingBox(), to = await card.locator('.mapping-key-card').last().boundingBox();
   if (!from || !to) throw Error('missing route geometry');
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);

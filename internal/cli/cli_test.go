@@ -150,8 +150,8 @@ func TestCLIManagementWorkflow(t *testing.T) {
 	if m, err := s.Model("shared"); err != nil || len(m.Candidates) != 1 || m.Candidates[0].ProviderID != "multi" {
 		t.Fatal(m, err)
 	}
-	run("", "model", "routing", "--id", "shared", "--revision", "3", "--strategy", "lowest-latency", "--candidate", "multi:up-multi")
-	if m, err := s.Model("shared"); err != nil || m.Strategy != "lowest-latency" || m.Revision != 4 {
+	run("", "model", "routing", "--id", "shared", "--revision", "3", "--strategy", "lowest-latency", "--candidate", "multi:up-multi", "--source", "multi:anonymous:up-multi")
+	if m, err := s.Model("shared"); err != nil || m.Strategy != "lowest-latency" || m.Revision != 4 || len(m.SourceOrder) != 1 || m.SourceOrder[0].KeyID != "anonymous" {
 		t.Fatal(m, err)
 	}
 	run("", "model", "add", "--id", "key-scoped", "--candidate", "p:actual", "--candidate-key", "1:default", "--strategy", "cache-priority")

@@ -3,6 +3,7 @@ package desktop
 import (
 	"encoding/json"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -146,13 +147,20 @@ func TestSharedRoutingContract(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fixture struct {
-		Input   ModelRouting      `json:"input"`
-		Success ModelRoutingState `json:"success"`
+		Input    ModelRouting      `json:"input"`
+		Success  ModelRoutingState `json:"success"`
+		KeyOrder struct {
+			Input   ModelRouting      `json:"input"`
+			Success ModelRoutingState `json:"success"`
+		} `json:"key_order"`
 	}
 	if err = json.Unmarshal(raw, &fixture); err != nil {
 		t.Fatal(err)
 	}
 	if fixture.Success.Revision != fixture.Input.ExpectedRevision+1 || fixture.Success.Strategy != fixture.Input.Strategy || len(fixture.Success.Order) != 2 {
 		t.Fatal(fixture)
+	}
+	if len(fixture.KeyOrder.Input.SourceOrder) != 3 || !reflect.DeepEqual(fixture.KeyOrder.Input.SourceOrder, fixture.KeyOrder.Success.SourceOrder) {
+		t.Fatal("shared Key order fixture", fixture.KeyOrder)
 	}
 }

@@ -28,6 +28,8 @@ HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
 | `diagnostics.go` | 固定阶段、错误类别、完整／降级／不支持结果，安全错误包装 |
 | `internal/core/gateway*.go`、`translation_logging.go` | 鉴权／访问范围、调度、上游认证、连接与取消、候选及恢复预算、HTTP 交付、诊断与账务持久化 |
 
+2026-10-22 当前源码的逐 Key 来源排序由核心 model_routing_control／model_routing 管理，身份为供应商／上游模型／Key；不改变协议层 Session／Attempt、同渠道恢复预算或转换规则。
+
 网关不再持有 `ChatMapping`，不判断何时展平或恢复工具，也不解析普通输出、思考、结束原因、用量或流式事件。协议库不依赖 core、state 或数据库；HTTP 专用兼容入口单独隔离。已有低层 ConvertRequest/Stream 入口继续共用相同规则，不建立第二套转换器。
 
 ## 生命周期与内部表示

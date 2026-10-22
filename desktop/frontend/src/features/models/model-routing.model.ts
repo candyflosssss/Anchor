@@ -1,3 +1,6 @@
+import { channelKeys } from '../providers/channel-availability.model';
+import type { ModelGroup } from '../providers/provider-summary.model';
+import type { SourceRoute } from '../../desktop/contract.generated';
 import type { KeyStatus } from '../../desktop/contract.generated';
 import type { ProviderSummary } from '../providers/provider-summary.model';
 import type { ModelRouting, ModelRoutingState, RouteCandidate } from '../../desktop/contract.generated';
@@ -13,6 +16,12 @@ export const routingRules = {
 export const validRoutingRule = (v: string) => Object.hasOwn(routingRules, v);
 export const ruleLabel = (v: string) => routingRules[v as keyof typeof routingRules]?.label ?? v;
 export const routeID = (v: RouteCandidate) => JSON.stringify([v.provider_id, v.model]);
+export const sourceID = (v: SourceRoute) => JSON.stringify([v.provider_id, v.model, v.key_id]);
+export function modelSources(g: ModelGroup, order = g.candidates[0]?.source_order ?? []) {
+ const sources = g.candidates.flatMap(candidate => channelKeys(candidate.key_ids, candidate.keys).map(source => ({ candidate, source, ref: { provider_id: candidate.provider_id, model: candidate.upstream, key_id: source.id } })));
+ const rank = new Map(order.map((ref, i) => [sourceID(ref), i]));
+ return sources.map((item, i) => ({ item, rank: rank.get(sourceID(item.ref)) ?? order.length + i })).sort((a,b) => a.rank-b.rank).map(v => v.item);
+}
 export function effectiveRouteMultiplier(candidate: { cost_multiplier: number; multiplier: number; availability: { state: string }; key_ids: string[]; keys: { id: string; enabled: boolean; state: string; effective_multiplier: number | null; rate: { multiplier: number | null } | null }[] }): number | null {
   if (candidate.availability.state !== 'available') return null;
   const scoped = candidate.key_ids.length ? candidate.key_ids : candidate.keys.length ? candidate.keys.map(k => k.id) : ['anonymous'];
@@ -33,7 +42,8 @@ export function priceOrder<T extends { provider_id: string; model: string }>(ite
 }
 export function checkedRouting(v: ModelRoutingState, input: ModelRouting): ModelRoutingState {
   if (!v || v.model_id !== input.model_id || v.revision !== input.expected_revision + 1 || v.strategy !== input.strategy || !Array.isArray(v.order) || v.order.length !== input.order.length || v.order.some((c, i) => c.provider_id !== input.order[i].provider_id || c.model !== input.order[i].model)) throw new ProviderProblem('unknown');
-  return { model_id: v.model_id, revision: v.revision, strategy: v.strategy, order: v.order.map(c => ({ provider_id: c.provider_id, model: c.model })) };
+  if ((v.source_order?.length ?? 0) !== (input.source_order?.length ?? 0) || v.source_order?.some((ref, i) => sourceID(ref) !== sourceID(input.source_order![i]))) throw new ProviderProblem('unknown');
+  return { ...(v.source_order ? { source_order: v.source_order.map(c => ({ provider_id:c.provider_id, model:c.model, key_id:c.key_id })) } : {}), model_id: v.model_id, revision: v.revision, strategy: v.strategy, order: v.order.map(c => ({ provider_id: c.provider_id, model: c.model })) };
 }
 export function moveRoute<T>(values: T[], from: number, to: number): T[] {
   if (from < 0 || to < 0 || from >= values.length || to >= values.length) return values;

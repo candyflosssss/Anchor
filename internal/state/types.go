@@ -3,6 +3,7 @@ package state
 import (
 	"errors"
 	"fmt"
+	"github.com/candyflosssss/Anchor/internal/catalog"
 	"math"
 	"net"
 	"net/url"
@@ -170,6 +171,9 @@ func (p Provider) Validate() error {
 	return nil
 }
 
+// SourceRoute identifies one independently ordered model source.
+type SourceRoute = catalog.SourceRoute
+
 type Candidate struct {
 	KeyIDs     []string `json:"key_ids,omitempty"`
 	ProviderID string   `json:"provider_id"`
@@ -185,6 +189,7 @@ func (c Candidate) EffectiveMultiplier() float64 {
 }
 
 type Model struct {
+	SourceOrder []SourceRoute  `json:"source_order,omitempty"`
 	ServiceTier string         `json:"service_tier,omitempty"` // Empty forwards the caller tier; otherwise fixed by Anchor.
 	Strategy    string         `json:"strategy,omitempty"`     // Empty preserves legacy ordered priority.
 	ID          string         `json:"id"`
@@ -255,6 +260,16 @@ func (m Model) Validate() error {
 			return errors.New("duplicate candidate")
 		}
 		seen[key] = true
+	}
+	if len(m.SourceOrder) > 1024 {
+		return errors.New("too many ordered sources")
+	}
+	sources := map[SourceRoute]bool{}
+	for _, ref := range m.SourceOrder {
+		if !ValidID(ref.KeyID) || sources[ref] {
+			return errors.New("invalid or duplicate ordered source")
+		}
+		sources[ref] = true
 	}
 	return nil
 }

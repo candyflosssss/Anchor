@@ -83,6 +83,15 @@ func pruneProviderSources(tx *sql.Tx, providerID, keyID string, remainingKeys in
 				candidates = append(candidates, c)
 			}
 		}
+		refs := make([]SourceRoute, 0, len(m.SourceOrder))
+		for _, ref := range m.SourceOrder {
+			if ref.ProviderID == providerID && (keyID == "" || ref.KeyID == keyID) {
+				affected = true
+				continue
+			}
+			refs = append(refs, ref)
+		}
+		m.SourceOrder = refs
 		if affected {
 			m.Candidates = candidates
 			changed = append(changed, m)

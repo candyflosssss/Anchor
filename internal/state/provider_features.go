@@ -148,6 +148,11 @@ func (s *Store) MutateProvider(id string, revision int64, action, target, secret
 				}
 			}
 			if used {
+				for i := range m.SourceOrder {
+					if m.SourceOrder[i].ProviderID == id {
+						m.SourceOrder[i].ProviderID = target
+					}
+				}
 				changed = append(changed, m)
 			}
 		}
