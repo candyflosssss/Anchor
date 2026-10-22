@@ -49,6 +49,8 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
               {!canConfigure && binding && <div><dt>默认模型</dt><dd>{binding.model}</dd></div>}
             </dl>
             {!target && !binding && <p className="card-hint">未发现此平台的本机配置。</p>}
+            {row.agent === 'claude' && <p className="card-hint">映射模型同步到 /model 菜单；完整列表需要 Claude Code 2.1.242 或更新版本。旧版可能只显示部分模型。配置成功不代表实际请求已验证。</p>}
+            {row.agent === 'claude-desktop' && <p className="card-hint">接管当前已应用的本地第三方配置，可能同时影响 Chat、Cowork 和 Code。请先在 Claude Desktop 开启 Developer Mode 并应用本地配置。公司策略和远程配置不接管；切换配置后需返回原配置才能继续更新。应用或恢复后请完全退出并重开 Claude Desktop。</p>}
             {(canConfigure || canRebuild) && <form onSubmit={e => { e.preventDefault(); c.update(); }}>
               <fieldset disabled={c.busy}>
                 <div className="field"><label htmlFor={`agent-default-${row.id}`}>默认模型</label>
@@ -71,6 +73,7 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
       <p className="break-all">{c.selected?.config_root}</p><p>默认模型：{c.updateInput?.model}</p>{c.updateInput?.rebuild
         ? <p>将先备份整个 config.toml，再替换为干净的托管配置，并同步最新模型列表。原来的其他设置也会从当前配置移除，完整原件和旧恢复记录保留在 Anchor 数据目录的 recovery 中。停用托管只清除新托管内容，不会自动恢复坏配置。完成后请重启 Codex。</p>
         : <p>将使用当前选择更新连接配置，并同步最新模型列表。其他软件改过的托管字段也会重新应用，外部值会先保存，停用托管时恢复；其他设置不动。更新后请重启对应 Agent。</p>}
+      {c.selected?.agent === 'claude-desktop' && <p>此操作可能同时更改 Claude Desktop 的 Chat、Cowork 和 Code 请求去向及计费来源。将使用 Anchor 的绑定凭据和模型列表；原认证设置在停用时按字段恢复。请完全退出并重开 Claude Desktop，关闭窗口可能只是隐藏。</p>}
     </ConfirmAction>
     <ConfirmAction open={!!c.disableTarget} title="停用此 Agent 的托管？" busy={c.busy} onCancel={() => c.setDisableTarget(null)} onConfirm={() => { if (c.disableTarget) void c.manage(c.disableTarget, 'disable'); }}>
       <p className="break-all">{c.disableTarget?.config_root}</p><p>按字段恢复 Anchor 写入的配置并停用网关凭据。第三方修改会保留并报告冲突。完成后请重启对应 Agent（DSH Desktop 关闭窗口可能只是隐藏，请完全退出）；DSH 请新建会话。</p>

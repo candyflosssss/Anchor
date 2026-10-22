@@ -106,7 +106,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   agent discover                     Read targets, mapped model availability and bindings
   agent enroll --target ID --model MODEL --approve [--revision N] [--model-scope all-mapped|all-compatible] [--rebuild]
                [--template ALIAS:LOCAL_SOURCE ...] (empty source excludes alias)
-  agent add --id ID --adapter codex|claude|dsh|dsh-desktop --config-root ABS_DIR --model MODEL --approve
+  agent add --id ID --adapter codex|claude|claude-desktop|dsh|dsh-desktop --config-root ABS_DIR --model MODEL --approve
             [--model-scope all-compatible|all-mapped|single] [--anchor-executable ABS_PATH]
                                             Register; apply explicitly or on next serve
   agent codex-settings [--retries 0..10 --revision N]  Unified retries; restart Codex after saving
@@ -158,7 +158,9 @@ Provider, Key, public model and Context names accept 1..128 Unicode letters (inc
 Agent binding names use the same characters, with a 64 UTF-8 byte limit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
 init/serve/access/context/recover/agent token operate locally. update is local except explicit --context check/upgrade. restart is local unless --context explicitly selects SSH. Business commands use the selected context.
-Codex, Claude Code user settings and independent DSH Web (dsh) / Desktop (dsh-desktop) profile management are available; runtime connection remains unverified.
+Codex, Claude Code CLI (claude), Claude Desktop (claude-desktop) and independent DSH Web (dsh) / Desktop (dsh-desktop) profile management are available; runtime connection remains unverified.
+Claude CLI modelPicker lists mapped aliases on Claude Code >=2.1.242; older clients may show a partial list.
+Claude Desktop requires an applied local configLibrary profile; it can affect Chat/Cowork/Code. Organization/bootstrap profiles are not managed. Fully quit and relaunch Desktop.
 DSH Web/Desktop sync mapped display names, vision/input, context and supported off/minimal/low/medium/high/xhigh/max efforts.
 DSH defaults use the binding default model; native none/default/null and toggle/budget reasoning are not relabelled.
 DSH maxTokens exports explicit default output tokens only, not the output capacity alone.

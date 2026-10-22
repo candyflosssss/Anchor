@@ -15,6 +15,8 @@ func AdapterFor(id string) Adapter {
 		return Codex{}
 	case "claude":
 		return StructuredAgent{}
+	case "claude-desktop":
+		return StructuredAgent{Desktop: true}
 	case "dsh":
 		return StructuredAgent{DSH: true}
 	case "dsh-desktop":
@@ -52,6 +54,9 @@ func (a StructuredAgent) path(b state.Binding) string {
 }
 func (a StructuredAgent) Discover(b state.Binding) (Inspection, error) { return a.Inspect(b) }
 func (a StructuredAgent) Inspect(b state.Binding) (Inspection, error) {
+	if a.Desktop && !a.DSH {
+		return inspectClaudeDesktop(b)
+	}
 	path := a.path(b)
 	raw, exists, err := readConfig(filepath.Dir(path), path)
 	if err != nil {
@@ -68,7 +73,7 @@ func (a StructuredAgent) Inspect(b state.Binding) (Inspection, error) {
 		}
 	}
 	id := "claude"
-	limits := []string{"user settings only; project, managed and CLI overrides are not probed", "configuration verification only; restart Claude Code after changes"}
+	limits := []string{"CLI user settings only; Desktop inference uses a separate adapter; project, managed and CLI overrides are not probed", "modelPicker requires Claude Code 2.1.242 or later; older clients may show only the custom default and recognizable Claude IDs", "configuration verification only; restart Claude Code after changes; all tier and subagent aliases use the selected default"}
 	reload := "restart_required"
 	if a.DSH {
 		id = "dsh"
@@ -86,6 +91,9 @@ func (a StructuredAgent) Inspect(b state.Binding) (Inspection, error) {
 	return Inspection{AdapterID: id, AdapterVersion: "1", ConfigPath: path, Exists: exists, Support: "configuration_only", EffectiveConnection: "unknown", Reload: reload, Limitations: limits}, nil
 }
 func (a StructuredAgent) desired(b state.Binding, g GatewayBinding, raw []byte) ([][]string, []any, error) {
+	if a.Desktop && !a.DSH {
+		return claudeDesktopDesired(b, g)
+	}
 	ids := []string{}
 	models := []any{}
 	var defaultReasoning any
@@ -108,7 +116,20 @@ func (a StructuredAgent) desired(b state.Binding, g GatewayBinding, raw []byte) 
 	}
 	if !a.DSH {
 		paths := [][]string{{"model"}, {"availableModels"}, {"env", "ANTHROPIC_BASE_URL"}, {"env", "ANTHROPIC_AUTH_TOKEN"}, {"env", "ANTHROPIC_API_KEY"}, {"env", "ANTHROPIC_MODEL"}, {"env", "ANTHROPIC_DEFAULT_SONNET_MODEL"}, {"env", "ANTHROPIC_DEFAULT_OPUS_MODEL"}, {"env", "ANTHROPIC_DEFAULT_HAIKU_MODEL"}, {"env", "CLAUDE_CODE_SUBAGENT_MODEL"}, {"env", "CLAUDE_CODE_USE_BEDROCK"}, {"env", "CLAUDE_CODE_USE_VERTEX"}, {"env", "CLAUDE_CODE_USE_FOUNDRY"}, {"apiKeyHelper"}, {"env", "CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY"}, {"env", "ANTHROPIC_CUSTOM_MODEL_OPTION"}}
-		return paths, []any{b.Model, ids, strings.TrimSuffix(g.BaseURL, "/v1"), g.Token, "", b.Model, b.Model, b.Model, b.Model, b.Model, "0", "0", "0", nil, "1", b.Model}, nil
+		options := []any{}
+		for _, id := range ids {
+			label := id
+			for _, model := range g.Models {
+				if model.ID == id && model.DisplayName != "" {
+					label = model.DisplayName
+					break
+				}
+			}
+			options = append(options, map[string]any{"model": id, "label": label})
+		}
+		// Explicit rows also expose aliases that gateway discovery filters out.
+		paths = append(paths, []string{"modelPicker"}, []string{"env", "CLAUDE_CODE_USE_ANTHROPIC_AWS"})
+		return paths, []any{b.Model, ids, strings.TrimSuffix(g.BaseURL, "/v1"), g.Token, "", b.Model, b.Model, b.Model, b.Model, b.Model, "0", "0", "0", nil, "1", b.Model, map[string]any{"options": options, "replaceBuiltInOptions": true}, "0"}, nil
 	}
 	provider := "anchor-" + b.ID
 	route := map[string]any{"displayName": "Anchor", "api": "openai-completions", "baseURL": g.BaseURL, "headers": map[string]any{"Authorization": "Bearer " + g.Token}, "models": models, "retryPolicy": map[string]any{"mode": "normal", "maxRetries": 0}}
@@ -197,6 +218,10 @@ func (a StructuredAgent) planFrom(b state.Binding, g GatewayBinding, raw []byte,
 		}
 	}
 	p := Plan{BindingID: b.ID, ExpectedRevision: b.Revision, Model: b.Model, ModelScope: b.ModelScope, GatewayURL: g.BaseURL, CredentialMethod: "scoped binding token in owner-only configuration", AdapterVersion: "1", Path: inspection.ConfigPath, Fingerprint: fingerprint(raw, exists), Fields: paths, Reload: inspection.Reload, Verification: "configuration only", original: raw, existed: exists}
+	if a.Desktop && !a.DSH {
+		b.ClaudeDesktopProfile = strings.TrimSuffix(filepath.Base(inspection.ConfigPath), ".json")
+		p.check = func() error { _, err := inspectClaudeDesktop(b); return err }
+	}
 	for i, path := range paths {
 		p.Edits = append(p.Edits, Edit{Path: path, Before: values[i], After: Value{Exists: after[i] != nil, Data: normalize(after[i])}})
 	}

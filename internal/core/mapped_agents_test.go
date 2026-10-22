@@ -14,7 +14,7 @@ import (
 
 // Exercise the two actual client protocols with scoped mapped-model credentials.
 func TestMappedAgentsGatewayProtocols(t *testing.T) {
-	for _, adapter := range []string{"claude", "dsh", "dsh-desktop"} {
+	for _, adapter := range []string{"claude", "claude-desktop", "dsh", "dsh-desktop"} {
 		t.Run(adapter, func(t *testing.T) {
 			f := setup(t)
 			var calls atomic.Int32
@@ -55,7 +55,7 @@ func TestMappedAgentsGatewayProtocols(t *testing.T) {
 			}
 			path := "/v1/chat/completions"
 			input := `{"model":"unflagged","messages":[{"role":"user","content":"mock"}]}`
-			if adapter == "claude" {
+			if adapter == "claude" || adapter == "claude-desktop" {
 				path = "/v1/messages"
 				input = `{"model":"unflagged","max_tokens":32,"messages":[{"role":"user","content":"mock"}]}`
 			}

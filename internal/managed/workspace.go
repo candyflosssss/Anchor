@@ -214,6 +214,7 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 			b.ID = old.ID
 			b.ConfigRoot = old.ConfigRoot
 			b.Executable = old.Executable
+			b.ClaudeDesktopProfile = old.ClaudeDesktopProfile
 			b.Revision = old.Revision
 			break
 		}

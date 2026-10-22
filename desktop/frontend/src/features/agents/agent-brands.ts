@@ -6,7 +6,8 @@ import dsh from '../../assets/agent-brands/deepseek-color.svg';
 
 export const agentBrands: Record<string, { name: string; logo: string; monochrome?: boolean }> = {
   codex: { name: 'Codex', logo: codex, monochrome: true },
-  claude: { name: 'Claude Code', logo: claude },
+  claude: { name: 'Claude Code CLI', logo: claude },
+  'claude-desktop': { name: 'Claude Desktop', logo: claude },
   gemini: { name: 'Gemini CLI', logo: gemini },
   opencode: { name: 'OpenCode', logo: opencode, monochrome: true },
   dsh: { name: 'DSH Web', logo: dsh },

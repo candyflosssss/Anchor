@@ -100,7 +100,7 @@ func diagnosticField(path []string) string {
 		}
 	case "catalog":
 		return "model_catalog_json"
-	case "model", "model_provider", "model_providers", "model_catalog_json", "availableModels", "env", "apiKeyHelper":
+	case "model", "model_provider", "model_providers", "model_catalog_json", "availableModels", "modelPicker", "env", "apiKeyHelper", "inferenceModels", "inferenceProvider", "inferenceGatewayBaseUrl", "inferenceGatewayApiKey", "inferenceCredentialKind":
 		return path[0]
 	}
 	return "managed_field"

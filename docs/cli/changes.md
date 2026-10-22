@@ -888,3 +888,11 @@
 - 旧 → 新：原需逐个手动录入；现在读取所有平台及共享供应商，预览后原子导入供应商、独立协议Key和明确模型来源，按 Anchor 启用。保留已存在ID与原 CCS 数据，未知协议／OAuth／凭据引用等提供跳过原因，报告不回显秘密。
 - 兼容与迁移：新增命令不改变旧入口；CLI／GUI与核心需配套升级。应用必须携带预览指纹和批准，冲突或结果未知后先重读，禁止盲目重放；SSH读取远程账户，不上传本机数据库。供应商保存与客户端托管、上游验证分别表达。
 - 验证：隔离合成 SQLite 的11平台／共享供应商、WAL只读、重复导入、脱敏、模型来源约束、事务回滚，以及真实 HTTP CLI／Bridge 身份与冲突测试通过；前端验证见任务记录。
+
+## 2026-10-22 — Claude CLI 全模型菜单与 Desktop 独立托管（当前源码，未打包）
+
+- 类型：适配器和对外行为增量；无新增命令路径。`agent add --adapter` 新增 `claude-desktop`，根为已初始化的 configLibrary；discover/enroll/sync/恢复沿用原入口。
+- 旧 → 新：原 `claude` 仅 CLI 用户 settings 与发现名单；现在补充 2.1.242+ 的完整 modelPicker，别名与显示名独立，旧绑定启动或同步时补齐。Desktop 使用独立凭据、固定本地 appliedId 配置、显式模型列表及默认排序；不跟随后续配置切换。首次 GUI 开启说明 Chat/Cowork/Code 范围，CLI --approve 等价批准。
+- 兼容：旧 claude 身份/权限范围/凭据不变，新受管字段纳入恢复日志；不自动创建或接管 Desktop。组织策略（当前含仅行为策略）、bootstrap/hybrid、损坏/不安全配置拒绝。Binding JSON 增加可选 claude_desktop_profile，未改变数据库 schema；旧二进制不支持新适配器，回退前应停用 Desktop 并恢复配置。
+- 数据面：仅原生 Anthropic Messages 转发客户端 anthropic-version 和重复 anthropic-beta，凭据仍由供应商配置替换；跨协议不转发这些客户端头。不新增 count_tokens/tool search 或错误恢复能力。
+- 验证使用隔离配置、模拟 HTTP 上游和受控桥接；实际执行结果及未验证边界见本轮任务记录。未打包、安装或请求真实付费上游。

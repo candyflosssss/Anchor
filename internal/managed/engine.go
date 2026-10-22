@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/candyflosssss/Anchor/internal/platform"
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -39,6 +40,7 @@ type Plan struct {
 	existed           bool
 	configFingerprint string
 	catalog           *catalogArtifact
+	check             func() error // Additional read-only adapter preconditions.
 }
 type Result struct {
 	BindingID   string     `json:"binding_id"`
@@ -242,6 +244,11 @@ func (e *Engine) Apply(p Plan) (Result, error) {
 		if fingerprint(b, exists) != expected {
 			return withDiagnostic(ErrChanged, "read_configuration", "configuration_changed_since_plan", "")
 		}
+		if p.check != nil {
+			if err := p.check(); err != nil {
+				return err
+			}
+		}
 		if p.catalog != nil {
 			if filepath.Dir(p.catalog.Path) != root || filepath.Base(p.catalog.Path) != catalogName(p.BindingID) || len(p.catalog.Written) > maxConfig || !json.Valid(p.catalog.Written) {
 				return ErrUnsafe
@@ -272,6 +279,11 @@ func (e *Engine) Apply(p Plan) (Result, error) {
 		out.Status = "recovery_pending"
 		if j.Catalog != nil {
 			if err = atomicWrite(root, j.Catalog.Path, j.Catalog.Written, fingerprint(nil, false), true); err != nil {
+				return err
+			}
+		}
+		if p.check != nil {
+			if err = p.check(); err != nil {
 				return err
 			}
 		}
@@ -534,6 +546,9 @@ func (e *Engine) recoverCatalog(j journal, out *Result) error {
 }
 
 func supportedConfig(path string) bool {
+	if filepath.Base(filepath.Dir(path)) == "configLibrary" && filepath.Ext(path) == ".json" && state.ValidClaudeDesktopProfile(strings.TrimSuffix(filepath.Base(path), ".json")) {
+		return true
+	}
 	switch filepath.Base(path) {
 	case "config.toml", "settings.json":
 		return true
@@ -544,6 +559,9 @@ func supportedConfig(path string) bool {
 	return false
 }
 func (e *Engine) editor(path string) Editor {
+	if filepath.Base(filepath.Dir(path)) == "configLibrary" && filepath.Ext(path) == ".json" {
+		return StructuredEditor{}
+	}
 	switch filepath.Base(path) {
 	case "settings.json":
 		return StructuredEditor{}

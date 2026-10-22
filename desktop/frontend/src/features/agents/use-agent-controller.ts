@@ -80,7 +80,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
       if (busy || !selected?.supported || (rebuild ? selected.agent !== 'codex' || !['ready', 'config_unsupported'].includes(selected.status) : selected.status !== 'ready') || !availableModels.some(m => m.id === model)) return;
       const input: EnrollAgent = { target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
         model_scope: 'all-mapped', model_templates: {}, approved: true, ...(rebuild ? { rebuild: true } : {}) };
-      if (binding || rebuild) setUpdateInput(input);
+      if (binding || rebuild || selected.agent === 'claude-desktop') setUpdateInput(input);
       else void write(() => agentService.enroll(input));
     },
     confirmUpdate: () => updateInput && write(() => agentService.enroll(updateInput)),

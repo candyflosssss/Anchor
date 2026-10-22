@@ -116,8 +116,8 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 	case "add":
 		f := a.flags("agent add")
 		id := f.String("id", "", "binding ID: Chinese supported, at most 64 UTF-8 bytes")
-		adapter := f.String("adapter", "codex", "adapter: codex, claude, dsh (Web) or dsh-desktop")
-		root := f.String("config-root", "", "approved absolute configuration root; DSH home for dsh/web or dsh-desktop/desktop; profile must exist")
+		adapter := f.String("adapter", "codex", "adapter: codex, claude (CLI), claude-desktop, dsh (Web) or dsh-desktop")
+		root := f.String("config-root", "", "approved absolute configuration root; Claude Desktop configLibrary with applied local profile; DSH home with initialized profile")
 		codexRoot := f.String("codex-home", "", "alias for --config-root with --adapter codex")
 		model := f.String("model", "", "default public model (tools and streaming required)")
 		scope := f.String("model-scope", "", "model permission scope: all-compatible, all-mapped or single; legacy bindings stay single")

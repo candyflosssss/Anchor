@@ -211,3 +211,7 @@ Codex 另提供「备份并重建配置」，包括未登记、profile 或 WebSo
 本机 runtime 更新先准备旁路可执行文件和 helper，旧核心继续运行；最终一次 restart_handoff 后校验同身份／新版／ready，激活启动入口，退出旧 GUI 并自动打开新版，后者复用已就绪核心。CLI `update desktop --approve` 可更新本机并经受控 IPC 重开同数据目录 GUI。旧安装器 feed 保留原行为，旧宿主／CLI 需引导升级；不承诺在途流不断开或数据库自动回滚。
 
 SSH 更新使用 `CheckRemoteUpdate(instance_id)`／`InstallRemoteUpdate({instance_id,version,approved})`，锁定当前远端和检查候选。密码与密钥均复用 connection.Live，远端账号执行自身更新 CLI；成功再核对远端 ready/version/PID，失败候选清空且不重放。本机和远端操作在 UI 分开，远端操作不改本机程序／核心。契约、锁与来源／权限边界以[在线更新](online-updates.md#runtime-与-ssh-更新2026-10-20源码未发布)为准。
+
+### Claude CLI／Desktop 身份（2026-10-22，当前源码未打包）
+
+AgentWorkspace/EnrollAgent/ManageAgent DTO 形状与桥接方法不变；agent/adapter_id 增加 claude-desktop，claude 保持 CLI。目标状态字符串增加 desktop_setup_required/desktop_policy_present，前端只展示核心决定；两端按各自目标 ID 操作，Desktop 初次提交前明确确认可能影响 Chat/Cowork/Code。可选 claude_desktop_profile 仅属于核心 Binding 持久身份，不由 GUI 路径参数指定；核心解析并固定已应用本地 UUID 配置。没有新建任意路径或配置脚本接口。配置与生命周期边界见[接入契约](agent-management-layer.md#2026-10-22-claude-clidesktop-独立接入当前源码未打包)。

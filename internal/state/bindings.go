@@ -22,12 +22,17 @@ type Binding struct {
 	Executable     string `json:"anchor_executable"`
 	Enabled        bool   `json:"enabled"`
 	Revision       int64  `json:"revision"`
+	// Pin the approved local Desktop profile; never follow a later UI selection.
+	ClaudeDesktopProfile string `json:"claude_desktop_profile,omitempty"`
 	// Local catalog snapshots belong to this target/version, not provider routing.
 	CodexCatalog   map[string]CodexMetadata `json:"codex_catalog,omitempty"`
 	ModelTemplates map[string]string        `json:"model_templates,omitempty"`
 }
 
 func (b Binding) Validate() error {
+	if b.ClaudeDesktopProfile != "" && (b.AdapterID != "claude-desktop" || !ValidClaudeDesktopProfile(b.ClaudeDesktopProfile)) {
+		return ErrInvalid
+	}
 	if b.AdapterID != "codex" && (b.ModelScope == "all-compatible" || b.CodexVersion != "" || len(b.CodexCatalog) > 0 || len(b.ModelTemplates) > 0) {
 		return ErrInvalid
 	}
@@ -65,10 +70,27 @@ func (b Binding) Validate() error {
 	if (b.ModelScope == "all-compatible" || b.CodexVersion != "") && !ValidCodexVersion(b.CodexVersion) {
 		return errors.New("all-compatible bindings require a Codex catalog version")
 	}
-	if !ValidID(b.ID) || len(b.ID) > 64 || (b.AdapterID != "codex" && b.AdapterID != "claude" && b.AdapterID != "dsh" && b.AdapterID != "dsh-desktop") || b.AdapterVersion != "1" || !ValidModelID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
+	if !ValidID(b.ID) || len(b.ID) > 64 || (b.AdapterID != "codex" && b.AdapterID != "claude" && b.AdapterID != "claude-desktop" && b.AdapterID != "dsh" && b.AdapterID != "dsh-desktop") || b.AdapterVersion != "1" || !ValidModelID(b.Model) || !filepath.IsAbs(b.ConfigRoot) || !filepath.IsAbs(b.Executable) {
 		return errors.New("invalid binding: supported adapter v1, absolute approved root/executable and valid IDs required")
 	}
 	return nil
+}
+
+// Desktop's configLibrary filenames are UUIDs, never arbitrary relative paths.
+func ValidClaudeDesktopProfile(id string) bool {
+	if len(id) != 36 {
+		return false
+	}
+	for i, c := range id {
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if c != '-' {
+				return false
+			}
+		} else if !(c >= 'a' && c <= 'f' || c >= '0' && c <= '9') {
+			return false
+		}
+	}
+	return true
 }
 func (s *Store) Bindings() ([]Binding, error) {
 	rows, e := s.db.Query(`SELECT document FROM bindings ORDER BY id`)
@@ -367,7 +389,7 @@ func (s *Store) UpdateBindingCatalog(b Binding, expected int64) (Binding, error)
 	if old.Revision != expected {
 		return b, ErrConflict
 	}
-	if old.ConfigRoot != b.ConfigRoot || old.Executable != b.Executable || old.AdapterID != b.AdapterID || old.AdapterVersion != b.AdapterVersion {
+	if old.ConfigRoot != b.ConfigRoot || old.Executable != b.Executable || old.AdapterID != b.AdapterID || old.AdapterVersion != b.AdapterVersion || old.ClaudeDesktopProfile != b.ClaudeDesktopProfile {
 		return b, ErrInvalid
 	}
 	b.Revision = expected + 1

@@ -73,7 +73,7 @@ func TestAgentTokenAndIndependentRecovery(t *testing.T) {
 	}
 }
 func TestAgentHelpMatchesLifecycle(t *testing.T) {
-	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|dsh|dsh-desktop", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version", "DSH Web/Desktop sync mapped display names, vision/input, context", "off/minimal/low/medium/high/xhigh/max", "native none/default/null and toggle/budget reasoning are not relabelled", "DSH maxTokens exports explicit default output tokens only", "without overwriting external changes", "agent sync explicitly reclaims approved fields and catalogs", "agent enroll updates the selected default and latest mappings, reclaiming approved fields"} {
+	for _, s := range []string{"agent discover", "agent enroll", "--template", "agent sync", "agent add", "agent apply", "agent token", "recover [--id ID]", "--fingerprint", "--codex-home", "--config-root", "codex|claude|claude-desktop|dsh|dsh-desktop", "all-mapped", "--approve", "--model-scope", "agent set-models", "--codex-catalog", "--codex-version", "DSH Web/Desktop sync mapped display names, vision/input, context", "off/minimal/low/medium/high/xhigh/max", "native none/default/null and toggle/budget reasoning are not relabelled", "DSH maxTokens exports explicit default output tokens only", "without overwriting external changes", "agent sync explicitly reclaims approved fields and catalogs", "agent enroll updates the selected default and latest mappings, reclaiming approved fields"} {
 		if !strings.Contains(help, s) {
 			t.Fatal("missing help", s)
 		}

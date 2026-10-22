@@ -4,6 +4,13 @@ import (
 	"encoding/json"
 )
 
+// RequestMetadata carries protocol-owned headers only, never authentication.
+type RequestMetadata struct {
+	AnthropicVersion string
+	AnthropicBeta    []string
+}
+type RequestHeader struct{ Name, Value string }
+
 // Session owns an immutable client baseline. It contains no credentials, routes,
 // network resources or global state, and can prepare independent attempts concurrently.
 // Native payloads are retained separately from the Responses-shaped policy view:
@@ -112,7 +119,8 @@ type AttemptOptions struct {
 	Model       string
 	PublicModel string
 	// ServiceTier is explicit routing policy, never inferred from a vendor/model name.
-	ServiceTier string
+	ServiceTier    string
+	ClientMetadata RequestMetadata
 }
 
 // Attempt keeps its wire request and private return-path mapping together.
@@ -122,6 +130,7 @@ type Attempt struct {
 	body                     []byte
 	mapping                  *ChatMapping
 	diagnostics              Diagnostics
+	headers                  []RequestHeader
 }
 
 func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
@@ -159,6 +168,14 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 		diagnostics: Diagnostics{Client: s.client, Upstream: o.Protocol, Stage: StageRequest, Compatibility: Full}}
 	if native {
 		a.body = raw
+		if o.Protocol == "anthropic" {
+			if o.ClientMetadata.AnthropicVersion != "" {
+				a.headers = append(a.headers, RequestHeader{"anthropic-version", o.ClientMetadata.AnthropicVersion})
+			}
+			for _, value := range o.ClientMetadata.AnthropicBeta {
+				a.headers = append(a.headers, RequestHeader{"anthropic-beta", value})
+			}
+		}
 	} else {
 		var err error
 		a.body, a.mapping, err = ConvertRequestMapped(raw, "responses", o.Protocol)
@@ -175,8 +192,9 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 
 // RequestBody returns an owned copy. Neither callers nor retry paths can mutate
 // the attempt's baseline. Endpoint is protocol metadata, not a selected URL.
-func (a *Attempt) RequestBody() []byte { return append([]byte(nil), a.body...) }
-func (a *Attempt) Endpoint() string    { return Endpoint(a.upstream) }
+func (a *Attempt) RequestBody() []byte             { return append([]byte(nil), a.body...) }
+func (a *Attempt) RequestHeaders() []RequestHeader { return append([]RequestHeader(nil), a.headers...) }
+func (a *Attempt) Endpoint() string                { return Endpoint(a.upstream) }
 func (a *Attempt) Diagnostics() Diagnostics {
 	d := a.diagnostics
 	d.Degradations = append([]Degradation(nil), d.Degradations...)

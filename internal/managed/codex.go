@@ -217,7 +217,10 @@ func ValidateTarget(b *state.Binding) error {
 	if e := validateTargetIdentity(b); e != nil {
 		return e
 	}
-	_, e := AdapterFor(b.AdapterID).Inspect(*b)
+	inspection, e := AdapterFor(b.AdapterID).Inspect(*b)
+	if e == nil && b.AdapterID == "claude-desktop" && b.ClaudeDesktopProfile == "" {
+		b.ClaudeDesktopProfile = strings.TrimSuffix(filepath.Base(inspection.ConfigPath), ".json")
+	}
 	return e
 }
 

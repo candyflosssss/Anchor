@@ -46,10 +46,10 @@ async function openSettings(page: import('@playwright/test').Page) {
 
 test('compact platform list, unified configuration update and conditional disable', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
-  await expect(page.getByRole('switch')).toHaveCount(6);
+  await expect(page.getByRole('switch')).toHaveCount(7);
   await expect(page.getByRole('region', { name: 'Codex 托管设置' })).toHaveCount(0);
   await expect(page.getByText(fixture.workspace.targets[0].config_root, { exact: true })).toHaveCount(0);
-  for (const name of ['Claude Code', 'Gemini CLI', 'OpenCode', 'DSH Web', 'DSH Desktop']) await expect(page.getByRole('switch', { name: `${name} 托管`, exact: true })).toBeDisabled();
+  for (const name of ['Claude Code CLI', 'Claude Desktop', 'Gemini CLI', 'OpenCode', 'DSH Web', 'DSH Desktop']) await expect(page.getByRole('switch', { name: `${name} 托管`, exact: true })).toBeDisabled();
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).not.toBeChecked();
   await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
@@ -184,7 +184,7 @@ test('compact layout stays within narrow windows and dark theme', async ({ page 
   await page.screenshot({ path: process.env.ANCHOR_AGENT_DARK_PREVIEW ?? 'test-results/agents-dark.png' });
 });
 
-for (const [agent, name] of [['claude', 'Claude Code'], ['dsh', 'DSH Web'], ['dsh-desktop', 'DSH Desktop']]) {
+for (const [agent, name] of [['claude', 'Claude Code CLI'], ['dsh', 'DSH Web'], ['dsh-desktop', 'DSH Desktop']]) {
   test(`${name} enrolls all mapped aliases and restores through its platform switch`, async ({ page }) => {
     await page.evaluate(agent => {
       const id = `${agent}-fixture`;
@@ -345,3 +345,34 @@ for (const fail of [false, true]) {
     expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
   });
 }
+
+
+test('Claude Desktop requires scope confirmation and stays independent from CLI', async ({ page }) => {
+  await page.evaluate(() => {
+    for (const agent of ['claude', 'claude-desktop']) {
+      window.agentTest.data.targets.push({ id: agent, agent, config_root: `/fixture/${agent}`, source: 'home', supported: true, status: 'ready', catalog_version: '', templates: [] });
+      for (const model of window.agentTest.data.models) model.available_targets.push(agent);
+    }
+  });
+  await page.getByRole('button', { name: '重新识别', exact: true }).click();
+  const desktop = page.getByRole('switch', { name: 'Claude Desktop 托管', exact: true });
+  const cli = page.getByRole('switch', { name: 'Claude Code CLI 托管', exact: true });
+  await desktop.click();
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Chat、Cowork 和 Code');
+  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([]);
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([]);
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(desktop).toBeChecked();
+  await expect(cli).not.toBeChecked();
+  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([expect.objectContaining({ target_id: 'claude-desktop', approved: true, model_scope: 'all-mapped' })]);
+  await cli.click();
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await expect(cli).toBeChecked();
+  await desktop.click();
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(desktop).not.toBeChecked();
+  await expect(cli).toBeChecked();
+});

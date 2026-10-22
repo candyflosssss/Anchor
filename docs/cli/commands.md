@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-21
+- 最近核对：2026-10-22
+- 2026-10-22 当前源码新增 Claude Desktop 独立适配器及 Claude CLI 完整映射菜单（CLI 2.1.242+）；尚未打包，已安装 desktop.64 不含本轮增量，详见 §8。
 - 2026-10-21 desktop.64 dev 已发布：同版 CLI／核心包含 Key 分数冷却及 `settings key-cooldown --error-window-seconds`、会话保持、`model routing` 顺序保存和首字测试结果；桌面支持拖动与快速排序。独立 alpha.6 CLI 不含这些增量；本轮仅更新交付状态，无新增命令契约。详见[发行记录](../release/desktop.md#routing-priority-64)。
 - 2026-10-21 desktop.61 dev 已发布：原生 Responses 发送前移除历史 reasoning 中显式为 null、非字符串或空字符串的 encrypted_content 及对应 id，保留摘要、非空密文及其他历史条目；只修改派发副本，不新增请求、命令或开关，不记为报错后清理重试。缺少密文字段的条目不改写，既有明确密文拒绝后恢复机制保留。需升级核心才生效，详见[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。
 - 适用实现：源码默认 `0.1.0-dev`，发行构建使用注入版本；均为当前开发里程碑，不是稳定发布。
@@ -612,7 +613,7 @@ anchor agent sync ID --revision N
 
 作用域为所选 Context 的核心所在机器，需要兼容的新版核心在线。`discover` 无参数，只读返回 `{targets, bindings, models}`。目标包含路径、来源、适配状态、可选缓存版本和模板摘要；绑定包含 `adapter_id`、revision、默认模型、授权模型及恢复状态。models 的 `available_targets` 直接依据全部模型映射和至少一个启用供应商候选计算，不要求 tools、streaming 或 Codex 元数据，不做上游健康探测。接口不返回令牌或完整模型指令。
 
-发现范围为绝对路径 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`DSH_HOME`，以及 `~/.codex`、`~/.claude`、`~/.dsh`、`~/.gemini`、`~/.config/opencode`；Windows 另查用户 `AppData/Roaming/opencode`。同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录痕迹不证明已安装或运行。当前 Codex、Claude Code、DSH Web（`dsh`）、DSH Desktop（`dsh-desktop`）可独立托管；Gemini/OpenCode 只识别。DSH 两端共用 home，但返回不同目标 ID；Desktop 仅在 `profiles/desktop` 已存在时发现，不替桌面应用初始化 profile。
+发现范围为绝对路径 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`DSH_HOME`，以及 `~/.codex`、`~/.claude`、`~/.dsh`、`~/.gemini`、`~/.config/opencode`；Windows 另查用户 `AppData/Roaming/opencode`。Claude Desktop 另查 Linux `${XDG_CONFIG_HOME:-~/.config}/Claude-3p/configLibrary`、Windows `%LOCALAPPDATA%/Claude-3p/configLibrary`（缺失变量时用用户 AppData/Local）、macOS `~/Library/Application Support/Claude-3p/configLibrary`。同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录痕迹不证明已安装或运行。当前 Codex、Claude Code CLI（`claude`）、Claude Desktop（`claude-desktop`）、DSH Web（`dsh`）、DSH Desktop（`dsh-desktop`）可独立托管；Gemini/OpenCode 只识别。DSH 两端共用 home，但返回不同目标 ID；DSH Desktop 仅在 `profiles/desktop` 已存在时发现，不替桌面应用初始化 profile。
 
 `enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不依赖本地模型缓存；Codex 会生成 Anchor 自有的模型目录并设置 `model_catalog_json`，Claude/DSH 则更新各自配置内的名单。Codex 优先保留模型已声明的元数据，或复用接管前配置明确引用、且位于配置根内的本地目录中精确公开 ID／唯一上游 ID 匹配项；不改写用户目录文件，停止托管时恢复原目录指针。没有模板时导出保守模型条目，并使用 Anchor 明示的通用编程助手指令（不是官方模型模板）；Codex 不接受完全缺失指令的条目。已有指令保持不变，不借用其他模型模板，不推测上下文长度或推理档位。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
 
@@ -638,23 +639,31 @@ Codex 目录导出把模型设置中的推理档位投影为客户端可表示�
 
 Codex provider 的 Anchor 注释不是所有权凭据；journal 才是恢复依据。第三方 TOML 序列化删掉注释、重排普通／带引号／嵌套 provider table 时，按语义定位既有托管表，完整核对结果并保留其他配置。显式修复可以在受保护备份后整份重写，但只使用已登记的托管快照，不把未知内容当成 Anchor 所有权；后台同步仍不抢回外部修改。
 
+### Claude CLI 与 Desktop（2026-10-22，当前源码未打包）
+
+- `claude` 保持 CLI 适配器身份；`claude-desktop` 是独立绑定、凭据与恢复记录，两端互不代替。`agent discover/enroll/add/inspect/plan/apply/sync/disable` 复用现有入口。
+- CLI 把授权范围内的映射写入 `availableModels` 和 `modelPicker.options`，映射 ID 是实际路由值，display_name 是菜单标签；`replaceBuiltInOptions=true`。完整 `/model` 列表需要 Claude Code **2.1.242+**。不按三档限制数量：all-mapped 下有多少具备启用供应商的映射就写多少；single 仍只写默认模型。旧版客户端可能只显示默认自定义项和可识别的 Claude ID。保留网关发现作为补充；仅靠发现会过滤不含 claude/anthropic 的名字。Sonnet/Opus/Haiku/subagent 别名目前仍统一指向所选默认模型，不提供独立角色分配。AWS/Bedrock/Vertex/Foundry 路由开关在托管期间关闭，停用条件恢复。
+- Desktop 须先自行开启 Developer Mode 并应用本地第三方推理配置。无有效本地配置返回 `desktop_setup_required`，检测到组织策略返回 `desktop_policy_present`；这两个状态都不能直接开启托管。当前保守拒绝任何已发现的组织策略（含仅行为设置），以及 bootstrap/hybrid 远程配置。只接管当前已应用配置，绑定新增可选 `claude_desktop_profile` 固定 UUID；切换 Desktop 配置后拒绝继续更新，需返回原配置。恢复按原日志处理固定文件，不切换 Desktop 的当前选择。一个 configLibrary 仅登记一个绑定。
+- Desktop 写入 gateway 地址（无 `/v1` 后缀）、独立 bearer 绑定凭据、static 认证、`inferenceModels` 和 `modelDiscoveryEnabled=false`；默认模型排第一，其余映射全量列出并带显示标签。旧凭据 helper/OIDC/custom headers 在托管期间移除，按字段保存并条件恢复。不会写 CLI settings、共享 skills/hooks/MCP。配置可能同时影响 **Chat、Cowork、Code 的请求去向及计费来源**；GUI 首次开启有单独确认，CLI 的 `--approve` 批准这一范围。应用或恢复后须完全退出并重开 Desktop。
+- 当前仅配置层验证，实际连接仍 `unknown`。远程开发、WSL/SSH 引擎是否能访问本机网关未验收；远端 localhost 不等于桌面主机。Desktop Auto mode 的分类器默认请求 `claude-sonnet-5`，未配置该精确映射时可能阻止操作；Anchor 不自动伪造这个映射。没有新增 `/v1/messages/count_tokens` 或承诺 tool search、签名思考跨协议转换及 Claude 专属错误恢复。原生 Anthropic 版本/beta 头处理见[协议契约](../design/protocol-translation.md#claude-请求头2026-10-22当前源码未发布)。真实 CLI/Desktop、Windows 原生窗口与付费上游尚待验收。
+
 ### `agent add`
 
 ```text
-anchor agent add --id ID [--adapter codex|claude|dsh|dsh-desktop] --config-root ABS_DIR --model MODEL --approve
+anchor agent add --id ID [--adapter codex|claude|claude-desktop|dsh|dsh-desktop] --config-root ABS_DIR --model MODEL --approve
                  [--anchor-executable ABS_PATH] [--model-scope all-compatible|all-mapped|single]
 ```
 
 - 作用域：所选 Context 的目标实例；路径按目标机器解释。支持本机及已连接 SSH Context。
-- `--id` 必填，符合中文命名规则且最多 64 个 UTF-8 字节；`--adapter` 默认 `codex`，支持 `codex|claude|dsh|dsh-desktop`，适配器修订固定为 `1`。
-- `--config-root` 必填绝对目录，必须已存在；`--codex-home` 为仅限 Codex 的旧参数别名，二者不可同时传。Codex 修改基础 `config.toml` 和可选目录；Claude 修改 `settings.json`；`dsh` 修改已有 `profiles/web` 下的 `cordis.patch.yml`，`dsh-desktop` 修改已有 `profiles/desktop` 下同名文件；二者的 `--config-root` 均为 DSH home，不是 profile 子目录，不创建 profile 目录。
+- `--id` 必填，符合中文命名规则且最多 64 个 UTF-8 字节；`--adapter` 默认 `codex`，支持 `codex|claude|claude-desktop|dsh|dsh-desktop`，适配器修订固定为 `1`。
+- `--config-root` 必填绝对目录，必须已存在；`--codex-home` 为仅限 Codex 的旧参数别名，二者不可同时传。Codex 修改基础 `config.toml` 和可选目录；Claude CLI 修改 `settings.json`；Claude Desktop 的根须为已经初始化的 `configLibrary`，只改 `_meta.json` 中 appliedId 指向的现存本地 `<UUID>.json`，不创建配置、不修改指针；`dsh` 修改已有 `profiles/web` 下的 `cordis.patch.yml`，`dsh-desktop` 修改已有 `profiles/desktop` 下同名文件；二者的 `--config-root` 均为 DSH home，不是 profile 子目录，不创建 profile 目录。
 - `--model` 必填，指定**默认公开模型**，不是 all-mapped/all-compatible 的权限边界；仅 Codex single/all-compatible 要求 tools/streaming，声明不是上游能力探测。
 - `--model-scope` Codex 默认 `all-compatible`，Claude/DSH 默认 `all-mapped`。all-mapped 授权所有具备启用供应商候选的映射，不要求 Codex 元数据或能力标记；all-compatible 仅支持 Codex：凭据可使用所有 tools/streaming、具有与绑定精确版本匹配的有效 Codex 元数据、且至少一个候选供应商 enabled 的公开模型；默认模型也必须在其中。版本从默认模型元数据固定到绑定。不是供应商健康探测，也不是任意/未知模型放行。
 - `single` 只授权默认模型；有元数据时生成单模型目录，无元数据时保留旧的仅配置方式，Codex 需自行识别 slug 或已有目录。旧 Binding 未填 scope 时仍为单模型，升级不会静默扩权。
 - `--anchor-executable` 默认当前 CLI 可执行文件的绝对路径；必须是目标机器现存、稳定的 Anchor 二进制。**不要把 `go run` 临时二进制作为长期 helper**，源码入口使用此命令时必须显式传稳定路径。搬动/删除二进制会破坏认证；目前没有修改 helper 路径的命令。
 - `--approve` 必填显式为 true：批准长期配置管理、下次 `serve` 自动接管与正常停服恢复。只登记 SQLite/凭据，不立即改配置；当前服务中的接管需 `agent plan` + `agent apply`，或重启服务。
 - 输出 Binding 元数据，`enabled:true`、`revision:1`，无秘密；同一规范化配置根只能登记一个 Binding，唯一例外是同一 DSH home 可各登记一个 `dsh` 与 `dsh-desktop`，分别拥有 web/desktop profile；禁用亦保留所有权。旧 `dsh` 绑定及目标 ID 保持不变，不自动迁移或同时接管 Desktop。Linux 配置根/文件须当前用户所有且不可被组/其他用户写入；符号链接、硬链接配置文件和 Windows reparse point 拒绝。
-- Codex 支持基础配置，已选择 profile、WebSocket 和不支持的 TOML 结构拒绝。Claude 仅管理用户 settings 的默认模型、availableModels、Anthropic 网关/auth/default/subagent 环境字段及 apiKeyHelper；项目/策略/CLI 覆盖不探测。DSH Web/Desktop 仅管理各自 profile 的 llm-pi-ai 命名路由与 agent-default-model，使用 openai-completions 和公开映射；现有其他路由及 YAML 注释/自定义标量标签保留，insert、别名/合并和重复键拒绝。不会执行 Agent、自定义脚本或安装流程。DSH 不改 home 级 patch、凭据库或 Electron 壳设置；高优先级 home/运行时覆盖不探测。默认模型用于新会话，未启用 HMR 时须重启；Desktop 需完全退出应用，关闭窗口可能只是隐藏。
+- Codex 支持基础配置，已选择 profile、WebSocket 和不支持的 TOML 结构拒绝。Claude CLI 仅管理用户 settings 的默认模型、availableModels、modelPicker、Anthropic 网关/auth/default/subagent 环境字段及 apiKeyHelper；项目/策略/CLI 覆盖不探测。Claude Desktop 的独立字段及范围见上方说明。DSH Web/Desktop 仅管理各自 profile 的 llm-pi-ai 命名路由与 agent-default-model，使用 openai-completions 和公开映射；现有其他路由及 YAML 注释/自定义标量标签保留，insert、别名/合并和重复键拒绝。不会执行 Agent、自定义脚本或安装流程。DSH 不改 home 级 patch、凭据库或 Electron 壳设置；高优先级 home/运行时覆盖不探测。默认模型用于新会话，未启用 HMR 时须重启；Desktop 需完全退出应用，关闭窗口可能只是隐藏。
 
 ### `agent list` / `agent inspect` / `agent plan`
 

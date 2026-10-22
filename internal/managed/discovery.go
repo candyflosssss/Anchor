@@ -17,7 +17,7 @@ import (
 )
 
 // Environment is supplied by the local host, never by a remote/UI path argument.
-type Environment struct{ Home, CodexHome, ClaudeHome, DSHHome, Executable string }
+type Environment struct{ Home, CodexHome, ClaudeHome, ClaudeDesktopHome, DSHHome, Executable string }
 
 func LocalEnvironment() (Environment, error) {
 	home, err := os.UserHomeDir()
@@ -28,7 +28,7 @@ func LocalEnvironment() (Environment, error) {
 	if err != nil {
 		return Environment{}, err
 	}
-	return Environment{Home: home, CodexHome: os.Getenv("CODEX_HOME"), ClaudeHome: os.Getenv("CLAUDE_CONFIG_DIR"), DSHHome: os.Getenv("DSH_HOME"), Executable: exe}, nil
+	return Environment{Home: home, CodexHome: os.Getenv("CODEX_HOME"), ClaudeHome: os.Getenv("CLAUDE_CONFIG_DIR"), ClaudeDesktopHome: claudeDesktopDataRoot(home, os.Getenv("XDG_CONFIG_HOME"), os.Getenv("LOCALAPPDATA"), runtime.GOOS), DSHHome: os.Getenv("DSH_HOME"), Executable: exe}, nil
 }
 
 type CatalogTemplate struct {
@@ -82,6 +82,13 @@ func Discover(env Environment) ([]AgentTarget, error) {
 		struct{ agent, root, source string }{"gemini", filepath.Join(env.Home, ".gemini"), "home"},
 		struct{ agent, root, source string }{"opencode", filepath.Join(env.Home, ".config", "opencode"), "home"},
 	)
+	desktopRoot := env.ClaudeDesktopHome
+	if desktopRoot == "" {
+		desktopRoot = claudeDesktopDataRoot(env.Home, "", "", runtime.GOOS)
+	}
+	if filepath.IsAbs(desktopRoot) {
+		candidates = append(candidates, struct{ agent, root, source string }{"claude-desktop", filepath.Join(desktopRoot, "configLibrary"), "desktop-local-inference"})
+	}
 	if runtime.GOOS == "windows" {
 		candidates = append(candidates, struct{ agent, root, source string }{"opencode", filepath.Join(env.Home, "AppData", "Roaming", "opencode"), "home"})
 	}
@@ -102,6 +109,9 @@ func Discover(env Environment) ([]AgentTarget, error) {
 		seen[id] = true
 		st, err := os.Lstat(root)
 		if errors.Is(err, os.ErrNotExist) {
+			if c.agent == "claude-desktop" && (filePresentOrUnreadable(filepath.Dir(root)) || filePresentOrUnreadable(strings.TrimSuffix(filepath.Dir(root), "-3p"))) {
+				out = append(out, AgentTarget{ID: id, Agent: c.agent, ConfigRoot: root, Source: c.source, Supported: true, Status: "desktop_setup_required", Templates: []CatalogTemplate{}})
+			}
 			continue
 		}
 		t := AgentTarget{ID: id, Agent: c.agent, ConfigRoot: root, Source: c.source, Templates: []CatalogTemplate{}, Status: "unsupported"}
@@ -110,11 +120,17 @@ func Discover(env Environment) ([]AgentTarget, error) {
 			out = append(out, t)
 			continue
 		}
-		if c.agent == "claude" || c.agent == "dsh" || c.agent == "dsh-desktop" {
+		if c.agent == "claude" || c.agent == "claude-desktop" || c.agent == "dsh" || c.agent == "dsh-desktop" {
 			t.Supported = true
 			t.Status = "ready"
 			if _, err := AdapterFor(c.agent).Inspect(state.Binding{ConfigRoot: root}); err != nil {
 				t.Status = "config_unsupported"
+				if c.agent == "claude-desktop" {
+					t.Status = "desktop_setup_required"
+					if claudeDesktopPolicyPresent(root) {
+						t.Status = "desktop_policy_present"
+					}
+				}
 			}
 			out = append(out, t)
 			continue

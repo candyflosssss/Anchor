@@ -41,6 +41,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 - 内部表示不能成为静默丢能力的最小公共子集。当前 Responses 形状请求桥可增量复用；`PolicyFields` 仅为旧日志／亲和性逻辑的策略投影，不是通用语义模型或原生发送体。
 - 同协议保留受控原生路径及原生字段，不强制往返其他协议。仍执行鉴权、无状态、工具执行范围、能力校验和生命周期限制；顶层 tools 与 inline additional_tools 同样检查。
 - 原生路径允许设计契约明确列出的规范化，如路由 model／service_tier、Responses store=false、Anthropic 缺省 max_tokens；不得据此任意过滤字段。原生保留签名思考或多模态不代表跨协议支持。
+- 协议请求头只通过类型化非秘密元数据进入 Prepare，由协议层返回固定名单及副本；网关机械写入，不转发客户端认证或任意头。当前仅 Anthropic → Anthropic 保留 anthropic-version/重复 anthropic-beta；跨协议隔离，缺省版本沿用认证层默认。新增头/方向必须同步契约及认证隔离测试，不能从 beta 名称推断已支持能力。
 - 协议标准映射与供应商特性分开。不得按供应商或模型名称猜测 thinking、预算或 Token 字段；特殊行为须有已验证的显式能力配置及针对性测试，由适配器消费。
 
 ## 兼容与恢复

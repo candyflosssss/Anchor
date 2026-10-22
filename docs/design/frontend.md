@@ -414,9 +414,9 @@ Go DTO、生成 TS 和 provider-model-mapping.json 样例同步；Mock 跨平台
 
 侧栏 Agent 托管已启用，核心 ready 时通过受限桌面 Bridge 读取本机发现与绑定；原型模式不读取本机。feature agents 的 agent.model 管 DTO 清洗/运输及核心返回的可用模型，use-agent-controller 管登记草稿、批准、状态/失效和重读，agents.view 只呈现表单与反馈。不得将路径发现或配置写入搬入前端。
 
-2026-10-14 当前源码：页面采用默认折叠的平台列表，常态每行只显示本地品牌 Logo、平台名称、托管开关与展开箭头；固定展示 Codex、Claude Code、Gemini CLI、OpenCode、DSH Web、DSH Desktop（Desktop 为 2026-10-15 当前源码新增），未发现目录或尚无适配器时开关禁用，具体原因仅在本平台展开区展示。多个配置根各有独立行；已登记但当前未发现的目录保留状态与恢复开关，不因识别失败隐藏已有托管。品牌 SVG 随前端打包，保留来源和 MIT 许可，不从远端加载图片。
+2026-10-14 当前源码：页面采用默认折叠的平台列表，常态每行只显示本地品牌 Logo、平台名称、托管开关与展开箭头；固定展示 Codex、Claude Code CLI、Claude Desktop、Gemini CLI、OpenCode、DSH Web、DSH Desktop（Claude Desktop 为 2026-10-22 当前源码新增），未发现目录或尚无适配器时开关禁用，具体原因仅在本平台展开区展示。多个配置根各有独立行；已登记但当前未发现的目录保留状态与恢复开关，不因识别失败隐藏已有托管。品牌 SVG 随前端打包，保留来源和 MIT 许可，不从远端加载图片。
 
-配置目录、适配/缓存状态、缓存版本、默认模型与同步操作全部收进对应行的折叠区域；取消独立的发现卡片和已登记目标卡片，删除重复可用模型清单、不可用模型长段落与批准勾选框。初次点击关闭的开关先展开设置，选择默认模型并明确点击「开启托管」后才提交 approved=true；开关在核心成功前保持关闭。已登记目标通过开关重新启用，关闭开关继续确认条件恢复的影响。已登记目标只保留「更新配置」：确认后一次提交当前默认模型、更新最新映射并重新应用托管配置；外部变化值保存为停用时的恢复基线。提交空 model_templates，移除旧目标级模板覆盖/排除，不改供应商映射。默认选择器展示全部模型映射，没有启用供应商的项禁用；不要求 Codex 元数据或工具/流式标记。旧默认失效时回落到可用项，无可用项时阻止提交。桌面显式登记 all-mapped，模型视图不重复维护另一套目录。失败后重读、不重放写入，写入期间阻止重复提交，实例变化卸载旧页面及异步结果。应用后提示重启相应客户端；DSH 默认模型在新会话生效，配置成功和真实链路验证仍分开。DSH 支持绝对路径 DSH_HOME 与 ~/.dsh 发现。Codex、Claude Code 用户 settings、DSH Web 与 Desktop profile 已接入配置托管，Gemini/OpenCode 仍只识别。DSH Desktop 使用独立 dsh-desktop 适配器及行，同 home 匹配绑定还须检查 adapter_id，分别启停、选择默认模型、同步及恢复；未初始化的 Desktop 不自动创建 profile。默认模型需新会话，未启用 HMR 时完全退出并重启，Desktop 关闭窗口可能只是隐藏。不修改 Electron 壳设置或 DSH 公共 patch；真实 Desktop 和原生窗口未验收。
+配置目录、适配/缓存状态、缓存版本、默认模型与同步操作全部收进对应行的折叠区域；取消独立的发现卡片和已登记目标卡片，删除重复可用模型清单、不可用模型长段落与批准勾选框。初次点击关闭的开关先展开设置，选择默认模型并明确点击「开启托管」后才提交 approved=true；开关在核心成功前保持关闭。已登记目标通过开关重新启用，关闭开关继续确认条件恢复的影响。已登记目标只保留「更新配置」：确认后一次提交当前默认模型、更新最新映射并重新应用托管配置；外部变化值保存为停用时的恢复基线。提交空 model_templates，移除旧目标级模板覆盖/排除，不改供应商映射。默认选择器展示全部模型映射，没有启用供应商的项禁用；不要求 Codex 元数据或工具/流式标记。旧默认失效时回落到可用项，无可用项时阻止提交。桌面显式登记 all-mapped，模型视图不重复维护另一套目录。失败后重读、不重放写入，写入期间阻止重复提交，实例变化卸载旧页面及异步结果。应用后提示重启相应客户端；DSH 默认模型在新会话生效，配置成功和真实链路验证仍分开。DSH 支持绝对路径 DSH_HOME 与 ~/.dsh 发现。Codex、Claude Code CLI 用户 settings、Claude Desktop 本地推理配置、DSH Web 与 Desktop profile 已接入配置托管，Gemini/OpenCode 仍只识别。DSH Desktop 使用独立 dsh-desktop 适配器及行，同 home 匹配绑定还须检查 adapter_id，分别启停、选择默认模型、同步及恢复；未初始化的 Desktop 不自动创建 profile。默认模型需新会话，未启用 HMR 时完全退出并重启，Desktop 关闭窗口可能只是隐藏。不修改 Electron 壳设置或 DSH 公共 patch；真实 Desktop 和原生窗口未验收。
 
 实现契约见 desktop-runtime.md 的 Agent 增量；对应 discover/enroll/sync CLI 和边界见唯一指令大全 §8。原生 Windows 安装与 Codex 模型选择器仍需单独验收。
 
@@ -769,3 +769,7 @@ SSH 更新 Controller 使用独立的远端错误映射：旧 CLI 不支持、�
 ### CC Switch 一键导入（2026-10-21，源码未发布）
 
 供应商列表提供「从 CC Switch 导入」，按当前实例自动读取全部平台的供应商清单，弹窗预览地址、来源、Key协议、模型映射及不可转换原因，明确确认后启用。前端 Model 使用类型化 ImportCCSwitch 桥接，hook Controller 管理预览／同步提交锁／冲突重读／取消后的迟到结果，View 复用现有 shadcn Dialog 与列表控件；原型模式禁用真实导入。密钥不进入前端，成功刷新现有工作台权威列表，不宣称已通过上游推理验证。契约和支持范围见[供应商接口](provider-interface.md#cc-switch-导入契约2026-10-21源码实现未打包)，CLI同步覆盖见[指令大全](../cli/commands.md#cc-switch-供应商导入2026-10-21当前源码未发布)。
+
+### Claude CLI／Desktop 接入（2026-10-22，源码未打包）
+
+Agent Model 保持七个平台行，Claude CLI/Desktop 按各自 adapter_id + 根匹配绑定，发现缺失也保留恢复入口；沿用 AgentWorkspace 字符串身份，不新增任意文件/系统命令桥接。hook Controller 对首次 Desktop 开启也要求确认，取消不提交；View 说明当前本地第三方配置可能影响 Chat/Cowork/Code 的请求与计费，应用/恢复须完全退出重开。CLI 提示完整菜单需要 2.1.242+；Desktop 提示先初始化本地配置、组织策略拒绝、切换后返回原配置才可更新。模型选择和可用性继续复用核心映射，前端不推测 Claude 能力。新增 desktop_setup_required/desktop_policy_present 的只读原因展示；实际保护由核心执行。受控桥接测试不代替真实 Claude 或 Wails 原生窗口验收。

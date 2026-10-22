@@ -1,7 +1,7 @@
 # Anchor 托管层与 Agent 接入契约
 
 - 日期：2026-10-10
-- 状态：部分落地；托管/恢复引擎与 Codex 全局配置 v1 已实现，其余仍是设计
+- 状态：部分落地；Codex、Claude CLI／Desktop、DSH Web／Desktop 配置适配已实现；声明式扩展等仍是设计
 - 适用范围：无头常驻服务与 CLI；Linux / Windows；优先 Codex、CC（Claude Code）、DSH。
 - 不提供：Agent 执行引擎、任意脚本执行平台、系统全局代理、多设备同步。
 
@@ -422,3 +422,21 @@ TOML provider 的所有权来自恢复日志和实际配置表路径，起止注
 已托管配置损坏或删除时，「更新配置」与 CLI sync 可用最后一次已验证快照恢复；正常文件优先局部更新，无法表达的有效 TOML 在完整备份后重新序列化。后台同步不覆盖外部漂移。
 
 Codex 另提供「备份并重建配置」，包括未登记、profile 或 WebSocket 覆盖配置。Controller 冻结所选模型／revision，确认整体替换影响后只提交一次 EnrollAgent(rebuild=true, all-mapped, approved=true, model_templates={})；取消不写，失败只重读、不自动重放。核心先备份原文件和旧 journal，再按空配置生成并校验连接及最新模型目录，按当前快照原子替换；不从坏文件猜测设置。原来的其他设置仅在 recovery 完整备份保留，停用不自动还原坏配置。已有凭据不旋转，revision 仍必检，无法备份／不可写／危险路径仍明确失败。旧核心须升级，字段省略不改变行为。新绑定无需本地模型缓存。隔离 Mock 与真实桥接验证分别记录，不代表原生窗口和付费上游通过。
+
+## 2026-10-22 Claude CLI／Desktop 独立接入（当前源码，未打包）
+
+`claude` 继续管理 CLI 用户 settings；新增 `claude-desktop` 管理 Desktop 本地第三方推理配置。两端复用 Manager/Engine、绑定鉴权、动态映射授权、条件恢复与冲突机制，分别发现、选择默认模型、同步、启停。前端不写文件，也不执行 Claude。未新增 Agent 执行引擎或对话托管系统。
+
+CLI 在现有 availableModels/默认环境字段之上增加 modelPicker.options（model=映射 ID、label=显示名）及 replaceBuiltInOptions=true，需要 Claude Code 2.1.242+。不含 claude/anthropic 的别名也能进入显式列表，旧版只保证原有默认项/发现路径。授权 all-mapped 写全部可用映射，single 保持单项；三档与 subagent 目前共用默认模型，不按名称推测能力。补充关闭 ANTHROPIC_AWS 开关；新增字段在旧 journal 的启动/同步迁移中保存当时原值，恢复不丢用户菜单。
+
+Desktop 的数据目录为 Linux XDG_CONFIG_HOME（缺省 ~/.config）、Windows LOCALAPPDATA、macOS Library/Application Support 下的 Claude-3p。根为 configLibrary；读取 `_meta.json` 的 appliedId，并要求 entries 唯一包含该 UUID，随后只管理同目录现存 UUID.json 的直接配置对象。新 Binding 的 claude_desktop_profile 固定已批准 UUID，更新不能换身份；Plan/Apply/reconcile 写入前重复检查当前指针、文件安全及组织策略。指针变化拒绝，_meta 从不写入。恢复依据 journal 的原固定路径，不重定向当前选择。文件编辑与恢复继续走受保护 journal、字段比较和原子写入。存储格式是当前客户端实现细节，未来变化应先拒绝并重新验证，不能猜测新路径。
+
+托管字段：inferenceProvider=gateway、无 /v1 的 inferenceGatewayBaseUrl、独立 inferenceGatewayApiKey、inferenceGatewayAuthScheme=bearer、inferenceCredentialKind=static、inferenceModels（name/labelOverride，默认排首）、modelDiscoveryEnabled=false；移除并记录旧 helper、OIDC 和 custom headers，避免旧认证优先或错误转发。无需发现名字过滤；不编造上下文、推理能力或官方 tier 标签。只接管已应用本地配置；组织策略、bootstrapUrl、meta hybridPointer 均不覆盖，策略读取失败也拒绝。当前任何已发现策略（含行为专用项）均保守阻止；配置缺失要求用户先在 Desktop Developer Mode 初始化，Anchor 不创建配置库。
+
+Desktop 推理配置可同时影响 Chat/Cowork/Code 和计费来源，初次 GUI 提交增加范围确认，CLI --approve 使用同一批准范围。完全退出重开后才可能加载。CLI settings 和 Desktop 配置分开，共享 skills/hooks/MCP 不在接管范围。一个 configLibrary 只允许一个绑定；切换配置后须返回原配置再同步，原日志仍可恢复。WSL/SSH/远程会话连通性未知，不能把远端 localhost 当成本机。配置成功保持 configuration_only/unknown，不冒充客户端或上游已通过。
+
+资料依据（2026-10-22 收集）：[CLI settings](https://code.claude.com/docs/en/settings-reference)、[gateway](https://code.claude.com/docs/en/llm-gateway-connect)、[Desktop 配置](https://claude.com/docs/third-party/claude-desktop/configuration)、[Desktop MDM](https://claude.com/docs/third-party/claude-desktop/mdm)。本地库文件格式另外核对官方 apt stable 的 Claude Desktop **3.1623.1 amd64** 静态 app.asar：包 SHA256 `731677d2f39b2a7343ee381ec5d3396dd28ec1d832cfcb1f9e4a022e9e80eadb` 与仓库索引一致，未安装/运行；测试夹具沿用 appliedId/entries 和直接配置对象结构。静态核对不等于真实 UI 运行验收。
+
+Desktop Auto mode 的分类器默认调用精确 ID `claude-sonnet-5`；没有该映射或上游不接受相应 beta 头时可能阻止操作，不为此自动生成模型别名。
+
+尚未实现：messages/count_tokens、Claude 专属错误信号/上下文恢复、托管 tool search 执行、签名思考跨协议转换、独立角色模型配置、远程引擎网关布置及客户端版本自动探测。原生 Anthropic 请求头支持属于[协议层](protocol-translation.md#claude-请求头2026-10-22当前源码未发布)，不在托管适配器重复实现。

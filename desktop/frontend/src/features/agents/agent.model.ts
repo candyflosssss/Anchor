@@ -34,6 +34,8 @@ export function createAgentService(getBridge: () => DesktopBridge = bridge) { re
 export const agentService = createAgentService();
 
 export const targetStatus: Record<string, string> = {
+  desktop_setup_required: '请先在 Claude Desktop 的 Developer → Configure Third-Party Inference 中创建并应用本地配置；不支持的配置格式也需要在客户端核对',
+  desktop_policy_present: '检测到组织管理策略，Anchor 不修改；请由管理员配置',
   ready: '可托管', unsupported: '尚无适配器', unsafe: '目录权限或类型不支持', config_unsupported: '配置含暂不支持的覆盖或传输设置',
   catalog_unavailable: '无法读取模型缓存。请核对该目录的 models_cache.json，重新启动不一定能解决',
   catalog_missing: '该目录没有 models_cache.json。请核对 Codex 使用的 CODEX_HOME；只有生成缓存后才能设置托管',
@@ -77,7 +79,7 @@ export function agentRows(data: AgentWorkspace): AgentRow[] {
   for (const binding of data.bindings) {
     if (!rows.some(row => row.binding?.id === binding.id)) rows.push({ id: `binding-${binding.id}`, agent: binding.adapter_id, binding });
   }
-  const platforms = ['codex', 'claude', 'gemini', 'opencode', 'dsh', 'dsh-desktop'];
+  const platforms = ['codex', 'claude', 'claude-desktop', 'gemini', 'opencode', 'dsh', 'dsh-desktop'];
   for (const agent of platforms) if (!rows.some(row => row.agent === agent)) rows.push({ id: `platform-${agent}`, agent });
   return rows.sort((a, b) => (platforms.indexOf(a.agent) < 0 ? platforms.length : platforms.indexOf(a.agent)) -
     (platforms.indexOf(b.agent) < 0 ? platforms.length : platforms.indexOf(b.agent)));

@@ -139,6 +139,11 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 		if err != nil {
 			return err
 		}
+		if p.check != nil {
+			if err := p.check(); err != nil {
+				return err
+			}
+		}
 		if p.Path != j.Path || (j.Catalog != nil && (p.catalog == nil || p.catalog.Path != j.Catalog.Path)) {
 			return ErrUnsafe
 		}
@@ -226,6 +231,11 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 			}
 		}
 		if !bytes.Equal(observed, next) || !exists {
+			if p.check != nil {
+				if err := p.check(); err != nil {
+					return err
+				}
+			}
 			if err := atomicWrite(root, j.Path, next, fingerprint(observed, exists), true); err != nil {
 				return err
 			}

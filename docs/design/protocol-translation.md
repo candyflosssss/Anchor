@@ -9,7 +9,7 @@
 ```text
 HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
         → 网关选择模型、候选和 Key
-        → Session.Prepare(AttemptOptions) → Attempt.RequestBody / Endpoint
+        → Session.Prepare(AttemptOptions) → Attempt.RequestBody / RequestHeaders / Endpoint
         → 网关认证、网络发送、期限、响应类型检查
         → Attempt.TranslateResponse / TranslateStream
         → 网关 HTTP 交付、重试决策、日志和用量持久化
@@ -89,3 +89,9 @@ Diagnostics 只含客户端／上游协议、request/response/stream 阶段、�
 ### 网关调度会话与重试边界（2026-10-21，当前源码未发布）
 
 显式会话由 `X-Anchor-Session` 或 Codex thread/session 元数据确定；不再以提示词相似度推测会话。仅在会话请求成功后记住渠道，后续优先复用；该渠道没有可用 Key／供应商不可用时按当前顺序 fallback，新会话按当前映射优先级开始。粘性仅影响网关调度，不表示上游必然缓存命中；进程重启或有界会话表淘汰后重新选择。连接前传输失败及明确 HTTP 失败可尝试下一候选；连接后的超时／传输结果不明不重放。任何客户端流式输出开始后不重放。
+
+## Claude 请求头（2026-10-22，当前源码未发布）
+
+AttemptOptions.ClientMetadata 只接受类型化的 AnthropicVersion/AnthropicBeta，不含认证；网关从请求头提取后交给 Prepare，协议层仅在 Anthropic → Anthropic 原生路径生成 anthropic-version/anthropic-beta。重复 beta 值和顺序保留，缺少客户端 version 时保持供应商认证层既有默认值；RequestHeaders 返回副本，每次 Attempt 独立。Anthropic 与其他协议之间转换不复制这些客户端头，避免对目标协议虚报能力。此处仅保留能力声明，不据此新增 tool search 或其他未验证语义。
+
+网关在应用供应商认证后机械写入协议层返回的固定头，不转发客户端 Authorization/x-api-key/cookie/任意 custom headers，不记录原始头值，不扩大重试预算。签名思考/cache_control 在原生请求体上继续沿用既有保留契约；跨协议仍按已有能力表拒绝或转换。新增测试覆盖原生声明/认证替换、重复 beta、跨协议隔离及请求副本，不代表真实 Claude 或付费上游验收。
