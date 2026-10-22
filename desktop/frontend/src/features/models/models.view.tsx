@@ -33,16 +33,24 @@ function MappingKey({ source, candidate: m, rates, children, disabled, onOpen }:
   const key = rates.keys[id] ?? source.key;
   const multiplier = effectiveRouteMultiplier({ ...m, key_ids: [source.id], keys: key ? [{ ...key, enabled: source.key?.enabled ?? false, state: source.key?.state ?? 'disabled' }] : [] });
   const rateDetail = `供应商 ${m.cost_multiplier}× · 模型 ${m.multiplier}× · 分组倍率 ${key?.rate?.multiplier == null ? '未知' : `${key.rate.multiplier}×`} · 相对倍率 ${key?.effective_multiplier == null ? '未知' : `${key.effective_multiplier}×`}${key?.rate?.failure ? key.rate.multiplier == null ? ' · 刷新失败，尚无有效缓存。' : ' · 刷新失败，沿用上次成功缓存。' : ''}`;
+  const group = key?.rate?.group_name || key?.rate?.group;
   return <div className={`mapping-key-card mapping-key-rate availability-${state.state}`} role="group" aria-label={`${m.provider_id} · ${source.anonymous ? '匿名来源' : `Key ${source.id}`}`}>
-    <div className="mapping-source-header">
-      <span className={`channel-status state-${state.state}`} title={`${m.provider_enabled ? '供应商已启用' : '供应商已停用'} · ${state.reason}`}><span className="sr-only">{state.label}</span></span>
-      <button className={`candidate tone-${m.tone}`} disabled={disabled} title={`${m.provider_id} · ${m.upstream}`} aria-label={`${m.provider_id}（${m.label}）上游 ${m.upstream}，编辑映射`} onClick={() => onOpen(m.provider_id, 'models')}><strong>{m.provider_id}</strong></button>
-      <strong className="mapping-effective-rate" tabIndex={0} aria-label={`排序倍率 ${multiplier == null ? '未知' : `${Number(multiplier.toPrecision(6))}倍`}`} title={rateDetail}>{rates.pending === id ? <LoaderCircle size={14} className="route-spinner" aria-label="查询中" /> : multiplier == null ? '—' : `${Number(multiplier.toPrecision(6))}×`}</strong>
+    <div className="mapping-key-identity">
+      <div className="mapping-source-header">
+        <span className={`channel-status state-${state.state}`} title={`${m.provider_enabled ? '供应商已启用' : '供应商已停用'} · ${state.reason}`}><span className="sr-only">{state.label}</span></span>
+        <button className={`candidate tone-${m.tone}`} disabled={disabled} title={`${m.provider_id} · ${m.upstream}`} aria-label={`${m.provider_id}（${m.label}）上游 ${m.upstream}，编辑映射`} onClick={() => onOpen(m.provider_id, 'models')}><strong>{m.provider_id}</strong></button>
+      </div>
+      <div className="mapping-key-name" aria-label={`来源 Key ${source.id}`} title={source.anonymous ? '匿名来源' : source.id}>{source.anonymous ? '匿名来源' : source.id}</div>
+      <span className="mapping-key-status sr-only">{source.key && (source.key.enabled ? 'Key 已启用' : 'Key 已停用')}</span>
     </div>
-    <div className="mapping-key-name" aria-label={`来源 Key ${source.id}`} title={source.anonymous ? '匿名来源' : source.id}>{source.anonymous ? '匿名来源' : source.id}</div>
-    <span className="mapping-key-status sr-only">{source.key && (source.key.enabled ? 'Key 已启用' : 'Key 已停用')}</span>
-    {(state.state !== 'available' || source.key?.state === 'degraded') && <span className="mapping-key-issue">{state.label}</span>}
-    {failure && <span className="mapping-rate-failure" role="alert" title={failure}>倍率刷新失败<span className="sr-only">：{failure}</span></span>}
+    <div className="mapping-key-feedback">
+      {(state.state !== 'available' || source.key?.state === 'degraded') && <span className="mapping-key-issue">{state.label}</span>}
+      {failure && <span className="mapping-rate-failure" role="alert" title={failure}>倍率刷新失败<span className="sr-only">：{failure}</span></span>}
+    </div>
+    <div className="mapping-key-pricing">
+      <strong className="mapping-effective-rate" tabIndex={0} aria-label={`排序倍率 ${multiplier == null ? '未知' : `${Number(multiplier.toPrecision(6))}倍`}`} title={rateDetail}>{rates.pending === id ? <LoaderCircle size={14} className="route-spinner" aria-label="查询中" /> : multiplier == null ? '—' : `${Number(multiplier.toPrecision(6))}×`}</strong>
+      <span className="mapping-key-group" aria-label={`分组 ${group || '未知'}`} title={group || '分组未知'}>{group || '—'}</span>
+    </div>
     {children}
   </div>;
 

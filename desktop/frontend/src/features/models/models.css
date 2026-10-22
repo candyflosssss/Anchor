@@ -10,22 +10,34 @@
 .route-toolbar > select { width: auto; max-width: 100%; font-size: 12px; height: 32px; }
 .route-quick-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .route-quick-sort > span { font-size: 12px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.model-card .candidate-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 12px; padding: 0; margin: 0; list-style: none; }
+.model-card .candidate-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 0; margin: 0; list-style: none; }
 /* The route wrapper owns order only. Every source Key has its own visible card. */
 .mapping-candidate { display: contents; }
-.mapping-key-card { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px 14px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--surface)); }
+.mapping-key-card { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(80px, 140px) 78px; align-items: center; gap: 16px; min-width: 0; padding: 12px 14px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--surface)); }
+.mapping-key-identity { display: grid; gap: 4px; min-width: 0; }
+.mapping-key-feedback { display: grid; gap: 4px; min-width: 0; }
+.mapping-key-pricing { display: grid; justify-items: end; gap: 4px; min-width: 0; }
+.mapping-key-group { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: hsl(var(--muted-foreground)); font-size: 12px; }
 .mapping-source-header { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .mapping-source-header .candidate { flex: 1; border: 0; border-radius: 4px; min-width: 0; background: transparent; padding: 0; text-align: left; color: hsl(var(--foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mapping-source-header .candidate strong { font-size: 13px; font-weight: 600; }
 .mapping-source-header .candidate:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; }
 .mapping-source-header .candidate:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
-.mapping-key-name { min-width: 0; font-size: 12px; color: hsl(var(--muted-foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 78px; }
+.mapping-key-name { min-width: 0; font-size: 12px; color: hsl(var(--muted-foreground)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mapping-effective-rate { flex-shrink: 0; font-size: 14px; line-height: 1.5; font-weight: 600; font-variant-numeric: tabular-nums; }
 .mapping-key-issue, .mapping-rate-failure { font-size: 11px; color: hsl(var(--destructive)); overflow-wrap: anywhere; }
 .mapping-key-card.availability-available .mapping-key-issue { color: hsl(var(--warning)); }
 .mapping-key-card.availability-unknown .mapping-key-issue { color: hsl(var(--muted-foreground)); }
-.mapping-route-controls { position: absolute; bottom: 7px; right: 8px; display: flex; align-items: center; gap: 2px; opacity: 0; pointer-events: none; }
+.mapping-route-controls { display: flex; justify-content: flex-end; align-items: center; gap: 2px; opacity: 0; pointer-events: none; }
 .mapping-key-card:hover .mapping-route-controls, .mapping-key-card:focus-within .mapping-route-controls, .is-sorting .mapping-route-controls { opacity: 1; pointer-events: auto; }
+@media (max-width: 480px) {
+  .mapping-key-card { grid-template-columns: minmax(0, 1fr) minmax(50px, 90px) 78px; gap: 8px; padding: 10px; }
+  .mapping-key-identity { grid-column: 1; grid-row: 1; }
+  .mapping-key-pricing { grid-column: 2; grid-row: 1; }
+  .mapping-route-controls { grid-column: 3; grid-row: 1; }
+  .mapping-key-feedback { grid-column: 1 / -1; grid-row: 2; }
+  .mapping-key-feedback:empty { display: none; }
+}
 @media (hover: none) { .mapping-route-controls { opacity: 1; pointer-events: auto; } }
 .route-grip { display: grid; place-items: center; flex: 0 0 24px; height: 28px; border: 0; border-radius: 4px; background: transparent; padding: 0; touch-action: none; cursor: grab; color: hsl(var(--muted-foreground)); }
 .route-grip:hover:not([aria-disabled="true"]) { background: hsl(var(--accent)); color: hsl(var(--foreground)); }

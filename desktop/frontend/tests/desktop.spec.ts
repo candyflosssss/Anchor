@@ -631,10 +631,11 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
       const result = await read(input);
       if (result.data && input.provider_id === '摸鱼AI') {
         const base = result.data.keys[0];
+        const rate = (group: string, group_name: string, multiplier: number) => ({ group, group_name, multiplier, basis: 'authenticated_group', observed_at: '2026-10-22T02:00:00Z', attempted_at: '2026-10-22T02:00:00Z', failure: '' });
         result.data.keys = [
-          { ...base, id: 'cheap', state: 'ready', effective_multiplier: 0.2 },
-          { ...base, id: 'expensive', state: 'ready', effective_multiplier: 3 },
-          { ...base, id: 'cooling', state: 'cooling', effective_multiplier: 0.01 },
+          { ...base, id: 'cheap', state: 'ready', effective_multiplier: 0.2, rate: rate('discount', '优惠组', 0.2) },
+          { ...base, id: 'expensive', state: 'ready', effective_multiplier: 3, rate: rate('standard', '', 3) },
+          { ...base, id: 'cooling', state: 'cooling', effective_multiplier: 0.01, rate: rate('low', '低价组', 0.01) },
           { ...base, id: 'unrelated', state: 'ready', effective_multiplier: 0.001 },
         ];
         result.data.models = result.data.models.map(m => ({ ...m, multiplier: 1, key_ids: ['cheap', 'expensive', 'cooling', 'missing'] }));
@@ -650,6 +651,9 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
   for (const key of await cards.all()) await expect(key).toBeVisible();
   await expect(model.getByRole('group', { name: '摸鱼AI · Key cheap', exact: true }).locator('.mapping-effective-rate')).toHaveText('0.2×');
   await expect(model.getByRole('group', { name: '摸鱼AI · Key expensive', exact: true }).locator('.mapping-effective-rate')).toHaveText('3×');
+  await expect(model.getByRole('group', { name: '摸鱼AI · Key cheap', exact: true }).locator('.mapping-key-group')).toHaveText('优惠组');
+  await expect(model.getByRole('group', { name: '摸鱼AI · Key expensive', exact: true }).locator('.mapping-key-group')).toHaveText('standard');
+  await expect(model.getByRole('group', { name: '摸鱼AI · Key missing', exact: true }).locator('.mapping-key-group')).toHaveText('—');
   await expect(model.getByRole('group', { name: '摸鱼AI · Key cooling', exact: true })).toContainText('冷却中');
   await expect(model.getByRole('group', { name: '摸鱼AI · Key missing', exact: true })).toContainText('Key 不存在');
   await expect(model.getByLabel('来源 Key unrelated', { exact: true })).toHaveCount(0);
@@ -665,12 +669,12 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
   if (process.env.ANCHOR_MAPPING_CAPTURE_DIR) {
     await page.setViewportSize({ width: 1600, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-light.png` });
-    await model.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-detail.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-light.png` });
+    await model.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-detail.png` });
     await page.getByRole('button', { name: '深色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-dark.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-dark.png` });
     await page.setViewportSize({ width: 600, height: 850 });
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-narrow.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-key-rows-narrow.png` });
   }
 });
 

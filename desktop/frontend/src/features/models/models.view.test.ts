@@ -79,8 +79,8 @@ describe('model channel availability presentation', () => {
     const summary = makeSummary(true);
     const base = summary.workspace!.keys[0];
     summary.workspace!.keys = [
-      { ...base, id: 'cheap', effective_multiplier: 0.2 },
-      { ...base, id: 'expensive', effective_multiplier: 3 },
+      { ...base, id: 'cheap', effective_multiplier: 0.2, rate: { multiplier: 0.2, group: 'discount', group_name: '优惠组', basis: 'authenticated_group', observed_at: '2026-10-22T02:00:00Z', attempted_at: '2026-10-22T02:00:00Z', failure: '' } },
+      { ...base, id: 'expensive', effective_multiplier: 3, rate: { multiplier: 3, group: 'standard', group_name: '', basis: 'authenticated_group', observed_at: '2026-10-22T02:00:00Z', attempted_at: '2026-10-22T02:00:00Z', failure: '' } },
       { ...base, id: 'cooling', state: 'cooling', effective_multiplier: 0.01 },
       { ...base, id: 'unrelated', effective_multiplier: 0.001 },
     ];
@@ -89,6 +89,9 @@ describe('model channel availability presentation', () => {
     expect(html.match(/class="mapping-key-card /g)).toHaveLength(4);
     expect(html).toContain('0.2×</strong>');
     expect(html).toContain('3×</strong>');
+    expect(html).toContain('aria-label="分组 优惠组"');
+    expect(html).toContain('aria-label="分组 standard"');
+    expect(html).toContain('aria-label="分组 未知"');
     expect(html).toContain('冷却中');
     expect(html).toContain('Key 不存在');
     expect(html).not.toContain('来源 Key unrelated');
