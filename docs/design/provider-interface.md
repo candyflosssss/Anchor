@@ -22,7 +22,7 @@ Provider 公开字段为 `id`, `homepage_url`, `base_urls`, `protocol`, `enabled
 - 返回 revision 范围 1..Number.MAX_SAFE_INTEGER；请求 expected_revision 为 0..MAX_SAFE_INTEGER-1，且与输入 provider.revision 一致，防止更新后超出 JS 安全整数范围。
 - 超时单位为秒，1..3600；并发为 1..64。前端即时校验只帮助填写，核心仍做最终业务校验。
 - 新增供应商可选填写多个 Key：首个默认 Key 留空发送 secret=null，非空保存为 default Key；可选 `initial_keys` 数组包含其他 Key 的 `id`、`protocol`、`secret`，只在 expected_revision=0 创建时接受。名称唯一且不可为 default，协议逐 Key 独立、秘密非空且不超过 8192 字节，总计至多 64 个 Key（表单保留一个默认槽位）；这些 Key 默认启用，与供应商及全部地址在同一事务保存，只产生 revision=1，任何校验或写入失败全部回滚。更新不得携带非空 initial_keys，仍用 key-put 管理命名 Key；旧核心严格拒绝新增字段，不会静默丢 Key，需配套更新宿主和核心；无数据库迁移。管理请求仍受 128 KiB 总体积上限约束。只填命名 Key 也可保存；has_secret 在保存／列表／单项读取统一表示存在任意 Key，而不是仅 default。填写任意 Key 后保存成功使用返回的 revision 显式查询目录，并在同一弹窗快速／全部导入模型。目录失败保留已保存供应商，可重试查询或修改配置／Key；不重放创建请求。自定义别名仍在详情中处理。编辑时 secret=null 保留 default Key、空字符串清除 default Key、非空替换 default Key；命名 Key 不受影响；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空所有 Key 输入，完成或失败后清理请求快照，取消／卸载丢弃整个草稿；失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
-- 添加／编辑均可增删请求地址，支持 HTTPS 域名或 IP（含端口）；HTTP 仍仅限数值回环测试地址，不放宽 TLS 规则。修改地址时保留全部 Key、各 Key 协议和既有 revision 冲突保护。
+- 添加／编辑均可增删请求地址，支持 HTTPS 域名或 IP（含端口）；HTTP 支持本机服务：精确主机名 `localhost`（大小写不敏感）或数值回环 IP；其他域名仍要求 HTTPS。直接连接 localhost 固定使用 IPv4／IPv6 回环并保留 Host，显式代理继续遵循已保存的路由策略。CLI、桌面表单与 CC Switch 导入共用核心校验。修改地址时保留全部 Key、各 Key 协议和既有 revision 冲突保护。
 - 保存成功返回新 revision，不表示供应商连通性已经验证。
 
 ## 2. 查询、写入与错误

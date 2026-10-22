@@ -42,14 +42,14 @@ func TestProviderMultiKeyAddressCLI(t *testing.T) {
 	}
 	run("context", "add", "local", "--local")
 	run("context", "use", "local")
-	run("provider", "add", "--id", "p", "--base-url", "https://example.invalid/v1", "--base-url", "https://192.0.2.10:8443/v1")
+	run("provider", "add", "--id", "p", "--base-url", "http://localhost:18080/v1", "--base-url", "https://192.0.2.10:8443/v1")
 	run("provider", "key-put", "--id", "p", "--revision", "1", "--target", "named", "--protocol", "anthropic", "--secret-stdin")
 	run("provider", "key-put", "--id", "p", "--revision", "2", "--target", "secondary", "--protocol", "chat-completions", "--secret-stdin")
 	var rows []state.Provider
-	if err = json.Unmarshal([]byte(run("provider", "list")), &rows); err != nil || len(rows) != 1 || !rows[0].HasSecret || rows[0].Revision != 3 || len(rows[0].BaseURLs) != 2 {
+	if err = json.Unmarshal([]byte(run("provider", "list")), &rows); err != nil || len(rows) != 1 || !rows[0].HasSecret || rows[0].Revision != 3 || len(rows[0].BaseURLs) != 2 || rows[0].BaseURLs[0] != "http://localhost:18080/v1" {
 		t.Fatal("named Key list status", err)
 	}
-	run("provider", "put", "--id", "p", "--revision", "3", "--base-url", "https://edited.example.invalid/v1")
+	run("provider", "put", "--id", "p", "--revision", "3", "--base-url", "http://localhost:18081/v1")
 	keys, err := store.ProviderKeys("p")
 	if err != nil || len(keys) != 2 || keys[0].Protocol != "anthropic" || keys[1].Protocol != "chat-completions" || keys[0].Secret != "synthetic-cli-key" {
 		t.Fatal("address edit changed Keys")

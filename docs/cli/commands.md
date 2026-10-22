@@ -259,7 +259,7 @@ anchor provider put --id ID --base-url URL [--base-url URL ...] [--homepage-url 
 | 参数（add/put） | 必填 / 默认 | 约束 |
 | --- | --- | --- |
 | `--id` | 必填 | 供应商 ID，支持中文，例如 `摸鱼AI`；1..128 个 Unicode 码点，完整规则见公共约定 |
-| `--base-url` | 必填，可重复 | 请求地址，1..16 个且不可重复（忽略末尾 `/`）；多个地址按请求轮询做负载均衡，模型目录与测试使用第一个。每个都是 API 根地址，可含 `/v1` 前缀，不含 `/responses`、`/chat/completions` 或 `/messages`；HTTPS，仅数值回环测试地址允许 HTTP；禁止 userinfo/query/fragment |
+| `--base-url` | 必填，可重复 | 请求地址，1..16 个且不可重复（忽略末尾 `/`）；多个地址按请求轮询做负载均衡，模型目录与测试使用第一个。每个都是 API 根地址，可含 `/v1` 前缀，不含 `/responses`、`/chat/completions` 或 `/messages`；HTTPS；本机服务允许 HTTP（`localhost`、`127.0.0.1` 或 `::1` 等回环 IP），禁止 userinfo/query/fragment |
 | `--homepage-url` | 空 | 供应商主页，仅用于展示，不参与请求；HTTP(S)，禁止 userinfo |
 | `--protocol` | 空 | `responses` / `chat-completions` / `anthropic`；显式提供时原子更新供应商匿名协议与 default Key 默认协议，不影响命名 Key、模型独立覆盖或 Key 启用状态；省略／空值保留两者，新供应商按 `responses` |
 | `--timeout` | `120` | 单候选总超时，秒，1..3600；仍受上游响应头 30 秒等待上限限制 |

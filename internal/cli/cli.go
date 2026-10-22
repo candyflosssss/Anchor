@@ -665,7 +665,7 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	f := a.flags("provider " + args[0])
 	id := f.String("id", "", "provider ID: 1..128 Unicode letters (including Chinese), digits, or ._-; start with a letter or digit")
 	var bases repeated
-	f.Var(&bases, "base-url", "request API base including optional /v1, not /responses; repeat for round-robin load balancing (max 16)")
+	f.Var(&bases, "base-url", "request API base including optional /v1, not /responses; HTTPS or HTTP localhost/loopback; repeat for round-robin load balancing (max 16)")
 	homepage := f.String("homepage-url", "", "optional provider homepage, display only")
 	protocol := f.String("protocol", "", "request protocol for anonymous requests and the default Key; omitted keeps existing protocols (new: responses)")
 	timeout := f.Int("timeout", 120, "total request timeout in seconds")

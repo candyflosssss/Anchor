@@ -99,10 +99,11 @@ export function requestURLError(raw: string): string | undefined {
     const url = new URL(raw);
     const authority = raw.match(/^https?:\/\/([^/]+)/)?.[1] ?? '';
     const numericLoopback = /^127(?:\.\d{1,3}){3}(?::\d+)?$/.test(authority) || /^\[::1\](?::\d+)?$/.test(authority);
+    const localhost = /^localhost(?::\d+)?$/i.test(authority);
     if (!url.hostname || url.username || url.password || raw.includes('?') || raw.includes('#') || /\s/.test(raw) || raw.includes('\\')) throw new Error();
-    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && numericLoopback)) throw new Error();
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && (numericLoopback || localhost))) throw new Error();
     if (/\/responses\/?$/.test(url.pathname)) return '填写 API 根地址（可含 /v1），不包含 /responses。';
-  } catch { return '请输入 HTTPS 根地址，不含账号、查询或片段；HTTP 仅限数值回环测试地址。'; }
+  } catch { return '请输入 HTTPS 根地址，不含账号、查询或片段；本机服务可用 HTTP（localhost 或回环 IP）。'; }
   return undefined;
 }
 export function toSave(draft: ProviderDraft, source?: Provider): SaveProvider {

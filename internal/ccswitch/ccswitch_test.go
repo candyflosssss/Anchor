@@ -33,6 +33,34 @@ func insert(t *testing.T, db *sql.DB, id, app, config, meta string) {
 	}
 }
 
+func TestImportLocalhostCodexProvider(t *testing.T) {
+	path, db := sourceDB(t)
+	insert(t, db, "local", "codex", `{"auth":{"OPENAI_API_KEY":"synthetic-local-key"},"config":"model_provider = 'custom'\nmodel = 'local-model'\n[model_providers.custom]\nbase_url = 'http://localhost:18080/v1'\nwire_api = 'responses'"}`, `{}`)
+	st, err := state.Open(t.TempDir(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	plan, err := Build(context.Background(), path, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Report.Failure != "" || len(plan.Providers) != 1 || len(plan.Report.Issues) != 0 {
+		t.Fatalf("localhost import rejected: %+v", plan.Report)
+	}
+	if err = st.ImportProviders(context.Background(), plan.Providers, plan.Models); err != nil {
+		t.Fatal(err)
+	}
+	p, err := st.Provider(plan.Providers[0].Provider.ID)
+	if err != nil || !p.Enabled || !p.HasSecret || p.URLs()[0] != "http://localhost:18080/v1" {
+		t.Fatalf("localhost provider not saved: %+v %v", p, err)
+	}
+	model, err := st.Model("local-model")
+	if err != nil || len(model.Candidates) != 1 || model.Candidates[0].ProviderID != p.ID {
+		t.Fatalf("localhost mapping not imported: %+v %v", model, err)
+	}
+}
+
 func TestAllPlatformsAndUniversalReadOnly(t *testing.T) {
 	path, db := sourceDB(t)
 	fixtures := map[string]string{

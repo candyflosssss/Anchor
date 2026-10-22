@@ -35,10 +35,10 @@ describe('immediate field feedback, not replacement backend validation', () => {
   it.each(['', '含 空格', '-start', 'emoji😀', 'a'.repeat(129), '\ud800'])('rejects invalid ID %s', id => {
     expect(validateDraft({ ...valid(), id }).id).toBeDefined();
   });
-  it.each(['https://api.example.com/v1', 'http://127.0.0.1:18080/v1', 'http://[::1]:18080/v1'])('allows base URL %s', base_url => {
+  it.each(['https://api.example.com/v1', 'http://127.0.0.1:18080/v1', 'http://[::1]:18080/v1', 'http://localhost/v1', 'http://localhost:18080/v1', 'http://LOCALHOST:18080/v1'])('allows base URL %s', base_url => {
     expect(validateDraft({ ...valid(), base_urls: [base_url] }).base_url_0).toBeUndefined();
   });
-  it.each(['http://localhost/v1', 'http://127.1/v1', 'http://example.com', 'https://a:b@example.com', 'https://example.com?q=1', 'https://example.com#key', 'https://example.com/v1/responses', 'https://example.com\\foo'])('rejects URL %s', base_url => {
+  it.each(['http://localhost.example/v1', 'http://sub.localhost/v1', 'http://localhost./v1', 'http://localhost@outside.example/v1', 'http://127.1/v1', 'http://example.com', 'https://a:b@example.com', 'https://example.com?q=1', 'https://example.com#key', 'https://example.com/v1/responses', 'https://example.com\\foo'])('rejects URL %s', base_url => {
     expect(validateDraft({ ...valid(), base_urls: ['https://ok.example.com', base_url] }).base_url_1).toBeDefined();
   });
   it('checks multiple URLs for duplicates and count, and homepage separately', () => {

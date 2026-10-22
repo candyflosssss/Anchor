@@ -64,8 +64,9 @@ func ValidateURL(s string) error {
 	}
 	if u.Scheme != "https" {
 		ip := net.ParseIP(u.Hostname())
-		if u.Scheme != "http" || ip == nil || !ip.IsLoopback() {
-			return errors.New("upstreams require HTTPS (HTTP allowed only for a numeric loopback test endpoint)")
+		loopback := strings.EqualFold(u.Hostname(), "localhost") || (ip != nil && ip.IsLoopback())
+		if u.Scheme != "http" || !loopback {
+			return errors.New("upstreams require HTTPS (HTTP allowed only for localhost or a numeric loopback endpoint)")
 		}
 	}
 	return nil

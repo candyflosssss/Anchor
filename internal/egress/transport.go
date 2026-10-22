@@ -3,10 +3,12 @@ package egress
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -52,9 +54,35 @@ func New(store *state.Store, base *http.Transport) *Manager {
 	// HTTP_PROXY. It cannot override an OS TUN or a router's transparent proxy.
 	base = base.Clone()
 	base.Proxy = nil
+	base.DialContext = localhostDialer(base.DialContext)
 	system := base.Clone()
 	system.Proxy = requiredSystemProxy
 	return &Manager{store: store, base: base, system: system, entries: map[string]*entry{}}
+}
+
+// Pin locally dialed localhost to loopback without DNS or hosts-file lookups.
+// The URL and Host header stay intact, and explicit proxy routing is preserved.
+func localhostDialer(dial func(context.Context, string, string) (net.Conn, error)) func(context.Context, string, string) (net.Conn, error) {
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+	return func(ctx context.Context, network, address string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil || !strings.EqualFold(host, "localhost") {
+			return dial(ctx, network, address)
+		}
+		if network == "tcp6" {
+			return dial(ctx, network, net.JoinHostPort("::1", port))
+		}
+		conn, err := dial(ctx, network, net.JoinHostPort("127.0.0.1", port))
+		if err == nil || network == "tcp4" {
+			return conn, err
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return dial(ctx, network, net.JoinHostPort("::1", port))
+	}
 }
 func (m *Manager) Status() state.ProxyEngine {
 	m.mu.Lock()

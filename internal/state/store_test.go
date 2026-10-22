@@ -252,12 +252,12 @@ func TestInputPolicies(t *testing.T) {
 			t.Fatalf("unsafe listener accepted: %s", v)
 		}
 	}
-	for _, v := range []string{"http://example.org/v1", "https://user:secret@example.org/v1", "https://example.org/v1?key=secret", "https://example.org/#fragment"} {
+	for _, v := range []string{"http://example.org/v1", "http://localhost.example/v1", "http://sub.localhost/v1", "http://localhost./v1", "http://localhost@outside.example/v1", "http://127.1/v1", "https://user:secret@example.org/v1", "https://example.org/v1?key=secret", "https://example.org/#fragment"} {
 		if ValidateURL(v) == nil {
 			t.Fatalf("unsafe provider URL accepted: %s", v)
 		}
 	}
-	for _, v := range []string{"https://example.org/v1", "http://127.0.0.1:8000/v1", "http://[::1]:8000/v1"} {
+	for _, v := range []string{"https://example.org/v1", "http://127.0.0.1:8000/v1", "http://[::1]:8000/v1", "http://localhost/v1", "http://localhost:8000/v1", "http://LOCALHOST:8000/v1"} {
 		if e := ValidateURL(v); e != nil {
 			t.Fatal(v, e)
 		}

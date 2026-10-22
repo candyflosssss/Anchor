@@ -53,7 +53,7 @@ printf '%s' "$PROVIDER_KEY" | ./scripts/anchor-dev.sh provider add \
 ./scripts/anchor-dev.sh model list
 ```
 
-`api.example.com` 和 `upstream-model` 是占位示例，必须替换为供应商的实际 API 根地址与模型 ID。Base URL 不包含推理端点；代理保留该 URL 的路径前缀，按协议追加 `/responses`、`/chat/completions` 或 `/messages`。拒绝 URL 中的 userinfo、查询参数和 fragment；上游要求 HTTPS，仅数值回环测试端点允许 HTTP。
+`api.example.com` 和 `upstream-model` 是占位示例，必须替换为供应商的实际 API 根地址与模型 ID。Base URL 不包含推理端点；代理保留该 URL 的路径前缀，按协议追加 `/responses`、`/chat/completions` 或 `/messages`。拒绝 URL 中的 userinfo、查询参数和 fragment；上游要求 HTTPS，本机服务允许 HTTP（精确主机名 `localhost`，大小写不敏感，或数值回环 IP）。直接连接 `localhost` 时不查询 DNS／hosts，依次尝试 `127.0.0.1` 和 `::1`，保留 URL 路径与 Host；显式代理仍按原配置路由，失败不回退直连。此处 localhost 指核心所在机器，不一定是桌面窗口所在机器。
 
 更新供应商 / 模型使用 `put --revision N`，通过 list 获取当前 revision；其余字段是完整替换，不是隐式合并。更新供应商时不提供 `--secret-stdin` 则保留旧秘密，显式输入空值则清空。供应商删除/改名/复制、模型删除及多 Key 工作台已提供，见最新 CLI 大全 §5；删除供应商／Key（包括清除 default 凭据）自动清理对应模型来源，保留其他 Key／供应商的同名模型，最后一个来源的已启用 Binding 默认模型保护仍有效。
 
