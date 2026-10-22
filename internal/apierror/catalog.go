@@ -20,6 +20,7 @@ const (
 	InvalidJSONFields              ID = "invalid_json_fields"
 	SingleJSONObject               ID = "single_json_object"
 	BrowserOriginRejected          ID = "browser_origin_rejected"
+	APIClientRejected              ID = "api_client_rejected"
 	InvalidHost                    ID = "invalid_host"
 	Unauthorized                   ID = "unauthorized"
 	Starting                       ID = "starting"
@@ -111,6 +112,7 @@ var definitions = map[ID]definition{
 	InvalidJSONFields:              {400, "invalid_json", ""},
 	SingleJSONObject:               {400, "invalid_json", ""},
 	BrowserOriginRejected:          {403, "browser_origin_rejected", ""},
+	APIClientRejected:              {403, "api_client_rejected", ""},
 	InvalidHost:                    {400, "invalid_host", ""},
 	Unauthorized:                   {401, "unauthorized", ""},
 	Starting:                       {503, "starting", ""},

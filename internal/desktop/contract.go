@@ -439,3 +439,24 @@ type CCImportResult struct {
 	Data     *CCImportReport `json:"data"`
 	Problem  *Problem        `json:"problem"`
 }
+
+// Application API management, independent of Agent configuration.
+type APIServiceSettings = state.APIServiceSettings
+type SaveAPIServiceSettings = state.SaveAPIServiceSettings
+type APIServiceWorkspace = state.APIServiceWorkspace
+type APIAccess = state.Access
+type IssueAPIKey = state.IssueAPIKey
+type IssuedAPIKey = state.IssuedAPIKey
+type RevokeAPIKey struct {
+	ID string `json:"id"`
+}
+type APIServiceResult struct {
+	Contract string               `json:"contract"`
+	Data     *APIServiceWorkspace `json:"data"`
+	Problem  *Problem             `json:"problem"`
+}
+type IssuedAPIKeyResult struct {
+	Contract string        `json:"contract"`
+	Data     *IssuedAPIKey `json:"data"`
+	Problem  *Problem      `json:"problem"`
+}

@@ -3,8 +3,8 @@ import type { CostAdjustment, KnownUsage, ReferenceCost } from '../../desktop/co
 import { adjustmentValue, costMultiplier, referenceUSD } from './log-reference-cost.model';
 import { accelerationSummary, tierSnapshot } from './log-service-tier.model';
 import type { Query } from '../../desktop/contract.generated';
-export type LogDimension = 'agent' | 'binding' | 'project' | 'session';
-export const dimensionLabels: Record<LogDimension, string> = { agent: 'Agent', binding: 'Agent 绑定', project: '项目', session: '会话' };
+export type LogDimension = 'agent' | 'binding' | 'project' | 'session' | 'access_key';
+export const dimensionLabels: Record<LogDimension, string> = { access_key: '调用 Key', agent: 'Agent', binding: 'Agent 绑定', project: '项目', session: '会话' };
 export type LogStatus = 'succeeded' | 'failed' | 'cancelled' | 'interrupted' | 'pending';
 export type LogSource = 'proxy' | 'probe';
 export interface LogTimeRange { since: number; before: number }
@@ -20,7 +20,7 @@ export interface LogAttempt {
 export interface RequestLog {
   knownUsage?: KnownUsage | null;
   referenceCost?: ReferenceCost | null;
-  agent?: string; binding?: string; project?: string; session?: string;
+  access_key?: string; accessLabel?: string; agent?: string; binding?: string; project?: string; session?: string;
   id: string; ageMinutes: number; time: string; status: LogStatus; source: LogSource;
   model: string; upstreamModel?: string; attemptCount?: number; attemptsTruncated?: boolean; protocol: string; elapsed: number | null; http: number | null;
   provider: string; key: string; revision: number; delivery: string;
@@ -34,8 +34,8 @@ export interface SystemLog {
   id: string; ageMinutes: number; time: string; level: 'info' | 'warn' | 'error';
   source: 'core' | 'desktop'; event: string; message: string; requestId?: string;
 }
-export interface LogFilters { agent?: string | null; binding?: string | null; project?: string | null; session?: string | null; query: string; status: string; source: string; provider: string; window: string; model: string; key: string; http: string; code: string; stage: string }
-export const initialFilters: LogFilters = { agent: null, binding: null, project: null, session: null, query: '', status: 'all', source: 'all', provider: 'all', window: '60', model: '', key: '', http: '', code: '', stage: '' };
+export interface LogFilters { access_key?: string | null; agent?: string | null; binding?: string | null; project?: string | null; session?: string | null; query: string; status: string; source: string; provider: string; window: string; model: string; key: string; http: string; code: string; stage: string }
+export const initialFilters: LogFilters = { access_key: null, agent: null, binding: null, project: null, session: null, query: '', status: 'all', source: 'all', provider: 'all', window: '60', model: '', key: '', http: '', code: '', stage: '' };
 // null/undefined means all; an empty string is a deliberate unknown filter.
 export function identityQuery(filters: LogFilters): Pick<Query, LogDimension> {
   return Object.fromEntries((Object.keys(dimensionLabels) as LogDimension[]).filter(key => filters[key] != null).map(key => [key, filters[key]]));
@@ -59,7 +59,7 @@ export function filterRequests(rows: RequestLog[], filters: LogFilters): Request
     && (filters.status === 'all' || row.status === filters.status)
     && (filters.source === 'all' || row.source === filters.source)
     && (filters.provider === 'all' || row.attempts.some(attempt => attempt.provider === filters.provider))
-    && [row.id, row.model, row.provider, row.key, row.code ?? '', row.agent ?? '', row.binding ?? '', row.project ?? '', row.session ?? '', ...row.attempts.map(attempt => `${attempt.provider} ${attempt.model} ${attempt.key}`)].join(' ').toLowerCase().includes(query));
+    && [row.id, row.model, row.provider, row.key, row.code ?? '', row.access_key ?? '', row.accessLabel ?? '', row.agent ?? '', row.binding ?? '', row.project ?? '', row.session ?? '', ...row.attempts.map(attempt => `${attempt.provider} ${attempt.model} ${attempt.key}`)].join(' ').toLowerCase().includes(query));
 }
 export function safeSummary(row: RequestLog): string {
   const a = row.referenceCost?.adjustment;
@@ -67,7 +67,7 @@ export function safeSummary(row: RequestLog): string {
   const group = !row.referenceCost ? '—' : !a ? '未记录' : costMultiplier(a.group_multiplier, a.group_mixed);
   return ['Anchor 日志', `request_id: ${row.id}`, `结果: ${statusLabels[row.status]} · ${row.summary}`,
     ...(Object.keys(dimensionLabels) as LogDimension[]).map(key => `${dimensionLabels[key]}: ${row[key] || '未识别'}`),
-    `原始参考费用: ${row.referenceCost && row.referenceCost.usd == null ? '未知' : referenceUSD(row.referenceCost?.usd)}`, `供应商倍率: ${supplier}`, `分组倍率: ${group}`, `最终参考费用: ${row.referenceCost ? adjustmentValue(row.referenceCost.adjustment) : '—'}`, `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
+    `调用 Key 名称: ${row.accessLabel || '未记录'}`, `原始参考费用: ${row.referenceCost && row.referenceCost.usd == null ? '未知' : referenceUSD(row.referenceCost?.usd)}`, `供应商倍率: ${supplier}`, `分组倍率: ${group}`, `最终参考费用: ${row.referenceCost ? adjustmentValue(row.referenceCost.adjustment) : '—'}`, `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
     `请求档位: ${serviceTierLabel(row.evidence.requested_service_tier, true)} · 原始值 ${tierSnapshot(row.evidence, 'requested').raw}`,
     `发送档位（最后候选）: ${tierSnapshot(row.evidence, 'sent').raw}`,
     `加速状态（上游报告）: ${accelerationSummary(row.evidence).label} · ${accelerationSummary(row.evidence).tier.label}`,

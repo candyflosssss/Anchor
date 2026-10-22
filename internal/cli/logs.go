@@ -18,7 +18,7 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		f := a.flags("logs suggestions")
 		q := logbook.SuggestionsQuery{}
 		f.StringVar(&q.Kind, "kind", "requests", "requests|system (system supports only search)")
-		f.StringVar(&q.Field, "field", "search", "search|provider|model|key|http|code|stage|agent|binding|project|session")
+		f.StringVar(&q.Field, "field", "search", "search|provider|model|key|http|code|stage|agent|binding|project|session|access_key")
 		f.StringVar(&q.Prefix, "prefix", "", "case-sensitive value prefix")
 		f.IntVar(&q.Limit, "limit", 20, "maximum candidates (1..100)")
 		since := f.Duration("since", time.Hour, "lookback duration (up to 2160h)")
@@ -85,10 +85,11 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		var includeErrors bool
 		if args[0] == "stats" {
 			f.BoolVar(&includeErrors, "include-errors", false, "include full-range error groups (top 100, safe codes only)")
-			f.StringVar(&groupBy, "group-by", "", "agent|binding|project|session (top 100 groups)")
+			f.StringVar(&groupBy, "group-by", "", "agent|binding|project|session|access_key (top 100 groups)")
 			interval = f.Duration("interval", 0, "bucket interval: 10s|30s|1m|5m|15m|1h|6h|24h (default auto, max 600 buckets)")
 		}
-		var agent, binding, project, session string
+		var agent, binding, project, session, accessKey string
+		f.StringVar(&accessKey, "access-key", "", "authenticated calling Key ID; empty selects unattributed")
 		f.StringVar(&agent, "agent", "", "exact authenticated Agent type; empty selects unattributed")
 		f.StringVar(&binding, "binding", "", "exact enrolled binding ID; empty selects unattributed")
 		f.StringVar(&project, "project", "", "exact project label (explicit or Codex metadata); empty selects unattributed")
@@ -119,6 +120,8 @@ func (a App) logs(ctx context.Context, c *client.Client, args []string) error {
 		}
 		f.Visit(func(flag *flag.Flag) {
 			switch flag.Name {
+			case "access-key":
+				q.AccessKey = &accessKey
 			case "agent":
 				q.Agent = &agent
 			case "binding":

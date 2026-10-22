@@ -20,6 +20,7 @@ export function RequestDetail({ row, onClose, onCopy, notice }: { row: RequestLo
         <section><h3 className="log-section-title">请求</h3><dl className="log-properties">{logColumns.map(col => <div key={col.id}><dt>{col.label}</dt><dd><ColumnValue id={col.id} row={row} /></dd></div>)}</dl></section>
         {row.referenceCost && <ReferenceCostDetail cost={row.referenceCost} />}
         <section aria-label="请求归属"><h3 className="log-section-title">请求归属</h3><dl className="log-properties">
+          <div><dt>调用 Key 名称</dt><dd>{row.accessLabel || '未记录'}</dd></div>
           {(Object.keys(dimensionLabels) as LogDimension[]).map(key => <div key={key}><dt>{dimensionLabels[key]}</dt><dd className="mono">{row[key] || '未识别'}</dd></div>)}
         </dl></section>
         <section aria-label="服务档位"><h3 className="log-section-title">服务档位</h3><dl className="log-properties">

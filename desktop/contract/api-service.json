@@ -1,0 +1,7 @@
+{
+  "settings": { "enabled": false, "port": 17862, "allow_lan": false, "revision": 1 },
+  "active_address": "",
+  "restart_required": false,
+  "base_urls": [],
+  "keys": []
+}

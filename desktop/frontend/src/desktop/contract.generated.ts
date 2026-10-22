@@ -2,6 +2,53 @@
 export const CONTRACT = "anchor-desktop-v1";
 export const PROBLEM_CODES = ["offline", "unauthorized", "read_error", "conflict", "unknown", "invalid", "startup_failed", "identity", "unsupported", "closed", "integrity", "permission", "referenced", "ssh_missing", "ssh_host_key", "ssh_auth", "ssh_unreachable", "remote_anchor", "remote_anchor_missing", "remote_anchor_unsupported", "remote_control_port", "remote_core_not_ready", "tunnel_failed", "agent_operation_failed", "agent_model_unavailable", "agent_catalog_invalid", "agent_config_conflict", "agent_config_unsafe", "skill_unsafe", "skill_changed", "skill_limit", "skill_link_unavailable"] as const;
 export type ProblemCode = typeof PROBLEM_CODES[number];
+export interface APIServiceSettings {
+  enabled: boolean;
+  port: number;
+  allow_lan: boolean;
+  revision: number;
+}
+export interface SaveAPIServiceSettings {
+  enabled: boolean | null;
+  port: number;
+  allow_lan: boolean | null;
+  expected_revision: number;
+}
+export interface APIServiceWorkspace {
+  settings: APIServiceSettings;
+  active_address: string;
+  restart_required: boolean;
+  base_urls: string[];
+  keys: Access[];
+}
+export interface Access {
+  id: string;
+  label: string;
+  scope: string;
+  expires_at: number;
+  revoked: boolean;
+}
+export interface IssueAPIKey {
+  label: string;
+  ttl_seconds: number;
+}
+export interface IssuedAPIKey {
+  access: Access;
+  token: string;
+}
+export interface RevokeAPIKey {
+  id: string;
+}
+export interface APIServiceResult {
+  contract: string;
+  data: APIServiceWorkspace | null;
+  problem: Problem | null;
+}
+export interface IssuedAPIKeyResult {
+  contract: string;
+  data: IssuedAPIKey | null;
+  problem: Problem | null;
+}
 export interface CCImportRequest {
   database_path: string;
   fingerprint: string;
@@ -1048,6 +1095,8 @@ export interface KnownUsage {
   attempts: number;
 }
 export interface Request {
+  access_key?: string;
+  access_label?: string;
   known_usage?: KnownUsage | null;
   reference_cost?: ReferenceCost | null;
   agent?: string;
@@ -1091,6 +1140,7 @@ export interface Event {
   fields: Record<string, string>;
 }
 export interface Query {
+  access_key?: string | null;
   errors_only?: boolean;
   agent?: string | null;
   binding?: string | null;
@@ -1154,6 +1204,7 @@ export interface LogSettingsResult {
   problem: Problem | null;
 }
 export interface DesktopBridge {
+  APIService(): Promise<APIServiceResult>;
   AgentWorkspace(): Promise<AgentWorkspaceResult>;
   CheckRemoteUpdate(input1: string): Promise<UpdateResult>;
   CheckUpdate(input1: string): Promise<UpdateResult>;
@@ -1172,6 +1223,7 @@ export interface DesktopBridge {
   ImportCCSwitch(input1: CCImportRequest): Promise<CCImportResult>;
   InstallRemoteUpdate(input1: ConfirmRemoteUpdate): Promise<UpdateResult>;
   InstallUpdate(input1: ConfirmUpdate): Promise<UpdateResult>;
+  IssueAPIKey(input1: IssueAPIKey): Promise<IssuedAPIKeyResult>;
   KeyCooldownSettings(): Promise<KeyCooldownSettingsResult>;
   LogDetail(input1: string): Promise<LogDetailResult>;
   LogSettings(): Promise<LogSettingsResult>;
@@ -1193,6 +1245,8 @@ export interface DesktopBridge {
   Providers(): Promise<ProvidersResult>;
   ProxyWorkspace(): Promise<ProxyWorkspaceResult>;
   RestartCore(input1: ConfirmStop): Promise<SessionResult>;
+  RevokeAPIKey(input1: RevokeAPIKey): Promise<APIServiceResult>;
+  SaveAPIService(input1: SaveAPIServiceSettings): Promise<APIServiceResult>;
   SaveCodexSettings(input1: SaveCodexSettings): Promise<CodexSettingsResult>;
   SaveKeyCooldownSettings(input1: SaveKeyCooldownSettings): Promise<KeyCooldownSettingsResult>;
   SaveModelSettings(input1: SaveModelSettings): Promise<ModelSettingsResult>;

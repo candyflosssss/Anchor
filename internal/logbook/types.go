@@ -68,6 +68,8 @@ type KnownUsage struct {
 	Attempts int   `json:"attempts"`
 }
 type Request struct {
+	AccessKey     string         `json:"access_key,omitempty"`
+	AccessLabel   string         `json:"access_label,omitempty"`
 	KnownUsage    *KnownUsage    `json:"known_usage,omitempty"`
 	ReferenceCost *ReferenceCost `json:"reference_cost,omitempty"`
 	// Agent and Binding come from authenticated enrollment, never caller labels.
@@ -114,7 +116,8 @@ type Event struct {
 	Fields    map[string]string `json:"fields"`
 }
 type Query struct {
-	ErrorsOnly bool `json:"errors_only,omitempty"`
+	AccessKey  *string `json:"access_key,omitempty"`
+	ErrorsOnly bool    `json:"errors_only,omitempty"`
 	// nil means all; a pointer to an empty string selects unattributed records.
 	Agent    *string `json:"agent,omitempty"`
 	Binding  *string `json:"binding,omitempty"`
@@ -196,7 +199,7 @@ func (q *Query) Validate() error {
 	if q.SinceMS < 0 || q.BeforeMS < 0 || (q.BeforeMS != 0 && q.BeforeMS < q.SinceMS) {
 		return ErrInvalid
 	}
-	for _, value := range []*string{q.Agent, q.Binding, q.Project, q.Session} {
+	for _, value := range []*string{q.AccessKey, q.Agent, q.Binding, q.Project, q.Session} {
 		if value != nil && (q.Kind != "requests" || len(*value) > 512) {
 			return ErrInvalid
 		}

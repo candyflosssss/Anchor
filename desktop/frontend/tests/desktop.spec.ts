@@ -1,3 +1,4 @@
+import apiServiceFixture from '../../contract/api-service.json' with { type: 'json' };
 import keyCooldownFixture from '../../contract/key-cooldown.json' with { type: 'json' };
 import codexSettingsFixture from '../../contract/codex-settings.json' with { type: 'json' };
 import modelCatalogFixture from '../../contract/model-catalog.json' with { type: 'json' };
@@ -14,7 +15,7 @@ declare global { interface Window { keyCooldownTest: { saves: number } } }
 declare global { interface Window { accountTest: { saves: number; queries: number; rateQueries: number; failure: string } } }
 async function host(page: Page, rateMappings = false, detectedPlatform = '') {
   // A fake Wails boundary exercises the real frontend mode, not a native window.
-  await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, keyCooldown, rateMappings, detectedPlatform }) => {
+  await page.addInitScript(({ contract, rows, update, account, modelSettings, codexSettings, keyCooldown, apiService, rateMappings, detectedPlatform }) => {
     window.desktopTest = { directories: 0, starts: 0, saves: 0, stops: 0, status: true, writeError: null, checks: 0, downloads: 0, installs: 0, updateError: false };
     const counters = window.desktopTest;
     window.accountTest = { saves: 0, queries: 0, rateQueries: 0, failure: '' };
@@ -31,6 +32,10 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
     let cooldownState = structuredClone(keyCooldown);
     window.keyCooldownTest = { saves: 0 };
     const api: DesktopBridge = {
+      APIService: async () => ({ contract, data: apiService, problem: null }),
+      SaveAPIService: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      IssueAPIKey: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      RevokeAPIKey: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ImportCCSwitch: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       KeyCooldownSettings: async () => ({ contract, data: cooldownState, problem: null }),
       SaveKeyCooldownSettings: async input => {
@@ -160,7 +165,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
       },
     };
     window.go = { desktop: { Bridge: api } };
-  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, codexSettings: codexSettingsFixture, keyCooldown: keyCooldownFixture, rateMappings, detectedPlatform });
+  }, { contract: CONTRACT, rows: fixture.providers, update: updateFixture.downloaded, account: accountFixture, modelSettings: modelSettingsFixture, codexSettings: codexSettingsFixture, keyCooldown: keyCooldownFixture, apiService: apiServiceFixture, rateMappings, detectedPlatform });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '摸鱼AI', exact: true })).toBeVisible();
 }
@@ -1559,4 +1564,51 @@ test('mapping quick sorts use refreshed multipliers and measured first text (sim
   expect(calls).toHaveLength(3);
   expect(calls[2].strategy).toBe('priority');
   expect(calls[2].source_order!.map(c => c.provider_id)).toEqual(['备用供应商', '摸鱼AI', '本地调试']);
+});
+
+
+test('application API saves listener settings, issues a Key once, revokes and locks unknown writes (simulated host)', async ({ page }) => {
+  await host(page);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    let workspace = { settings: { enabled: false, port: 17862, allow_lan: false, revision: 1 }, active_address: '', restart_required: false, base_urls: [] as string[], keys: [] as import('../src/desktop/contract.generated').Access[] };
+    api.APIService = async () => ({ contract: 'anchor-desktop-v1', data: structuredClone(workspace), problem: null });
+    api.SaveAPIService = async input => {
+      if (window.desktopTest.writeError) return { contract: 'anchor-desktop-v1', data: null, problem: { code: window.desktopTest.writeError } };
+      workspace = { ...workspace, settings: { enabled: input.enabled!, port: input.port, allow_lan: input.allow_lan!, revision: input.expected_revision + 1 }, restart_required: true };
+      return { contract: 'anchor-desktop-v1', data: structuredClone(workspace), problem: null };
+    };
+    api.IssueAPIKey = async input => {
+      const access = { id: 'caller-phone', label: input.label, scope: 'gateway', revoked: false, expires_at: 0 };
+      workspace.keys.push(access);
+      return { contract: 'anchor-desktop-v1', data: { access, token: 'a'.repeat(43) }, problem: null };
+    };
+    api.RevokeAPIKey = async input => {
+      workspace.keys = workspace.keys.map(key => key.id === input.id ? { ...key, revoked: true } : key);
+      return { contract: 'anchor-desktop-v1', data: structuredClone(workspace), problem: null };
+    };
+  });
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  const section = page.getByRole('region', { name: 'API 服务', exact: true });
+  await expect(section.getByLabel('API 端口')).toHaveValue('17862');
+  await section.getByRole('switch', { name: '启用 API 服务', exact: true }).click();
+  await section.getByRole('switch', { name: '允许局域网调用', exact: true }).click();
+  await section.getByLabel('API 端口').fill('18762');
+  await section.getByRole('button', { name: '保存监听设置', exact: true }).click();
+  await expect(section.getByText('监听设置待生效', { exact: false })).toBeVisible();
+  await section.getByLabel('名称', { exact: true }).fill('手机助手');
+  await section.getByRole('button', { name: '签发 Key（仅显示一次）', exact: true }).click();
+  await expect(section.getByLabel('新 API Key')).toHaveValue('a'.repeat(43));
+  expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('a'.repeat(43));
+  await section.getByRole('button', { name: '关闭显示', exact: true }).click();
+  await expect(section.getByLabel('新 API Key')).toHaveCount(0);
+  await section.getByRole('button', { name: '撤销', exact: true }).click();
+  await section.getByRole('button', { name: '确认撤销', exact: true }).click();
+  await expect(section.getByText('已撤销', { exact: true })).toBeVisible();
+  await page.evaluate(() => { window.desktopTest.writeError = 'unknown'; });
+  await section.getByRole('button', { name: '保存监听设置', exact: true }).click();
+  await expect(section.getByRole('alert')).toContainText('操作结果未知');
+  await expect(section.getByRole('button', { name: '保存监听设置', exact: true })).toBeDisabled();
+  await section.getByRole('button', { name: '重新读取', exact: true }).click();
+  await expect(section.getByRole('button', { name: '保存监听设置', exact: true })).toBeEnabled();
 });

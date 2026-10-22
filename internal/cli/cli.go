@@ -78,13 +78,13 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   catalog estimate --provider ID --model MODEL [--input-tokens N --output-tokens N]
                    [--cache-read-tokens N --cache-write-tokens N --reasoning-tokens N --refresh]
   provider price-import --id ID --revision N --target ALIAS --catalog-provider ID --model MODEL
-  logs suggestions [--field search|provider|model|key|http|code|stage|agent|binding|project|session] [--prefix value] [--since 1h] [--limit 20] [--kind requests|system]
-  logs stats [--since 1h | --from RFC3339 --to RFC3339] [--interval 1m] [--group-by agent|binding|project|session] [--include-errors] [--errors-only] [request filters]
+  logs suggestions [--field search|provider|model|key|http|code|stage|agent|binding|project|session|access_key] [--prefix value] [--since 1h] [--limit 20] [--kind requests|system]
+  logs stats [--since 1h | --from RFC3339 --to RFC3339] [--interval 1m] [--group-by agent|binding|project|session|access_key] [--include-errors] [--errors-only] [request filters]
   logs list|follow|export [--kind requests|system] [--since 1h | --from RFC3339 --to RFC3339] [--errors-only] [--limit 50]
       [--cursor N] [--until N] [--status RESULT] [--source SOURCE] [--provider ID]
       [--model MODEL] [--key ID] [--http CODE] [--code CODE] [--stage STAGE]
       [--level LEVEL] [--search PREFIX]
-  Attribution filters: [--agent TYPE] [--binding ID] [--project ID] [--session ID]; explicit empty selects unknown.
+  Attribution filters: [--access-key ID] [--agent TYPE] [--binding ID] [--project ID] [--session ID]; explicit empty selects unknown.
   Authenticated Codex requests can use native thread IDs and local project metadata; explicit tags take precedence.
   Historical logs are not backfilled; session titles and conversation content are not collected.
   Conversion failures retain route IDs and safe conversion_target/conversion_reason evidence in detail/export.
@@ -103,6 +103,13 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   model add|put --id ID --candidate PROVIDER:MODEL [--candidate ...] [--strategy RULE] [--candidate-key INDEX:KEY] [--service-tier priority|ultrafast]
                [--display-name NAME] [--tools] [--streaming] [--revision N]
                [--codex-catalog FILE --codex-model SOURCE --codex-version X.Y.Z]
+  api settings                      Read application API settings, active addresses and gateway Key metadata
+  api configure --enabled=true|false --port 17862 --allow-lan=true|false --revision N --approve
+                                    Replace settings; restart core to apply (Agent gateway unchanged)
+  api keys                          List gateway Key metadata (no secrets)
+  api issue --label LABEL [--ttl-seconds 2592000] --show-once
+                                    Issue gateway-only Key; stdout contains secret once
+  api revoke --id ID --approve       Revoke gateway Key; management tokens excluded
   access grant --label LABEL --scope manage|gateway [--ttl 24h] --show-once
   access list | access revoke ID      Local-owner authorization operations
   agent discover                     Read targets, mapped model availability and bindings
@@ -433,6 +440,8 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.agents(ctx, cl, args[1:])
 	case "settings":
 		return a.keyCooldownSettings(ctx, cl, args[1:])
+	case "api":
+		return a.apiService(ctx, cl, args[1:])
 	case "proxy":
 		return a.proxies(ctx, cl, args[1:])
 	case "skill":

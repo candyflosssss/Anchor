@@ -35,3 +35,13 @@ it('does not pretend an older core implements grouping', () => {
   const html = renderToStaticMarkup(createElement(LogGroups, { data, dimension: 'project', onSelect: () => {} }));
   expect(html).toContain('当前核心未提供分类统计');
 });
+
+it('keeps calling Key separate from supplier Key through filters, groups and summaries', () => {
+  const filters = { ...initialFilters, access_key: 'caller-id', key: 'supplier-key' };
+  expect(identityQuery(filters)).toEqual({ access_key: 'caller-id' });
+  expect(statsQuery(filters, 60000, 1800000000000, 'access_key')).toMatchObject({ group_by: 'access_key', filter: { access_key: 'caller-id', key: 'supplier-key' } });
+  const data = { ...structuredClone(fixture.stats), group_by: 'access_key' };
+  expect(checkedStats(data).group_by).toBe('access_key');
+  expect(safeSummary({ ...requestFixtures[0], access_key: 'caller-id', accessLabel: 'phone' })).toContain('调用 Key: caller-id');
+  expect(safeSummary({ ...requestFixtures[0], accessLabel: 'phone' })).toContain('调用 Key 名称: phone');
+});

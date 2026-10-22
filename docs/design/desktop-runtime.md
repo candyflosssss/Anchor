@@ -215,3 +215,7 @@ SSH 更新使用 `CheckRemoteUpdate(instance_id)`／`InstallRemoteUpdate({instan
 ### Claude CLI／Desktop 身份（2026-10-22，当前源码未打包）
 
 AgentWorkspace/EnrollAgent/ManageAgent DTO 形状与桥接方法不变；agent/adapter_id 增加 claude-desktop，claude 保持 CLI。目标状态字符串增加 desktop_setup_required/desktop_policy_present，前端只展示核心决定；两端按各自目标 ID 操作，Desktop 初次提交前明确确认可能影响 Chat/Cowork/Code。可选 claude_desktop_profile 仅属于核心 Binding 持久身份，不由 GUI 路径参数指定；核心解析并固定已应用本地 UUID 配置。没有新建任意路径或配置脚本接口。配置与生命周期边界见[接入契约](agent-management-layer.md#2026-10-22-claude-clidesktop-独立接入当前源码未打包)。
+
+## 应用 API 服务（2026-10-22，当前源码，未发布）
+
+桥接新增 APIService / SaveAPIService / IssueAPIKey / RevokeAPIKey，复用选定实例的类型化管理连接、鉴权和安全错误映射。Go DTO、监听设置启动快照与待重启状态、Key一次性秘密返回及日志归属见[应用 API 服务契约](api-service.md)。独立监听与核心同生命周期；不把管理面暴露到LAN，不随窗口关闭停止。旧核心缺少api_service_v1时拒绝操作，未知写入不自动重放。未打包或替换运行版本。

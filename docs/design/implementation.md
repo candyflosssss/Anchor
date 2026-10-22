@@ -71,7 +71,7 @@ Context 当前只支持 `--local`，创建时必须连通并验证实例身份�
 
 ## 3. 实际 HTTP 契约
 
-全部路由要求对应 scope 的认证；管理面使用 Bearer，网关也接受 x-api-key；仅接受数值回环 Host，不接受浏览器 Origin；不开放公开管理或任意 CORS。
+全部路由要求对应 scope 的认证；管理面使用 Bearer，网关也接受 x-api-key；原管理与 Agent 网关仅接受数值回环 Host，不接受浏览器 Origin；不开放公开管理或任意 CORS。当前源码另提供默认关闭的独立[应用 API 服务](api-service.md)：可设置端口及私有 IPv4 LAN 准入，完整鉴权和无 Origin 规则继续生效，管理面不对 LAN 开放。
 
 | 接口 | 状态 |
 | --- | --- |

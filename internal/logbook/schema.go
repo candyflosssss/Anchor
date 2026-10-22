@@ -18,6 +18,7 @@ CREATE INDEX IF NOT EXISTS request_agent ON requests(COALESCE(json_extract(docum
 CREATE INDEX IF NOT EXISTS request_binding ON requests(COALESCE(json_extract(document,'$.binding'),''),seq DESC);
 CREATE INDEX IF NOT EXISTS request_project ON requests(COALESCE(json_extract(document,'$.project'),''),seq DESC);
 CREATE INDEX IF NOT EXISTS request_session ON requests(COALESCE(json_extract(document,'$.session'),''),seq DESC);
+CREATE INDEX IF NOT EXISTS request_access_key ON requests(COALESCE(json_extract(document,'$.access_key'),''),seq DESC);
 CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT,id TEXT NOT NULL UNIQUE,created_at INTEGER NOT NULL,level TEXT NOT NULL,source TEXT NOT NULL,event TEXT NOT NULL,request_id TEXT NOT NULL,size INTEGER NOT NULL,document TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS event_time ON events(created_at);
 CREATE INDEX IF NOT EXISTS event_level ON events(level,seq DESC);

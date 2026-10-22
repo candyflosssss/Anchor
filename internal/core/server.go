@@ -37,6 +37,7 @@ var Version = "0.1.0-dev"
 const MaxRequestBytes = 32 << 20
 
 type Server struct {
+	apiServiceActive state.APIServiceSettings
 	AgentEnvironment func() (managed.Environment, error)
 	Skills           *skills.Manager
 	Agents           *managed.Manager
@@ -178,17 +179,30 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 			fail(w, apierror.BrowserOriginRejected)
 			return
 		}
-		host, _, err := net.SplitHostPort(r.Host)
-		ip := net.ParseIP(host)
-		if err != nil || ip == nil || !ip.IsLoopback() {
-			fail(w, apierror.InvalidHost)
+		if !allowedAPIHost(r, scope) {
+			if _, application := r.Context().Value(applicationListenerKey{}).(bool); application {
+				fail(w, apierror.APIClientRejected)
+			} else {
+				fail(w, apierror.InvalidHost)
+			}
 			return
 		}
 		auth := r.Header.Get("Authorization")
 		if auth == "" && scope == "gateway" && r.Header.Get("x-api-key") != "" {
 			auth = "Bearer " + r.Header.Get("x-api-key")
 		}
-		valid := strings.HasPrefix(auth, "Bearer ") && s.Store.Authenticate(strings.TrimPrefix(auth, "Bearer "), scope)
+		valid := false
+		if strings.HasPrefix(auth, "Bearer ") {
+			token := strings.TrimPrefix(auth, "Bearer ")
+			if scope == "gateway" {
+				if a, err := s.Store.AccessForToken(token, scope); err == nil {
+					valid = true
+					r = r.WithContext(context.WithValue(r.Context(), accessKey{}, a))
+				}
+			} else {
+				valid = s.Store.Authenticate(token, scope)
+			}
+		}
 		if !valid && scope == "gateway" && strings.HasPrefix(auth, "Bearer ") {
 			if b, err := s.Store.BindingForToken(strings.TrimPrefix(auth, "Bearer ")); err == nil {
 				valid = true
@@ -213,6 +227,7 @@ func (s *Server) guard(scope string, next http.Handler) http.Handler {
 func (s *Server) Control() http.Handler {
 	s.initLogs()
 	mux := http.NewServeMux()
+	s.apiServiceRoutes(mux)
 	s.ccSwitchRoutes(mux)
 	s.logRoutes(mux)
 	s.modelCatalogRoutes(mux)
@@ -272,7 +287,7 @@ func (s *Server) Control() http.Handler {
 		if u, err := user.Current(); err == nil {
 			username = u.Username
 		}
-		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "process_id": os.Getpid(), "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"graceful_stop", "restart_handoff", "responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth", "skill_library_v1", "proxy_v1"}})
+		writeJSON(w, 200, map[string]any{"instance_id": cfg.InstanceID, "version": Version, "api_version": 1, "process_id": os.Getpid(), "platform": runtime.GOOS, "user": username, "control_address": cfg.ControlAddress, "gateway_address": cfg.GatewayAddress, "capabilities": []string{"graceful_stop", "restart_handoff", "responses_passthrough", "local_context", "provider_model_revision", "codex_configuration_management", "conditional_recovery", "binding_gateway_auth", "skill_library_v1", "proxy_v1", "api_service_v1"}})
 	})
 	mux.HandleFunc("GET /control/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		agents, err := s.Agents.Status()
@@ -476,9 +491,32 @@ func (s *Server) Run(ctx context.Context) error {
 	// Route HTTP server errors through the structured, non-secret logger.
 	control.ErrorLog = slog.NewLogLogger(s.Log.Handler(), slog.LevelWarn)
 	gateway.ErrorLog = control.ErrorLog
-	errs := make(chan error, 2)
-	go func() { errs <- control.Serve(cl) }()
-	go func() { errs <- gateway.Serve(gl) }()
+	servers := []*http.Server{control, gateway}
+	listeners := []net.Listener{cl, gl}
+	apiSettings, err := s.Store.APIServiceSettings()
+	if err != nil {
+		cl.Close()
+		gl.Close()
+		return err
+	}
+	if apiSettings.Enabled {
+		ln, e := net.Listen("tcp4", apiSettings.Address())
+		if e != nil {
+			cl.Close()
+			gl.Close()
+			return fmt.Errorf("application API listen failed: %w", e)
+		}
+		apiServer := &http.Server{Handler: s.applicationGateway(apiSettings.AllowLAN), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 << 10, BaseContext: func(net.Listener) context.Context { return running }, ErrorLog: control.ErrorLog}
+		servers = append(servers, apiServer)
+		listeners = append(listeners, ln)
+	}
+	s.mu.Lock()
+	s.apiServiceActive = apiSettings
+	s.mu.Unlock()
+	errs := make(chan error, len(servers))
+	for i, server := range servers {
+		go func() { errs <- server.Serve(listeners[i]) }()
+	}
 	s.modelCatalog.StartRefresh()
 	stopSkillCollection := s.startSkillCollection()
 	defer stopSkillCollection()
@@ -523,17 +561,28 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	deadline, stop := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stop()
-	// Begin draining both listeners together, then cancel any requests that outlive the deadline.
-	shutdowns := make(chan error, 2)
-	go func() { shutdowns <- control.Shutdown(deadline) }()
-	go func() { shutdowns <- gateway.Shutdown(deadline) }()
-	e1, e2 := <-shutdowns, <-shutdowns
+	// Begin draining all listeners together, then cancel any requests that outlive the deadline.
+	shutdowns := make(chan error, len(servers))
+	for _, server := range servers {
+		go func() { shutdowns <- server.Shutdown(deadline) }()
+	}
+	drainFailed := false
+	for range servers {
+		if <-shutdowns != nil {
+			drainFailed = true
+		}
+	}
 	cancel()
-	_ = control.Close()
-	_ = gateway.Close()
-	if e1 != nil || e2 != nil {
+	for _, server := range servers {
+		_ = server.Close()
+	}
+	s.mu.Lock()
+	s.apiServiceActive = state.APIServiceSettings{}
+	s.mu.Unlock()
+	if drainFailed {
 		s.Log.Warn("drain deadline exceeded; remaining requests canceled")
 	}
+
 	s.Log.Info("core stopped")
 	if runErr != nil && !errors.Is(runErr, http.ErrServerClosed) {
 		return runErr

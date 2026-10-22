@@ -3,7 +3,7 @@ import type { Suggestion } from '../../desktop/contract.generated';
 import { logService } from './log.service';
 import { logTimeRange, type LogTimeRange } from './log.model';
 
-export type SuggestionField = 'search' | 'provider' | 'model' | 'key' | 'http' | 'code' | 'stage' | 'agent' | 'binding' | 'project' | 'session';
+export type SuggestionField = 'search' | 'provider' | 'model' | 'key' | 'http' | 'code' | 'stage' | 'agent' | 'binding' | 'project' | 'session' | 'access_key';
 type Result = { key: string; items: Suggestion[]; hasMore: boolean; failed: boolean };
 
 // Only the focused control loads candidates. No page cursor or active filters

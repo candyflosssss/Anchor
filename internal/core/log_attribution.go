@@ -13,6 +13,16 @@ func logAttribution(r *http.Request, t *requestTrace) {
 	credentials := []string{strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), r.Header.Get("x-api-key")}
 	t.row.Project = logIdentity(r.Header.Values("X-Anchor-Project"), credentials...)
 	t.row.Session = logIdentity(r.Header.Values("X-Anchor-Session"), credentials...)
+	if a, ok := r.Context().Value(accessKey{}).(state.Access); ok {
+		t.row.AccessKey = a.ID
+		// A user may paste a credential into a label. Never persist it as identity.
+		t.row.AccessLabel = a.Label
+		for _, credential := range credentials {
+			if credential != "" && strings.Contains(t.row.AccessLabel, credential) {
+				t.row.AccessLabel = ""
+			}
+		}
+	}
 	b, ok := r.Context().Value(bindingKey{}).(state.Binding)
 	if !ok {
 		return

@@ -123,8 +123,8 @@ describe('grouped request log values', () => {
     expect(render('referenceCost', { ...row, referenceCost: undefined })).toContain('—');
   });
   it('exposes compact block presets with no duplicate columns', () => {
-    expect(logColumns).toHaveLength(15);
-    expect(columnPresets.common.ids).toHaveLength(9);
+    expect(logColumns).toHaveLength(16);
+    expect(columnPresets.common.ids).toHaveLength(10);
     for (const preset of Object.values(columnPresets)) expect(new Set(preset.ids).size).toBe(preset.ids.length);
     for (const column of logColumns) expect(render(column.id)).not.toBe('');
   });
@@ -138,4 +138,12 @@ it('groups raw, supplier, group and final values into one cost cell without repr
   expect(render('referenceCost', { ...priced, referenceCost: { ...priced.referenceCost!, adjustment: undefined } })).toContain('未记录');
   expect(render('referenceCost', { ...priced, referenceCost: { ...priced.referenceCost!, adjustment: { ...priced.referenceCost!.adjustment!, group_multiplier: null } } })).toContain('未知');
   expect(render('referenceCost', { ...priced, referenceCost: { ...priced.referenceCost!, adjustment: { ...priced.referenceCost!.adjustment!, supplier_mixed: true, supplier_multiplier: null } } })).toContain('逐次');
+});
+
+it('renders caller name and identity separately from upstream credentials', () => {
+  const request = { ...row, access_key: 'caller-phone', accessLabel: '手机助手', key: 'upstream-channel' };
+  const caller = render('accessKey', request);
+  expect(caller).toContain('手机助手'); expect(caller).toContain('caller-phone');
+  expect(caller).not.toContain('upstream-channel');
+  expect(render('provider', request)).toContain('upstream-channel');
 });

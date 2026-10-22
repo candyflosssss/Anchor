@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-10-22
+- 2026-10-22 当前源码未发布：新增独立应用 API 端口／LAN 设置、gateway Key 签发管理，以及日志调用 Key 归属；见[应用 API 服务](#应用-api-服务与调用-key2026-10-22当前源码未发布)。
 - 2026-10-22 desktop.69 dev 已发布：修复 Responses 历史工具项 ID 前缀不兼容，保留 call_id 与工具结果；同版包含此前已提交的供应商首字超时设置。工具项修复无新增命令或参数，未自动安装；详见[发行记录](../release/desktop.md#tool-item-ids-69)。
 - 2026-10-22 desktop.68 dev 已发布：同版CLI／核心／GUI自动发现常见目录中的项目及Skill，后台收录保留原件，无须手动登记；无新增命令或参数。含网关诊断、补路径缓存及日志压缩，不含其后供应商首输出超时增量；详见[发行记录](../release/desktop.md#skill-project-discovery-68)。
 - 2026-10-22 desktop.67 dev 已发布：逐Key独立拖拽与调度，model routing新增可重复 --source；同版含日志默认保留及容量上限调整，详见[发行记录](../release/desktop.md#independent-keys-67)。
@@ -48,13 +49,13 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | 全局选项 | 默认与行为 |
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
-| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill`、`proxy` 管理动作（不含 token）。`restart` 是例外：只有显式提供 SSH Context 才操作远程，未提供仍操作本机，不受默认 Context 影响；其他本机操作显式提供非空 Context 会失败 |
+| `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill`、`proxy`、`api` 管理动作（不含 token）。`restart` 是例外：只有显式提供 SSH Context 才操作远程，未提供仍操作本机，不受默认 Context 影响；其他本机操作显式提供非空 Context 会失败 |
 | `--ssh-password-stdin` | 从 stdin 读取本次 SSH 密码（最多 8192 bytes，去掉末尾 CR/LF，非空），仅本次使用，不保存；SSH add 时选择密码模式，已保存密码 Context 每次管理请求重新提供。不能与供应商 `--secret-stdin` 同用 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
 推荐把全局选项放在命令之前。当前解析器也会从整条参数列表提取全局选项。值选项可写 `--name VALUE` 或 `--name=VALUE`；布尔选项关闭时用 `--name=false`，不要写 `--name false`。除表中指定的位置参数外，不添加额外位置参数。
 
-- 正常操作 stdout 为一个 JSON 值；`logs export` 为逐条 JSONL，`logs follow` 为重复页 JSON；`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 的 JSON 是**明确含秘密的例外**。
+- 正常操作 stdout 为一个 JSON 值；`logs export` 为逐条 JSONL，`logs follow` 为重复页 JSON；`agent token` 是原始秘密文本例外；`help` 为文本，`serve` 没有正常 stdout 结果。诊断和服务日志在 stderr。`access grant` 与 `api issue` 的 JSON 是**明确含秘密的例外**。
 - 应用退出码：成功 `0`，失败 `1`；帮助 `0`。开发包装脚本的资源保护/环境失败可能返回不同非零码。
 - 供应商 ID 为 1..128 个 Unicode 码点，支持中文等 Unicode 字母、十进制数字，以及 `.`、`_`、`-`；首字符必须为字母或十进制数字。拒绝空白、控制/格式字符、组合附加符号、emoji、冒号、路径分隔符与 URL 保留符号；不自动裁剪、大小写折叠或 Unicode 归一化，按原值精确匹配。
 - 当前源码的公开模型 ID 另允许单个 `(fast)`／`(ultrafast)` 保留后缀（完整 ID 仍最多 128 个 Unicode 码点）；其他用户名称不接受括号。此速度分身增量已随 desktop.36 宿主／核心发布 dev；独立 CLI 公开 alpha.6 不含本功能，须使用兼容源码 CLI 并同步升级核心。
@@ -68,6 +69,11 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 
 | 指令 | 用途 | 作用域 / 前置条件 |
 | --- | --- | --- |
+| `api settings` | 读取应用 API 设置、实际地址与 Key 元数据 | 当前 Context；在线兼容核心 |
+| `api configure` | 完整替换应用监听端口、启停及 LAN 配置 | revision + approve；重启生效 |
+| `api keys` | 列出普通 gateway Key 元数据 | 当前 Context；不含秘密 |
+| `api issue` | 按名称及期限签发 Key | show-once；stdout 含秘密 |
+| `api revoke` | 撤销普通 gateway Key | id + approve；不撤销管理授权 |
 | `proxy list` | 查看脱敏代理、绑定和 mihomo 状态 | 当前 Context；核心在线 |
 | `proxy put` | 新建/编辑外部代理或内置 mihomo 节点 | revision + approve；秘密可从 stdin 输入 |
 | `proxy delete` | 删除无引用代理 | revision + approve |
@@ -184,7 +190,7 @@ anchor init [--control-address ADDRESS] [--gateway-address ADDRESS]
 anchor serve
 ```
 
-无专属参数；前台运行管理/网关两监听面，日志在 stderr。只有两端口均成功绑定才 ready；第二面失败释放第一面，同一实例已有核心或端口冲突则失败。管理 CLI 退出不会停止它。Linux Ctrl+C/SIGTERM、Windows Ctrl+C 触发最多 10 秒的优雅停服；关闭承载终端可能停服。本轮新增 `stop --approve` 可在另一进程请求正常停服；`serve` 不自行后台化，也没有系统服务管理命令。桌面宿主的独立核心模式见[桌面运行契约](../design/desktop-runtime.md)，不改变 `serve` 的前台语义。
+无专属参数；前台运行管理/网关两监听面（启用应用 API 服务时增加独立第三监听），日志在 stderr。只有两端口均成功绑定才 ready；第二面失败释放第一面，同一实例已有核心或端口冲突则失败。管理 CLI 退出不会停止它。Linux Ctrl+C/SIGTERM、Windows Ctrl+C 触发最多 10 秒的优雅停服；关闭承载终端可能停服。本轮新增 `stop --approve` 可在另一进程请求正常停服；`serve` 不自行后台化，也没有系统服务管理命令。桌面宿主的独立核心模式见[桌面运行契约](../design/desktop-runtime.md)，不改变 `serve` 的前台语义。
 
 两面绑定后才对已批准且 enabled 的 Binding 自动接管；某个目标失败不阻断其他目标，`status.bindings` 分别报告 pending/applied/overridden/conflict 等状态。正常停止先冻结托管写入并条件恢复，然后最多 10 秒排空请求。崩溃不会自动执行恢复；重新启动会核对原日志，或核心离线后用 `recover`。已运行的 Codex 会话可能缓存旧地址，恢复后应重启 Codex。
 
@@ -793,6 +799,7 @@ anchor recover [--id ID]
 | 授权签发/列表/撤销 | access 的 grant、list、revoke | 已提供 CLI；管理令牌选择未实现；Binding 级凭据随 agent 自动管理 |
 | 多轮文本对话测试（当前源码，未发布） | provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve；stdin 为完整消息数组，支持可选原生思考深度 | 共享核心与桌面 ProviderChat；CLI 输出最终 JSON，不单独提供终端交互／流式展示命令，复制和清空为页面生命周期 |
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
+| 应用 API 端口、LAN 与调用 Key | api settings/configure/keys/issue/revoke；设置 → API 服务 | 独立监听默认关闭／17862；监听保存后重启生效，Key 管理即时生效；日志按 access_key 区分 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
 | 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／Key 默认收起后置，渠道始终按保存顺序展示并可拖动；快速倍率排序含隐藏模型倍率，未知后置；低延迟排序经确认对可用渠道各测一次首字时间。CLI 用 model routing 保存顺序、provider test 测试；无专用一键排序命令。冷却设置见 settings key-cooldown（§16） |
 | 平台自动识别与列表余额（首次识别持久缓存为当前源码未发布增量） | provider detect-platform/balance-summary；platform-put 默认 auto | 创建时自动识别一次并持久缓存成功或失败，旧供应商首次查询补齐；GUI「重新探测」与 detect-platform 才更新识别。余额／倍率数据按既有策略刷新，切页复用上次余额。NewAPI 金额按站点比例换算，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
@@ -865,11 +872,11 @@ anchor logs list|follow|export [--kind requests|system] [--since 1h | --from RFC
   [--provider ID] [--model NAME] [--key ID] [--http N]
   [--code VALUE] [--stage VALUE] [--level VALUE] [--search PREFIX]
 anchor logs stats [--since 1h | --from RFC3339 --to RFC3339] [--interval 0s|10s|30s|1m|5m|15m|1h|6h|24h] [--include-errors] [--errors-only]
-  [--group-by agent|binding|project|session]
+  [--group-by agent|binding|project|session|access_key]
   [--status VALUE] [--source proxy|probe] [--provider ID] [--model NAME]
   [--key ID] [--http N] [--code VALUE] [--stage VALUE] [--search PREFIX]
   # 请求 list/follow/export/stats 均可额外使用：
-  [--agent TYPE] [--binding ID] [--project ID] [--session ID]
+  [--access-key ID] [--agent TYPE] [--binding ID] [--project ID] [--session ID]
 anchor logs suggestions [--kind requests|system] [--field search|provider|model|key|http|code|stage|agent|binding|project|session]
   [--prefix VALUE] [--since 1h] [--limit 20]
 anchor logs detail REQUEST_ID
@@ -1091,3 +1098,27 @@ anchor [--context NAME] provider import-ccs [--db PATH] --approve --fingerprint 
 2026-10-22 错误诊断与自动补路径（已随 desktop.68 dev 发布）：`logs detail REQUEST_ID` / `logs export` 的 evidence 增加 `anchor_error_id`、`transport_cause`、`transport_phase`、`provider_timeout_seconds`、`upstream_error_category`；列表白名单不变，旧日志不回填，不保存上游错误原文。网关 all-mapped/all-compatible 绑定的缺映射/无启用供应商分别为 404/unknown_model 和 503/model_no_enabled_provider，其余范围拒绝保持 403。供应商期限包含等待响应头，取消隐式 30 秒上限，连接后响应头超时为 504/upstream_header_timeout。推理/`provider test` 已有 HTML 补 `/v1` 成功返回 JSON/SSE 后，按地址/协议/凭据摘要缓存 10 分钟（最多128项）；`endpoint_resolution=v1_cached` 表示直接复用，`endpoint_repair=learned` 表示本次学习。配置不写回；缓存 HTML/404/405 时失效，下一独立请求重新识别，当前请求不重放。无需新增命令、参数或数据库迁移，完整分类与边界见[日志设计](../design/logging.md#错误原因与端点修复2026-10-22当前源码未发布)。
 
 2026-10-22 首字期限与默认值（当前源码，未打包/未发布）：`provider add|put --first-token-timeout 30 --timeout 500 --max-concurrent 20` 提供首字/整条期限与默认并发。CLI put仍为完整替换，未传普通字段回默认值；已存配置读取不改总超时/并发，旧首字字段缺失按30，旧客户端省略该字段更新保留已存首字值。正文、思考、工具参数或音频生成停止首字计时，心跳/角色声明/HTTP头不计；非流式等完整结果。补/v1与密文恢复共享两类原期限；首字超时不重放，网关返回upstream_first_token_timeout，SSE已提交时为固定错误事件，probe/chat新增first_token_timeout且保留诊断10/120秒上限。详情/导出增加timeout_kind=first_token与first_token_timeout_seconds，列表白名单不变。新建及CC Switch导入默认30/500/20，已有配置不自动改写。需要同步升级核心/CLI/GUI，无数据库迁移或新手工操作。
+
+## 应用 API 服务与调用 Key（2026-10-22，当前源码，未发布）
+
+```text
+anchor api settings
+anchor api configure --enabled=true|false --port 17862 --allow-lan=true|false --revision N --approve
+anchor api keys
+anchor api issue --label LABEL [--ttl-seconds 2592000] --show-once
+anchor api revoke --id ID --approve
+```
+
+以上动作通过所选 Context 的管理授权和实例身份核验，需要在线且支持 `api_service_v1` 的核心；旧核心明确拒绝，不自动回退本机。GUI入口为「设置 → API 服务」，完整契约见[应用 API 服务](../design/api-service.md)。成功stdout为JSON、退出0，参数／授权／版本冲突等失败非零；不自动重放写入。
+
+- `settings` 无参数，返回 `{settings,active_address,restart_required,base_urls,keys}`。settings含 enabled/port/allow_lan/revision；keys仅普通gateway授权元数据，无完整令牌或管理授权。active_address和base_urls反映当前启动状态，不冒充已保存值已生效。
+- `configure` 完整替换监听配置：enabled默认false，port默认17862（1..65535），allow-lan默认false，revision必须是上次settings的版本，approve必填。省略普通参数回默认值；默认关闭。不能与初始化的管理或Agent网关端口重复。保存持久化，**重启核心后生效**，CLI可用 `anchor restart --approve`（远程需显式SSH Context）；第三监听失败会清理已绑定端口并使启动失败，不自动回退端口。
+- `keys` 无参数，返回普通gateway Access数组，字段为id/label/scope/expires_at/revoked。包含既有 `access grant --scope gateway` 生成的授权，不含Agent Binding凭据或manage授权。expires_at为Unix秒，0永久。
+- `issue` label必填且非空、最多128字节、禁止控制字符；ttl-seconds默认2592000（30天），范围0..315360000，0永久。show-once必填；返回 `{access,token}`，**此输出包含完整秘密，仅返回这一次，不可写入日志或分享**。签发仅保存摘要；Key允许调用全部已配置公开模型，不提供逐Key模型限制或额度。
+- `revoke` id为keys列表中的Access ID，approve必填；返回 `{revoked:true}`。仅撤销普通gateway授权，manage ID失败；已撤销再次撤销仍成功。新请求立即拒绝，已接受请求不强制取消。签发、撤销无需重启监听。
+
+应用地址默认 `http://127.0.0.1:17862/v1`（启用并重启后）。允许LAN时监听IPv4 `0.0.0.0:PORT`，使用核心主机的实际私有IPv4地址调用；来源和数值Host均须回环／私有IPv4，仍须Bearer或x-api-key。不支持DNS Host、公网来源、浏览器Origin或任意CORS。仅在可信LAN使用HTTP，系统防火墙需用户自行按需放行。管理面17861和托管Agent网关17860保持本机用途。已有四个模型HTTP端点和协议转换规则不变。
+
+日志 `list/follow/stats/export` 新增 `--access-key ID` 精确过滤（显式空字符串仅选未记录），`stats --group-by access_key`、`suggestions --field access_key` 新增调用Key维度。列表／详情／JSONL新增可选access_key/access_label，分别为已验证Access ID和名称快照；原 `--key` / key字段继续表示上游供应商Key。托管Key沿用agent／binding身份，历史不回填，认证失败不猜归属，不记录完整秘密。
+
+功能覆盖：端口／LAN设置与Key签发、元数据、撤销同时提供CLI和GUI；监听修改需要重启，跨设备LAN、系统防火墙和原生窗口尚未实机验收。本任务不打包、不发布、不替换正在运行的核心。

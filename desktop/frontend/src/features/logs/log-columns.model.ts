@@ -4,6 +4,7 @@ export const columnGroups = ['基础信息', '模型与路由', '速度与用量
 type ColumnGroup = typeof columnGroups[number];
 interface ColumnDefinition { id: string; label: string; group: ColumnGroup; description: string; width: number }
 export const logColumns = [
+  { id: 'accessKey', label: '调用 Key', group: '基础信息', description: '经鉴权的本地调用 Key 名称和 ID，与上游供应商 Key 区分。', width: 170 },
   { id: 'time', label: '时间', group: '基础信息', description: '请求发生时间与相对时间。', width: 120 },
   { id: 'status', label: '结果与交付', group: '基础信息', description: 'Anchor 结果、上游 HTTP、错误码、生成状态与客户端交付；这些状态彼此独立。', width: 160 },
   { id: 'requestId', label: '请求 ID', group: '基础信息', description: '关联请求明细和系统事件的稳定标识。', width: 175 },
@@ -22,7 +23,7 @@ export const logColumns = [
 ] as const satisfies readonly ColumnDefinition[];
 export type LogColumnId = typeof logColumns[number]['id'];
 export const columnPresets = {
-  common: { label: '常用', ids: ['time', 'status', 'model', 'provider', 'timing', 'tokens', 'referenceCost', 'sentTier', 'acceleration'] },
+  common: { label: '常用', ids: ['time', 'status', 'accessKey', 'model', 'provider', 'timing', 'tokens', 'referenceCost', 'sentTier', 'acceleration'] },
   performance: { label: '性能', ids: ['time', 'model', 'provider', 'protocol', 'timing', 'tokens', 'referenceCost', 'sentTier', 'acceleration'] },
   debugging: { label: '排障', ids: ['time', 'status', 'requestId', 'provider', 'diagnostics', 'attempts'] },
 } satisfies Record<string, { label: string; ids: LogColumnId[] }>;

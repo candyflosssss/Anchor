@@ -962,3 +962,11 @@
 - 旧 → 新：仅从 Codex 工作区索引／手动项目取路径 → 自动检查常见项目容器的直接子目录，合并索引及已归档来源／挂载项目；Codex 索引缺失、手动项目列表为空也能发现五类标准项目 Skill。自动候选按真实目录去重，已有来源别名保留，原件不改写。
 - 兼容与迁移：无数据库／索引格式迁移；`scopes[].origin` 可出现 `project-directory`／`archived-source`，索引 `projects` 仍仅指手动补充列表。有效项目最多1024个、容器目录项每轮最多4096个，边界与不可读容器在 `warnings` 明确报告，非全盘／任意深度穷举。需升级运行中的核心；desktop.67 及更早版本不含此增量，本轮未打包、安装或发布。
 - 验证：隔离 Manager、后台核心与 CLI 回归覆盖无索引／无登记自动收录、新项目／新 Skill 增量、原件保留、项目与 Skill 别名去重、手动路径优先、旧项目记忆、扫描上限和取消；实际执行结果及前端检查见本轮任务记录。
+
+## 2026-10-22 — 应用 API 监听、Key 管理和调用者日志（当前源码，未发布）
+
+- 类型：新增／修改。
+- 指令与参数：新增 `api settings/configure/keys/issue/revoke`；configure支持enabled/port/allow-lan/revision/approve，issue支持label/ttl-seconds/show-once，revoke支持id/approve。日志list/follow/stats/export新增access-key，stats.group-by和suggestions.field新增access_key。
+- 旧 → 新：此前普通gateway令牌只通过本机access命令签发、网关仅回环；现可经选定Context管理独立应用监听和gateway Key，桌面设置同步支持。监听默认关闭、端口17862，保存后重启生效；原管理与Agent网关不变。日志新增access_key/access_label，与上游供应商Key区分。
+- 兼容与迁移：需要同版核心与支持api_service_v1的客户端；无state schema升级，旧日志不回填。api issue stdout含一次性秘密；配置完整替换、省略字段回默认值，revision必填，未知写入不重放。已存access gateway Key继续可用。
+- 验证：隔离state/core/CLI/桌面桥接、共享样例、前端类型与单元检查；具体执行结果见本任务更新记录。未验证跨设备LAN／原生窗口，未打包或发布。

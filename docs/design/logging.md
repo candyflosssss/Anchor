@@ -271,3 +271,9 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 ### 首字超时证据（2026-10-22，当前源码未发布）
 
 新增固定错误 upstream_first_token_timeout（probe/chat 为 first_token_timeout），详情/导出 evidence.timeout_kind=first_token、first_token_timeout_seconds=配置秒数，并保留 provider_timeout_seconds。anchor_error_id=upstream_first_token_timeout 用于共享语言目录；列表白名单不变。首字期含连接/响应头/等待实际生成内容，不能用TTFT指标替代该配置；正文、思考、工具参数或音频可满足首字，心跳不满足，非流式等待完整结果。未取得上游响应时HTTP=null，已取得上游200后超时仍保存HTTP200；SSE已提交则发本地错误事件并记失败，不合成成功、不重放、不记录正文，旧日志不回填。
+
+## 调用 Key 归属（2026-10-22，当前源码，未打包／未发布）
+
+请求新增可选 `access_key`（经鉴权的普通 gateway Access ID）与 `access_label`（当时名称）；列表／详情／导出保留，不从自报头推断，不记录完整令牌。原有 `key`／attempt.key 继续表示上游供应商 Key；托管凭据继续由 agent／binding区分。解析失败的已鉴权请求同样归属，认证失败不猜归属，旧日志不补写。
+
+Query.access_key 为可空指针：省略代表全部，空字符串仅选未记录，非空精确匹配；CLI list/follow/stats/export 提供 `--access-key`。统计 `group_by=access_key` 沿用前100组和完整总量规则；suggestions.field=access_key 返回安全ID候选。JSON表达式索引支持筛选、搜索和汇总，不升级日志schema。桌面「调用 Key」列与筛选／分类、详情／摘要同步支持；原供应商 Key 筛选不变。名称中包含本次认证秘密时不写名称，Key撤销后历史名称快照保留。管理与生命周期见[应用 API 服务](api-service.md)。

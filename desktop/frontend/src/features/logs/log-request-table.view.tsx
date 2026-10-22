@@ -19,6 +19,7 @@ function Metric({ label, value, tone, icon: Icon, detail }: { label: string; val
 }
 export function ColumnValue({ id, row }: { id: LogColumnId; row: RequestLog }) {
   switch (id) {
+    case 'accessKey': return <div className="log-info-block"><span>{row.accessLabel || (row.binding ? `托管：${row.binding}` : '未记录')}</span><small className="mono break-all">{row.access_key || '—'}</small></div>;
     case 'referenceCost': return <CostCell cost={row.referenceCost} />;
     case 'sentTier': return <SentTier row={row} />;
     case 'acceleration': return <Acceleration row={row} />;

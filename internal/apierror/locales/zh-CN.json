@@ -7,6 +7,7 @@
   "invalid_json_fields": "JSON 字段无效、存在未知字段或内容过大。",
   "single_json_object": "请求必须恰好包含一个 JSON 对象。",
   "browser_origin_rejected": "不支持来自浏览器的请求。",
+  "api_client_rejected": "API 服务仅接受数字回环 Host；启用局域网时也允许私有 IPv4 Host 和来源地址。",
   "invalid_host": "Host 必须是数字形式的回环 IP 地址和端口。",
   "unauthorized": "需要有效的 Bearer 访问凭据。",
   "starting": "核心正在启动。",

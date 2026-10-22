@@ -72,7 +72,7 @@ type Stats struct {
 // dimensionColumn is a whitelist, not an SQL expression supplied by the client.
 func dimensionColumn(name string) string {
 	switch name {
-	case "agent", "binding", "project", "session":
+	case "agent", "binding", "project", "session", "access_key":
 		return "COALESCE(json_extract(document,'$." + name + "'),'')"
 	default:
 		return ""

@@ -22,6 +22,7 @@ function testBridge(overrides: Partial<DesktopBridge> = {}): DesktopBridge {
     ModelCatalog: vi.fn(), EstimateModelCost: vi.fn(),
     SkillWorkspace: vi.fn(), SkillDetail: vi.fn(), ManageSkill: vi.fn(),
     AgentWorkspace: vi.fn(), EnrollAgent: vi.fn(), ManageAgent: vi.fn(),
+    APIService: vi.fn(), SaveAPIService: vi.fn(), IssueAPIKey: vi.fn(), RevokeAPIKey: vi.fn(),
     KeyCooldownSettings: vi.fn(), SaveKeyCooldownSettings: vi.fn(),
     CodexSettings: vi.fn(), SaveCodexSettings: vi.fn(), ModelSettings: vi.fn(), SaveModelSettings: vi.fn(), ConfigureModelRouting: vi.fn(), ProviderWorkspace: vi.fn(), ProviderAction: vi.fn(), ProviderProbe: vi.fn(), ProviderChat: vi.fn(),
     Providers: vi.fn(async () => ({ contract: CONTRACT, data: fixture.providers, problem: null })),

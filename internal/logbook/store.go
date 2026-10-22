@@ -483,7 +483,7 @@ func logWhere(q Query, table string) ([]string, []any) {
 		for _, dimension := range []struct {
 			name  string
 			value *string
-		}{{"agent", q.Agent}, {"binding", q.Binding}, {"project", q.Project}, {"session", q.Session}} {
+		}{{"access_key", q.AccessKey}, {"agent", q.Agent}, {"binding", q.Binding}, {"project", q.Project}, {"session", q.Session}} {
 			if dimension.value != nil {
 				add(dimensionColumn(dimension.name)+"=?", *dimension.value)
 			}
@@ -494,7 +494,7 @@ func logWhere(q Query, table string) ([]string, []any) {
 		if q.Search != "" {
 			// UNION uses indexed prefix ranges rather than a body/JSON search or leading wildcard.
 			var parts []string
-			for _, col := range []string{"id", "model", "provider", "key_id", "error_code", dimensionColumn("agent"), dimensionColumn("binding"), dimensionColumn("project"), dimensionColumn("session")} {
+			for _, col := range []string{"id", "model", "provider", "key_id", "error_code", dimensionColumn("agent"), dimensionColumn("binding"), dimensionColumn("project"), dimensionColumn("session"), dimensionColumn("access_key")} {
 				parts = append(parts, "SELECT seq FROM requests WHERE "+col+">=? AND "+col+"<?")
 				args = append(args, q.Search, q.Search+"\U0010ffff")
 			}

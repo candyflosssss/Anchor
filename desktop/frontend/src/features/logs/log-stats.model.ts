@@ -45,7 +45,7 @@ export function checkedStats(value: Stats): Stats {
     }
     if ((v.error_rate ?? 0) > 100 || (v.cache_hit_rate ?? 0) > 100) throw new DesktopProblem('read_error');
   };
-  if (value.group_by != null && !['agent', 'binding', 'project', 'session'].includes(value.group_by)) throw new DesktopProblem('read_error');
+  if (value.group_by != null && !['agent', 'binding', 'project', 'session', 'access_key'].includes(value.group_by)) throw new DesktopProblem('read_error');
   if (value.group_by) {
     const groups = value.groups ?? [];
     if (!Array.isArray(groups) || groups.length > 100 || !Number.isSafeInteger(value.group_count ?? 0) || (value.group_count ?? 0) < groups.length) throw new DesktopProblem('read_error');
