@@ -157,10 +157,11 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 	}
 	if o.Protocol == "responses" {
 		fields["store"] = json.RawMessage("false")
-		if native {
-			if input, exists := fields["input"]; exists {
-				fields["input"] = sanitizeNativeReasoningInput(input)
+		if input, exists := fields["input"]; exists {
+			if native {
+				input = sanitizeNativeReasoningInput(input)
 			}
+			fields["input"] = sanitizeResponsesToolIDs(input)
 		}
 	}
 	raw, _ = json.Marshal(fields)

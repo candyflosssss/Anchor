@@ -25,6 +25,7 @@ HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
 | `stream_http.go` | 兼容旧 Stream 入口；HTTP 写期限和刷新适配到通用 writer，不参与协议语义 |
 | `recovery.go` | 已有密文拒绝识别、恢复窗口、清理派生会话；没有自动重试或渠道选择 |
 | `native_reasoning.go` | 原生 Responses 派发副本中无效加密推理字段的预清理；不修改客户端基线 |
+| `responses_tool_ids.go` | 目标 Responses 派发副本中工具项 ID 前缀、长度和碰撞规范化；保留 call_id 与客户端基线 |
 | `diagnostics.go` | 固定阶段、错误类别、完整／降级／不支持结果，安全错误包装 |
 | `internal/core/gateway*.go`、`translation_logging.go` | 鉴权／访问范围、调度、上游认证、连接与取消、候选及恢复预算、HTTP 交付、诊断与账务持久化 |
 
@@ -40,7 +41,7 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 跨协议继续使用现有 Responses 形状的内部请求桥及类型化输出；不能表达的原生字段在 Prepare 时拒绝，不把最小公共子集当成静默过滤器。下一轮工具结果通过客户端回传的声明、name/namespace、call_id 和历史调用重建映射，不依赖上次 HTTP 请求的进程内状态。碰撞、长名称与歧义身份继续由既有 Chat 适配器处理。
 
-同协议发送保留原生字段，保留原生响应字节；修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false，并应用下述原生 Responses 无效密文字段预清理；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
+同协议发送保留原生字段，保留原生响应字节；修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false，并应用下述原生 Responses 无效密文字段预清理与工具项 ID 规范化；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
 
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
 
@@ -68,6 +69,16 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 6. Anthropic 输出按上游内容项结束边界关闭当前块并释放后续块，顺序文本不再等到整体回答完成。
 
 原生 Responses 历史兼容路径仍接受没有 status 的 JSON，状态记为未知；不会因 HTTP 200 记录 generation_status=completed。原生 Chat 的 `[DONE]` 与 Anthropic `message_stop` 继续是透传终止边界；缺少可解析结束信息时不编造生成状态。传输成功与完整生成语义分开。
+
+## 工具项 ID 兼容修复（2026-10-22，当前源码未发布）
+
+每次 Prepare 在目标协议为 Responses 时，对派发副本 input 顶层的 function_call、custom_tool_call、custom_tool_call_output 的非空字符串 id 分别检查 fc、ctc、ctco 前缀；缺少对应前缀则补上。例如 custom_tool_call 的 id=call_fixture 改为 ctc_call_fixture，call_id=call_fixture 保持不变。由协议层在首次发送前完成，不等待上游拒绝、不新增重试，也不依赖前一请求的进程状态。普通与流式请求共用同一规则。
+
+已有正确前缀且不超过64个Unicode字符的ID保留。修复后的ID如果超过64字符，或与输入中已有ID／本次生成的ID碰撞，则使用保留前缀的确定性SHA-256短后缀缩短／消歧；相同输入重复准备以及对已修复内容再次处理保持稳定。既有重复ID不属于本次修复范围。
+
+只修改上述工具项的 id；保留 call_id、name、namespace、参数／自由文本／执行结果和未知扩展字段，不生成缺失／空ID，不改非字符串ID、不扫描嵌套内容、不改 function_call_output、message、reasoning 或未知类型。原有无效密文字段预清理独立保留，不引入 CLIProxyAPI 的超长加密推理条目删除策略。客户端 Session 基线、其他目标协议的尝试及原生返回JSON／SSE保持原有内容，不重写真实会话文件或Agent配置。
+
+参考 [CLIProxyAPIPlus 工具项ID规范化](https://github.com/kaitranntt/CLIProxyAPIPlus/blob/8f22abcbc089051073167882157556a90a753c0a/internal/runtime/executor/helps/codex_input_ids.go) 的兼容边界，使用 Anchor 现有 RawMessage 派发副本机制独立实现。此项属于内部协议数据面修复，不新增管理开关、CLI命令或日志正文。回归测试覆盖保留边界、候选隔离、前缀与长度／碰撞，以及模拟HTTP上游的普通／流式工具调用→历史与结果回传→最终答案；不代表真实付费上游或运行版本验收。
 
 ## 流式与取消边界
 
