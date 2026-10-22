@@ -100,8 +100,8 @@ describe('model channel availability presentation', () => {
     const id = JSON.stringify([summary.provider.id, summary.workspace!.keys[0].id]);
     const html = render([summary], { ...rates, keys: { [id]: { ...summary.workspace!.keys[0], state: 'ready', effective_multiplier: 0.4 } } });
     expect(html).toContain('冷却中');
-    expect(html).toContain('相对倍率 <strong>0.4×');
-    expect(html).not.toContain('>0.4×</strong></div>');
+    expect(html).toContain('相对倍率 0.4×');
+    expect(html).toContain('aria-label="排序倍率 未知"');
   });
   it('labels genuinely anonymous routes without inventing a Key', () => {
     const summary = makeSummary(true);

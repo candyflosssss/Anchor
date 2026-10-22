@@ -549,13 +549,13 @@ test('group rate mappings distinguish routing and platform values and deduplicat
   await expect(page.locator('.mapping-effective-rate[title^="供应商 0.5×"]')).toHaveCount(2);
   const before = await page.evaluate(() => window.accountTest.queries);
   await page.getByRole('button', { name: '刷新分组倍率', exact: true }).dblclick();
-  await expect(page.locator('.key-multiplier').filter({ hasText: '分组倍率 0.8×' })).toHaveCount(6);
+  await expect(page.locator('.mapping-effective-rate[title*="分组倍率 0.8×"]')).toHaveCount(6);
   expect(await page.evaluate(() => window.accountTest.queries)).toBe(before + 3);
-  await expect(page.locator('.key-multiplier').filter({ hasText: '相对倍率 0.4×' })).toHaveCount(2);
+  await expect(page.locator('.mapping-effective-rate[title*="相对倍率 0.4×"]')).toHaveCount(2);
   await page.evaluate(() => { window.accountTest.failure = 'auth_required'; });
   await page.getByRole('button', { name: '刷新分组倍率', exact: true }).click();
   await expect(page.getByRole('alert').first()).toContainText('用户令牌');
-  await expect(page.locator('.key-multiplier').filter({ hasText: '刷新失败，沿用上次成功缓存。' })).toHaveCount(6);
+  await expect(page.locator('.mapping-effective-rate[title*="刷新失败，沿用上次成功缓存。"]')).toHaveCount(6);
   await expect(page.locator('.mapping-effective-rate[title^="供应商 0.5×"]')).toHaveCount(2);
   await page.locator('.mapping-candidate .candidate').first().click();
   await page.getByRole('tab', { name: '账户与余额', exact: true }).click();
@@ -579,7 +579,7 @@ test('group rate mappings distinguish routing and platform values and deduplicat
     await expect(page.getByRole('article', { name: '模型 claude-opus-4-6', exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1789, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
-    await page.getByRole('button', { name: '拖动 备用供应商 claude-opus-4-6', exact: true }).hover();
+    await page.locator('.mapping-key-card').filter({ has: page.getByRole('button', { name: '拖动 备用供应商 claude-opus-4-6', exact: true }) }).hover();
     await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/model-mappings-light.png` });
     await page.setViewportSize({ width: 820, height: 1000 });
     await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/model-mappings-narrow.png`, fullPage: true });
@@ -665,12 +665,12 @@ test('multiple scoped Keys are separate visible cards and move together as a cha
   if (process.env.ANCHOR_MAPPING_CAPTURE_DIR) {
     await page.setViewportSize({ width: 1600, height: 1100 });
     await page.getByRole('button', { name: '浅色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/key-cards-light.png` });
-    await model.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/key-cards-detail.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-light.png` });
+    await model.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-detail.png` });
     await page.getByRole('button', { name: '深色', exact: true }).click();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/key-cards-dark.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-dark.png` });
     await page.setViewportSize({ width: 600, height: 850 });
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/key-cards-narrow.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/compact-key-cards-narrow.png` });
   }
 });
 
@@ -742,6 +742,7 @@ for (const failure of ['conflict', 'unknown'] as const) test(`model routing ${fa
   await host(page, true); await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true });
   await page.evaluate(value => { window.desktopTest.writeError = value; }, failure);
+  await card.locator('.mapping-key-card').filter({ has: page.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }) }).hover();
   await card.getByRole('button', { name: '下移 摸鱼AI upstream-shared-one', exact: true }).click();
   await expect(card.getByRole('alert')).toContainText(failure === 'conflict' ? '未覆盖新版本' : '结果未知');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
@@ -1449,6 +1450,7 @@ test('mapping quick sorts use refreshed multipliers and measured first text (sim
   await expect(rows.first()).toContainText('备用供应商');
   await expect(card).toContainText('已自动保存');
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
+  await card.locator('.mapping-key-card').filter({ has: page.getByRole('button', { name: '下移 备用供应商 upstream-shared-one', exact: true }) }).hover();
   await card.getByRole('button', { name: '下移 备用供应商 upstream-shared-one', exact: true }).click();
   await expect(rows.first()).toContainText('摸鱼AI');
   await expect(card.getByRole('button', { name: '低延迟优先', exact: true })).toBeEnabled();
