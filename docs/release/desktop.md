@@ -1,10 +1,40 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.68](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.68)，发布于 `2026-10-22T16:43:13+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `589366ce083d93a50f800ecd0e2ba93c14104713`、SOURCE dirty=false。
-- 自动发现常见目录中的 Agent 项目并收录 Skill，无需逐个登记；外部原件保留，新项目与新 Skill 由后台继续发现。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.69](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.69)，发布于 `2026-10-22T17:43:55+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `29b86eaa19ee4a3461f97a63e0277a13fb2c7172`、SOURCE dirty=false。
+- 修复 Codex 工具历史 ID 前缀不兼容：发送前规范化工具项编号，保留调用与结果关联；同版包含已提交的供应商首字超时设置。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="tool-item-ids-69"></a>
+
+## Responses 工具历史 ID 修复 .69（已发布 dev）
+
+修复 Codex 继续工具调用时，历史 custom_tool_call.id 使用 call_ 编号导致上游拒绝、客户端显示断流的问题。目标 Responses 的派发副本在发送前修正 function_call／custom_tool_call／custom_tool_call_output 的 fc／ctc／ctco 前缀，确定性处理超长编号与碰撞；保留 call_id、参数、结果、未知扩展和客户端历史。原生响应不改写，不增加上游请求或恢复预算，非工具项及密文推理策略保持。
+
+同版包含主线已提交的供应商首字超时设置（9a652f5），旧版 .68 未包含此增量；沿用 schema9。工具修复契约见[协议翻译层](../design/protocol-translation.md#工具项-id-兼容修复2026-10-22已随-desktop69-dev-发布)。
+
+构建提交 `29b86eaa19ee4a3461f97a63e0277a13fb2c7172`，输入摘要 `1a30b5f4ee3dcf685a1db88abec0a26c116d10dcb905e60e134d44825f70c89e`，SOURCE dirty=false；从干净独立 worktree 构建，未纳入其他任务未提交改动。产物与证据位于 `dist/desktop/0.1.0-dev.desktop.69/`；对应源码包含 Anchor Go vendor、固定 mihomo v1.19.32 对应源码／vendor及许可。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.69_amd64.deb` | 29215160 | `faafce8e07854ab8be8957f1271440d6b6a4ed1b8fc118cf5fe572b9e87523f8` |
+| `Anchor-Desktop-0.1.0-dev.desktop.69-windows-amd64-setup.exe` | 31231860 | `0f8362496e3fd1b094c5969df880d99d8f70078291e08bbf0c853f7a337b32b9` |
+| `anchor-desktop-0.1.0-dev.desktop.69-linux-amd64` | 43390640 | `e065fdab402c2b78d163b6203ad2f1399da5f26a6c3f513a7804e42459e98e66` |
+| `anchor-desktop-0.1.0-dev.desktop.69-windows-amd64.exe` | 44517376 | `f651cfa5cf90f70e14c2e9254ddb5209e07255ba1dbc9dc83e2b23e2d52fb883` |
+| `anchor-0.1.0-dev.desktop.69-linux-amd64` | 37978274 | `ad851bdc512c83e6fe9698af05eb63742aed8eaaa4a0dafd093f66acf35f8c0c` |
+| `anchor-0.1.0-dev.desktop.69-windows-amd64.exe` | 38106624 | `5da76d3ba34126fd31b7be992928eca54a9645afe8c9cf3f220bd762adb03644` |
+| `update-desktop.json` | 1755 | `30b6af197fe0b5d9d35e9f09ec22872fe179db96f7b657182de7bd66cc3cb00d` |
+| `update-cli.json` | 876 | `8930e1fdea00f1e20a64d5c26b8777114dbfa92153746b05a2343fd57085ea04` |
+| `anchor_0.1.0-dev.desktop.69_source.tar.gz` | 97796365 | `e73606b6b3b382976d35bec5322917c844577be4152b9a8ea7b07a50b87fb10c` |
+| `anchor_0.1.0-dev.desktop.69_metadata.zip` | 122169 | `2bc848f8810b65f37b030093a6b5e1a067cc6e9345450bcfd5bd09c2a0407313` |
+| `SHA256SUMS` | 1073 | `05a9b6801a522d086272adf908c0c5974b2a52c128e2f7b816024c7a0deaa11f` |
+
+复用本轮功能修复阶段协议／核心全量测试，以及最终工具项前缀、长度／碰撞、幂等、未知类型ID保留、候选隔离和普通／流式模拟工具闭环回归。发布轮完成 Go／TS 契约比对、TypeScript／Vite、Windows AMD64与Ubuntu24.04 AMD64生产编译／打包；嵌入前端／mihomo、deb与runtime载荷、对应源码输入摘要和metadata ZIP CRC核对通过。Vite大chunk提示不阻塞构建。
+
+于 `2026-10-22T17:43:55+08:00` 发布为dev prerelease，非latest；11附件大小与远端digest均匹配，tag指向构建提交。默认dev源实际下载Linux runtime、旧客户端兼容deb和独立CLI，版本／目标／大小／SHA256及runtime／CLI可执行版本核对通过。证据见publication下preparation-verification.json、publication-verification.json、online-verification.json；BUILD.json保留构建时未发布／未安装／未原生验收事实。
+
+本轮仅在线投放，未安装、重启或修改真实实例／Agent配置及用户更新设置，未请求付费上游；双平台原生窗口、系统安装器及真实SSH升级未验收。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 
 <a id="skill-project-discovery-68"></a>
 

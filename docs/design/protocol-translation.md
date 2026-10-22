@@ -70,7 +70,7 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 原生 Responses 历史兼容路径仍接受没有 status 的 JSON，状态记为未知；不会因 HTTP 200 记录 generation_status=completed。原生 Chat 的 `[DONE]` 与 Anthropic `message_stop` 继续是透传终止边界；缺少可解析结束信息时不编造生成状态。传输成功与完整生成语义分开。
 
-## 工具项 ID 兼容修复（2026-10-22，当前源码未发布）
+## 工具项 ID 兼容修复（2026-10-22，已随 desktop.69 dev 发布）
 
 每次 Prepare 在目标协议为 Responses 时，对派发副本 input 顶层的 function_call、custom_tool_call、custom_tool_call_output 的非空字符串 id 分别检查 fc、ctc、ctco 前缀；缺少对应前缀则补上。例如 custom_tool_call 的 id=call_fixture 改为 ctc_call_fixture，call_id=call_fixture 保持不变。由协议层在首次发送前完成，不等待上游拒绝、不新增重试，也不依赖前一请求的进程状态。普通与流式请求共用同一规则。
 

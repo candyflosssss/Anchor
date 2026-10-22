@@ -1,10 +1,14 @@
 # 在线更新 v1
 
 - 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.68](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.68)，发布于 `2026-10-22T16:43:13+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `589366ce083d93a50f800ecd0e2ba93c14104713`、SOURCE dirty=false。
-- 自动发现常见目录中的 Agent 项目并收录 Skill，无需逐个登记；外部原件保留，新项目与新 Skill 由后台继续发现。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.69](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.69)，发布于 `2026-10-22T17:43:55+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `29b86eaa19ee4a3461f97a63e0277a13fb2c7172`、SOURCE dirty=false。
+- 修复 Codex 工具历史 ID 前缀不兼容：发送前规范化工具项编号，保留调用与结果关联；同版包含已提交的供应商首字超时设置。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .69 在线投放（2026-10-22）
+
+修复工具历史ID前缀错误导致的断流，发送前补齐编号并保留call_id与工具结果；同版包含已提交的供应商首字超时设置。11附件远端摘要、tag与非latest核对，默认dev源Linux runtime／旧客户端deb／CLI三条实际下载及版本／大小／SHA256验证通过。仅投放，未安装；详见[发行记录](../release/desktop.md#tool-item-ids-69)。
 
 ## .68 在线投放（2026-10-22）
 

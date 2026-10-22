@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-10-22
+- 2026-10-22 desktop.69 dev 已发布：修复 Responses 历史工具项 ID 前缀不兼容，保留 call_id 与工具结果；同版包含此前已提交的供应商首字超时设置。工具项修复无新增命令或参数，未自动安装；详见[发行记录](../release/desktop.md#tool-item-ids-69)。
 - 2026-10-22 desktop.68 dev 已发布：同版CLI／核心／GUI自动发现常见目录中的项目及Skill，后台收录保留原件，无须手动登记；无新增命令或参数。含网关诊断、补路径缓存及日志压缩，不含其后供应商首输出超时增量；详见[发行记录](../release/desktop.md#skill-project-discovery-68)。
 - 2026-10-22 desktop.67 dev 已发布：逐Key独立拖拽与调度，model routing新增可重复 --source；同版含日志默认保留及容量上限调整，详见[发行记录](../release/desktop.md#independent-keys-67)。
 - 2026-10-22 desktop.66 dev 已发布：模型横向并排、模型内渠道纵向排列与整卡拖拽；同版CLI／核心沿用desktop.65契约，本轮无命令／参数变化。详见[发行记录](../release/desktop.md#model-layout-66)。
