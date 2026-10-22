@@ -80,7 +80,8 @@ export function ProviderEditor({ c, restoreFocus }: { c: ProviderController; res
             <Input {...errorProps('costMultiplier')} type="number" min="0.000001" max="1000" step="any" value={draft.costMultiplier} onChange={event => c.changeDraft('costMultiplier', event.target.value)} />
           </Field>
           <div className="field-grid">
-            <Field name="timeout" title="请求超时（秒）" errors={c.errors}><Input {...errorProps('timeout')} inputMode="numeric" value={draft.timeout} onChange={event => c.changeDraft('timeout', event.target.value)} /></Field>
+            <Field name="firstTokenTimeout" title="首字超时（秒）" errors={c.errors}><Input {...errorProps('firstTokenTimeout')} inputMode="numeric" value={draft.firstTokenTimeout} onChange={event => c.changeDraft('firstTokenTimeout', event.target.value)} /><p className="text-xs text-muted-foreground">等待首个正文、思考或工具参数；响应头和心跳不计。非流式等待完整结果。</p></Field>
+            <Field name="timeout" title="整条请求超时（秒）" errors={c.errors}><Input {...errorProps('timeout')} inputMode="numeric" value={draft.timeout} onChange={event => c.changeDraft('timeout', event.target.value)} /></Field>
             <Field name="concurrent" title="最大并发" errors={c.errors}><Input {...errorProps('concurrent')} inputMode="numeric" value={draft.concurrent} onChange={event => c.changeDraft('concurrent', event.target.value)} /></Field>
           </div>
           <label className="enabled-field"><span><strong>启用此供应商</strong></span><Switch aria-label="启用此供应商" checked={draft.enabled} onCheckedChange={value => c.changeDraft('enabled', value)} /></label>

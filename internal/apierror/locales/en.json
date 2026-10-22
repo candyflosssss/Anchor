@@ -78,5 +78,6 @@
   "upstream_missing_usage": "upstream omitted usage required by Messages",
   "upstream_stream_incomplete": "Upstream stream incomplete or unsupported",
   "model_no_enabled_provider": "model mapping has no enabled provider; add a route or enable its provider",
-  "upstream_header_timeout": "timed out waiting for upstream response headers; check provider latency or increase its request timeout"
+  "upstream_header_timeout": "timed out waiting for upstream response headers; check provider latency or increase its request timeout",
+  "upstream_first_token_timeout": "timed out waiting for the first generated output; increase the provider first token timeout or check upstream latency"
 }

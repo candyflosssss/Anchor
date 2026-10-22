@@ -22,6 +22,12 @@ type forwardAttemptResult struct {
 func (s *Server) forward(w http.ResponseWriter, r *http.Request, translation *protocol.Session, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity string) bool {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(p.TimeoutSeconds)*time.Second)
 	defer cancel()
+	firstSeconds := p.FirstTokenTimeoutSeconds
+	if firstSeconds == 0 {
+		firstSeconds = state.DefaultFirstTokenTimeoutSeconds
+	}
+	ctx, first := withFirstOutputTimeout(ctx, time.Duration(firstSeconds)*time.Second)
+	defer first.close()
 	var result forwardAttemptResult
 	defer func() {
 		if !result.attempted || r.Context().Err() != nil {
@@ -36,7 +42,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, translation *pr
 	if t := trace(r); t != nil && t.encryptedContextRetried {
 		allowRecovery = false
 	}
-	retry := s.forwardAttempt(w, r, translation, public, c, p, key, stream, routeModel, affinity, base, allowRecovery, ctx, &result)
+	retry := s.forwardAttempt(w, r, translation, public, c, p, key, stream, routeModel, affinity, base, allowRecovery, ctx, first, &result)
 	if result.opaque == nil {
 		return retry
 	}
@@ -57,7 +63,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, translation *pr
 			s.logs.Request(t.row)
 		}
 	}
-	retry = s.forwardAttempt(w, r, recovery.Session(), public, c, p, key, stream, routeModel, affinity, base, false, ctx, &result)
+	retry = s.forwardAttempt(w, r, recovery.Session(), public, c, p, key, stream, routeModel, affinity, base, false, ctx, first, &result)
 	if t := trace(r); t != nil {
 		outcome := "failed"
 		if result.success {

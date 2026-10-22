@@ -664,6 +664,7 @@ export interface Provider {
   base_urls: string[];
   enabled: boolean;
   timeout_seconds: number;
+  first_token_timeout_seconds?: number;
   max_concurrent: number;
   revision: number;
   has_secret: boolean;

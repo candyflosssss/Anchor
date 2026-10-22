@@ -7,14 +7,14 @@ const valid = () => ({ ...newDraft(), id: '新供应商', base_urls: ['https://a
 const signal = () => new AbortController().signal;
 describe('draft conversion aligned to current provider DTO', () => {
   it('uses real defaults and separates saved data from draft', () => {
-    expect(newDraft().timeout).toBe('120'); expect(newDraft().concurrent).toBe('4');
+    expect(newDraft().timeout).toBe('500'); expect(newDraft().concurrent).toBe('20');
     const draft = newDraft(source); draft.timeout = '180';
     expect(source.timeout_seconds).toBe(90); expect(isDirty(draft, source)).toBe(true);
     expect(isDirty(newDraft(source), source)).toBe(false);
   });
   it('preserves every ordinary field in a complete replacement, including disabled', () => {
     const saved = toSave(newDraft(source), source);
-    expect(saved.provider).toEqual(source); expect(saved.expected_revision).toBe(4); expect(saved.secret).toBeNull();
+    expect(saved.provider).toEqual({ ...source, first_token_timeout_seconds: 30 }); expect(saved.expected_revision).toBe(4); expect(saved.secret).toBeNull();
   });
   it('maps create / replace / clear / keep without masked placeholders', () => {
     expect(toSave(valid()).expected_revision).toBe(0);
@@ -153,4 +153,12 @@ describe('provider request protocol editing', () => {
     await transport.save(toSave({ ...newDraft(p), timeout: '240' }, p), signal());
     expect((await transport.workspace(p.id, signal())).keys.find(k => k.id === 'default')?.protocol).toBe('responses');
   });
+});
+
+it('uses new request defaults and round-trips first token timeout independently', () => {
+  const draft = newDraft();
+  expect([draft.firstTokenTimeout, draft.timeout, draft.concurrent]).toEqual(['30', '500', '20']);
+  const custom = { ...source, first_token_timeout_seconds: 75 };
+  expect(toSave(newDraft(custom), custom).provider.first_token_timeout_seconds).toBe(75);
+  for (const value of ['', '0', '3601', '1.5']) expect(validateDraft({ ...valid(), firstTokenTimeout: value }).firstTokenTimeout).toBeDefined();
 });

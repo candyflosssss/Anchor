@@ -145,7 +145,7 @@ func Build(ctx context.Context, path string, store *state.Store) (*Plan, error) 
 					if state.ValidateHomepage(homepage) != nil {
 						homepage = ""
 					}
-					g = &group{public: Provider{ID: id, BaseURLs: urls, Sources: []Source{}, Keys: []Key{}, Status: "ready"}, private: state.ProviderImport{Provider: state.Provider{ID: id, BaseURLs: urls, Protocol: e.Protocol, HomepageURL: homepage, Enabled: true, TimeoutSeconds: 120, MaxConcurrent: 4, CostMultiplier: 1}}, keys: map[string]string{}, models: map[string][]string{}}
+					g = &group{public: Provider{ID: id, BaseURLs: urls, Sources: []Source{}, Keys: []Key{}, Status: "ready"}, private: state.ProviderImport{Provider: state.Provider{ID: id, BaseURLs: urls, Protocol: e.Protocol, HomepageURL: homepage, Enabled: true, FirstTokenTimeoutSeconds: state.DefaultFirstTokenTimeoutSeconds, TimeoutSeconds: state.DefaultTimeoutSeconds, MaxConcurrent: state.DefaultMaxConcurrent, CostMultiplier: 1}}, keys: map[string]string{}, models: map[string][]string{}}
 					groups[identity] = g
 				}
 				keyIdentity := e.Protocol + "\x00" + e.Secret

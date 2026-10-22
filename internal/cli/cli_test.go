@@ -96,6 +96,9 @@ func TestCLIManagementWorkflow(t *testing.T) {
 		}
 	}
 	out := run("provider-secret\n", "provider", "add", "--id", "p", "--base-url", "https://example.invalid/v1", "--secret-stdin")
+	if !strings.Contains(out, `"first_token_timeout_seconds":30`) || !strings.Contains(out, `"timeout_seconds":500`) || !strings.Contains(out, `"max_concurrent":20`) {
+		t.Fatal("provider defaults drifted", out)
+	}
 	if strings.Contains(out, "provider-secret") {
 		t.Fatal("provider write leaked secret")
 	}

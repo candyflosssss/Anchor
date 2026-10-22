@@ -15,6 +15,7 @@
 
 - [CLI 连接与实例管理](cli-connections.md)：本机 / SSH 连接、Context、首次授权、隧道生命周期和管理接口草案。
 - [托管层与 Agent 接入契约](agent-management-layer.md)：内置 / 声明式适配器、Binding、配置修改、冲突检测和恢复。
+- [协议层兼容与错误恢复规划](protocol-recovery-roadmap.md)：历史条目、Thinking、加密任务与有损降级的待实现能力、优先级及验收边界。
 
 专题里的具体命令、接口字段与端口仍是草案；若将来调整这些细节，应同步更新有关文档，不借调整细节扩大本版产品范围。`docs/updates/` 记录实际变更与检查结果，不代替现行设计。
 

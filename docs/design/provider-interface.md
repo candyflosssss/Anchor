@@ -1,6 +1,6 @@
 # 供应商桌面接口语义
 
-- 更新：2026-10-19；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
+- 更新：2026-10-22；标识：`anchor-desktop-v1`（替代仅供设计的 `provider-ui-prototype-v1`）。
 - 状态：真实 Go 桥接、桌面传输和共享契约已实现；隔离核心读写已测试，**不等于 Wails 原生窗口或安装验收通过**。
 - 桌面 DTO 权威：`internal/desktop/contract.go`；TypeScript 由 `go run ./cmd/desktop-contract` 生成，漂移由 Go 测试检查。核心业务规则仍归 `internal/state` / `internal/core`，不复制到宿主。
 - 受限方法、窗口／核心生命周期与构建边界见[桌面运行契约](desktop-runtime.md)。
@@ -13,14 +13,14 @@
 | `discover(input, signal)` / `Bridge.DiscoverProviderModels(input)` | `client.DiscoverProviderModels` → POST `/control/v1/providers/{id}/discover-models`；显式读取上游目录，不改配置 |
 | `save(input, signal)` / `Bridge.SaveProvider(input)` | `client.PutProviderWithKeys` → PUT 指定 ID；revision=0 创建，>0 条件更新；普通字段完整替换 |
 
-Provider 公开字段为 `id`, `homepage_url`, `base_urls`, `protocol`, `enabled`, `timeout_seconds`, `max_concurrent`, `cost_multiplier`, `revision`, `has_secret`。`homepage_url` 可空，仅展示；`base_urls` 为 1..16 个不重复请求地址，网关按请求轮询，目录与测试使用第一个。`cost_multiplier` 为供应商充值成本倍率。`protocol` 接受 `responses`、`chat-completions`、`anthropic`，未知协议拒绝；当前宿主返回已存协议，作为 `anchor-desktop-v1` 的可选字段增量，旧宿主未提供时前端保留未知状态，不将它默认为 Responses。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
+Provider 公开字段为 `id`, `homepage_url`, `base_urls`, `protocol`, `enabled`, `first_token_timeout_seconds`, `timeout_seconds`, `max_concurrent`, `cost_multiplier`, `revision`, `has_secret`。`homepage_url` 可空，仅展示；`base_urls` 为 1..16 个不重复请求地址，网关按请求轮询，目录与测试使用第一个。`cost_multiplier` 为供应商充值成本倍率。`protocol` 接受 `responses`、`chat-completions`、`anthropic`，未知协议拒绝；当前宿主返回已存协议，作为 `anchor-desktop-v1` 的可选字段增量，旧宿主未提供时前端保留未知状态，不将它默认为 Responses。不添加健康、余额、最近测试时间、display_name 等没有来源的字段。Go 内部 Secret 不进入 DTO，前端传输再次挑选公开字段。
 
 - 新增／编辑弹窗的「请求渠道」选择对应 `protocol`，详情概况回显。新建默认 `responses`；编辑仅在选择变化时显式发送该字段，旧宿主缺字段时显示「保留现有渠道」。
 - 保存显式非空 `protocol` 时，核心在同一 revision 条件事务中更新供应商匿名请求协议与已有 default Key 的默认协议，无需重新输入密钥，不影响其他命名 Key、default Key 启用／健康状态或模型独立协议覆盖。省略／空字符串保留供应商和已有 Key 各自的值；新建 default Key 仍按供应商协议初始化。普通编辑不重复发送未改变的渠道，避免覆盖单独设置过的 default Key。
 - 本行为为 2026-10-19 当前源码增量，未打包发布；旧核心不会同步修改已有 default Key，须同步升级宿主／CLI 与核心。数据库 schema 不变，不自动重写现存 Key；CLI 复用既有 `provider add|put --protocol`，见[指令大全](../cli/commands.md)。
 
 - 返回 revision 范围 1..Number.MAX_SAFE_INTEGER；请求 expected_revision 为 0..MAX_SAFE_INTEGER-1，且与输入 provider.revision 一致，防止更新后超出 JS 安全整数范围。
-- 超时单位为秒，1..3600；并发为 1..64。前端即时校验只帮助填写，核心仍做最终业务校验。
+- 两类超时单位为秒，1..3600；首字 first_token_timeout_seconds 默认30，整条 timeout_seconds 默认500；并发 max_concurrent 为1..64，新建默认20。首字字段是可选兼容增量，旧配置缺失读取按30，更新省略时保留旧值；已存总超时与并发不自动覆盖。首字等待实际生成内容（正文/思考/工具参数等），响应头/心跳不计，非流式等待完整结果；首字后总期限继续生效。旧宿主未提供字段时表单按30展示，真实写入需同步升级核心/宿主，旧核心拒绝未知字段。前端即时校验只帮助填写，核心仍做最终业务校验。
 - 新增供应商可选填写多个 Key：首个默认 Key 留空发送 secret=null，非空保存为 default Key；可选 `initial_keys` 数组包含其他 Key 的 `id`、`protocol`、`secret`，只在 expected_revision=0 创建时接受。名称唯一且不可为 default，协议逐 Key 独立、秘密非空且不超过 8192 字节，总计至多 64 个 Key（表单保留一个默认槽位）；这些 Key 默认启用，与供应商及全部地址在同一事务保存，只产生 revision=1，任何校验或写入失败全部回滚。更新不得携带非空 initial_keys，仍用 key-put 管理命名 Key；旧核心严格拒绝新增字段，不会静默丢 Key，需配套更新宿主和核心；无数据库迁移。管理请求仍受 128 KiB 总体积上限约束。只填命名 Key 也可保存；has_secret 在保存／列表／单项读取统一表示存在任意 Key，而不是仅 default。填写任意 Key 后保存成功使用返回的 revision 显式查询目录，并在同一弹窗快速／全部导入模型。目录失败保留已保存供应商，可重试查询或修改配置／Key；不重放创建请求。自定义别名仍在详情中处理。编辑时 secret=null 保留 default Key、空字符串清除 default Key、非空替换 default Key；命名 Key 不受影响；清除有明确确认。秘密只入不出、不写前端持久存储、日志或 URL；提交开始清空所有 Key 输入，完成或失败后清理请求快照，取消／卸载丢弃整个草稿；失败需重新输入。不能承诺 JS/Go 字符串的物理内存擦除。
 - 添加／编辑均可增删请求地址，支持 HTTPS 域名或 IP（含端口）；HTTP 支持本机服务：精确主机名 `localhost`（大小写不敏感）或数值回环 IP；其他域名仍要求 HTTPS。直接连接 localhost 固定使用 IPv4／IPv6 回环并保留 Host，显式代理继续遵循已保存的路由策略。CLI、桌面表单与 CC Switch 导入共用核心校验。修改地址时保留全部 Key、各 Key 协议和既有 revision 冲突保护。
 - 保存成功返回新 revision，不表示供应商连通性已经验证。
@@ -57,7 +57,7 @@ Provider 公开字段为 `id`, `homepage_url`, `base_urls`, `protocol`, `enabled
 规范 DTO `DiscoverProviderModels` / `ProviderModels` 定义于 `internal/catalog/models.go`，经 `internal/desktop/contract.go` 别名纳入 Go → TS 单一生成源；桌面 envelope 为 `ProviderModelsResult`，继续使用 `anchor-desktop-v1`。本次 Key 协议增量扩展查询字段及工作台动作，客户端与核心须同步升级。共享合成样例为 `desktop/contract/provider-models.json`，Mock 与 Go / TS 测试共用。
 
 - 输入为 `provider_id`、`expected_revision`（桌面 1..MAX_SAFE_INTEGER）和 `key_id`（空字符串自动查询全部启用的已存 Key，跳过停用 Key）。必须匹配路径及当前已存供应商 revision，使用管理授权和 `X-Anchor-Instance`。不接收临时 URL、密钥或任意路径；冲突在发起上游请求前返回409。
-- 后端从已存快照取地址／密钥，使用 `<base_url 去尾斜杠>/models`，保留部署前缀；未带版本的根地址或自定义前缀，仅404/405或200 HTML网页时尝试同前缀 `/v1/models`，兼容 NewAPI 代理部署（例如 `/newapi/v1/models`）；已带版本路径或版本后的 `/openai` 不重复追加 `/v1`。官方 OpenAI、Anthropic、Kimi/Moonshot 和硅基流动根地址固定 `/v1/models`；DeepSeek 根地址固定 `/models`，OpenRouter 固定 `/api/v1/models`，Gemini 根地址及 `/v1beta/openai` 目录改用 `/v1beta/models`；`/v1beta` 前缀使用 `x-goog-api-key`，其他路径沿用 Key 默认协议鉴权。所有凭据只进请求头。停用供应商也允许显式查询。复用无环境代理、禁止重定向的客户端与全局16／供应商并发上限；全部路径/分页共用 `min(timeout_seconds, 8)` 秒。每个 Key 最多10次目录 HTTP请求、每页请求1000条；全部 Key 的目录与倍率抓取共用上述期限，先读取全部目录再读取倍率，目录读取不重试失败请求或后台轮询，目录本身不持久缓存；2026-10-20 当前源码分组倍率由独立后台维护器按小时刷新；逐 Key 倍率持久缓存见[倍率设计](provider-multipliers.md)；完整规则见[CLI 大全](../cli/commands.md#provider-modelsdesktop10-小步)。
+- 后端从已存快照取地址／密钥，使用 `<base_url 去尾斜杠>/models`，保留部署前缀；未带版本的根地址或自定义前缀，仅404/405或200 HTML网页时尝试同前缀 `/v1/models`，兼容 NewAPI 代理部署（例如 `/newapi/v1/models`）；已带版本路径或版本后的 `/openai` 不重复追加 `/v1`。官方 OpenAI、Anthropic、Kimi/Moonshot 和硅基流动根地址固定 `/v1/models`；DeepSeek 根地址固定 `/models`，OpenRouter 固定 `/api/v1/models`，Gemini 根地址及 `/v1beta/openai` 目录改用 `/v1beta/models`；`/v1beta` 前缀使用 `x-goog-api-key`，其他路径沿用 Key 默认协议鉴权。所有凭据只进请求头。停用供应商也允许显式查询。复用无环境代理、禁止重定向的客户端与全局64／供应商并发上限；全部路径/分页共用 `min(timeout_seconds, 8)` 秒。每个 Key 最多10次目录 HTTP请求、每页请求1000条；全部 Key 的目录与倍率抓取共用上述期限，先读取全部目录再读取倍率，目录读取不重试失败请求或后台轮询，目录本身不持久缓存；2026-10-20 当前源码分组倍率由独立后台维护器按小时刷新；逐 Key 倍率持久缓存见[倍率设计](provider-multipliers.md)；完整规则见[CLI 大全](../cli/commands.md#provider-modelsdesktop10-小步)。
 - 输出十字段：原有 provider_id、key_id、revision、http_status、elapsed_ms、models、failure，新增 partial、entries、keys。默认聚合 key_id 为空，无已存 Key 为 anonymous，显式指定时保留该 ID。全部 Key 停用或指定停用 Key 时返回 no_enabled_keys、http_status=0 和空 models/entries/keys，不回退匿名请求。models 为始终非null的模型 ID 去重排序数组；entries 为 `{id,key_ids}`，合并同一模型对应的全部启用且目录成功的可选 Key；keys 为 `{id,enabled,protocol,http_status,failure,group,group_name,multiplier,rate_basis,rate_failure}`，倍率为十进制字符串或 null。至少一个 Key 目录成功则顶层 failure 为空，partial 标记失败 Key；逐 Key 目录必须完整分页才关联模型，全部失败或聚合超限时不返回模型。接受 OpenAI/Anthropic data[].id、Gemini models[].name（去除 models/ 前缀）；全部 Key 累计目录512 KiB，最多64个 Key、每 Key 1000条原始记录、合并1000个模型、每 ID 256字节；分页循环、格式变化、后续页失败只使该 Key 失败。
 - 倍率复用 providerapi，与 Key 默认推理协议独立。sub2api 优先用每个推理 Key 读取 `/v1/sub2api/billing` 的当前有效倍率（含个人覆盖与高峰规则），无需用户 JWT；未配置平台时以一个 Key 专用请求识别 sub2api，缺接口才要求配置平台。该接口不返回组名／ID，`group` 与 `group_name` 留空，`rate_basis=key_billing`。仅404/405或200 HTML网页回退旧站用户授权查询，其他错误直接报告。旧 sub2api 与 NewAPI 自动读取账号 Key 列表并精确核对身份；NewAPI 掩码候选经固定只读 POST /api/token/{数字ID}/key 验证完整凭据后取分组与 pricing.group_ratio，Sub2API 取个人覆盖或可用组倍率和组名；OneAPI、auto 分组或缺授权不会假定1×。每 Key 最多4页账号列表（100条/页），倍率适配器最多8次请求/2 MiB响应。未知和失败用 rate_failure 标明，不写入 Anchor 映射倍率，不使目录结果丢失；多 Key 的组名也检查凭据回显。
 - 请求受理后目录失败仍返回 HTTP200 与固定分类：`no_enabled_keys`（无启用 Key，跳过目录和倍率请求）、`authentication`（401/403）、`unsupported`（404/405）、`rate_limited`（429）、`http_error`（其他非200）、`network`、`timeout`、`busy`、`too_large`、`invalid_response`。上游错误正文、原始网络异常、密钥不回显；包含已存密钥的 ID 也拒绝。管理层鉴权／冲突／实例错误仍走 `problem`，不混作上游结果。
@@ -279,3 +279,7 @@ Go 公共 DTO 由 `contract.go` 引用，TS 经 `go run ./cmd/desktop-contract` 
 验证分层：合成 SQLite + 真 Go client／CLI／Bridge 管理链，及共享样例的前端模拟 Wails 测试；不访问用户真实数据库／Agent配置，不代表双平台原生 WebView 验收。
 
 来源核对：CC Switch 上游 [farion1231/cc-switch，0a41250](https://github.com/farion1231/cc-switch/tree/0a41250dc03a01dd6418ed815023fd46db9b7840) 的 `database/schema.rs`、`provider.rs`、各平台配置及预设；未引入运行时上游依赖。
+
+### 首字设置与超时结果（2026-10-22，当前源码未发布）
+
+供应商编辑器在超时/并发区域分别显示「首字超时（秒）」「整条请求超时（秒）」和「最大并发」，详情独立回显。Model 用字符串草稿即时校验整数范围，保存经既有 SaveProvider / client / 核心验证；无新桥接方法。CC Switch 新供应商导入同样用30/500/20，已有供应商导入保持既有配置。probe/chat 首字超时结果新增 first_token_timeout，前端受限校验与中文提示同步；网关错误为 upstream_first_token_timeout，完整边界见[协议契约](protocol-translation.md#显式首字期限2026-10-22当前源码未发布)。

@@ -95,7 +95,7 @@ func NewWithModelCatalog(store *state.Store, log *slog.Logger, catalogClient *mo
 		// A broken read must not silently enable the default policy.
 		policy = state.KeyCooldownSettings{}
 	}
-	return &Server{keyPolicy: policy, egress: outbound, Skills: skills.New(store.Dir), modelCatalog: catalogClient, keyRateRefresh: newKeyRateRefresh(), Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: outbound, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 16), shutdown: make(chan struct{})}
+	return &Server{keyPolicy: policy, egress: outbound, Skills: skills.New(store.Dir), modelCatalog: catalogClient, keyRateRefresh: newKeyRateRefresh(), Agents: managed.NewManager(store), Store: store, Log: log, upstream: &http.Client{Transport: outbound, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, routing: map[string]*modelSchedule{}, affinity: map[string]routeAffinity{}, latency: map[string]routeLatency{}, active: map[string]int{}, health: map[string]*keyHealth{}, cursor: map[string]int{}, slots: make(chan struct{}, 64), shutdown: make(chan struct{})}
 }
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {

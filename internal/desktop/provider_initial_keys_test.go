@@ -22,6 +22,9 @@ func TestProviderInitialKeysSharedContractAndBridge(t *testing.T) {
 	if saved.Problem != nil || saved.Data == nil || saved.Data.Revision != 1 || len(saved.Data.BaseURLs) != 2 {
 		t.Fatal(saved)
 	}
+	if saved.Data.FirstTokenTimeoutSeconds != 30 || saved.Data.TimeoutSeconds != 500 || saved.Data.MaxConcurrent != 20 {
+		t.Fatal("new defaults lost in bridge", saved.Data)
+	}
 	workspace := b.ProviderWorkspace(WorkspaceQuery{ProviderID: saved.Data.ID})
 	if workspace.Problem != nil || workspace.Data == nil || len(workspace.Data.Keys) != 3 {
 		t.Fatal("incomplete workspace")

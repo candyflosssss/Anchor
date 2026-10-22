@@ -118,7 +118,8 @@ function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Works
         <dt>请求地址</dt><dd className="mono break-all">{p.base_urls.map(u => <div key={u}>{u}</div>)}</dd>
         <dt>请求渠道</dt><dd>{p.protocol ? protocolName[p.protocol] : '未提供'}</dd>
         <dt>凭据</dt><dd className="flex items-center gap-2"><KeyRound size={14} />{p.has_secret ? '已配置 · 密钥不可回显' : '未配置密钥'}</dd>
-        <dt>请求超时</dt><dd>{p.timeout_seconds} 秒</dd>
+        <dt>首字超时</dt><dd>{p.first_token_timeout_seconds ?? 30} 秒</dd>
+        <dt>整条请求超时</dt><dd>{p.timeout_seconds} 秒</dd>
         <dt>最大并发</dt><dd>{p.max_concurrent} 个请求</dd>
         <dt>配置版本</dt><dd className="mono">revision {p.revision}</dd>
       </dl>

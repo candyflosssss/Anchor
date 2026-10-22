@@ -9,12 +9,13 @@
         "https://api2.example.com/v1"
       ],
       "enabled": true,
-      "timeout_seconds": 120,
-      "max_concurrent": 4,
+      "timeout_seconds": 500,
+      "max_concurrent": 20,
       "revision": 3,
       "has_secret": true,
       "cost_multiplier": 1,
-      "protocol": "responses"
+      "protocol": "responses",
+      "first_token_timeout_seconds": 30
     },
     {
       "id": "备用供应商",
@@ -28,7 +29,8 @@
       "revision": 1,
       "has_secret": true,
       "cost_multiplier": 1,
-      "protocol": "anthropic"
+      "protocol": "anthropic",
+      "first_token_timeout_seconds": 30
     },
     {
       "id": "本地调试",
@@ -42,7 +44,8 @@
       "revision": 2,
       "has_secret": false,
       "cost_multiplier": 1,
-      "protocol": "chat-completions"
+      "protocol": "chat-completions",
+      "first_token_timeout_seconds": 30
     }
   ],
   "empty": [],

@@ -35,10 +35,11 @@ export function checkedProvider(p: DesktopProvider): Provider {
     typeof p.enabled !== 'boolean' || typeof p.has_secret !== 'boolean' ||
     !Number.isSafeInteger(p.revision) || p.revision < 1 ||
     !Number.isInteger(p.timeout_seconds) || p.timeout_seconds < 1 || p.timeout_seconds > 3600 ||
+    (p.first_token_timeout_seconds !== undefined && (!Number.isInteger(p.first_token_timeout_seconds) || p.first_token_timeout_seconds < 1 || p.first_token_timeout_seconds > 3600)) ||
     !Number.isInteger(p.max_concurrent) || p.max_concurrent < 1 || p.max_concurrent > 64) throw new ProviderProblem('read_error');
   // Pick only public DTO fields; unexpected response properties never reach state.
   return { ...(p.protocol !== undefined ? { protocol: p.protocol } : {}), cost_multiplier: p.cost_multiplier, id: p.id, homepage_url: p.homepage_url, base_urls: [...p.base_urls], enabled: p.enabled,
-    has_secret: p.has_secret, revision: p.revision, timeout_seconds: p.timeout_seconds, max_concurrent: p.max_concurrent };
+    has_secret: p.has_secret, revision: p.revision, timeout_seconds: p.timeout_seconds, ...(p.first_token_timeout_seconds !== undefined ? { first_token_timeout_seconds: p.first_token_timeout_seconds } : {}), max_concurrent: p.max_concurrent };
 }
 function providerError(error: unknown, writing: boolean): never {
   if (error instanceof DesktopProblem) {

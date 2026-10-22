@@ -31,3 +31,7 @@ it('uses the exact Anchor identity and fixed upstream category without remote te
   expect(errorDiagnosis('upstream_rejected', { upstream_error_category: 'private-upstream-text' })).not.toContain('private-upstream-text');
   expect(errorExplanation('invalid_upstream_response')).not.toContain('JSON');
 });
+
+it('explains configured first output timeout separately from header timeout', () => {
+  expect(errorDiagnosis('upstream_first_token_timeout', { timeout_kind: 'first_token', first_token_timeout_seconds: '30', provider_timeout_seconds: '500' })).toContain('首字超时配置为 30 秒');
+});

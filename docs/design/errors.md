@@ -44,3 +44,5 @@ JSON 错误响应继续采用 `{ "error": { "code": "…", "message": "…" } }`
 all-mapped/all-compatible 绑定请求不存在的映射返回 404/unknown_model；映射没有启用供应商返回 503/model_no_enabled_provider；其余授权不匹配继续 403/binding_model_denied。三者均在派发前保留请求模型，无上游 HTTP、尝试次数为零。此分类不等同于 Key 配额、冷却或并发可用性。
 
 上游非 200 错误至多查看 16 KiB，仅提取已识别的 code/type 为固定类别，保留完整响应体供既有恢复识别，不记录远程 message 或未知 code。详情可区分无效 Key、余额/配额不足、限流、模型不可访问、权限不足、上下文超限、参数无效、过载和服务错误；未知类别不猜测。见[日志契约](logging.md#错误原因与端点修复2026-10-22当前源码未发布)。
+
+2026-10-22 首字设置增量（当前源码未发布）：显式 first_token_timeout_seconds 默认30秒；超时使用504/upstream_first_token_timeout与独立中英模板。HTTP头/心跳不算首字，思考/工具输出计入生成内容。已提交SSE不能改HTTP状态，协议层编码固定错误事件并记失败；响应头阶段的总期限错误仍用upstream_header_timeout。桌面日志与probe提示消费同一安全原因，详见[协议契约](protocol-translation.md#显式首字期限2026-10-22当前源码未发布)。

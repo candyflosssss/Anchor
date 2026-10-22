@@ -3,7 +3,7 @@
 import chinese from '../../../../../internal/apierror/locales/zh-CN.json';
 import english from '../../../../../internal/apierror/locales/en.json';
 
-const aliases: Record<string, string> = { invalid_response: 'upstream_unsupported_content', unsupported_upstream_response: 'upstream_unsupported_content', upstream_stream_error: 'upstream_stream_incomplete', internal_error: 'internal' };
+const aliases: Record<string, string> = { first_token_timeout: 'upstream_first_token_timeout', invalid_response: 'upstream_unsupported_content', unsupported_upstream_response: 'upstream_unsupported_content', upstream_stream_error: 'upstream_stream_incomplete', internal_error: 'internal' };
 const logErrors: Record<string, string> = {
   invalid_upstream_response: '上游响应格式无效，请查看结构诊断中的具体原因。',
   upstream_connect: '连接上游失败，请检查网络、域名和供应商地址。',
@@ -28,6 +28,10 @@ const causes: Record<string, string> = { timeout: '等待超时', cancelled: '�
 export function errorDiagnosis(code: string, evidence: Record<string, unknown>): string {
   const identity = typeof evidence.anchor_error_id === 'string' && Object.hasOwn(chinese, evidence.anchor_error_id) ? evidence.anchor_error_id : code;
   const remote: Record<string, string> = { invalid_api_key: '上游报告 Key 无效。', insufficient_quota: '上游报告余额或配额不足。', rate_limit: '上游报告请求限流。', model_not_found: '上游报告模型不存在或不可访问。', permission_denied: '上游报告权限不足。', context_length: '上游报告上下文超限。', invalid_request: '上游报告请求参数无效。', overloaded: '上游报告服务过载。', server_error: '上游报告服务内部错误。' };
+  if (evidence.timeout_kind === 'first_token') {
+    const seconds = Number(evidence.first_token_timeout_seconds);
+    return `${errorExplanation(identity)}${Number.isSafeInteger(seconds) && seconds > 0 ? `首字超时配置为 ${seconds} 秒。` : ''}`;
+  }
   const category = evidence.upstream_error_category;
   const upstream = typeof category === 'string' && Object.hasOwn(remote, category) ? ` ${remote[category]}` : '';
   const cause = evidence.transport_cause;

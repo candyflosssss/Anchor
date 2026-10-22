@@ -4,6 +4,8 @@ import "time"
 
 // Observation retains timing and structural facts only, never generated content.
 type Observation struct {
+	onFirstOutput func()
+
 	ServiceTier    string
 	ServiceTierRaw string
 	FirstOutput    time.Time
@@ -15,13 +17,23 @@ type Observation struct {
 }
 
 // output records usable generated content, not stream envelopes or reasoning.
+func (o *Observation) generated() {
+	if o != nil && o.onFirstOutput != nil {
+		notify := o.onFirstOutput
+		o.onFirstOutput = nil
+		notify()
+	}
+}
+
 func (o *Observation) output() {
+	o.generated()
 	if o != nil && o.FirstOutput.IsZero() {
 		o.FirstOutput = time.Now()
 	}
 }
 
 func (o *Observation) text() {
+	o.generated()
 	if o != nil && o.FirstText.IsZero() {
 		o.FirstText = time.Now()
 		if o.FirstOutput.IsZero() {
@@ -47,8 +59,14 @@ func (o *Observation) event(m Object, p string) {
 			}
 		case "response.audio.delta":
 			o.NonText = true
+			if str(m["delta"]) != "" {
+				o.generated()
+			}
 		case "response.reasoning_summary_text.delta", "response.reasoning_text.delta":
 			o.Reasoning = true
+			if str(m["delta"]) != "" {
+				o.generated()
+			}
 		case "response.output_item.added":
 			x := obj(m["item"])
 			switch x["type"] {
@@ -89,6 +107,7 @@ func (o *Observation) event(m Object, p string) {
 			}
 			if str(d["reasoning_content"]) != "" {
 				o.Reasoning = true
+				o.generated()
 			}
 			if finish := str(c["finish_reason"]); finish != "" {
 				o.Terminal = time.Now()
@@ -109,6 +128,9 @@ func (o *Observation) event(m Object, p string) {
 				}
 			case "thinking", "redacted_thinking":
 				o.Reasoning = true
+				if str(b["thinking"]) != "" || str(b["data"]) != "" {
+					o.generated()
+				}
 			default:
 				o.NonText = true
 			}
@@ -121,6 +143,9 @@ func (o *Observation) event(m Object, p string) {
 				}
 			case "thinking_delta":
 				o.Reasoning = true
+				if str(d["thinking"]) != "" {
+					o.generated()
+				}
 			case "input_json_delta":
 				o.NonText = true
 				if str(d["partial_json"]) != "" {
@@ -136,4 +161,15 @@ func (o *Observation) event(m Object, p string) {
 			o.Terminal = time.Now()
 		}
 	}
+}
+
+// Report semantic progress before downstream writes can block, while keeping
+// existing delivery timing/observation semantics unchanged. No payload escapes.
+func (o *Observation) firstGenerated(m Object, p string) {
+	if o == nil || o.onFirstOutput == nil {
+		return
+	}
+	probe := Observation{onFirstOutput: o.onFirstOutput}
+	probe.event(m, p)
+	o.onFirstOutput = probe.onFirstOutput
 }

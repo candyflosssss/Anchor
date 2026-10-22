@@ -36,6 +36,9 @@ test('new provider validates fields, handles Chinese ID and never persists secre
   await ready(page);
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
   const dialog = page.getByRole('dialog');
+  await expect(dialog.getByLabel('首字超时（秒）')).toHaveValue('30');
+  await expect(dialog.getByLabel('整条请求超时（秒）')).toHaveValue('500');
+  await expect(dialog.getByLabel('最大并发')).toHaveValue('20');
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).click();
   await expect(page.getByLabel('供应商名称 / ID')).toBeFocused();
   await page.getByLabel('供应商名称 / ID').fill('中文供应商');
@@ -61,7 +64,7 @@ test('complete edit preserves disabled status, limits and keep-secret semantics'
   await ready(page); await edit(page, '本地调试');
   await expect(page.getByLabel('供应商名称 / ID')).toHaveAttribute('readonly', '');
   await expect(page.getByRole('switch', { name: '启用此供应商' })).not.toBeChecked();
-  await expect(page.getByLabel('请求超时（秒）')).toHaveValue('30');
+  await expect(page.getByLabel('整条请求超时（秒）')).toHaveValue('90');
   await page.getByLabel('最大并发').fill('3');
   await page.getByRole('button', { name: '保存配置', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
@@ -80,9 +83,9 @@ test('cancel, close and escape discard directly; keyboard trap and focus restora
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden(); await expect(page.getByText('有未保存的修改')).toHaveCount(0);
   await expect(trigger).toBeFocused();
-  await trigger.click(); await page.getByLabel('请求超时（秒）').fill('99');
+  await trigger.click(); await page.getByLabel('整条请求超时（秒）').fill('99');
   await page.keyboard.press('Escape'); await expect(page.getByRole('dialog')).toBeHidden();
-  await trigger.click(); await expect(page.getByLabel('请求超时（秒）')).not.toHaveValue('99');
+  await trigger.click(); await expect(page.getByLabel('整条请求超时（秒）')).not.toHaveValue('99');
   await page.getByRole('dialog').getByRole('button', { name: '关闭编辑面板' }).click(); await expect(page.getByRole('dialog')).toBeHidden();
   await trigger.click(); await page.getByRole('button', { name: '替换密钥' }).click();
   await expect(page.getByLabel('新的 API 密钥')).toHaveValue('');
@@ -192,18 +195,18 @@ for (const failure of ['conflict', 'unknown'] as const) {
 }
 test('conflict does not override latest values or silently retry', async ({ page }) => {
   await ready(page); await scenario(page, 'conflict'); await edit(page);
-  await page.getByLabel('请求超时（秒）').fill('240');
+  await page.getByLabel('整条请求超时（秒）').fill('240');
   await page.getByRole('button', { name: '保存配置', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('未覆盖新版本');
   await expect(page.getByRole('button', { name: '保存配置', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '丢弃草稿并重新读取' }).click();
   await expect(page.getByRole('dialog')).toBeHidden(); await edit(page);
-  await expect(page.getByLabel('请求超时（秒）')).toHaveValue('180');
+  await expect(page.getByLabel('整条请求超时（秒）')).toHaveValue('180');
   await expect(page.getByRole('dialog').getByRole('heading', { level: 2 })).toHaveText('编辑 摸鱼AI · 演示');
 });
 test('unknown write locks mutations until explicit reread; no success toast', async ({ page }) => {
   await ready(page); await scenario(page, 'unknown'); await edit(page);
-  await page.getByLabel('请求超时（秒）').fill('150');
+  await page.getByLabel('整条请求超时（秒）').fill('150');
   await page.getByRole('button', { name: '保存配置', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
   await expect(page.getByRole('alert')).toContainText('写入结果未知');

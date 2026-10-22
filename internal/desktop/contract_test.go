@@ -45,7 +45,7 @@ func TestSharedProviderContractFixtures(t *testing.T) {
 		encoded, _ := json.Marshal(dto)
 		var fields map[string]any
 		_ = json.Unmarshal(encoded, &fields)
-		if len(fields) != 10 {
+		if len(fields) != 11 {
 			t.Fatal("unexpected provider fields")
 		}
 		if _, ok := fields["secret"]; ok {

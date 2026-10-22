@@ -238,7 +238,7 @@ func authorizeUpstream(req *http.Request, p state.Provider, key string) {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 }
-func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translation *protocol.Session, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity, base string, allowRecovery bool, attemptCtx context.Context, attemptResult *forwardAttemptResult) (retry bool) {
+func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translation *protocol.Session, public string, c state.Candidate, p state.Provider, key state.ProviderKey, stream bool, routeModel state.Model, affinity, base string, allowRecovery bool, attemptCtx context.Context, first *firstOutputTimeout, attemptResult *forwardAttemptResult) (retry bool) {
 	request := translation.PolicyFields()
 	if routeModel.ServiceTier != "" {
 		request["service_tier"], _ = json.Marshal(routeModel.ServiceTier)
@@ -262,7 +262,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	delivered := false
 	setLogStage(r, "request_convert")
 	if t := trace(r); t != nil {
-		for _, name := range []string{"transport_cause", "transport_phase", "provider_timeout_seconds", "anchor_error_id", "upstream_error_category"} {
+		for _, name := range []string{"transport_cause", "transport_phase", "provider_timeout_seconds", "first_token_timeout_seconds", "timeout_kind", "anchor_error_id", "upstream_error_category"} {
 			delete(t.row.Evidence, name)
 		}
 		if _, exists := t.row.Evidence["model_revision"]; !exists {
@@ -362,6 +362,28 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	target := strings.TrimRight(base, "/") + translationAttempt.Endpoint()
 	ctx, cancel := context.WithCancel(attemptCtx)
 	defer cancel()
+	sseStarted := false
+	firstFailure := func() bool {
+		if !errors.Is(context.Cause(ctx), errFirstOutputTimeout) || r.Context().Err() != nil {
+			return false
+		}
+		status, code = 504, "upstream_first_token_timeout"
+		if t := trace(r); t != nil {
+			t.row.Code, t.row.Status = code, "failed"
+			t.row.Evidence["anchor_error_id"] = string(apierror.UpstreamFirstTokenTimeout)
+			t.row.Evidence["timeout_kind"] = "first_token"
+			seconds := p.FirstTokenTimeoutSeconds
+			if seconds == 0 {
+				seconds = state.DefaultFirstTokenTimeoutSeconds
+			}
+			t.row.Evidence["first_token_timeout_seconds"] = strconv.Itoa(seconds)
+			t.row.Evidence["provider_timeout_seconds"] = strconv.Itoa(p.TimeoutSeconds)
+		}
+		if !sseStarted {
+			fail(w, apierror.UpstreamFirstTokenTimeout)
+		}
+		return true
+	}
 	var connected atomic.Bool
 	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{GotConn: func(httptrace.GotConnInfo) { connected.Store(true) }})
 	up, err := http.NewRequestWithContext(egress.WithKeyRoute(ctx, p.ID, key.ID, key.Secret != ""), http.MethodPost, target, bytes.NewReader(body))
@@ -401,6 +423,16 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 			t.row.Evidence[name] = value
 		}
 	}
+	if resp != nil {
+		actualHTTP := resp.StatusCode
+		upstreamHTTP = &actualHTTP
+	}
+	if firstFailure() {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return false
+	}
 	if err != nil {
 		if errors.Is(err, egress.ErrUnavailable) {
 			recordTransportFailure(r, err, connected.Load(), p.TimeoutSeconds)
@@ -434,7 +466,8 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	}
 	defer resp.Body.Close()
 	status = resp.StatusCode
-	upstreamHTTP = &status
+	actualHTTP := status
+	upstreamHTTP = &actualHTTP
 	setLogStage(r, "response_validate")
 	after = resp.Header.Get("Retry-After")
 	setLogStage(r, "upstream_response")
@@ -442,8 +475,14 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 		if t := trace(r); t != nil {
 			captureUpstreamError(resp, t.row.Evidence)
 		}
+		if firstFailure() {
+			return false
+		}
 		if allowRecovery && (status == 400 || status == 422) {
 			data, readErr := io.ReadAll(io.LimitReader(resp.Body, protocol.RecoveryPrefixLimit+1))
+			if firstFailure() {
+				return false
+			}
 			if readErr == nil && len(data) <= protocol.RecoveryPrefixLimit {
 				recovery = translation.RecoverError(data)
 				if recovery != nil {
@@ -486,6 +525,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 			setLogStage(r, "stream_start")
 			var details protocol.RecoveryStreamDetails
 			reader, reason, inspection, event := protocol.PrimeRecoveryStream(ctx, resp.Body, &details)
+			if firstFailure() {
+				return false
+			}
 			if t := trace(r); t != nil {
 				t.row.Evidence["encrypted_context_stream_inspection"] = inspection
 				t.row.Evidence["encrypted_context_stream_event"] = event
@@ -505,9 +547,20 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Accel-Buffering", "no")
 		w.WriteHeader(200)
+		sseStarted = true
 		setLogStage(r, "stream")
-		result, translateErr := translationAttempt.TranslateStream(ctx, &translationDeliveryWriter{Writer: protocol.HTTPStreamWriter(w), delivered: &delivered}, resp.Body, protocol.StreamOptions{Language: apierror.LanguageOf(w)})
+		delivery := &translationDeliveryWriter{Writer: protocol.HTTPStreamWriter(w), delivered: &delivered}
+		result, translateErr := translationAttempt.TranslateStream(ctx, delivery, resp.Body, protocol.StreamOptions{Language: apierror.LanguageOf(w), OnFirstOutput: first.observe, ErrorWriter: delivery, FailureID: func() apierror.ID {
+			if errors.Is(context.Cause(ctx), errFirstOutputTimeout) {
+				return apierror.UpstreamFirstTokenTimeout
+			}
+			return ""
+		}})
 		usage, observation, translationFacts, err = result.Usage, result.Observation, result.Diagnostics, translateErr
+		first.observe()
+		if firstFailure() {
+			return false
+		}
 		if err != nil {
 			code = "stream_interrupted"
 			if t := trace(r); t != nil {
@@ -522,6 +575,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	// translator owns interpretation; the gateway alone authorizes a replay.
 	if allowRecovery {
 		data, readErr := io.ReadAll(io.LimitReader(resp.Body, protocol.MaxResponseBytes+1))
+		if firstFailure() {
+			return false
+		}
 		if readErr != nil || len(data) > protocol.MaxResponseBytes {
 			fail(w, apierror.UpstreamIncomplete)
 			return false
@@ -535,6 +591,10 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	}
 	result, translateErr := translationAttempt.TranslateResponse(resp.Body)
 	usage, observation, translationFacts = result.Usage, result.Observation, result.Diagnostics
+	first.observe()
+	if firstFailure() {
+		return false
+	}
 	if translateErr != nil {
 		fail(w, protocol.ResponseErrorID(translateErr))
 		return false

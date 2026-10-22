@@ -432,6 +432,12 @@ func (s *Store) PutProviderWithKeys(p Provider, expected int64, secret *string, 
 	if current != expected {
 		return Provider{}, ErrConflict
 	}
+	if p.FirstTokenTimeoutSeconds == 0 && oldDocument != "" {
+		var old Provider
+		if json.Unmarshal([]byte(oldDocument), &old) == nil {
+			p.FirstTokenTimeoutSeconds = old.FirstTokenTimeoutSeconds
+		}
+	}
 	if p.CostMultiplier == 0 && oldDocument != "" {
 		var old Provider
 		if json.Unmarshal([]byte(oldDocument), &old) == nil {

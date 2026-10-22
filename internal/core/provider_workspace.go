@@ -463,6 +463,23 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	}
 	ctx, cancel := context.WithTimeout(ctx, min(time.Duration(p.TimeoutSeconds)*time.Second, timeout))
 	defer cancel()
+	firstSeconds := p.FirstTokenTimeoutSeconds
+	if firstSeconds == 0 {
+		firstSeconds = state.DefaultFirstTokenTimeoutSeconds
+	}
+	ctx, first := withFirstOutputTimeout(ctx, time.Duration(firstSeconds)*time.Second)
+	defer first.close()
+	firstFailed := func() bool {
+		if !errors.Is(context.Cause(ctx), errFirstOutputTimeout) {
+			return false
+		}
+		out.Failure = "first_token_timeout"
+		row.Evidence["anchor_error_id"] = string(apierror.UpstreamFirstTokenTimeout)
+		row.Evidence["timeout_kind"] = "first_token"
+		row.Evidence["first_token_timeout_seconds"] = strconv.Itoa(firstSeconds)
+		row.Evidence["provider_timeout_seconds"] = strconv.Itoa(p.TimeoutSeconds)
+		return true
+	}
 	req, err := http.NewRequestWithContext(egress.WithKeyRoute(ctx, p.ID, key.ID, key.Secret != ""), "POST", strings.TrimRight(p.BaseURL, "/")+protocol.Endpoint(p.Protocol), bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -473,6 +490,17 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 	attempted = true
 	stage = "upstream_connect"
 	resp, err := s.inferenceResponse(req, p.BaseURL, p.Protocol, row.Evidence)
+	if resp != nil {
+		value := resp.StatusCode
+		actualHTTP = &value
+		out.HTTPStatus = value
+	}
+	if firstFailed() {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return out, nil
+	}
 	if errors.Is(err, egress.ErrUnavailable) {
 		out.Failure = "proxy_unavailable"
 		return out, nil
@@ -513,7 +541,11 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 		if strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
 			output := &probeOutput{header: http.Header{}, secret: key.Secret, limit: maxText, strict: messages != nil, notify: notify}
 			observation := &protocol.Observation{}
-			u, err = protocol.StreamObserved(output, io.LimitReader(resp.Body, maxBody+1), p.Protocol, "responses", model, observation)
+			u, err = protocol.StreamObservedOptions(output, io.LimitReader(resp.Body, maxBody+1), p.Protocol, "responses", model, observation, nil, protocol.StreamOptions{OnFirstOutput: first.observe})
+			first.observe()
+			if firstFailed() {
+				return out, nil
+			}
 			recordReturnedServiceTier(row.Evidence, observation.ServiceTier, observation.ServiceTierRaw, key.Secret)
 			stage = "response_validate"
 			if err != nil || observation.Status == "failed" || observation.Status == "incomplete" {
@@ -536,6 +568,10 @@ func (s *Server) inferenceObserved(ctx context.Context, p state.Provider, keyID,
 		}
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
+	first.observe()
+	if firstFailed() {
+		return out, nil
+	}
 	if err != nil {
 		out.Failure = "network"
 		return out, nil

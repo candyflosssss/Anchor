@@ -186,7 +186,7 @@ anchor serve
 
 两面绑定后才对已批准且 enabled 的 Binding 自动接管；某个目标失败不阻断其他目标，`status.bindings` 分别报告 pending/applied/overridden/conflict 等状态。正常停止先冻结托管写入并条件恢复，然后最多 10 秒排空请求。崩溃不会自动执行恢复；重新启动会核对原日志，或核心离线后用 `recover`。已运行的 Codex 会话可能缓存旧地址，恢复后应重启 Codex。
 
-2026-10-16 网关修订：`serve` 的 Responses / Chat Completions / Anthropic 请求体上限由 8 MiB 提高到 **32 MiB**，超限仍返回 HTTP 413 `request_too_large`，错误信息包含上限。该限制包括内嵌图片与完整历史，不是 token 限制；跨协议转换后的请求也受保护。全局并发 16、供应商并发和管理写入 128 KiB 上限不变；无新增 CLI 参数。需更新并重启核心才能生效，未发布新的官方桌面安装包，既有安装包不会自动改变。
+2026-10-16 网关修订：`serve` 的 Responses / Chat Completions / Anthropic 请求体上限由 8 MiB 提高到 **32 MiB**，超限仍返回 HTTP 413 `request_too_large`，错误信息包含上限。该限制包括内嵌图片与完整历史，不是 token 限制；跨协议转换后的请求也受保护。当前源码全局保护上限64、供应商并发1..64、管理写入128 KiB；无新增 CLI 参数。需更新并重启核心才能生效，未发布新的官方桌面安装包，既有安装包不会自动改变。
 
 ### `stop`（当前开发版）
 
@@ -265,9 +265,10 @@ anchor provider put --id ID --base-url URL [--base-url URL ...] [--homepage-url 
 | `--base-url` | 必填，可重复 | 请求地址，1..16 个且不可重复（忽略末尾 `/`）；多个地址按请求轮询做负载均衡，模型目录与测试使用第一个。每个都是 API 根地址，可含 `/v1` 前缀，不含 `/responses`、`/chat/completions` 或 `/messages`；HTTPS；本机服务允许 HTTP（`localhost`、`127.0.0.1` 或 `::1` 等回环 IP），禁止 userinfo/query/fragment |
 | `--homepage-url` | 空 | 供应商主页，仅用于展示，不参与请求；HTTP(S)，禁止 userinfo |
 | `--protocol` | 空 | `responses` / `chat-completions` / `anthropic`；显式提供时原子更新供应商匿名协议与 default Key 默认协议，不影响命名 Key、模型独立覆盖或 Key 启用状态；省略／空值保留两者，新供应商按 `responses` |
-| `--timeout` | `120` | 单候选总超时，秒，1..3600；仍受上游响应头 30 秒等待上限限制 |
+| `--first-token-timeout` | `30` | 单候选首字期限，秒，1..3600；等待首个实际生成内容，响应头/心跳不计，非流式等待完整结果 |
+| `--timeout` | `500` | 单候选整条请求总超时，秒，1..3600；首字到达后继续生效，包含响应头等待 |
 | `--cost-multiplier` | 新建 `1`；编辑省略保留 | 供应商充值成本倍率，有限数 `0.000001..1000`；1:2充值填0.5；输出 `cost_multiplier`。0仅作旧客户端省略值 |
-| `--max-concurrent` | `4` | 单供应商并发 1..64；网关全局另有限制 16 |
+| `--max-concurrent` | `20` | 单供应商并发 1..64；网关全局保护上限64 |
 | `--disabled` | `false` | 设置后禁用此供应商 |
 | `--revision` | `0` | add 必须为 0；put 必填当前值且 ≥1，通过 list 获取 |
 | `--secret-stdin` | `false` | 从 stdin 读取密钥，最多 8192 字节，去除首尾空白；内部换行无效 |
@@ -1086,3 +1087,5 @@ anchor [--context NAME] provider import-ccs [--db PATH] --approve --fingerprint 
 - GUI 等价入口：供应商页「从 CC Switch 导入」，自动读取预览后点击「确认导入并启用」；原型模式禁用入口。需配套升级 CLI／GUI 与核心；旧版本没有此功能。
 
 2026-10-22 错误诊断与自动补路径（当前源码，未打包/未发布）：`logs detail REQUEST_ID` / `logs export` 的 evidence 增加 `anchor_error_id`、`transport_cause`、`transport_phase`、`provider_timeout_seconds`、`upstream_error_category`；列表白名单不变，旧日志不回填，不保存上游错误原文。网关 all-mapped/all-compatible 绑定的缺映射/无启用供应商分别为 404/unknown_model 和 503/model_no_enabled_provider，其余范围拒绝保持 403。供应商期限包含等待响应头，取消隐式 30 秒上限，连接后响应头超时为 504/upstream_header_timeout。推理/`provider test` 已有 HTML 补 `/v1` 成功返回 JSON/SSE 后，按地址/协议/凭据摘要缓存 10 分钟（最多128项）；`endpoint_resolution=v1_cached` 表示直接复用，`endpoint_repair=learned` 表示本次学习。配置不写回；缓存 HTML/404/405 时失效，下一独立请求重新识别，当前请求不重放。无需新增命令、参数或数据库迁移，完整分类与边界见[日志设计](../design/logging.md#错误原因与端点修复2026-10-22当前源码未发布)。
+
+2026-10-22 首字期限与默认值（当前源码，未打包/未发布）：`provider add|put --first-token-timeout 30 --timeout 500 --max-concurrent 20` 提供首字/整条期限与默认并发。CLI put仍为完整替换，未传普通字段回默认值；已存配置读取不改总超时/并发，旧首字字段缺失按30，旧客户端省略该字段更新保留已存首字值。正文、思考、工具参数或音频生成停止首字计时，心跳/角色声明/HTTP头不计；非流式等完整结果。补/v1与密文恢复共享两类原期限；首字超时不重放，网关返回upstream_first_token_timeout，SSE已提交时为固定错误事件，probe/chat新增first_token_timeout且保留诊断10/120秒上限。详情/导出增加timeout_kind=first_token与first_token_timeout_seconds，列表白名单不变。新建及CC Switch导入默认30/500/20，已有配置不自动改写。需要同步升级核心/CLI/GUI，无数据库迁移或新手工操作。

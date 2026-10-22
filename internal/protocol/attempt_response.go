@@ -153,14 +153,26 @@ func generationStatus(m Object, p string) (string, error) {
 	return "", ErrUnsupported
 }
 
-type StreamOptions struct{ Language apierror.Language }
+type StreamOptions struct {
+	Language apierror.Language
+	// OnFirstOutput reports actual generated content, including reasoning/tool data,
+	// once. Envelopes, role-only deltas and heartbeats do not satisfy it.
+	OnFirstOutput func()
+	// FailureID optionally identifies a local network deadline error.
+	FailureID func() apierror.ID
+	// ErrorWriter permits a final local failure frame after the upstream context
+	// is cancelled. Its owner supplies independent delivery limits.
+	ErrorWriter io.Writer
+}
 
 // TranslateStream performs synchronous incremental reads/writes. The owner must
 // cancel/close a blocking network reader on cancellation; no goroutine is spawned.
 func (a *Attempt) TranslateStream(ctx context.Context, w io.Writer, body io.Reader, options StreamOptions) (Response, error) {
 	out := Response{Diagnostics: a.Diagnostics()}
 	out.Diagnostics.Stage = StageStream
-	usage, err := translateStream(&contextWriter{ctx: ctx, w: w}, &contextReader{ctx: ctx, r: body}, a.upstream, a.client, a.public, &out.Observation, a.mapping, options.Language)
+	out.Observation.onFirstOutput = options.OnFirstOutput
+	usage, err := translateStream(&contextWriter{ctx: ctx, w: w}, &contextReader{ctx: ctx, r: body}, a.upstream, a.client, a.public, &out.Observation, a.mapping, options)
+	out.Observation.onFirstOutput = nil
 	out.Usage = usage
 	if err != nil {
 		category := "invalid_stream"

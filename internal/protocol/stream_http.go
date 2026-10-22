@@ -17,7 +17,17 @@ func StreamObserved(w http.ResponseWriter, body io.Reader, from, to, model strin
 	return StreamObservedMapped(w, body, from, to, model, observation, nil)
 }
 func StreamObservedMapped(w http.ResponseWriter, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping) (Usage, error) {
-	return translateStream(HTTPStreamWriter(w), body, from, to, model, observation, mapping, apierror.LanguageOf(w))
+	return StreamObservedOptions(w, body, from, to, model, observation, mapping, StreamOptions{Language: apierror.LanguageOf(w)})
+}
+
+// StreamObservedOptions keeps the legacy probe entry on the same semantic observer.
+func StreamObservedOptions(w http.ResponseWriter, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping, options StreamOptions) (Usage, error) {
+	if observation == nil {
+		observation = &Observation{}
+	}
+	observation.onFirstOutput = options.OnFirstOutput
+	defer func() { observation.onFirstOutput = nil }()
+	return translateStream(HTTPStreamWriter(w), body, from, to, model, observation, mapping, options)
 }
 
 // HTTPStreamWriter supplies delivery deadlines and flushing at the HTTP edge.

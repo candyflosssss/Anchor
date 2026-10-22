@@ -338,6 +338,7 @@ func TestProviderDeadlineAllowsSlowResponseHeaders(t *testing.T) {
 	f.add(t, "slow", up.URL, "synthetic-secret")
 	p, _ := f.store.Provider("slow")
 	p.TimeoutSeconds = 40
+	p.FirstTokenTimeoutSeconds = 35
 	if _, err := f.store.PutProvider(p, p.Revision, nil); err != nil {
 		t.Fatal(err)
 	}

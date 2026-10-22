@@ -67,7 +67,7 @@ func provider(p state.Provider) (Provider, bool) {
 	if !state.ValidProtocol(p.Protocol) {
 		return Provider{}, false
 	}
-	return Provider{p.Protocol, p.CostMultiplier, p.ID, p.HomepageURL, append([]string(nil), urls...), p.Enabled, p.TimeoutSeconds, p.MaxConcurrent, p.Revision, p.HasSecret}, true
+	return Provider{p.Protocol, p.CostMultiplier, p.ID, p.HomepageURL, append([]string(nil), urls...), p.Enabled, p.TimeoutSeconds, p.FirstTokenTimeoutSeconds, p.MaxConcurrent, p.Revision, p.HasSecret}, true
 }
 func (b *Bridge) Providers() ProvidersResult {
 	s := b.session
@@ -115,7 +115,7 @@ func (b *Bridge) SaveProvider(in SaveProvider) SaveResult {
 		r.Problem = &Problem{"invalid"}
 		return r
 	}
-	p := state.Provider{Protocol: in.Provider.Protocol, CostMultiplier: in.Provider.CostMultiplier, ID: in.Provider.ID, HomepageURL: in.Provider.HomepageURL, BaseURLs: append([]string(nil), in.Provider.BaseURLs...), Enabled: in.Provider.Enabled, TimeoutSeconds: in.Provider.TimeoutSeconds, MaxConcurrent: in.Provider.MaxConcurrent}
+	p := state.Provider{Protocol: in.Provider.Protocol, CostMultiplier: in.Provider.CostMultiplier, ID: in.Provider.ID, HomepageURL: in.Provider.HomepageURL, BaseURLs: append([]string(nil), in.Provider.BaseURLs...), Enabled: in.Provider.Enabled, TimeoutSeconds: in.Provider.TimeoutSeconds, FirstTokenTimeoutSeconds: in.Provider.FirstTokenTimeoutSeconds, MaxConcurrent: in.Provider.MaxConcurrent}
 	if err := p.Validate(); err != nil {
 		r.Problem = &Problem{"invalid"}
 		return r

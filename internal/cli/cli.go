@@ -95,7 +95,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   usage                                Persistent per-provider/model totals
   provider add|put --id ID --base-url URL [--base-url URL ...] [--homepage-url URL]
                 [--secret-stdin] [--revision N] [--protocol responses|chat-completions|anthropic]
-                [--timeout 120] [--max-concurrent 4] [--cost-multiplier N] [--disabled]
+                [--first-token-timeout 30] [--timeout 500] [--max-concurrent 20] [--cost-multiplier N] [--disabled]
   model list
   model settings --id ID [--file FILE]
   model routing --id ID --revision N --strategy RULE --candidate PROVIDER:MODEL... [--source PROVIDER:KEY:MODEL ...]
@@ -671,8 +671,9 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	f.Var(&bases, "base-url", "request API base including optional /v1, not /responses; HTTPS or HTTP localhost/loopback; repeat for round-robin load balancing (max 16)")
 	homepage := f.String("homepage-url", "", "optional provider homepage, display only")
 	protocol := f.String("protocol", "", "request protocol for anonymous requests and the default Key; omitted keeps existing protocols (new: responses)")
-	timeout := f.Int("timeout", 120, "total request timeout in seconds")
-	max := f.Int("max-concurrent", 4, "provider concurrency")
+	timeout := f.Int("timeout", state.DefaultTimeoutSeconds, "total request timeout in seconds")
+	firstToken := f.Int("first-token-timeout", state.DefaultFirstTokenTimeoutSeconds, "seconds until first generated text, reasoning or tool output; headers/heartbeats do not count")
+	max := f.Int("max-concurrent", state.DefaultMaxConcurrent, "provider concurrency")
 	cost := f.Float64("cost-multiplier", 0, "provider recharge cost factor 0.000001..1000; omitted preserves existing or defaults to 1")
 	disabled := f.Bool("disabled", false, "disable provider")
 	rev := f.Int64("revision", 0, "expected current revision")
@@ -686,7 +687,10 @@ func (a App) providers(ctx context.Context, c *client.Client, args []string) err
 	if args[0] == "put" && *rev < 1 {
 		return errors.New("put requires the current --revision")
 	}
-	p := state.Provider{CostMultiplier: *cost, ID: *id, HomepageURL: *homepage, BaseURLs: append([]string(nil), bases...), Protocol: *protocol, Enabled: !*disabled, TimeoutSeconds: *timeout, MaxConcurrent: *max}
+	if *firstToken < 1 {
+		return state.ErrInvalid
+	}
+	p := state.Provider{CostMultiplier: *cost, ID: *id, HomepageURL: *homepage, BaseURLs: append([]string(nil), bases...), Protocol: *protocol, Enabled: !*disabled, TimeoutSeconds: *timeout, FirstTokenTimeoutSeconds: *firstToken, MaxConcurrent: *max}
 	if err := p.Validate(); err != nil {
 		return err
 	}

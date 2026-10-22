@@ -13,7 +13,7 @@ import (
 )
 
 // translateStream is independent of HTTP. Optional flushing is a writer capability.
-func translateStream(w io.Writer, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping, language apierror.Language) (usage Usage, streamErr error) {
+func translateStream(w io.Writer, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping, options StreamOptions) (usage Usage, streamErr error) {
 	r := Result{ID: fmt.Sprintf("resp_anchor_%d", time.Now().UnixNano()), Model: model}
 	emit := &emitter{w: w, p: to, r: &r}
 	same := from == to
@@ -22,8 +22,18 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 		if streamErr != nil && !terminal {
 			usage = Usage{}
 		}
-		if streamErr != nil && !same {
-			_, detail := apierror.Render(apierror.UpstreamStreamIncomplete, language)
+		id := apierror.ID("")
+		if streamErr != nil && options.FailureID != nil {
+			id = options.FailureID()
+		}
+		if streamErr != nil && (!same || id != "") {
+			if id != "" && options.ErrorWriter != nil {
+				emit.w = options.ErrorWriter
+			}
+			if id == "" {
+				id = apierror.UpstreamStreamIncomplete
+			}
+			_, detail := apierror.Render(id, options.Language)
 			// No terminal success and no replay after downstream output has begun.
 			if to == "responses" {
 				_ = emit.send("error", Object{"code": detail.Code, "message": detail.Message, "param": nil})
@@ -68,6 +78,14 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 			return nil
 		}
 		payload := data
+		var m Object
+		var e error
+		if payload != "[DONE]" {
+			m, e = Decode([]byte(payload))
+			if e == nil {
+				observation.firstGenerated(m, from)
+			}
+		}
 		data = ""
 		if same {
 			if e := emit.raw(event, payload); e != nil {
@@ -80,7 +98,6 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 			}
 			return nil
 		}
-		m, e := Decode([]byte(payload))
 		if e != nil {
 			return e
 		}

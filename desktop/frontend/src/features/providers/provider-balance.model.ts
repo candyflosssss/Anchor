@@ -18,7 +18,7 @@ export class ProviderBalanceCache {
   retainToggle(before: Provider, after: Provider) {
     if (before.id !== after.id || after.revision !== before.revision + 1 || before.enabled === after.enabled ||
       before.homepage_url !== after.homepage_url || before.protocol !== after.protocol || before.has_secret !== after.has_secret ||
-      before.timeout_seconds !== after.timeout_seconds || before.max_concurrent !== after.max_concurrent ||
+      before.timeout_seconds !== after.timeout_seconds || before.first_token_timeout_seconds !== after.first_token_timeout_seconds || before.max_concurrent !== after.max_concurrent ||
       before.cost_multiplier !== after.cost_multiplier || JSON.stringify(before.base_urls) !== JSON.stringify(after.base_urls)) return;
     this.toggles.set(after.id, { revision: after.revision, queryRevision: this.queryRevision(before) });
     const previous = this.read(before);

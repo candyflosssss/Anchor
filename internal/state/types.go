@@ -100,6 +100,9 @@ func (p Provider) URLs() []string {
 
 // Normalize makes BaseURLs authoritative and BaseURL its first entry.
 func (p *Provider) Normalize() {
+	if p.FirstTokenTimeoutSeconds == 0 {
+		p.FirstTokenTimeoutSeconds = DefaultFirstTokenTimeoutSeconds
+	}
 	if p.CostMultiplier == 0 {
 		p.CostMultiplier = 1
 	}
@@ -113,6 +116,12 @@ func ValidProtocol(p string) bool {
 	return p == "responses" || p == "chat-completions" || p == "anthropic"
 }
 
+const (
+	DefaultFirstTokenTimeoutSeconds = 30
+	DefaultTimeoutSeconds           = 500
+	DefaultMaxConcurrent            = 20
+)
+
 type Provider struct {
 	CostMultiplier float64 `json:"cost_multiplier"`
 	ID             string  `json:"id"`
@@ -122,13 +131,14 @@ type Provider struct {
 	BaseURLs []string `json:"base_urls,omitempty"`
 	// Protocol selects anonymous requests and, when explicitly supplied on writes,
 	// the default Key. Empty preserves existing provider and Key protocols.
-	Protocol       string `json:"protocol,omitempty"`
-	Enabled        bool   `json:"enabled"`
-	TimeoutSeconds int    `json:"timeout_seconds"`
-	MaxConcurrent  int    `json:"max_concurrent"`
-	Revision       int64  `json:"revision"`
-	HasSecret      bool   `json:"has_secret"`
-	Secret         string `json:"-"`
+	Protocol                 string `json:"protocol,omitempty"`
+	Enabled                  bool   `json:"enabled"`
+	TimeoutSeconds           int    `json:"timeout_seconds"`
+	FirstTokenTimeoutSeconds int    `json:"first_token_timeout_seconds,omitempty"`
+	MaxConcurrent            int    `json:"max_concurrent"`
+	Revision                 int64  `json:"revision"`
+	HasSecret                bool   `json:"has_secret"`
+	Secret                   string `json:"-"`
 }
 
 func (p Provider) Validate() error {
@@ -162,8 +172,8 @@ func (p Provider) Validate() error {
 	if p.Protocol != "" && !ValidProtocol(p.Protocol) {
 		return errors.New("unsupported protocol")
 	}
-	if p.TimeoutSeconds < 1 || p.TimeoutSeconds > 3600 || p.MaxConcurrent < 1 || p.MaxConcurrent > 64 {
-		return errors.New("timeout must be 1..3600 seconds and concurrency 1..64")
+	if p.TimeoutSeconds < 1 || p.TimeoutSeconds > 3600 || p.MaxConcurrent < 1 || p.MaxConcurrent > 64 || p.FirstTokenTimeoutSeconds < 0 || p.FirstTokenTimeoutSeconds > 3600 {
+		return errors.New("timeouts must be 1..3600 seconds (omitted first token timeout defaults to 30) and concurrency 1..64")
 	}
 	if strings.ContainsAny(p.Secret, "\r\n") || len(p.Secret) > 8192 {
 		return errors.New("invalid secret")

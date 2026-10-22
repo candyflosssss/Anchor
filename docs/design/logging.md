@@ -267,3 +267,7 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 | endpoint_repair | learned 表示补 /v1 后得到 2xx 非 HTML 的 JSON/SSE 类型，缓存 10 分钟，最多 128 项；不保证生成完整 |
 
 不写原始 err.Error()、URL、远程 message、未知错误字符串或凭据。绑定拒绝前也记录请求模型，缺映射与无启用供应商分别为 unknown_model 与 model_no_enabled_provider，保持零尝试/HTTP=null。桌面日志复用核心语言目录，优先用 anchor_error_id，并结合安全类别/阶段/期限解释错误；旧记录无法恢复的原因明确保留未知，不根据 30 秒耗时反推原因。
+
+### 首字超时证据（2026-10-22，当前源码未发布）
+
+新增固定错误 upstream_first_token_timeout（probe/chat 为 first_token_timeout），详情/导出 evidence.timeout_kind=first_token、first_token_timeout_seconds=配置秒数，并保留 provider_timeout_seconds。anchor_error_id=upstream_first_token_timeout 用于共享语言目录；列表白名单不变。首字期含连接/响应头/等待实际生成内容，不能用TTFT指标替代该配置；正文、思考、工具参数或音频可满足首字，心跳不满足，非流式等待完整结果。未取得上游响应时HTTP=null，已取得上游200后超时仍保存HTTP200；SSE已提交则发本地错误事件并记失败，不合成成功、不重放、不记录正文，旧日志不回填。

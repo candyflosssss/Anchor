@@ -20,16 +20,17 @@ type Problem struct {
 	Code string `json:"code"`
 }
 type Provider struct {
-	Protocol       string   `json:"protocol,omitempty"`
-	CostMultiplier float64  `json:"cost_multiplier"`
-	ID             string   `json:"id"`
-	HomepageURL    string   `json:"homepage_url"`
-	BaseURLs       []string `json:"base_urls"`
-	Enabled        bool     `json:"enabled"`
-	TimeoutSeconds int      `json:"timeout_seconds"`
-	MaxConcurrent  int      `json:"max_concurrent"`
-	Revision       int64    `json:"revision"`
-	HasSecret      bool     `json:"has_secret"`
+	Protocol                 string   `json:"protocol,omitempty"`
+	CostMultiplier           float64  `json:"cost_multiplier"`
+	ID                       string   `json:"id"`
+	HomepageURL              string   `json:"homepage_url"`
+	BaseURLs                 []string `json:"base_urls"`
+	Enabled                  bool     `json:"enabled"`
+	TimeoutSeconds           int      `json:"timeout_seconds"`
+	FirstTokenTimeoutSeconds int      `json:"first_token_timeout_seconds,omitempty"`
+	MaxConcurrent            int      `json:"max_concurrent"`
+	Revision                 int64    `json:"revision"`
+	HasSecret                bool     `json:"has_secret"`
 }
 type InitialProviderKey struct {
 	ID       string `json:"id"`
