@@ -17,7 +17,7 @@ const routing: ModelRoutingController = {
   change: async () => {}, move: async () => {}, refresh: async () => {}, retry: async () => {}, undo: async () => {}, discard: () => {}, routeID: c => JSON.stringify([c.provider_id, c.model]),
 };
 const makeSummary = (enabled: boolean, state = 'ready', keyEnabled = true, candidateCount = 1) => summarize({ ...providers.providers[0], enabled }, { ...workspace, keys: [{ ...workspace.keys[0], state, enabled: keyEnabled }], models: [{ ...mapping, candidate_count: candidateCount }] });
-const render = (summaries: ReturnType<typeof summarize>[]) => renderToStaticMarkup(createElement(ModelsView, { summaries, loading: false, disabled: false, rates, routing, onOpen: () => {}, onShowProviders: () => {} }));
+const render = (summaries: ReturnType<typeof summarize>[], rateState = rates) => renderToStaticMarkup(createElement(ModelsView, { summaries, loading: false, disabled: false, rates: rateState, routing, onOpen: () => {}, onShowProviders: () => {} }));
 
 describe('model channel availability presentation', () => {
   it('marks zero valid channels and retains disabled Key details', () => {
@@ -73,6 +73,44 @@ describe('model channel availability presentation', () => {
     expect(html).not.toContain('aria-label="当前不可用的来源"');
     expect(html.indexOf('第 1 位')).toBeLessThan(html.indexOf('第 2 位'));
     expect(html).toContain('aria-label="下移 off');
+  });
+
+  it('shows one card per scoped Key with its own multiplier and scheduling state', () => {
+    const summary = makeSummary(true);
+    const base = summary.workspace!.keys[0];
+    summary.workspace!.keys = [
+      { ...base, id: 'cheap', effective_multiplier: 0.2 },
+      { ...base, id: 'expensive', effective_multiplier: 3 },
+      { ...base, id: 'cooling', state: 'cooling', effective_multiplier: 0.01 },
+      { ...base, id: 'unrelated', effective_multiplier: 0.001 },
+    ];
+    summary.workspace!.models[0] = { ...summary.workspace!.models[0], multiplier: 1, key_ids: ['cheap', 'expensive', 'cooling', 'missing'] };
+    const html = render([summary]);
+    expect(html.match(/class="mapping-key-card /g)).toHaveLength(4);
+    expect(html).toContain('0.2×</strong>');
+    expect(html).toContain('3×</strong>');
+    expect(html).toContain('冷却中');
+    expect(html).toContain('Key 不存在');
+    expect(html).not.toContain('来源 Key unrelated');
+    expect(html).not.toContain('class="mapping-keys"');
+    expect(html).not.toContain('当前不可用的 Key');
+  });
+  it('uses refreshed billing per Key without refreshing its scheduling state', () => {
+    const summary = makeSummary(true, 'cooling');
+    const id = JSON.stringify([summary.provider.id, summary.workspace!.keys[0].id]);
+    const html = render([summary], { ...rates, keys: { [id]: { ...summary.workspace!.keys[0], state: 'ready', effective_multiplier: 0.4 } } });
+    expect(html).toContain('冷却中');
+    expect(html).toContain('相对倍率 <strong>0.4×');
+    expect(html).not.toContain('>0.4×</strong></div>');
+  });
+  it('labels genuinely anonymous routes without inventing a Key', () => {
+    const summary = makeSummary(true);
+    summary.workspace!.keys = [];
+    summary.workspace!.models[0].key_ids = [];
+    const html = render([summary]);
+    expect(html.match(/class="mapping-key-card /g)).toHaveLength(1);
+    expect(html).toContain('匿名来源');
+    expect(html).not.toContain('Key 已启用');
   });
 
 });

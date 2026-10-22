@@ -28,13 +28,12 @@ test('provider switches expose unavailable mappings without deleting them', asyn
   const card = await mappings(page);
   await expect(card).toContainText('无有效渠道');
   await expect(card).toHaveClass(/availability-unavailable/);
-  await expect(card.locator('.channel-status[title^="供应商已停用"]')).toHaveCount(2);
-  await card.locator('.mapping-keys > summary').first().click();
+  await expect(card.locator('.channel-status[title^="供应商已停用"]')).toHaveCount(3);
   await expect(card.locator('.mapping-key-status').first()).toContainText('Key 已启用');
   await page.getByRole('button', { name: '供应商', exact: true }).click();
   await setProvider(page, '摸鱼AI', true);
   const restored = await mappings(page);
-  await expect(restored).toContainText('1/2 可用');
+  await expect(restored).toContainText('1/2 渠道可用');
   await expect(restored.locator('.model-unavailable-notice')).toHaveCount(0);
 });
 
@@ -53,9 +52,7 @@ test('Key switch preserves its setting independently and disabled Keys remain vi
   await expect(card).toContainText('无有效渠道');
   const source = card.locator('.mapping-candidate').first();
   await expect(source.locator('.channel-status').first()).toHaveAttribute('title', /供应商已启用/);
-  await expect(source.locator('.channel-status').first()).toHaveAttribute('title', /已停用/);
-  await source.locator('.mapping-keys > summary').click();
-  await source.getByLabel('当前不可用的 Key', { exact: true }).locator(':scope > summary').click();
+  await expect(source.locator('.channel-status').first()).toHaveText('已停用');
   await expect(source.locator('.mapping-key-status')).toContainText('Key 已停用');
   await expect(source).not.toContainText('匿名来源');
   await source.getByRole('button', { name: /摸鱼AI.*编辑映射/ }).click();
@@ -65,5 +62,5 @@ test('Key switch preserves its setting independently and disabled Keys remain vi
   await expect(key).toBeChecked();
   await expect(key).toBeEnabled();
   card = await mappings(page);
-  await expect(card).toContainText('1/2 可用');
+  await expect(card).toContainText('1/2 渠道可用');
 });

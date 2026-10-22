@@ -8,7 +8,7 @@ import { channelKeys, keyAvailability, type SourceKey } from '../providers/chann
 import { KeyMultiplierView } from '../providers/key-multiplier.view';
 import { rateFailureText } from '../providers/provider-account.model';
 import { rateID, type MappingRatesController, type RateTarget } from './use-mapping-rates';
-import { modelAvailability, visibleModels, visibleKeys } from './model-availability.model';
+import { modelAvailability, visibleModels } from './model-availability.model';
 import { effectiveRouteMultiplier, routingRules, routeID } from './model-routing.model';
 import type { ModelRoutingController } from './use-model-routing';
 import { useRouteDrag } from './use-route-drag';
@@ -25,21 +25,26 @@ function UnavailableSection({ label, count, children }: { label: string; count: 
   </details>;
 }
 
-function MappingKey({ source, candidate: m, rates }: { source: SourceKey; candidate: ModelCandidate; rates: MappingRatesController }) {
+function MappingKey({ source, candidate: m, rates, children, disabled, onOpen }: Pick<Common, 'rates' | 'disabled' | 'onOpen'> & { source: SourceKey; candidate: ModelCandidate; children: ReactNode }) {
   const id = rateID({ provider_id: m.provider_id, key_id: source.id }), value = rates.values[id];
   const failure = rates.errors[id] || (value?.failure && (rateFailureText[value.failure] ?? '查询失败，分组倍率未知。'));
-  const state = keyAvailability(source);
-  // A rate query must not override scheduling state from the workspace.
+  const keyState = keyAvailability(source);
+  const state = m.provider_enabled ? keyState : m.availability;
+  // Billing refreshes must never overwrite the workspace's scheduling state.
   const key = rates.keys[id] ?? source.key;
-  return <div className="mapping-key-rate"><span className="mapping-key-name" aria-label={`来源 Key ${source.id}`}><span>{source.anonymous ? '来源' : 'Key'}</span><strong className="mono">{source.id}</strong></span><span className="mapping-key-status">{source.key && <span>{source.key.enabled ? 'Key 已启用' : 'Key 已停用'}</span>}<span className={`channel-status state-${state.state}`} title={state.reason}>{state.label}</span></span>{!source.anonymous && source.key && (rates.pending === id ? <span>查询中…</span> : <KeyMultiplierView value={key} />)}{failure && <p className="feedback error-feedback" role="alert">{failure}</p>}</div>;
-}
-
-function MappingKeys({ candidate: m, rates }: { candidate: ModelCandidate; rates: MappingRatesController }) {
-  const keys = channelKeys(m.key_ids, m.keys), split = visibleKeys(keys);
-  return <details className="mapping-keys"><summary><ChevronDown size={12} />{keys.some(k => !k.anonymous) ? `${keys.length} 个来源 Key` : '匿名来源'}</summary><div className="mapping-rates">
-    {split.visible.map(source => <MappingKey key={source.id} source={source} candidate={m} rates={rates} />)}
-    <UnavailableSection label="当前不可用的 Key" count={split.unavailable.length}>{split.unavailable.map(source => <MappingKey key={source.id} source={source} candidate={m} rates={rates} />)}</UnavailableSection>
-  </div></details>;
+  const multiplier = effectiveRouteMultiplier({ ...m, key_ids: [source.id], keys: key ? [{ ...key, enabled: source.key?.enabled ?? false, state: source.key?.state ?? 'disabled' }] : [] });
+  return <div className={`mapping-key-card mapping-key-rate availability-${state.state}`} role="group" aria-label={`${m.provider_id} · ${source.anonymous ? '匿名来源' : `Key ${source.id}`}`}>
+    <div className="mapping-source-header">
+      <button className={`candidate tone-${m.tone}`} disabled={disabled} title={m.label} aria-label={`${m.provider_id}（${m.label}）上游 ${m.upstream}，编辑映射`} onClick={() => onOpen(m.provider_id, 'models')}><strong>{m.provider_id}</strong></button>
+      <span className={`channel-status state-${state.state}`} title={`${m.provider_enabled ? '供应商已启用' : '供应商已停用'} · ${state.reason}`}>{state.label}</span>
+    </div>
+    <div className="mapping-key-name" aria-label={`来源 Key ${source.id}`}><span>{source.anonymous ? '来源' : 'Key'}</span><strong className="mono">{source.anonymous ? '匿名来源' : source.id}</strong></div>
+    <div className="mapping-upstream"><span>上游模型</span><span className="mono">{m.upstream}</span></div>
+    <div className="mapping-rate-summary"><span>排序倍率</span><strong className="mapping-effective-rate" title={`供应商 ${m.cost_multiplier}× · 模型 ${m.multiplier}×`}>{multiplier == null ? '未知' : `${Number(multiplier.toPrecision(6))}×`}</strong></div>
+    {!source.anonymous && source.key && (rates.pending === id ? <p className="card-hint" role="status">查询中…</p> : <KeyMultiplierView value={key} />)}
+    {failure && <p className="feedback error-feedback" role="alert">{failure}</p>}
+    <footer className="mapping-key-footer"><span className="mapping-key-status">{!m.provider_enabled && <span>供应商已停用</span>}{source.key && <span>{source.key.enabled ? 'Key 已启用' : 'Key 已停用'}</span>}</span>{children}</footer>
+  </div>;
 }
 
 function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Common & { group: ModelGroup; settings: () => void }) {
@@ -55,21 +60,24 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
   const availability = modelAvailability(g);
   const renderCandidate = (m: ModelCandidate) => {
     const i = visible.findIndex(c => candidateID(c) === candidateID(m));
-    const multiplier = effectiveRouteMultiplier(m);
+    const keys = channelKeys(m.key_ids, m.keys);
     return <li key={candidateID(m)} className={`mapping-candidate availability-${m.availability.state}${dragged && candidateID(m) === candidateID(dragged) ? ' is-drag-placeholder' : ''}`} data-route-id={candidateID(m)}>
-          <div className="mapping-source-header">
-            <span className="route-position" aria-label={`第 ${i + 1} 位`}>{i + 1}</span>
-            {candidates.length > 1 && <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}`} title="拖动或用方向键调整顺序" onPointerDown={e => drag.start(e, candidateID(m))} onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}><GripVertical size={16} /></button>}
-            <button className={`candidate tone-${m.tone}`} disabled={disabled || routing.busy} title={m.label} aria-label={`${m.provider_id}（${m.label}）上游 ${m.upstream}，编辑映射`} onClick={() => onOpen(m.provider_id, 'models')}><strong>{m.provider_id}</strong><span className="mono">{m.upstream}</span></button>
-            <span className={`channel-status state-${m.availability.state}`} title={`${m.provider_enabled ? '供应商已启用' : '供应商已停用'} · ${m.availability.reason}`}>{m.availability.label}</span>
-            <span className="mapping-effective-rate" title={`供应商 ${m.cost_multiplier}× · 模型 ${m.multiplier}×`}>{multiplier == null ? '倍率未知' : `${Number(multiplier.toPrecision(6))}×`}</span>
-            {candidates.length > 1 && <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i - 1); }}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === candidates.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}`} onClick={() => { void routing.move(g, i, i + 1); }}><ArrowDown size={13} /></Button></div>}
+      {keys.map((source, keyIndex) => {
+        const suffix = keyIndex ? ` Key ${source.id}` : '';
+        return <MappingKey key={source.id} source={source} candidate={m} rates={rates} disabled={disabled || routing.busy} onOpen={onOpen}>
+          <div className="mapping-route-controls" title={`渠道优先级；调整 ${m.provider_id} 的全部 ${keys.length} 个来源 Key`}>
+            <span className="route-position" aria-label={`第 ${i + 1} 位`}>渠道 {i + 1}</span>
+            {candidates.length > 1 && <>
+              <button type="button" className="route-grip" aria-disabled={!canEdit} aria-label={`拖动 ${m.provider_id} ${m.upstream}${suffix}`} title="拖动或用方向键调整整个渠道" onPointerDown={e => drag.start(e, candidateID(m))} onKeyDown={e => { if (canEdit && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); void routing.move(g, i, i + (e.key === 'ArrowUp' ? -1 : 1)); } }}><GripVertical size={16} /></button>
+              <div className="route-move"><Button variant="ghost" size="sm" disabled={!canEdit || i === 0} aria-label={`上移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => { void routing.move(g, i, i - 1); }}><ArrowUp size={13} /></Button><Button variant="ghost" size="sm" disabled={!canEdit || i === candidates.length - 1} aria-label={`下移 ${m.provider_id} ${m.upstream}${suffix}`} onClick={() => { void routing.move(g, i, i + 1); }}><ArrowDown size={13} /></Button></div>
+            </>}
           </div>
-          <MappingKeys candidate={m} rates={rates} />
-        </li>;
+        </MappingKey>;
+      })}
+    </li>;
   };
-  return <article className={`detail-card model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} aria-label={`模型 ${g.alias}`}>
-    <header><div className="model-title"><h2 className="mono">{g.alias}</h2><span className={`model-channel-count state-${availability}`} role="status" title={`${available} / ${candidates.length} 个渠道当前可用`}>{available ? `${available}/${candidates.length} 可用` : unknown ? '可用性待确认' : '无有效渠道'}</span></div><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="上下文、能力与速度" onClick={settings}><Settings2 size={15} /></Button></header>
+  return <article className={`model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} aria-label={`模型 ${g.alias}`}>
+    <header className="model-section-header"><div className="model-title"><h2 className="mono">{g.alias}</h2><span className={`model-channel-count state-${availability}`} role="status" title={`${available} / ${candidates.length} 个渠道当前可用`}>{available ? `${available}/${candidates.length} 渠道可用` : unknown ? '可用性待确认' : '无有效渠道'}</span></div><Button className="model-settings-trigger" variant="ghost" size="sm" disabled={disabled || routing.busy || !g.complete} aria-label={`模型设置 ${g.alias}`} title="上下文、能力与速度" onClick={settings}><Settings2 size={15} /></Button></header>
       <div className="model-sources-body">
         <div className="route-toolbar"><select aria-label={`调度规则 ${g.alias}`} className="select-field" disabled={!canEdit} value={draft.strategy} onChange={e => { void routing.change(g, { strategy: e.target.value }); }}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select>
         {candidates.length > 1 && <div className="route-quick-sort">

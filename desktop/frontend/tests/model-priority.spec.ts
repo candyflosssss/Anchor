@@ -39,7 +39,7 @@ test('manual order, quick sorts, cancellation and persistence', async ({ page })
   await card.getByRole('button', { name: /^拖动/ }).first().press('ArrowDown');
   await expect(card).toContainText('已自动保存');
   await expect(card.getByRole('button', { name: '按倍率', exact: true })).toBeEnabled();
-  const first = await rows.first().locator('.candidate strong').innerText();
+  const first = await rows.first().locator('.candidate strong').first().innerText();
   await page.getByRole('button', { name: '刷新配置', exact: true }).click();
   await expect(rows.first()).toContainText(first);
 });
@@ -47,11 +47,11 @@ test('manual order, quick sorts, cancellation and persistence', async ({ page })
 test('pointer dragging and compact layouts in light and dark themes', async ({ page }) => {
   const card = await mappings(page);
   const handle = card.getByRole('button', { name: '拖动 摸鱼AI demo-model-mini', exact: true });
-  const from = await handle.boundingBox(), to = await card.locator('.mapping-candidate').last().boundingBox();
+  const from = await handle.boundingBox(), to = await card.locator('.mapping-key-card').last().boundingBox();
   if (!from || !to) throw Error('missing route geometry');
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
-  await page.mouse.move(from.x + from.width / 2, to.y + to.height / 2, { steps: 8 });
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect(card.locator('.mapping-candidate').first()).toContainText('备用供应商');
   await expect(card.getByRole('button', { name: '按倍率', exact: true })).toBeEnabled();
