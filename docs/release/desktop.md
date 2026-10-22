@@ -1,10 +1,42 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.67](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.67)，发布于 `2026-10-22T14:57:43+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `4b05d821a796b78959ad1dccf4faca920f615d87`、SOURCE dirty=false。
-- 每个 Key 独立拖拽与保存，可跨供应商穿插排序；模型横排、内部卡片纵排，倍率与延迟排序也逐 Key 处理。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.68](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.68)，发布于 `2026-10-22T16:43:13+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `589366ce083d93a50f800ecd0e2ba93c14104713`、SOURCE dirty=false。
+- 自动发现常见目录中的 Agent 项目并收录 Skill，无需逐个登记；外部原件保留，新项目与新 Skill 由后台继续发现。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="skill-project-discovery-68"></a>
+
+## Skill 项目自动发现 .68（已发布 dev）
+
+核心自动识别常见项目容器的直接子项目，读取共享、Claude、Codex、Gemini、OpenCode 的项目 Skill；无需手动登记，也不依赖 Codex 工作区索引存在。核心启动时收录，运行期间每分钟检查新项目／Skill；页面「补充项目」仅用于非常用位置。外部原件保留，手动清理仍先核验归档再替换为固定版本软链接；重复入口复用库身份，发现边界与警告见 [Skill 设计 §3](../design/skills.md#3-发现范围与限制)。
+
+同版包含 desktop.67 之后已提交的网关安全失败诊断、成功补 `/v1` 端点缓存和日志记录压缩；不包含其后 `9a652f5` 的供应商首输出超时增量。沿用 schema9。
+
+构建提交 `589366ce083d93a50f800ecd0e2ba93c14104713`，输入摘要 `b8db3a4fe2c95b2a4aa69de4ed2734596f8b96238ee5ec06325bd42093e4677e`，SOURCE dirty=false；使用干净独立 worktree，不纳入其他任务未提交内容。产物／证据位于 `dist/desktop/0.1.0-dev.desktop.68/`；对应源码含 Anchor Go vendor、固定 mihomo v1.19.32 对应源码／vendor和许可。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.68_amd64.deb` | 29211016 | `23cbbd3fbacfc6ec1b250c6678edbfe5e34f9185d11b3abe2662e4940443f065` |
+| `Anchor-Desktop-0.1.0-dev.desktop.68-windows-amd64-setup.exe` | 31226084 | `ddcb0dbd03a37246b9e183c2a336e9655e6c9afb333e100dd80c56168d87e937` |
+| `anchor-desktop-0.1.0-dev.desktop.68-linux-amd64` | 43370128 | `f7e84ed3a5032d91f31f7074613b55f107c5926e1b8f883860e59a9119843a78` |
+| `anchor-desktop-0.1.0-dev.desktop.68-windows-amd64.exe` | 44496896 | `34c2b24344423d27f592e91536313f58fea85ae591f97555273413c60f8195b6` |
+| `anchor-0.1.0-dev.desktop.68-linux-amd64` | 37957794 | `77e74d91438e175e8942bfd2207484899d4fca6be4cf42927d1d44ae8540f2fd` |
+| `anchor-0.1.0-dev.desktop.68-windows-amd64.exe` | 38087680 | `560e3e6f8acae058199383fc6d24e6a6079137d0f35a916cc751e2bd144a7d4a` |
+| `update-desktop.json` | 1755 | `784d97926c12179724fc0e342b4a98f45f97e6c4ae21f49c21231ea59526265b` |
+| `update-cli.json` | 876 | `d0768d10c92083ab81d7b1cd47ba6ad18511ef9803867f566eaea0d81171dbbc` |
+| `anchor_0.1.0-dev.desktop.68_source.tar.gz` | 97783455 | `2e11896f276932c9394a7066b02abaefbad64adc7ed4667b1202de73512f1887` |
+| `anchor_0.1.0-dev.desktop.68_metadata.zip` | 122180 | `c87fa16235da09cadf0f7ec649f72de16be6de27495410163b858bcd1b37dcad` |
+| `SHA256SUMS` | 1073 | `6958097c791ce0bd92727089238b3d90835d2b05475f945d74d4c6ae2fc648f5` |
+
+复用最终功能提交已执行的 Skill/core/client/cli/desktop 五包隔离 Go 测试、Windows Skill 测试交叉编译、前端 typecheck、5 项 Skill 单测、ESLint 和6项单 worker 模拟桥接浏览器回归；本轮未重跑。此前本机只读来源／临时库验证识别40个不同 Skill（18个全局＋22个项目）、54个入口和30个项目，warnings为空，来源 inode／权限／摘要保持，见 [功能记录](../updates/2026/2026-10-22-152548-task.md)。
+
+本轮生产契约比对、TypeScript／Vite、Windows AMD64及Ubuntu24.04 AMD64编译打包通过；嵌入前端／mihomo、deb与runtime载荷、源码输入摘要和metadata ZIP CRC核对通过。Vite大chunk提示不阻塞构建。
+
+于 `2026-10-22T16:43:13+08:00` 公开为dev prerelease、非latest；11附件大小／GitHub digest与本地一致，tag指向实际构建提交，latest保持。默认dev源真实下载Linux runtime、旧客户端兼容deb及CLI，版本／目标／大小／SHA256及runtime／CLI可执行版本检查通过。证据见publication下preparation-verification.json、publication-verification.json和online-verification.json；原始BUILD.json保留构建时未发布／未安装／未原生验收事实。
+
+本轮仅在线投放，未安装、重启或修改真实实例／Agent配置及更新设置，未请求付费上游；双平台原生窗口、系统安装器和真实SSH升级未验收。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 
 <a id="independent-keys-67"></a>
 

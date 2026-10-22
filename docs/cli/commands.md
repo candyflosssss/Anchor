@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-10-22
+- 2026-10-22 desktop.68 dev 已发布：同版CLI／核心／GUI自动发现常见目录中的项目及Skill，后台收录保留原件，无须手动登记；无新增命令或参数。含网关诊断、补路径缓存及日志压缩，不含其后供应商首输出超时增量；详见[发行记录](../release/desktop.md#skill-project-discovery-68)。
 - 2026-10-22 desktop.67 dev 已发布：逐Key独立拖拽与调度，model routing新增可重复 --source；同版含日志默认保留及容量上限调整，详见[发行记录](../release/desktop.md#independent-keys-67)。
 - 2026-10-22 desktop.66 dev 已发布：模型横向并排、模型内渠道纵向排列与整卡拖拽；同版CLI／核心沿用desktop.65契约，本轮无命令／参数变化。详见[发行记录](../release/desktop.md#model-layout-66)。
 - 2026-10-22 desktop.65 dev 已发布：HTTP localhost 供应商地址可保存、导入与请求；同版 CLI／核心／GUI 包含模型 Key 卡片与拖动、Skill 自动收录／清理、Claude CLI 模型菜单及 Desktop 独立托管。独立公开 alpha.6 CLI 不含这些增量；本轮仅更新交付状态，无新增命令契约。详见[发行记录](../release/desktop.md#localhost-65)。
@@ -800,7 +801,7 @@ anchor recover [--id ID]
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | 固定区间（`--from/--to`）、仅错误（`--errors-only`）及 stats 全范围错误汇总（`--include-errors`）已加入当前源码；GUI 图表选区见[日志设计](../design/logging.md)。显示块选择、顺序、预设与费用合块是本机外观偏好，无需 CLI，不影响后台采集保存 |
 | 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；desktop.45 dev 已发布认证 Codex 原生线程及同机项目元数据关联，其他客户端仍需显式标签；历史不回填 |
 | 出站代理 / 内置 mihomo | proxy list/put/delete/bind；代理设置页及供应商详情 | Windows/Linux amd64；Key 支持继承、强制直连、指定代理；节点 YAML 导入，不含订阅刷新/测速 |
-| Skill 自动收录、原件清理、来源差异、固定版本链接 | skill 管理子命令（§14） | 常见目录项目自动发现，无须手动登记；自动收录保留原件；手动清理先核验归档再换链接；项目发现增量本轮未打包／发布 |
+| Skill 自动收录、原件清理、来源差异、固定版本链接 | skill 管理子命令（§14） | 常见目录项目自动发现，无须手动登记；自动收录保留原件；手动清理先核验归档再换链接；项目发现增量已随 desktop.68 dev 发布，未自动安装 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
@@ -977,9 +978,9 @@ anchor catalog estimate --provider PROVIDER_ID --model MODEL_ID \
 
 `--content-stdin` 不能与 `--ssh-password-stdin` 共用标准输入；命令会在读取输入前拒绝该组合。
 
-（含 2026-10-22 项目自动发现源码增量，未打包；既有自动收录与原件清理已随 desktop.65 发布）
+（项目自动发现已随 desktop.68 dev 发布；既有自动收录与原件清理已随 desktop.65 发布，未自动安装）
 
-需要兼容的客户端与核心（能力 `skill_library_v1`）、所选 Context 的 owner 管理凭据；没有本轮安装包或发布版本。路径属于**所选核心所在设备**，不是 CLI／桌面宿主；不依赖 Agent 网关接管。输出均为 JSON；成功退出0，参数、授权、冲突或安全检查失败非零。完整模型与限制见 [Skill 设计](../design/skills.md)。
+需要兼容的客户端与核心（能力 `skill_library_v1`）、所选 Context 的 owner 管理凭据；使用 desktop.68 dev 同版CLI／核心可获得项目自动发现，独立公开 alpha.6 CLI 不含此能力。路径属于**所选核心所在设备**，不是 CLI／桌面宿主；不依赖 Agent 网关接管。输出均为 JSON；成功退出0，参数、授权、冲突或安全检查失败非零。完整模型与限制见 [Skill 设计](../design/skills.md)。
 
 ```text
 anchor skill scan
@@ -1086,6 +1087,6 @@ anchor [--context NAME] provider import-ccs [--db PATH] --approve --fingerprint 
 - SQLite 以只读模式和同一事务读取已提交 WAL 内容，最多4096条供应商／16MiB配置，不迁移或修改 CC Switch。保存不等于上游连通性已验证，不发测试推理；现有已批准 Binding 使用既有同步流程，新客户端托管仍从 Agent 管理入口批准。超时／5xx等写入结果未知时先重新预览核对 exists，禁止盲目重放。
 - GUI 等价入口：供应商页「从 CC Switch 导入」，自动读取预览后点击「确认导入并启用」；原型模式禁用入口。需配套升级 CLI／GUI 与核心；旧版本没有此功能。
 
-2026-10-22 错误诊断与自动补路径（当前源码，未打包/未发布）：`logs detail REQUEST_ID` / `logs export` 的 evidence 增加 `anchor_error_id`、`transport_cause`、`transport_phase`、`provider_timeout_seconds`、`upstream_error_category`；列表白名单不变，旧日志不回填，不保存上游错误原文。网关 all-mapped/all-compatible 绑定的缺映射/无启用供应商分别为 404/unknown_model 和 503/model_no_enabled_provider，其余范围拒绝保持 403。供应商期限包含等待响应头，取消隐式 30 秒上限，连接后响应头超时为 504/upstream_header_timeout。推理/`provider test` 已有 HTML 补 `/v1` 成功返回 JSON/SSE 后，按地址/协议/凭据摘要缓存 10 分钟（最多128项）；`endpoint_resolution=v1_cached` 表示直接复用，`endpoint_repair=learned` 表示本次学习。配置不写回；缓存 HTML/404/405 时失效，下一独立请求重新识别，当前请求不重放。无需新增命令、参数或数据库迁移，完整分类与边界见[日志设计](../design/logging.md#错误原因与端点修复2026-10-22当前源码未发布)。
+2026-10-22 错误诊断与自动补路径（已随 desktop.68 dev 发布）：`logs detail REQUEST_ID` / `logs export` 的 evidence 增加 `anchor_error_id`、`transport_cause`、`transport_phase`、`provider_timeout_seconds`、`upstream_error_category`；列表白名单不变，旧日志不回填，不保存上游错误原文。网关 all-mapped/all-compatible 绑定的缺映射/无启用供应商分别为 404/unknown_model 和 503/model_no_enabled_provider，其余范围拒绝保持 403。供应商期限包含等待响应头，取消隐式 30 秒上限，连接后响应头超时为 504/upstream_header_timeout。推理/`provider test` 已有 HTML 补 `/v1` 成功返回 JSON/SSE 后，按地址/协议/凭据摘要缓存 10 分钟（最多128项）；`endpoint_resolution=v1_cached` 表示直接复用，`endpoint_repair=learned` 表示本次学习。配置不写回；缓存 HTML/404/405 时失效，下一独立请求重新识别，当前请求不重放。无需新增命令、参数或数据库迁移，完整分类与边界见[日志设计](../design/logging.md#错误原因与端点修复2026-10-22当前源码未发布)。
 
 2026-10-22 首字期限与默认值（当前源码，未打包/未发布）：`provider add|put --first-token-timeout 30 --timeout 500 --max-concurrent 20` 提供首字/整条期限与默认并发。CLI put仍为完整替换，未传普通字段回默认值；已存配置读取不改总超时/并发，旧首字字段缺失按30，旧客户端省略该字段更新保留已存首字值。正文、思考、工具参数或音频生成停止首字计时，心跳/角色声明/HTTP头不计；非流式等完整结果。补/v1与密文恢复共享两类原期限；首字超时不重放，网关返回upstream_first_token_timeout，SSE已提交时为固定错误事件，probe/chat新增first_token_timeout且保留诊断10/120秒上限。详情/导出增加timeout_kind=first_token与first_token_timeout_seconds，列表白名单不变。新建及CC Switch导入默认30/500/20，已有配置不自动改写。需要同步升级核心/CLI/GUI，无数据库迁移或新手工操作。
