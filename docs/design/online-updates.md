@@ -1,10 +1,14 @@
 # 在线更新 v1
 
 - 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.66](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.66)，发布于 `2026-10-22T14:21:48+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `5499289f986892ae45a3c97e86b1fdbca8255b7f`、SOURCE dirty=false。
-- 模型映射按模型横向并排，每个模型内的渠道／来源 Key 纵向排列；紧凑卡片支持整卡拖拽，分组显示在倍率下方，保留已有自动保存／撤销与键盘排序。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.67](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.67)，发布于 `2026-10-22T14:57:43+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `4b05d821a796b78959ad1dccf4faca920f615d87`、SOURCE dirty=false。
+- 每个 Key 独立拖拽与保存，可跨供应商穿插排序；模型横排、内部卡片纵排，倍率与延迟排序也逐 Key 处理。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .67 在线投放（2026-10-22）
+
+单个Key独立拖拽、跨供应商排序，刷新后保留；核心保存与实际调度同步为Key粒度。11附件摘要、tag与非latest核对，三条默认源真实下载及版本／大小／SHA256通过。仅投放、未安装；详见[发行记录](../release/desktop.md#independent-keys-67)。
 
 ## .66 在线投放（2026-10-22）
 

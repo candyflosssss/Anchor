@@ -1,10 +1,42 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.66](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.66)，发布于 `2026-10-22T14:21:48+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `5499289f986892ae45a3c97e86b1fdbca8255b7f`、SOURCE dirty=false。
-- 模型映射按模型横向并排，每个模型内的渠道／来源 Key 纵向排列；紧凑卡片支持整卡拖拽，分组显示在倍率下方，保留已有自动保存／撤销与键盘排序。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.67](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.67)，发布于 `2026-10-22T14:57:43+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `4b05d821a796b78959ad1dccf4faca920f615d87`、SOURCE dirty=false。
+- 每个 Key 独立拖拽与保存，可跨供应商穿插排序；模型横排、内部卡片纵排，倍率与延迟排序也逐 Key 处理。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="independent-keys-67"></a>
+
+## Key 独立拖拽与实际调度 .67（已发布 dev）
+
+修正 .66 仍会整供应商／渠道移动的问题。每张卡片以供应商／上游模型／Key 为独立排序身份，同供应商多个 Key 可分开移动、穿插其他供应商；只淡化正在拖动的卡片，单供应商多 Key 也可排序。松手自动保存，支持键盘、取消、撤销与刷新后保留。模型横向并排、内部卡片纵向排列及倍率下方分组保持。
+
+核心持久化完整 source_order 并实际按 Key 调度，不改 candidates、key_ids、倍率和模型元数据；倍率／主动延迟排序也逐 Key 处理。CLI model routing 新增可重复 --source PROVIDER:KEY:MODEL。旧客户端省略 source_order 时恢复旧候选排序，需配套升级核心与桌面；沿用 schema9，旧核心读取会忽略新的 Key 排序。契约与限制见[供应商接口](../design/provider-interface.md#9-来源-key与模型调度2026-10-13当前源码)。本版还含构建基线中已提交的日志默认30天、请求200,000条／512MiB及系统50,000条／64MiB，已有保存配置不覆盖；未提交的其他任务不进入构建。
+
+构建提交 `4b05d821a796b78959ad1dccf4faca920f615d87`，输入摘要 `c21302ee1d63817c707c3684524f0266091a74fd37133de08b69f37dfe5beeec`，SOURCE dirty=false。产物／证据位于 `dist/desktop/0.1.0-dev.desktop.67/`；对应源码含 Anchor Go vendor、固定 mihomo v1.19.32 对应源码／vendor与许可。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.67_amd64.deb` | 29197372 | `274ab65066bb21e873a971bc0332c21563da9404c3628c115c6bcd6ebbef7255` |
+| `Anchor-Desktop-0.1.0-dev.desktop.67-windows-amd64-setup.exe` | 31216735 | `a7b2ab90cbee13fa33c5d94f6772a30dfced1bea753abaa803def8fd6f6d46aa` |
+| `anchor-desktop-0.1.0-dev.desktop.67-linux-amd64` | 43320400 | `4b77591ad1ca69854dc07260305f39863dd027646231fa860a317a04cf0969ab` |
+| `anchor-desktop-0.1.0-dev.desktop.67-windows-amd64.exe` | 44447232 | `8023690541625f56aa64036833075a5b1ac01d9eb5fedcc2d0a3bfd5ddbf8cbd` |
+| `anchor-0.1.0-dev.desktop.67-linux-amd64` | 37916834 | `a934c8ac465294ffb3cd9c7e97c2b802c26e61ae00aac61818964bf662d03e86` |
+| `anchor-0.1.0-dev.desktop.67-windows-amd64.exe` | 38051840 | `f93f124bc5fd29760e3a52ae121bab35263e747e29722e760089c05e4fd3642e` |
+| `update-desktop.json` | 1755 | `61b5dd139a42ba0bdbea6b09118a364a755da08dc4e61d117d792c2b251b17c4` |
+| `update-cli.json` | 876 | `4f1043e0b2baf518c2179bc1a31963ecf2d6f8f386ee4e5912eba709cb8844b3` |
+| `anchor_0.1.0-dev.desktop.67_source.tar.gz` | 97761689 | `98dd5b6a611b4200f7b969b5bc8683c092bd863ade114710cdeae9e186060321` |
+| `anchor_0.1.0-dev.desktop.67_metadata.zip` | 122166 | `48e58c60decec4c167dd86d16cef62225ba9c86e8a18f62c361f37bf3a3685ad` |
+| `SHA256SUMS` | 1073 | `48e50b87a5a8e0e66e4b4ecca00fc7300ac33d57c07c9497efa676626ff319ad` |
+
+实际验证：Go core/state/desktop/cli 四个包通过（含独立 Key 持久化、实际调度、冷却切换、重复／遗漏／未知来源拒绝、revision冲突、改名／删除及 CLI --source），typecheck、ESLint、25项前端单测与9项模拟桌面浏览器回归通过。浏览器覆盖同供应商多 Key 跨供应商拖拽、单卡占位、刷新保留、撤销、点击、取消、键盘、失败／未知写入与倍率／延迟排序。首次浏览器路径不正确、一次过长临时路径导致Chrome启动失败，改用已有Chrome及短guard标签后全部通过；读取白名单丢弃新字段的问题经回归发现并修复后通过。
+
+生产契约比对、TypeScript／Vite、Windows AMD64及Ubuntu24.04 AMD64编译与打包通过；嵌入前端／mihomo、deb与runtime载荷、源码输入摘要及metadata ZIP CRC核对通过。第一次打包因输出软链接被Git计为未跟踪而dirty，停止该任务容器并弃用中间产物，改用独立目录重跑成功。保留非阻塞Vite大chunk提示。
+
+于 `2026-10-22T14:57:43+08:00` 公开为dev prerelease、非latest；11附件大小／GitHub digest与本地一致，tag指向实际构建提交。默认dev源真实下载Linux runtime、旧客户端deb和独立CLI，版本／目标／大小／SHA256及可执行版本核验通过。证据见publication/preparation-verification.json、publication-verification.json、online-verification.json。原始BUILD.json保留构建时未发布／未安装／未原生验收的事实。
+
+仅在线投放；未安装、重启或修改真实实例／Agent配置及更新设置，未请求付费上游。双平台原生窗口、系统安装器及真实SSH升级未验收。
 
 <a id="model-layout-66"></a>
 
