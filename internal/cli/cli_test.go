@@ -102,7 +102,7 @@ func TestCLIManagementWorkflow(t *testing.T) {
 	if out := run("", "logs", "list"); !strings.Contains(out, `"requests":[]`) {
 		t.Fatal(out)
 	}
-	if out := run("", "logs", "settings"); !strings.Contains(out, `"max_requests":50000`) {
+	if out := run("", "logs", "settings"); !strings.Contains(out, `"max_requests":200000`) || !strings.Contains(out, `"request_bytes":536870912`) || !strings.Contains(out, `"system_bytes":67108864`) {
 		t.Fatal(out)
 	}
 	if out := run("", "logs", "configure", "--days", "14"); !strings.Contains(out, `"days":14`) {

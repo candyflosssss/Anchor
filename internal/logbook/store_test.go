@@ -154,6 +154,40 @@ func TestOverflowNeverWaitsForSQLite(t *testing.T) {
 		t.Fatalf("producer waited on writer: %v", elapsed)
 	}
 }
+
+func TestSystemEventCountRetention(t *testing.T) {
+	s := openTest(t)
+	// Seed durable, small events without exercising the producer queue limit.
+	_, err := s.write.Exec(`WITH RECURSIVE n(i) AS (
+		SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<50000
+	) INSERT INTO events(id,created_at,level,source,event,request_id,size,document)
+	SELECT 'event_'||i,?,'error','core','request.failed','',512,
+		json_object('id','event_'||i) FROM n`, time.Now().UnixMilli())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.clean(); err != nil {
+		t.Fatal(err)
+	}
+	if s.Health().EventCount != 50000 {
+		t.Fatal("events pruned below count limit", s.Health())
+	}
+	s.Event(Event{ID: "newest_event", AtMS: time.Now().UnixMilli(), Level: "error", Source: "core", Event: "request.failed"})
+	flushTest(t, s)
+	if count := s.Health().EventCount; count > 50000 || count < 50001-256 {
+		t.Fatal("count cleanup did not remain bounded", s.Health())
+	}
+	var oldest, newest int
+	if err := s.read.QueryRow(`SELECT COUNT(*) FROM events WHERE id='event_1'`).Scan(&oldest); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.read.QueryRow(`SELECT COUNT(*) FROM events WHERE id='newest_event'`).Scan(&newest); err != nil {
+		t.Fatal(err)
+	}
+	if oldest != 0 || newest != 1 {
+		t.Fatal("cleanup did not retain the newest event", oldest, newest)
+	}
+}
 func TestSystemEventsUseSafeAllowlist(t *testing.T) {
 	s := openTest(t)
 	l := slog.New(NewHandler(slog.NewTextHandler(io.Discard, nil), s))

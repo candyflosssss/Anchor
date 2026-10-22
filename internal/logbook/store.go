@@ -20,6 +20,7 @@ const QueueSize = 2048
 const BatchSize = 128
 const MaxRequestSize = 32 << 10
 const MaxEventSize = 4 << 10
+const MaxSystemEvents = 50000
 
 type command struct {
 	raw      []byte
@@ -370,7 +371,7 @@ func (s *Store) clean() (err error) {
 				return err
 			}
 		}
-		if h.EventBytes > cfg.SystemBytes || h.EventCount > 10000 {
+		if h.EventBytes > cfg.SystemBytes || h.EventCount > MaxSystemEvents {
 			if _, err = s.write.ExecContext(ctx, `DELETE FROM events WHERE seq IN (SELECT seq FROM events ORDER BY seq LIMIT 128)`); err != nil {
 				return err
 			}

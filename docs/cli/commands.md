@@ -888,8 +888,8 @@ anchor logs configure [--days N] [--system-days N] [--max-requests N]
 | http | 0 表示不筛选；显式值 100–599，代表实际收到的上游状态 |
 | search | 空；区分大小写的标识前缀（请求 ID / 模型 / 供应商 / Key / 错误码；系统事件名），不搜索正文 |
 | days / system-days | 查询当前值再修改；初始均 30（2026-10-22 当前源码，未发布），范围 1–90；已保存设置保持原值 |
-| max-requests | 初始 50,000，100–200,000 |
-| request-mib / system-mib | 初始 256 / 32，范围 1–512 / 1–64；逻辑预算，非文件精确大小 |
+| max-requests | 初始 200,000（2026-10-22 当前源码，未发布），100–200,000；已保存设置保持原值 |
+| request-mib / system-mib | 初始 512 / 64（2026-10-22 当前源码，未发布），范围 1–512 / 1–64；已保存设置保持原值；逻辑预算，非文件精确大小；系统另有固定 50,000 条上限 |
 
 `suggestions`（2026-10-16 已随 desktop.43 dev 宿主／核心发布；命令由兼容源码 CLI 提供，公开独立 alpha.6 CLI 不含）只读查询所选 Context 的保留日志候选，需要 owner 管理授权、正确实例身份及兼容核心；不会调用上游或写配置。参数：`--kind` 默认 requests（system 只支持 search）；`--field` 默认 search，可选 provider/model/key/http/code/stage；desktop.44 dev 新增 agent/binding/project/session（独立公开 alpha.6 CLI 不含）；`--prefix` 默认空、区分大小写、最长512字节，不支持通配符；`--since` 默认1h、范围(0,2160h]；`--limit` 默认20、范围1..100。此命令不接收列表的其他过滤或分页参数。
 

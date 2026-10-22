@@ -154,7 +154,7 @@ type Settings struct {
 }
 
 func DefaultSettings() Settings {
-	return Settings{Days: 30, MaxRequests: 50000, RequestBytes: 256 << 20, SystemBytes: 32 << 20, SystemDays: 30}
+	return Settings{Days: 30, MaxRequests: 200000, RequestBytes: 512 << 20, SystemBytes: 64 << 20, SystemDays: 30}
 }
 func (s Settings) Validate() error {
 	if s.Days < 1 || s.Days > 90 || s.SystemDays < 1 || s.SystemDays > 90 || s.MaxRequests < 100 || s.MaxRequests > 200000 || s.RequestBytes < 1<<20 || s.RequestBytes > 512<<20 || s.SystemBytes < 1<<20 || s.SystemBytes > 64<<20 {
