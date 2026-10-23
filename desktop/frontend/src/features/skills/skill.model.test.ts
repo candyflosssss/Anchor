@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/skills.json';
 import { CONTRACT, type DesktopBridge } from '../../desktop/contract.generated';
-import { checkedSkillDetail, checkedSkillWorkspace, createSkillService, skillAction, skillMessage, skillQuery, skillWarning } from './skill.model';
+import { checkedSkillDetail, checkedSkillWorkspace, createSkillService, skillAction, skillLocationLabel, skillLocations, skillMessage, skillQuery, skillWarning } from './skill.model';
 import { DesktopProblem } from '../../desktop/transport';
 
 describe('Skill contract and controlled transport', () => {
@@ -10,7 +10,28 @@ describe('Skill contract and controlled transport', () => {
     expect(skillWarning('project_search_limit')).toContain('补充项目');
     expect(skillWarning('unreadable_project_search:search-example')).toContain('其他项目仍会继续扫描');
     expect(skillWarning('pending_transaction')).toContain('原件备份会保留');
-    expect(skillWarning('collect_failed:source-example')).toContain('部分 Skill 尚未收录');
+    expect(skillWarning('collect_failed:source-example')).toContain('部分 Skill 尚未保存到 Anchor');
+  });
+  it('counts file locations separately from saved Skill identities, including aliases and shortcut-only Skills', () => {
+    const data = structuredClone(fixture.workspace);
+    data.library.push({ ...data.library[0], id: 'shortcut-only', name: 'shortcut-only' });
+    data.sources.push({ ...data.sources[0], id: 'alias', path: '/fixture/alias/existing' });
+    data.mounts.push({ ...data.mounts[0], id: 'shortcut-only', skill_id: 'shortcut-only', status: 'missing' });
+    expect(data.library).toHaveLength(2);
+    expect(skillLocations(data)).toMatchObject({ total: 4 });
+    expect(skillLocations(data, 'skill-fixture')).toMatchObject({ total: 3 });
+    expect(skillLocations(data, 'shortcut-only')).toMatchObject({ sources: [], total: 1 });
+    expect(skillLocations(data, 'new-skill')).toEqual({ sources: [], mounts: [], total: 0 });
+    expect(data.sources).toHaveLength(2);
+  });
+  it('labels known Agent directories without claiming the Agent has loaded a Skill', () => {
+    const data = structuredClone(fixture.workspace);
+    expect(skillLocationLabel(data, 'scope-fixture')).toBe('共享目录 · 项目 /fixture/project');
+    data.scopes[0] = { ...data.scopes[0], agent: 'codex', kind: 'global' };
+    expect(skillLocationLabel(data, 'scope-fixture')).toBe('Codex · 用户目录');
+    data.scopes[0].kind = 'system';
+    expect(skillLocationLabel(data, 'scope-fixture')).toBe('Codex · 内置 Skill 目录');
+    expect(skillLocationLabel(data, 'unknown')).toBe('其他位置');
   });
   it('accepts the same fixture as Go and preserves version pinning and source baseline', () => {
     const ws = checkedSkillWorkspace(fixture.workspace);

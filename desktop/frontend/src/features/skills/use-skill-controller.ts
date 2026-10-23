@@ -5,7 +5,8 @@ export function useSkillController(onActivity?: (busy: boolean) => void) {
   const [data, setData] = useState<SkillWorkspace | null>(null);
   const [detail, setDetail] = useState<SkillDetail | null>(null);
   const [selected, setSelected] = useState('');
-  const [tab, setTab] = useState<'library' | 'sources' | 'mounts'>('library');
+  const [tab, setTab] = useState<'library' | 'locations'>('library');
+  const [locationSkill, setLocationSkill] = useState('');
   const [loading, setLoading] = useState(true);
   const [writing, setWriting] = useState(false);
   const [readingDetail, setReadingDetail] = useState(false);
@@ -60,17 +61,19 @@ export function useSkillController(onActivity?: (busy: boolean) => void) {
     } finally { lock.current = false; if (alive.current) { setWriting(false); setConfirmation(null); } }
   };
   const inspectSource = (source: SkillSource, latest = false) => {
+    setTab('locations'); setLocationSkill(source.skill_id);
     setSelected(''); const s = data?.library.find(s => s.id === source.skill_id);
     void query({ source_id: source.id, against_version: latest ? s?.versions.at(-1)?.number ?? 0 : 0 });
   };
+  const filterLocations = (id: string) => { setLocationSkill(id); setDetail(null); detailEpoch.current++; setReadingDetail(false); };
   const open = (value: typeof dialog) => { setName(''); setContent(''); setFilePath('SKILL.md'); setDialog(value); setScope(data?.scopes[0]?.id ?? ''); };
   const current = data?.library.find(s => s.id === selected);
-  return { data, detail, current, selected, tab, setTab, loading, writing, readingDetail, error, notice, dialog, setDialog, name, setName, content, setContent, filePath, setFilePath, scope, setScope, project, setProject, editing, setEditing, confirmation, setConfirmation, read, select, request, confirm, inspectSource, open,
-    save: () => detail && request(skillAction('save', { skill_id: detail.skill_id, version: detail.version, edits: [{ path: filePath, content, executable: detail.files.find(f => f.path === filePath)?.executable ?? false, delete: false }] }), '保存为新版本？', '内容有变化时保存新版本；与已有版本相同时复用该版本。原版本、项目原件和现有挂载保持不变。'),
+  return { data, detail, current, selected, tab, setTab, locationSkill, filterLocations, loading, writing, readingDetail, error, notice, dialog, setDialog, name, setName, content, setContent, filePath, setFilePath, scope, setScope, project, setProject, editing, setEditing, confirmation, setConfirmation, read, select, request, confirm, inspectSource, open,
+    save: () => detail && request(skillAction('save', { skill_id: detail.skill_id, version: detail.version, edits: [{ path: filePath, content, executable: detail.files.find(f => f.path === filePath)?.executable ?? false, delete: false }] }), '保存为新版本？', '只更新 Anchor 保存的内容。原版本、其他位置的文件和快捷方式使用的版本都不变。'),
     removeFile: () => detail && request(skillAction('save', { skill_id: detail.skill_id, version: detail.version, edits: [{ path: filePath, content: '', executable: false, delete: true }] }), `在新版本中删除 ${filePath}？`, '原版本与项目原件保持不变。'),
-    create: () => request(skillAction('create', { name, edits: [{ path: 'SKILL.md', content, executable: false, delete: false }] }), `创建 ${name}？`, '只创建中心库版本，不自动安装到任何项目。'),
+    create: () => request(skillAction('create', { name, edits: [{ path: 'SKILL.md', content, executable: false, delete: false }] }), `创建 ${name}？`, '先保存到 Anchor，不会自动添加到任何 Agent 或项目。'),
     register: () => request(skillAction('register-project', { project_path: project }), '登记项目？', `${project}；自动收录项目里的 Skill，保留原件。`),
-    cleanup: (source: SkillSource) => request(skillAction('cleanup', { source_id: source.id, expected_hash: source.hash }), `清理 ${source.name} 的原件？`, `${source.path}；先把原件当前内容完整复制到 Anchor 库并核对，再将原位置换成指向该版本的软链接。原位置若是软链接，只替换链接，保留其目标文件。不清理也能继续使用。`),
-    link: () => current && detail && request(skillAction('link', { skill_id: current.id, version: detail.version, scope_id: scope, name }), `安装 ${current.name} v${detail.version}？`, `${data?.scopes.find(s => s.id === scope)?.root}；只在空位置创建软链接，已有内容不覆盖。`),
+    cleanup: (source: SkillSource) => request(skillAction('cleanup', { source_id: source.id, expected_hash: source.hash }), `让 ${source.name} 的这个位置改用 Anchor 副本？`, `${source.path}；先将此处当前内容完整保存到 Anchor 并核对，再删除此处已保存的原文件，换成指向这次保存版本的快捷方式（软链接）。若此处本来就是软链接，只替换链接，保留其目标文件。以后在 Anchor 编辑不会自动更新此处版本；不操作也能继续使用原文件。`),
+    link: () => current && detail && request(skillAction('link', { skill_id: current.id, version: detail.version, scope_id: scope, name }), `添加 ${current.name} v${detail.version} 到这个位置？`, `${data?.scopes.find(s => s.id === scope)?.root}；在空位置创建指向 Anchor 此版本的快捷方式（软链接），已有内容不覆盖。以后保存新版本不会自动更新这里；添加成功不代表 Agent 已加载。`),
   };
 }
