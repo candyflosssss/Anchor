@@ -1,5 +1,6 @@
 import type { ProviderTransport } from '../providers/provider.model';
 import { useState, type HTMLAttributes, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeftRight, ArrowUp, ArrowDown, Check, GripVertical, LoaderCircle, RefreshCw, Settings2, Undo2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ConfirmAction } from '../../components/shared/confirm-action';
@@ -12,6 +13,7 @@ import { effectiveRouteMultiplier, modelSources, sourceID, routingRules, routeID
 import type { ModelRoutingController } from './use-model-routing';
 import { useRouteDrag } from './use-route-drag';
 import { useModelBoardPan } from './use-model-board-pan';
+import { modelFamily } from './model-appearance';
 import { ModelSettingsDialog } from './model-settings.view';
 import './models.css';
 const candidateID = (m: ModelCandidate) => routeID({ provider_id: m.provider_id, model: m.upstream });
@@ -81,7 +83,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
       </MappingKey>
     </li>;
   };
-  return <article className={`model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} aria-label={`模型 ${g.alias}`}>
+  return <article className={`model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} data-model-family={modelFamily(g)} aria-label={`模型 ${g.alias}`}>
     <header className="model-section-header"><div className="model-title"><h2 className="mono">{g.alias}</h2><span className={`model-channel-count state-${availability}`} role="status" title={`${available} / ${candidates.length} 个渠道当前可用`}>{available ? <>{available}/{candidates.length}<span className="sr-only"> 渠道可用</span></> : unknown ? '可用性待确认' : '无有效渠道'}</span></div>
         <div className="route-toolbar"><select aria-label={`调度规则 ${g.alias}`} className="select-field" disabled={!canEdit} value={draft.strategy} onChange={e => { void routing.change(g, { strategy: e.target.value }); }}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select>
         {sources.length > 1 && <div className="route-quick-sort">
@@ -105,9 +107,9 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
       <p>将对 {sources.filter(v => v.candidate.provider_enabled && (v.source.anonymous || v.source.key?.enabled && ['ready', 'degraded'].includes(v.source.key.state))).length} 个可用 Key 各发送 1 次推理请求，可能产生费用。</p>
     </ConfirmAction>
     <span className="sr-only" role="status">{drag.announcement}</span>
-    {dragged && drag.drag && <div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}>
+    {dragged && drag.drag && createPortal(<div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}>
       <MappingKey source={dragged.source} candidate={dragged.candidate} rates={rates} disabled onOpen={onOpen}><div className="mapping-route-controls"><GripVertical size={16} /></div></MappingKey>
-    </div>}
+    </div>, document.body)}
   </article>;
 }
 

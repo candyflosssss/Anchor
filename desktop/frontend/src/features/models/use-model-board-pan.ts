@@ -38,7 +38,9 @@ export function useModelBoardPan() {
       if (e.target !== e.currentTarget) return;
       const board = e.currentTarget;
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        e.preventDefault(); board.scrollLeft += e.key === 'ArrowLeft' ? -324 : 324;
+        const column = board.querySelector<HTMLElement>('.model-card');
+        const step = (column?.offsetWidth ?? 334) + (parseFloat(getComputedStyle(board).columnGap) || 0);
+        e.preventDefault(); board.scrollLeft += e.key === 'ArrowLeft' ? -step : step;
       } else if (e.key === 'Home' || e.key === 'End') {
         e.preventDefault(); board.scrollLeft = e.key === 'Home' ? 0 : board.scrollWidth;
       }

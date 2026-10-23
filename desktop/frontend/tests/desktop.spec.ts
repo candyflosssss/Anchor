@@ -922,9 +922,12 @@ test('model board stays on one row and supports horizontal pointer and keyboard 
     const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
     api.ProviderWorkspace = async input => {
       const result = await read(input);
-      if (result.data) result.data.models = result.data.models.flatMap(m => Array.from({ length: 4 }, (_, i) => ({
-        ...m, id: `${m.id}-${i}`, key_ids: i === 3 ? ['missing'] : m.key_ids,
-      })));
+      if (result.data?.models.length) {
+        const m = result.data.models[0];
+        result.data.models = ['claude-opus-4.6', 'deepseek-v4.1-flash', 'gpt-6-astra', 'z-custom', 'z-gemini-3-pro', 'z-qwen3', 'z-unknown', 'z-unavailable'].map((id, i) => ({
+          ...m, id, key_ids: i === 7 ? ['missing'] : m.key_ids,
+        }));
+      }
       return result;
     };
   });
@@ -971,7 +974,22 @@ test('model board stays on one row and supports horizontal pointer and keyboard 
     expect(await board.evaluate(el => el.scrollWidth - el.clientWidth - el.scrollLeft)).toBeLessThan(2);
     await page.keyboard.press('Home');
     expect(await board.evaluate(el => el.scrollLeft)).toBe(0);
-    if (width === 1440) await page.getByRole('button', { name: '深色', exact: true }).click();
+    if (process.env.ANCHOR_MAPPING_PREVIEW) {
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await board.getByRole('article').first().getByRole('heading').hover();
+      await expect.poll(() => board.getByRole('article').first().evaluate(el => getComputedStyle(el).translate)).toBe('0px -4px');
+      await board.evaluate(el => { el.blur(); el.scrollLeft = 0; });
+      await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/board-${width === 1440 ? 'light' : 'dark-narrow'}.png` });
+      if (width === 1440) await board.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/glass-light.png` });
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+    }
+    if (width === 1440) {
+      await page.getByRole('button', { name: '深色', exact: true }).click();
+      if (process.env.ANCHOR_MAPPING_PREVIEW) {
+        await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/board-dark.png` });
+        await board.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/glass-dark.png` });
+      }
+    }
   }
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);

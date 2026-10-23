@@ -48,11 +48,16 @@ test('manual order, quick sorts, cancellation and persistence', async ({ page })
 test('pointer dragging and compact layouts in light and dark themes', async ({ page }) => {
   const card = await mappings(page);
   const handle = card.getByRole('button', { name: '拖动 摸鱼AI demo-model-mini Key default', exact: true });
-  const from = await handle.boundingBox(), to = await card.locator('.mapping-key-card').last().boundingBox();
-  if (!from || !to) throw Error('missing route geometry');
+  await handle.hover();
+  const from = await handle.boundingBox(), to = await card.locator('.mapping-key-card').last().boundingBox(), origin = await card.locator('.mapping-key-card').first().boundingBox();
+  if (!from || !to || !origin) throw Error('missing route geometry');
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
   await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
+  const preview = page.locator('body > .route-drag-preview');
+  await expect(preview).toBeVisible();
+  await expect.poll(async () => (await preview.boundingBox())?.x).toBeCloseTo(to.x + to.width / 2 - (from.x + from.width / 2 - origin.x), 0);
+  await expect.poll(async () => (await preview.boundingBox())?.y).toBeCloseTo(to.y + to.height / 2 - (from.y + from.height / 2 - origin.y), 0);
   await page.mouse.up();
   await expect(card.locator('.mapping-candidate').first()).toContainText('备用供应商');
   await expect(card.getByRole('button', { name: '按倍率', exact: true })).toBeEnabled();
