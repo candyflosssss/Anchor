@@ -54,14 +54,13 @@ describe('model channel availability presentation', () => {
     expect(html).toContain('部分供应商状态读取失败');
     expect(html).not.toContain('还没有模型映射');
   });
-  it('puts unavailable model cards in a closed trailing section', () => {
+  it('keeps unavailable models visible at the end of the same board', () => {
     const off = makeSummary(false), on = makeSummary(true);
     off.workspace!.models[0].id = 'a-off'; on.workspace!.models[0].id = 'z-on';
     const html = render([off, on]);
-    const section = html.match(/<details[^>]*aria-label="当前不可用的模型"[^>]*>/)?.[0];
-    expect(section).toBeDefined(); expect(section).not.toContain('open');
-    expect(html.indexOf('模型 z-on')).toBeLessThan(html.indexOf('当前不可用的模型'));
-    expect(html.indexOf('当前不可用的模型')).toBeLessThan(html.indexOf('模型 a-off'));
+    expect(html).not.toContain('<details');
+    expect(html.match(/aria-label="模型别名"/g)).toHaveLength(1);
+    expect(html.indexOf('模型 z-on')).toBeLessThan(html.indexOf('模型 a-off'));
   });
   it('keeps every channel visible in saved priority order', () => {
     const off = makeSummary(false), on = makeSummary(true);

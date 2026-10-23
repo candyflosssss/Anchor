@@ -1,6 +1,6 @@
 import type { ProviderTransport } from '../providers/provider.model';
 import { useState, type HTMLAttributes, type ReactNode } from 'react';
-import { ArrowLeftRight, ArrowUp, ArrowDown, Check, ChevronDown, GripVertical, LoaderCircle, RefreshCw, Settings2, Undo2 } from 'lucide-react';
+import { ArrowLeftRight, ArrowUp, ArrowDown, Check, GripVertical, LoaderCircle, RefreshCw, Settings2, Undo2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ConfirmAction } from '../../components/shared/confirm-action';
 import { aggregateModels, type DetailTab, type ModelCandidate, type ModelGroup, type ProviderSummary } from '../providers/provider-summary.model';
@@ -11,18 +11,12 @@ import { modelAvailability, visibleModels } from './model-availability.model';
 import { effectiveRouteMultiplier, modelSources, sourceID, routingRules, routeID } from './model-routing.model';
 import type { ModelRoutingController } from './use-model-routing';
 import { useRouteDrag } from './use-route-drag';
+import { useModelBoardPan } from './use-model-board-pan';
 import { ModelSettingsDialog } from './model-settings.view';
 import './models.css';
 const candidateID = (m: ModelCandidate) => routeID({ provider_id: m.provider_id, model: m.upstream });
 const sourceTargets = (m: ModelCandidate): RateTarget[] => channelKeys(m.key_ids, m.keys).filter(k => !k.anonymous && k.key?.enabled).map(k => ({ provider_id: m.provider_id, key_id: k.id }));
 type Common = { disabled: boolean; rates: MappingRatesController; routing: ModelRoutingController; onOpen: (id: string, tab: DetailTab) => void };
-
-function UnavailableSection({ label, count, children }: { label: string; count: number; children: ReactNode }) {
-  return count > 0 && <details className="unavailable-section" aria-label={label}>
-    <summary><ChevronDown size={14} /><span>{label}</span><span className="source-count">{count}</span></summary>
-    <div className="unavailable-section-body">{children}</div>
-  </details>;
-}
 
 function MappingKey({ source, candidate: m, rates, children, disabled, onOpen, dragProps, sortable }: Pick<Common, 'rates' | 'disabled' | 'onOpen'> & { source: SourceKey; candidate: ModelCandidate; children?: ReactNode; sortable?: boolean; dragProps?: HTMLAttributes<HTMLDivElement> }) {
   const id = rateID({ provider_id: m.provider_id, key_id: source.id }), value = rates.values[id];
@@ -123,9 +117,10 @@ export function ModelsView({ summaries, loading, disabled, rates, routing, onOpe
   const [settingsID, setSettingsID] = useState<string | null>(null);
   const groups = aggregateModels(summaries), pending = loading || summaries.some(s => s.workspace === undefined);
   const split = visibleModels(groups);
+  const { panning, ...boardPan } = useModelBoardPan();
   const readFailed = summaries.some(s => s.workspace === null);
   const locked = disabled || rates.busy || routing.busy;
-  return <div className="workspace">
+  return <div className="workspace models-workspace">
     <header className="page-header"><div><div className="eyebrow">路由</div><h1>模型映射</h1></div><div className="mapping-rate-actions"><Button variant="outline" size="sm" disabled={locked} onClick={() => { void routing.refresh(); }}>刷新配置</Button><Button variant="outline" size="sm" disabled={locked || !groups.length} onClick={() => { void rates.refresh(groups.flatMap(g => g.candidates.flatMap(sourceTargets))); }}><RefreshCw size={14} />{rates.busy ? '正在查询分组倍率…' : '刷新分组倍率'}</Button></div></header>
     {children}
     {settingsID && <ModelSettingsDialog key={settingsID} id={settingsID} group={groups.find(g => g.alias === settingsID)} transport={transport} active={!disabled || routing.busy} close={() => setSettingsID(null)} saved={() => routing.refresh()} />}
@@ -133,7 +128,6 @@ export function ModelsView({ summaries, loading, disabled, rates, routing, onOpe
     {routing.error && <p className="feedback error-feedback" role="alert">{routing.error}</p>}
     {routing.needsRead && <p className="card-hint">保存结果需要核对，请重新读取配置后继续修改。</p>}
     {!groups.length ? <div className="empty-state"><ArrowLeftRight size={32} /><h2>{pending ? '正在读取模型映射' : readFailed ? '无法确认模型映射' : '还没有模型映射'}</h2>{!pending && <Button disabled={locked} onClick={onShowProviders}>前往供应商</Button>}</div>
-      : <><section className="model-grid" aria-label="模型别名">{split.visible.map(g => <ModelCard key={g.alias} group={g} disabled={disabled || rates.busy} rates={rates} routing={routing} onOpen={onOpen} settings={() => setSettingsID(g.alias)} />)}</section>
-      <UnavailableSection label="当前不可用的模型" count={split.unavailable.length}><section className="model-grid" aria-label="不可用模型别名">{split.unavailable.map(g => <ModelCard key={g.alias} group={g} disabled={disabled || rates.busy} rates={rates} routing={routing} onOpen={onOpen} settings={() => setSettingsID(g.alias)} />)}</section></UnavailableSection></>}
+      : <section className={`model-grid${panning ? ' is-panning' : ''}`} aria-label="模型别名" tabIndex={0} {...boardPan}>{[...split.visible, ...split.unavailable].map(g => <ModelCard key={g.alias} group={g} disabled={disabled || rates.busy} rates={rates} routing={routing} onOpen={onOpen} settings={() => setSettingsID(g.alias)} />)}</section>}
   </div>;
 }

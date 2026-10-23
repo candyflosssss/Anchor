@@ -11,7 +11,7 @@ async function mappings(page: import('@playwright/test').Page) {
 test('manual order, quick sorts, cancellation and persistence', async ({ page }) => {
   const card = await mappings(page);
   const rows = card.locator('.mapping-candidate');
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(3);
   await rows.first().locator('.mapping-key-card').hover();
   await card.getByRole('button', { name: '下移 摸鱼AI demo-model-mini Key default', exact: true }).click();
   await expect(rows.first()).toContainText('备用供应商');

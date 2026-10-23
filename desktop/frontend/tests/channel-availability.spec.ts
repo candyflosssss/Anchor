@@ -11,9 +11,7 @@ async function setProvider(page: Page, id: string, enabled: boolean) {
 async function mappings(page: Page) {
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   const card = page.getByRole('article', { name: '模型 coding-main', exact: true, includeHidden: true });
-  await expect(card.locator('.mapping-candidate')).toHaveCount(2);
-  const hidden = page.getByLabel('当前不可用的模型', { exact: true });
-  if (await hidden.count()) await hidden.locator(':scope > summary').click();
+  await expect(card.locator('.mapping-candidate')).toHaveCount(3);
   await expect(card).toBeVisible();
   return card;
 }

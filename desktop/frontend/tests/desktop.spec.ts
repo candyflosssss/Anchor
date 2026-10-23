@@ -916,6 +916,67 @@ test('model routing does not retry an acknowledged write when reloading fails (s
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
 });
 
+test('model board stays on one row and supports horizontal pointer and keyboard browsing (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
+    api.ProviderWorkspace = async input => {
+      const result = await read(input);
+      if (result.data) result.data.models = result.data.models.flatMap(m => Array.from({ length: 4 }, (_, i) => ({
+        ...m, id: `${m.id}-${i}`, key_ids: i === 3 ? ['missing'] : m.key_ids,
+      })));
+      return result;
+    };
+  });
+  await page.getByRole('button', { name: '模型映射', exact: true }).click();
+  await page.getByRole('button', { name: '刷新配置', exact: true }).click();
+  const board = page.getByRole('region', { name: '模型别名', exact: true });
+  await expect(board.getByRole('article')).toHaveCount(8);
+  await expect(board.locator('details')).toHaveCount(0);
+  await expect(board.getByRole('article').last()).toHaveClass(/availability-unavailable/);
+
+  for (const width of [1440, 600]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const geometry = await board.evaluate(el => ({
+      tops: Array.from(el.children).map(n => n.getBoundingClientRect().top),
+      overflows: el.scrollWidth > el.clientWidth,
+      pageFits: document.documentElement.scrollWidth <= innerWidth,
+      widths: { page: document.documentElement.scrollWidth, viewport: innerWidth, board: el.clientWidth },
+    }));
+    expect(new Set(geometry.tops).size).toBe(1);
+    expect(geometry.overflows).toBe(true);
+    expect(geometry.pageFits, JSON.stringify(geometry)).toBe(true);
+    await board.focus();
+    await page.keyboard.press('Home');
+    const box = await board.boundingBox();
+    if (!box) throw Error('missing model board geometry');
+    // Grab the non-interactive model heading; Key cards keep vertical sorting.
+    const x = box.x + 240, y = box.y + 18;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - 160, y, { steps: 8 });
+    await expect(board).toHaveClass(/is-panning/);
+    await page.mouse.up();
+    expect(await board.evaluate(el => el.scrollLeft)).toBeGreaterThan(100);
+    await expect(board).not.toHaveClass(/is-panning/);
+    await page.mouse.move(x - 160, y);
+    await page.mouse.down();
+    await page.mouse.move(x, y, { steps: 8 });
+    await page.mouse.up();
+    expect(await board.evaluate(el => el.scrollLeft)).toBeLessThan(10);
+    await board.focus();
+    await page.keyboard.press('ArrowRight');
+    expect(await board.evaluate(el => el.scrollLeft)).toBeGreaterThan(100);
+    await page.keyboard.press('End');
+    expect(await board.evaluate(el => el.scrollWidth - el.clientWidth - el.scrollLeft)).toBeLessThan(2);
+    await page.keyboard.press('Home');
+    expect(await board.evaluate(el => el.scrollLeft)).toBe(0);
+    if (width === 1440) await page.getByRole('button', { name: '深色', exact: true }).click();
+  }
+  expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
+});
+
 test('mapping availability follows scoped Keys and provider switches, not provider-wide health (simulated host)', async ({ page }) => {
   await host(page, true);
   await page.evaluate(() => {
@@ -934,11 +995,9 @@ test('mapping availability follows scoped Keys and provider switches, not provid
   });
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '刷新配置', exact: true }).click();
-  const hiddenModels = page.getByLabel('当前不可用的模型', { exact: true });
   const card = page.getByRole('article', { name: '模型 shared-one', exact: true, includeHidden: true });
-  await expect(card).not.toBeVisible();
-  await expect(hiddenModels).not.toHaveAttribute('open');
-  await hiddenModels.locator(':scope > summary').click();
+  await expect(card).toBeVisible();
+  await expect(page.getByLabel('当前不可用的模型', { exact: true })).toHaveCount(0);
   await expect(card).toContainText('无有效渠道');
   await expect(card.locator('.channel-status[title^="供应商已停用"]')).toHaveCount(1);
   await expect(card.locator('li.mapping-candidate').first().locator('.mapping-key-card').first()).toBeVisible();
@@ -959,7 +1018,7 @@ test('mapping availability follows scoped Keys and provider switches, not provid
   await expect(page.getByLabel('当前不可用的模型', { exact: true })).toHaveCount(0);
   await expect(card.locator('.model-sources-body > .candidate-list > li')).toHaveCount(3);
   await expect(card.locator('.model-sources-body > .candidate-list .mapping-key-status').first()).toContainText('Key 已启用');
-  // Reading, folding and restoring availability must not save a new routing order.
+  // Reading and restoring availability must not save a new routing order.
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
 });

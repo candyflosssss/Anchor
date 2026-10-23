@@ -1,4 +1,8 @@
-.workspace .model-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 300px)); gap: 24px; align-items: start; }
+.workspace.models-workspace { max-width: none; }
+.workspace .model-grid { position: relative; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: min(100%, 300px); gap: 24px; align-items: start; overflow-x: auto; overscroll-behavior-x: contain; padding: 2px 2px 18px; touch-action: pan-y; cursor: grab; }
+.model-grid:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; border-radius: 4px; }
+.model-grid.is-panning { cursor: grabbing; user-select: none; }
+.model-grid .model-title { user-select: none; }
 .model-card { min-width: 0; }
 .model-card > .model-section-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; margin-bottom: 12px; }
 .model-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; min-width: 0; }
@@ -68,13 +72,4 @@
 .mapping-key-card .channel-status.state-unavailable { background: hsl(var(--destructive)); }
 .mapping-key-card .channel-status.state-unknown { background: hsl(var(--muted-foreground)); }
 .mapping-key-card.availability-unavailable { border-color: hsl(var(--destructive) / .3); }
-/* Only whole unavailable models are folded; scoped Keys stay visible on each model. */
-.unavailable-section { min-width: 0; border-top: 1px solid hsl(var(--border)); margin-top: 12px; padding-top: 10px; }
-.unavailable-section > summary { display: flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; color: hsl(var(--muted-foreground)); font-size: 12px; }
-.unavailable-section > summary::-webkit-details-marker { display: none; }
-.unavailable-section > summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; border-radius: 3px; }
-.unavailable-section > summary > svg { transform: rotate(-90deg); }
-.unavailable-section[open] > summary > svg { transform: rotate(0); }
-.unavailable-section .source-count { margin-left: auto; font-variant-numeric: tabular-nums; }
-.unavailable-section-body { padding-top: 12px; }
 .model-grid:empty, .candidate-list:empty { display: none; }
