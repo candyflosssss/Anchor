@@ -1,10 +1,40 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.69](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.69)，发布于 `2026-10-22T17:43:55+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `29b86eaa19ee4a3461f97a63e0277a13fb2c7172`、SOURCE dirty=false。
-- 修复 Codex 工具历史 ID 前缀不兼容：发送前规范化工具项编号，保留调用与结果关联；同版包含已提交的供应商首字超时设置。
+- 更新：2026-10-24。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.71](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.71)，发布于 `2026-10-24T04:25:54+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `81f93782b28bef3773dfcf884d262716a199a596`、SOURCE dirty=false。
+- 模型映射全部单行横排并可左右拖动，整体底卡采用模型家族配色、圆角磨砂玻璃、柔和阴影和轻微悬浮，淡化描边；同版包含 LAN API／gateway Key 管理、Skills 页面整理及思考深度错误归类。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="model-glass-71"></a>
+
+## 模型单行横向浏览与玻璃底卡 .71（已发布 dev）
+
+全部映射保持一行横排，不可用模型直接排在末尾。支持拖动标题／空白处左右浏览、触控板、滚动条与键盘；组内 Key 继续独立上下排序。整体22px圆角底卡使用半透明磨砂、柔光、层叠阴影与悬停上浮，按反馈移除明显彩色描边。DeepSeek／DS蓝、GPT／Codex绿、Claude陶橙、Gemini紫、Qwen青，未知家族为中性色；浅深主题及减少动态／透明效果均有回退。浮层挂到body，避免玻璃滤镜／变换影响拖拽坐标。
+
+同版包含 .69 后已提交的独立 LAN API 服务与 gateway Key 管理、围绕 Skill 与文件位置组织的 Skills 页面、unsupported_reasoning_effort 日志归类；沿用schema9。本地 .70 为此前保留的包，未投放，本轮使用新版本 .71。
+
+构建提交 `81f93782b28bef3773dfcf884d262716a199a596`，输入摘要 `c5279d8b4eea02dce4411a8d6238a85b3044b4f20f753797fdc422e2d00bbf69`，SOURCE dirty=false；从干净独立worktree构建，未纳入其他任务未提交文件。产物和证据位于 `dist/desktop/0.1.0-dev.desktop.71/`；对应源码含 Anchor Go vendor、固定 mihomo v1.19.32 对应源码／vendor及许可。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.71_amd64.deb` | 29236024 | `7e87ac7c415235069d85de12f91c0bfa1fab4ef7612a1b9ee1eec985ec181557` |
+| `Anchor-Desktop-0.1.0-dev.desktop.71-windows-amd64-setup.exe` | 31254482 | `dc697a09ced04e2aac49c5cd4e9244a64dd625ab0701c1f11fc9fdc23df82218` |
+| `anchor-desktop-0.1.0-dev.desktop.71-linux-amd64` | 43468464 | `e98ef413dc36d6ea3dcea20378d5d80558270b9f14c25be948240bdf427a39d4` |
+| `anchor-desktop-0.1.0-dev.desktop.71-windows-amd64.exe` | 44598272 | `4b199ea3348afe8f7a84c66b923613d3ccfe9e9702f7368c47f9bb8831a5d6fc` |
+| `anchor-0.1.0-dev.desktop.71-linux-amd64` | 38031522 | `d43304e333f667bc4d577b82a3cbaf9f773689f4dc044950355d2531f7ca6eff` |
+| `anchor-0.1.0-dev.desktop.71-windows-amd64.exe` | 38156288 | `cd2d3a9c0576638a84de796b9e4e5f20cbf1b7eccf76c78c35dc21a084e747d1` |
+| `update-desktop.json` | 1755 | `5f72b69c97d4093e74a21077451059476190f733d7604f176551c7423dfab493` |
+| `update-cli.json` | 876 | `ad4c6abdcea5cbb9e8534262237f9cf29cc22329ba5af239236226906e92410a` |
+| `anchor_0.1.0-dev.desktop.71_source.tar.gz` | 97838754 | `984fb59bb86e74d214be76f32aba9b4028ab941546f6b11b7b924d4346d679b6` |
+| `anchor_0.1.0-dev.desktop.71_metadata.zip` | 122176 | `19194360d3e87830aa570960c74e4a37950bb9575f94dbdd9340ececf9dfb2f1` |
+| `SHA256SUMS` | 1073 | `6288976756c4b73d965ae55ed48d6ba1e5ce7864b5f66e9f5c9ecef1b6468ae0` |
+
+复用界面任务已通过的typecheck、ESLint、10项View单测和3项单worker模拟宿主浏览器测试。本轮Go／TS契约比对、TypeScript／Vite、Windows AMD64与Ubuntu24.04 AMD64生产编译／打包通过；嵌入前端／mihomo、deb与runtime载荷、对应源码输入摘要及metadata ZIP CRC核对通过。Vite大chunk提示不阻塞构建。
+
+于 `2026-10-24T04:25:54+08:00` 公开为dev prerelease、非latest；11附件大小／GitHub digest匹配，tag指向构建提交，latest保持。默认dev源实际下载Linux runtime、旧客户端兼容deb及独立CLI，版本／目标／大小／SHA256及runtime／CLI可执行版本核对通过。证据见publication/preparation-verification.json、publication-verification.json与online-verification.json；BUILD.json保留构建时未发布／未安装／未原生验收事实。
+
+本轮仅在线投放，未安装、重启或修改真实实例／Agent配置及用户更新设置，未请求付费上游；双平台原生窗口、系统安装器及真实SSH升级未验收。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 
 <a id="tool-item-ids-69"></a>
 

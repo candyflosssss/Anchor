@@ -5,19 +5,19 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.67**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.71**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.67 已发布为 GitHub prerelease**，修正每个 Key 独立拖拽／排序，可穿插其他供应商并在刷新后保留；模型横排、内部卡片纵排。设置 → 在线更新 → dev 获取；详见[构建与发布记录](docs/release/desktop.md#independent-keys-67)。
+**desktop.71 已发布为 GitHub prerelease**，全部映射单行横排并可左右拖动；整体圆角磨砂底卡按模型家族配色，柔和阴影与悬浮，淡化描边；组内 Key 继续独立排序。设置 → 在线更新 → dev 获取；详见[构建与发布记录](docs/release/desktop.md#model-glass-71)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.67/Anchor-Desktop-0.1.0-dev.desktop.67-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.67/anchor-desktop_0.1.0-dev.desktop.67_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.67)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.71/Anchor-Desktop-0.1.0-dev.desktop.71-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.71/anchor-desktop_0.1.0-dev.desktop.71_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.71)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -63,7 +63,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ## 打包与发行
 
-以下一键安装入口用于 CLI alpha.6。Windows GUI 与 Ubuntu24.04 AMD64 安装包已随 desktop.67 发布到 dev 渠道；默认源真实下载与大小／SHA256校验通过。本轮未自动安装或修改真实实例。**升级前备份并配套升级核心与桌面：沿用schema9，旧版升级无数据库降级，SSH远端单独升级。** 实际验收与兼容边界见[桌面安装说明](docs/release/desktop.md)。
+以下一键安装入口用于 CLI alpha.6。Windows GUI 与 Ubuntu24.04 AMD64 安装包已随 desktop.71 发布到 dev 渠道；默认源真实下载与大小／SHA256校验通过。本轮未自动安装或修改真实实例。**升级前备份并配套升级核心与桌面：沿用schema9，旧版升级无数据库降级，SSH远端单独升级。** 实际验收与兼容边界见[桌面安装说明](docs/release/desktop.md)。
 
 已提供 [一键安装脚本](docs/release/install.md)：识别 Linux/Windows AMD64、下载公开 Release 的单文件并校验 SHA256，默认安装到用户目录，不需要 sudo/管理员权限、不改 Codex 配置。可固定版本，已有程序必须显式允许替换；未设置 PATH 时只提示，不编辑 shell 配置。**Linux / Windows AMD64 `0.1.0-alpha.6` 已公开发布；两平台附件匿名下载与校验通过，Linux 远程一键安装已验证**。不从 Actions artifact 或草稿偷偷安装。
 
@@ -105,9 +105,9 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 已新增 Linux／Windows 桌面应用内 runtime 更新、Linux 一步命令更新和当前 SSH 被控机更新：先下载／校验，最后短暂交接核心并检查恢复，桌面自动重开。正在生成的回答仍可能中断。旧启动器／远端需先引导升级，SSH 沿用现有 POSIX/Linux 被控机支持范围；完整命令、来源／权限及失败边界见[最新指令大全](docs/cli/commands.md#11-本机与-ssh-在线更新)与[在线更新设计](docs/design/online-updates.md#runtime-与-ssh-更新2026-10-20源码未发布)。这些能力自 desktop.57 起已发布；desktop.60 包含 SSH 更新失败提示修复。
 
-### 在线更新（desktop.67 已投放 dev 渠道）
+### 在线更新（desktop.71 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认源已发布 `0.1.0-dev.desktop.67` 两平台安装器、runtime、CLI和更新清单，每个Key独立拖拽并参与实际排序；三条默认源下载及11附件摘要通过。沿用schema9，配套更新核心和桌面；本轮仅在线投放。详见[发行记录](docs/release/desktop.md#independent-keys-67)。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认源已发布 `0.1.0-dev.desktop.71` 两平台安装器、runtime、CLI和更新清单，映射单行横向拖动与模型家族玻璃底卡已包含，组内Key继续独立排序；三条默认源下载及11附件摘要通过。沿用schema9，配套更新核心和桌面；本轮仅在线投放。详见[发行记录](docs/release/desktop.md#model-glass-71)。
 
 **desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.59` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema9，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
 

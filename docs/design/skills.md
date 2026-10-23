@@ -2,7 +2,7 @@
 
 - 状态：2026-10-22 项目自动发现已随 [desktop.68 dev](../release/desktop.md#skill-project-discovery-68) 发布，核心、CLI 与页面同步；既有自动收录／原件清理已随 desktop.65 发布。本轮仅在线投放，未自动安装。
 - 命令唯一入口：[CLI 大全](../cli/commands.md#14-skill-中心库)。
-- 2026-10-23 桌面表达调整（当前源码，未打包／发布）：按“我的 Skill”和“文件位置”组织，不再将中心库／来源／挂载作为页面分类。存储及 CLI 契约不变。
+- 2026-10-23 桌面表达调整（已随 [desktop.71 dev](../release/desktop.md#model-glass-71) 发布）：按“我的 Skill”和“文件位置”组织，不再将中心库／来源／挂载作为页面分类。存储及 CLI 契约不变。
 
 ## 1. 自动收录，原件保留
 

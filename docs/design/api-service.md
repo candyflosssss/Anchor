@@ -1,4 +1,4 @@
-# 应用 API 服务（2026-10-22，当前源码，未打包／未发布）
+# 应用 API 服务（2026-10-22 实现，已随 desktop.71 dev 发布）
 
 契约标识 `anchor-api-service-v1`；唯一 Go DTO 源为 `internal/state/api_service.go`、`internal/desktop/contract.go`，TypeScript 由 `go run ./cmd/desktop-contract` 生成。桌面共享初始样例为 `desktop/contract/api-service.json`。
 

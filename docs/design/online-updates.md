@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-10-22。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.69](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.69)，发布于 `2026-10-22T17:43:55+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `29b86eaa19ee4a3461f97a63e0277a13fb2c7172`、SOURCE dirty=false。
-- 修复 Codex 工具历史 ID 前缀不兼容：发送前规范化工具项编号，保留调用与结果关联；同版包含已提交的供应商首字超时设置。
+- 更新：2026-10-24。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.71](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.71)，发布于 `2026-10-24T04:25:54+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `81f93782b28bef3773dfcf884d262716a199a596`、SOURCE dirty=false。
+- 模型映射全部单行横排并可左右拖动，整体底卡采用模型家族配色、圆角磨砂玻璃、柔和阴影和轻微悬浮，淡化描边；同版包含 LAN API／gateway Key 管理、Skills 页面整理及思考深度错误归类。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .71 在线投放（2026-10-24）
+
+模型映射单行横向拖动，按家族配色的圆角磨砂整体卡片、柔和悬浮和淡化描边；同版包含 LAN API／gateway Key、Skills 页面及日志错误归类。11附件远端摘要、构建tag与非latest核对通过；默认dev源Linux runtime／旧客户端deb／CLI三条实际下载及版本／大小／SHA256验证通过。仅投放，未安装；详见[发行记录](../release/desktop.md#model-glass-71)。
 
 ## .69 在线投放（2026-10-22）
 
