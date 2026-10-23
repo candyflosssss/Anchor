@@ -70,6 +70,7 @@ export function safeSummary(row: RequestLog): string {
     `调用 Key 名称: ${row.accessLabel || '未记录'}`, `原始参考费用: ${row.referenceCost && row.referenceCost.usd == null ? '未知' : referenceUSD(row.referenceCost?.usd)}`, `供应商倍率: ${supplier}`, `分组倍率: ${group}`, `最终参考费用: ${row.referenceCost ? adjustmentValue(row.referenceCost.adjustment) : '—'}`, `来源: ${sourceLabels[row.source]}`, `模型: ${row.model}`, `供应商 / Key: ${row.provider} / ${row.key}`,
     `请求档位: ${serviceTierLabel(row.evidence.requested_service_tier, true)} · 原始值 ${tierSnapshot(row.evidence, 'requested').raw}`,
     `发送档位（最后候选）: ${tierSnapshot(row.evidence, 'sent').raw}`,
+    `请求思考强度: ${row.reasoningEffort === undefined ? '未记录' : row.reasoningEffort === null ? '未指定' : row.reasoningEffort}`,
     `加速状态（上游报告）: ${accelerationSummary(row.evidence).label} · ${accelerationSummary(row.evidence).tier.label}`,
     ...(row.evidence.mapping_service_tier ? [`Anchor 固定档位: ${serviceTierLabel(row.evidence.mapping_service_tier)}`] : []),
     `上游返回档位（最后候选）: ${serviceTierLabel(row.evidence.upstream_service_tier)} · 原始值 ${tierSnapshot(row.evidence, 'upstream').raw}`,

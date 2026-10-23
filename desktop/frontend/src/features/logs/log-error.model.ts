@@ -27,7 +27,7 @@ export function errorExplanation(code: string, language: 'zh-CN' | 'en' = 'zh-CN
 const causes: Record<string, string> = { timeout: '等待超时', cancelled: '请求已取消', dns: '域名解析失败', tls_certificate: 'TLS 证书校验失败', connection_reset: '连接被对端重置', connection_refused: '连接被拒绝', broken_pipe: '发送时连接已断开', unexpected_eof: '对端提前关闭连接', transport: '未分类的网络传输错误' };
 export function errorDiagnosis(code: string, evidence: Record<string, unknown>): string {
   const identity = typeof evidence.anchor_error_id === 'string' && Object.hasOwn(chinese, evidence.anchor_error_id) ? evidence.anchor_error_id : code;
-  const remote: Record<string, string> = { invalid_api_key: '上游报告 Key 无效。', insufficient_quota: '上游报告余额或配额不足。', rate_limit: '上游报告请求限流。', model_not_found: '上游报告模型不存在或不可访问。', permission_denied: '上游报告权限不足。', context_length: '上游报告上下文超限。', invalid_request: '上游报告请求参数无效。', overloaded: '上游报告服务过载。', server_error: '上游报告服务内部错误。' };
+  const remote: Record<string, string> = { invalid_api_key: '上游报告 Key 无效。', insufficient_quota: '上游报告余额或配额不足。', rate_limit: '上游报告请求限流。', model_not_found: '上游报告模型不存在或不可访问。', permission_denied: '上游报告权限不足。', context_length: '上游报告上下文超限。', invalid_request: '上游报告请求参数无效。', unsupported_reasoning_effort: '上游不支持请求中的推理强度，请在调用方选择该渠道支持的思考等级。', overloaded: '上游报告服务过载。', server_error: '上游报告服务内部错误。' };
   if (evidence.timeout_kind === 'first_token') {
     const seconds = Number(evidence.first_token_timeout_seconds);
     return `${errorExplanation(identity)}${Number.isSafeInteger(seconds) && seconds > 0 ? `首字超时配置为 ${seconds} 秒。` : ''}`;

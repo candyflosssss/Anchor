@@ -27,6 +27,7 @@ HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
 | `native_reasoning.go` | 原生 Responses 派发副本中无效加密推理字段的预清理；不修改客户端基线 |
 | `responses_tool_ids.go` | 目标 Responses 派发副本中工具项 ID 前缀、长度和碰撞规范化；保留 call_id 与客户端基线 |
 | `diagnostics.go` | 固定阶段、错误类别、完整／降级／不支持结果，安全错误包装 |
+| `upstream_error.go` | 有界 JSON 错误信封的固定类别诊断；推理强度拒绝仅按受限结构或完整模板识别，不返回上游原文，不改变请求或重试 |
 | `internal/core/gateway*.go`、`translation_logging.go` | 鉴权／访问范围、调度、上游认证、连接与取消、候选及恢复预算、HTTP 交付、诊断与账务持久化 |
 
 2026-10-22 当前源码的逐 Key 来源排序由核心 model_routing_control／model_routing 管理，身份为供应商／上游模型／Key；不改变协议层 Session／Attempt、同渠道恢复预算或转换规则。
@@ -111,7 +112,9 @@ AttemptOptions.ClientMetadata 只接受类型化的 AnthropicVersion/AnthropicBe
 
 ## 期限与自动端点修复（2026-10-22，当前源码未发布）
 
-网关总期限由供应商 timeout_seconds 统一约束，包括等待响应头，不再叠加固定 30 秒响应头上限；另有显式可配置 first_token_timeout_seconds 首字期限，见下节。连接后超时属于响应头阶段，返回 upstream_header_timeout，未确认结果不重放；连接前失败沿用既有候选切换规则。网关只持久保存固定传输类别/阶段、配置秒数和 Anchor 错误身份；非 200 错误响应前缀最多 16 KiB，仅提取已识别 code/type 的固定类别，不保存原文，读取后完整还原给既有密文恢复识别器。
+网关总期限由供应商 timeout_seconds 统一约束，包括等待响应头，不再叠加固定 30 秒响应头上限；另有显式可配置 first_token_timeout_seconds 首字期限，见下节。连接后超时属于响应头阶段，返回 upstream_header_timeout，未确认结果不重放；连接前失败沿用既有候选切换规则。网关只持久保存固定传输类别/阶段、配置秒数和 Anchor 错误身份；非 200 错误响应前缀最多 16 KiB，由协议层 ClassifyUpstreamError 提取已识别类别，不保存原文，读取后完整还原给既有密文恢复识别器。
+
+2026-10-23 当前源码未发布：上游明确拒绝推理强度时，优先记录 upstream_error_category=unsupported_reasoning_effort，避免笼统的 invalid_request 遮蔽原因。只识别 error.code 为 unsupported_value/invalid_value 且 param 为 reasoning.effort、reasoning_effort 或 output_config.effort，或已知无效请求信封中的完整 Unsupported value 模板（拒绝值及全部支持值均为白名单 effort）；未知文本不猜测，不记录参数原文、模型名或 message。不按模型名称推断支持范围，不把 none 改为其他强度，不改变 HTTP／稳定错误码／候选与恢复预算。
 
 自动端点修复由网关 inference_endpoint 管理。没有版本路径的基址明确返回 HTML 且 HTTP 为 200/404/405 时，只允许同源补 /v1 一次，共享原期限和并发槽；保留部署前缀。补路径返回 2xx、非 HTML 且声明 JSON/SSE 后，在进程内按基址/协议/凭据摘要缓存 10 分钟，最多 128 项；后续请求直接使用修复地址，不改配置或 revision。该验证只证明响应类型，不保证生成完整；协议层继续验证内容。缓存返回 HTML/404/405 时失效，当前请求不重放，下一独立请求重新识别。重启、地址或凭据变化后重新识别，不从 JSON 错误、鉴权失败、限流、重定向或传输失败推测路径。
 

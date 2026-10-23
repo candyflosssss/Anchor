@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-22
+- 最近核对：2026-10-23
+- 2026-10-23 当前源码未发布：日志详情／导出可用固定类别 `unsupported_reasoning_effort` 区分上游不支持请求推理强度；不改强度或重试，不回填历史，稳定错误码仍为 `upstream_rejected`，无新增命令或参数。
 - 2026-10-22 当前源码未发布：新增独立应用 API 端口／LAN 设置、gateway Key 签发管理，以及日志调用 Key 归属；见[应用 API 服务](#应用-api-服务与调用-key2026-10-22当前源码未发布)。
 - 2026-10-22 desktop.69 dev 已发布：修复 Responses 历史工具项 ID 前缀不兼容，保留 call_id 与工具结果；同版包含此前已提交的供应商首字超时设置。工具项修复无新增命令或参数，未自动安装；详见[发行记录](../release/desktop.md#tool-item-ids-69)。
 - 2026-10-22 desktop.68 dev 已发布：同版CLI／核心／GUI自动发现常见目录中的项目及Skill，后台收录保留原件，无须手动登记；无新增命令或参数。含网关诊断、补路径缓存及日志压缩，不含其后供应商首输出超时增量；详见[发行记录](../release/desktop.md#skill-project-discovery-68)。

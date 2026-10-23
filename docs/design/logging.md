@@ -261,12 +261,14 @@ CLI `logs suggestions` 通过同一客户端查询，详见[最新指令大全](
 | transport_cause | timeout/cancelled/dns/tls_certificate/connection_reset/connection_refused/broken_pipe/unexpected_eof/transport |
 | transport_phase | connect 或 response_headers，后者表示连接已取得但没有取得响应头；不等同于 TTFT |
 | provider_timeout_seconds | 当前供应商请求期限的十进制秒数，不是实测耗时 |
-| upstream_error_category | invalid_api_key/insufficient_quota/rate_limit/model_not_found/permission_denied/context_length/invalid_request/overloaded/server_error；未知不记录 |
+| upstream_error_category | invalid_api_key/insufficient_quota/rate_limit/model_not_found/permission_denied/context_length/invalid_request/unsupported_reasoning_effort/overloaded/server_error；未知不记录 |
 | endpoint_resolution | configured/v1_fallback/v1_cached |
 | endpoint_requests | 本候选实际端点请求数，1 或 2 |
 | endpoint_repair | learned 表示补 /v1 后得到 2xx 非 HTML 的 JSON/SSE 类型，缓存 10 分钟，最多 128 项；不保证生成完整 |
 
 不写原始 err.Error()、URL、远程 message、未知错误字符串或凭据。绑定拒绝前也记录请求模型，缺映射与无启用供应商分别为 unknown_model 与 model_no_enabled_provider，保持零尝试/HTTP=null。桌面日志复用核心语言目录，优先用 anchor_error_id，并结合安全类别/阶段/期限解释错误；旧记录无法恢复的原因明确保留未知，不根据 30 秒耗时反推原因。
+
+2026-10-23 当前源码未发布：unsupported_reasoning_effort 表示协议层已识别固定参数路径的明确 unsupported_value/invalid_value，或完整已知推理强度拒绝模板及白名单枚举。只保留固定类别，远程参数路径、模型名、message 不持久化；400仍为 upstream_rejected，不自动换强度／渠道重发。详情／导出经既有 evidence 字典承载，不回填旧日志。桌面提示在调用方选择渠道支持的思考等级；复制摘要另含请求思考强度，区分 none、未指定和未记录。
 
 ### 首字超时证据（2026-10-22，当前源码未发布）
 

@@ -44,6 +44,7 @@ func TestUpstreamDiagnosticPreservesBodyAndOnlyRecordsKnownCategories(t *testing
 		{`{"error":{"code":"insufficient_quota","message":"private-key and prompt"}}`, "insufficient_quota"},
 		{`{"error":{"code":"private-code","type":"authentication_error","message":"private"}}`, "invalid_api_key"},
 		{`{"error":{"code":"private-code","type":"private-type","message":"private"}}`, ""},
+		{`{"error":{"type":"invalid_request_error","message":"Unsupported value: 'none' is not supported with the 'private-model' model. Supported values are: 'low', 'medium', 'high', 'xhigh', and 'max'."}}`, "unsupported_reasoning_effort"},
 		{`{"error":{"code":123,"message":"private"}}`, ""},
 		{"<html>private-error</html>", ""},
 		{`{"error":{"code":"invalid_api_key","message":"` + strings.Repeat("x", 32<<10) + `"}}`, ""},
@@ -70,6 +71,48 @@ func TestUpstreamDiagnosticPreservesBodyAndOnlyRecordsKnownCategories(t *testing
 			resp.Body.Close()
 			if !body.closed {
 				t.Fatal("underlying body not closed")
+			}
+		})
+	}
+}
+
+func TestUnsupportedReasoningEffortLoggedWithoutChangingOrReplayingRequest(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(strconv.FormatBool(stream), func(t *testing.T) {
+			f := setup(t)
+			calls := 0
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls++
+				var body struct {
+					Reasoning struct {
+						Effort string `json:"effort"`
+					} `json:"reasoning"`
+				}
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Reasoning.Effort != "none" {
+					t.Error("caller reasoning effort changed", err)
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(400)
+				io.WriteString(w, `{"error":{"type":"invalid_request_error","message":"Unsupported value: 'none' is not supported with the 'private-model' model. Supported values are: 'low', 'medium', 'high', 'xhigh', and 'max'."}}`)
+			}))
+			defer up.Close()
+			f.add(t, "p", up.URL, "synthetic-secret")
+			f.add(t, "fallback", up.URL, "synthetic-secret")
+			f.model(t, state.Candidate{ProviderID: "p", Model: "actual"}, state.Candidate{ProviderID: "fallback", Model: "actual"})
+			resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"private-input","stream":`+strconv.FormatBool(stream)+`,"reasoning":{"effort":"none"}}`)
+			if raw := text(t, resp); !strings.Contains(raw, "upstream_rejected") || strings.Contains(raw, "private") || calls != 1 {
+				t.Fatalf("response=%s calls=%d", raw, calls)
+			}
+			if err := f.core.logs.Flush(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			row, err := f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
+			if err != nil || row.Evidence["upstream_error_category"] != "unsupported_reasoning_effort" || row.AttemptCount != 1 || row.HTTP == nil || *row.HTTP != 400 || row.Delivery != "none" || row.ReasoningEffort == nil || *row.ReasoningEffort != "none" {
+				t.Fatalf("%+v %v", row, err)
+			}
+			raw, _ := json.Marshal(row)
+			if strings.Contains(string(raw), "private") || strings.Contains(string(raw), "synthetic-secret") || strings.Contains(string(raw), "Unsupported value") {
+				t.Fatal("upstream error leaked")
 			}
 		})
 	}

@@ -35,3 +35,12 @@ it('uses the exact Anchor identity and fixed upstream category without remote te
 it('explains configured first output timeout separately from header timeout', () => {
   expect(errorDiagnosis('upstream_first_token_timeout', { timeout_kind: 'first_token', first_token_timeout_seconds: '30', provider_timeout_seconds: '500' })).toContain('首字超时配置为 30 秒');
 });
+
+it('explains rejected reasoning effort and includes the actual effort in copied diagnostics', () => {
+  const evidence = { upstream_error_category: 'unsupported_reasoning_effort' };
+  const row = requestLog({ ...fixture.page.requests[0], code: 'upstream_rejected', reasoning_observed: true, reasoning_effort: 'none', evidence });
+  expect(safeSummary(row)).toContain('上游不支持请求中的推理强度');
+  expect(safeSummary(row)).toContain('请求思考强度: none');
+  expect(safeSummary({ ...row, reasoningEffort: null })).toContain('请求思考强度: 未指定');
+  expect(safeSummary({ ...row, reasoningEffort: undefined })).toContain('请求思考强度: 未记录');
+});
