@@ -33,8 +33,14 @@ class WindowsInstallerContractTests(unittest.TestCase):
     def test_invalid_directories_are_rejected_also_in_silent_mode(self):
         validation = self.function("ValidateInstallDirectory")
         self.assertIn('StrCpy $0 "$INSTDIR" 2 1', validation)
-        self.assertIn('GetFullPathName $INSTDIR "$INSTDIR"', validation)
-        self.assertIn("IfErrors invalid_directory", validation)
+        # Neither a new destination nor a stale remembered path may require
+        # existing parents just to normalize its spelling.
+        self.assertNotRegex(validation, r"(?m)^\s*GetFullPathName\s")
+        for directory in ("$INSTDIR", "$PreviousInstallDir"):
+            self.assertIn(f'kernel32::GetFullPathNameW(w "{directory}",', validation)
+            self.assertIn(f'StrCpy {directory} "$0"', validation)
+        self.assertEqual(validation.count("${If} $1 == 0"), 2)
+        self.assertEqual(validation.count("${OrIf} $1 >= ${NSIS_MAX_STRLEN}"), 2)
         self.assertIn("${If} $0 <= 3", validation)
         self.assertIn("SetErrorLevel 2\n  Abort", validation)
         self.assertIn("Call ValidateInstallDirectory", self.main_section())

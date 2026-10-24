@@ -89,9 +89,15 @@ Function ValidateInstallDirectory
   ${AndIf} $0 != ":/"
     Goto invalid_directory
   ${EndIf}
-  ClearErrors
-  GetFullPathName $INSTDIR "$INSTDIR"
-  IfErrors invalid_directory
+  ; NSIS GetFullPathName requires existing parent directories. Use the Win32
+  ; lexical API so first installs and new nested destinations can be created
+  ; later by SetOutPath (or the relocation writability check).
+  System::Call 'kernel32::GetFullPathNameW(w "$INSTDIR", i ${NSIS_MAX_STRLEN}, w .r0, p 0) i .r1'
+  ${If} $1 == 0
+  ${OrIf} $1 >= ${NSIS_MAX_STRLEN}
+    Goto invalid_directory
+  ${EndIf}
+  StrCpy $INSTDIR "$0"
   StrLen $0 "$INSTDIR"
   ${If} $0 <= 3
     Goto invalid_directory
@@ -105,8 +111,12 @@ Function ValidateInstallDirectory
   ; Re-read to avoid relying on a stale registry value after directory selection.
   ReadRegStr $PreviousInstallDir HKCU "${UNINSTALL_KEY}" "InstallLocation"
   ${If} $PreviousInstallDir != ""
-    GetFullPathName $PreviousInstallDir "$PreviousInstallDir"
-    IfErrors invalid_directory
+    System::Call 'kernel32::GetFullPathNameW(w "$PreviousInstallDir", i ${NSIS_MAX_STRLEN}, w .r0, p 0) i .r1'
+    ${If} $1 == 0
+    ${OrIf} $1 >= ${NSIS_MAX_STRLEN}
+      Goto invalid_directory
+    ${EndIf}
+    StrCpy $PreviousInstallDir "$0"
     StrCpy $0 "$PreviousInstallDir" 1 -1
     ${If} $0 == "\"
     ${OrIf} $0 == "/"
