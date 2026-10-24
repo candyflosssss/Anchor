@@ -1,10 +1,40 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-24。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.71](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.71)，发布于 `2026-10-24T04:25:54+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `81f93782b28bef3773dfcf884d262716a199a596`、SOURCE dirty=false。
-- 模型映射全部单行横排并可左右拖动，整体底卡采用模型家族配色、圆角磨砂玻璃、柔和阴影和轻微悬浮，淡化描边；同版包含 LAN API／gateway Key 管理、Skills 页面整理及思考深度错误归类。
+- 更新：2026-10-25。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.72](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.72)，发布于 `2026-10-25T03:22:46+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `307f82c0f9e48032492cc59a4f86c6408f602ecf`、SOURCE dirty=false。
+- 模型映射改为按列自上而下的响应式瀑布流；Windows 托盘退出确认、任务栏图标和双击唤醒窗口的前台权限交接修复已包含。保留模型家族玻璃配色及逐 Key 排序；同版包含安装目录父级缺失与生成流首字识别修复。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="masonry-windows-72"></a>
+
+## 响应式模型瀑布流与 Windows 桌面修复 .72（已发布 dev）
+
+模型整组以多列瀑布流从上到下衔接，列数随内容区宽度及侧栏折叠变化；整组不跨列分割，渠道卡片及拖拽浮层铺满实际列宽。保留模型家族玻璃配色、逐 Key 拖拽／键盘排序和撤销；重排不写配置。
+
+Windows 托盘完整退出改用原生是／否确认，只批准无错误的 Yes；主窗口／任务栏所需 RT_GROUP_ICON ID3 已随程序嵌入；再次双击应用时，新进程先向现有宿主 PID 交接前台激活资格，再发送受鉴权的唤醒请求。Windows 可按前台策略拒绝授权，不设置常驻置顶。同版包含 .71 后已提交的安装路径父目录缺失处理、Responses 完整生成内容及 SSE event 类型首字识别和首字超时失败原因保留；沿用 schema9。
+
+构建提交 `307f82c0f9e48032492cc59a4f86c6408f602ecf`，输入摘要 `cb94cc005bbb107882cc92c5ecb5f72b6607d24ef75c9f0be6b2fa53b118b979`，SOURCE dirty=false；从干净独立 worktree 构建，未纳入其他任务未提交内容。产物与证据位于 `dist/desktop/0.1.0-dev.desktop.72/`；对应源码含 Anchor Go vendor、固定 mihomo v1.19.32 对应源码／vendor及许可。
+
+| 附件 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.72_amd64.deb` | 29240112 | `b12714dddfc459de183305102b2cb690defdb3b0da77e0acf9442bc1bc8e1820` |
+| `Anchor-Desktop-0.1.0-dev.desktop.72-windows-amd64-setup.exe` | 31255001 | `da4d71ba81d5eaa60129fd644caf091242f5cf956bd058baf2852f445686f2da` |
+| `anchor-desktop-0.1.0-dev.desktop.72-linux-amd64` | 43476656 | `b6d34097363ba1d469353282b91a792c72842876e36ce742e834e17950c5d378` |
+| `anchor-desktop-0.1.0-dev.desktop.72-windows-amd64.exe` | 44632576 | `43777940499c3850d83ca6f49bcab7081a97aaff04a026a2b0cc464443546beb` |
+| `anchor-0.1.0-dev.desktop.72-linux-amd64` | 38035618 | `7aaf91871884bc70e3e6e86975bd747b256acf6821982b701cd32e21015b0794` |
+| `anchor-0.1.0-dev.desktop.72-windows-amd64.exe` | 38164480 | `d95f37e4290ee7afbef560b72aaa1d3ca5b15fa35e33e0044bd48c96e7f9e138` |
+| `update-desktop.json` | 1755 | `6d1cc8e93e515c3aca82a364069828f67fa3e7217c8a5cc7e1dd6b238544f63c` |
+| `update-cli.json` | 876 | `b3ade722e2c554024a546bee9ae58e99eca17dde8bbd5ebb558e8312491f2b02` |
+| `anchor_0.1.0-dev.desktop.72_source.tar.gz` | 97870837 | `ef12ecbc315c9cbb6fba086d91f4ee9aa44c2374b3672a9ed5e1ddd12ddc1b04` |
+| `anchor_0.1.0-dev.desktop.72_metadata.zip` | 122174 | `d28cd299dc1a29bf6cc8bc64271e20304a36790d42f0dc36d7e3c6bd7d43999b` |
+| `SHA256SUMS` | 1073 | `fb371692837bc927155a706315c303b34ba1cd01278d9f08999f89610415089d` |
+
+复用功能阶段已通过的定向 Go／Windows 交叉链接检查、前端类型检查／ESLint、10项 View 单测和6项模拟宿主浏览器检查。本轮 Go／TS 契约比对、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译／打包通过；最终 Windows EXE 图标资源逐尺寸／图像校验、嵌入前端／mihomo、deb 与 runtime 载荷、对应源码输入摘要、metadata ZIP CRC 核对通过。Vite 大 chunk 提示不阻塞构建。
+
+于 `2026-10-25T03:22:46+08:00` 公开为 dev prerelease、非 latest；11附件大小／GitHub digest匹配，tag指向构建提交，latest状态保持。默认dev源实际下载Linux runtime、旧客户端兼容deb及独立CLI，版本／目标／大小／SHA256及runtime／CLI可执行版本核对通过。证据见publication/preparation-verification.json、publication-verification.json与online-verification.json；BUILD.json保留构建时未发布／未安装／未原生验收事实。
+
+仅在线投放，未安装、重启或修改真实实例／Agent配置及用户更新设置，未请求付费上游；双平台原生窗口、系统安装器及真实SSH升级未验收。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 
 <a id="model-glass-71"></a>
 
@@ -540,7 +570,7 @@ desktop.58更新后的23:01和23:25请求仍失败，均为HTTP200、stream_inte
 运行 `Anchor-Desktop-<版本>-windows-amd64-setup.exe`：
 
 - 无默认管理员提权。desktop.51 安装器新增目录选择：首次默认 `%LOCALAPPDATA%\Programs\Anchor Desktop`，可选其他本地盘符和完整文件夹，支持中文及空格；所选目录须对当前用户可写，不支持盘符根目录、相对路径或 UNC 网络共享。`.50` 及更早版仍固定默认目录。`.51` 仅本地打包，线上 dev 仍为 `.50`。
-- 2026-10-25 当前源码修复（未打包／未发布）：路径规范化不再要求父目录已经存在；默认目录及自选多级目录由安装步骤自动创建，无需预先手动建文件夹。创建／写入失败仍终止安装；升级时的旧路径也使用不依赖目录存在的规范化，换位置前仍先验证新目录可写。
+- 2026-10-25 修复（已随 desktop.72 dev 发布）：路径规范化不再要求父目录已经存在；默认目录及自选多级目录由安装步骤自动创建，无需预先手动建文件夹。创建／写入失败仍终止安装；升级时的旧路径也使用不依赖目录存在的规范化，换位置前仍先验证新目录可写。
 - 升级默认从当前用户卸载注册项读取 `InstallLocation`，保持原安装目录。交互式选择其他目录时，先明确确认并探测新目录可写，再等待旧版卸载程序完成；旧版缺失、仍在运行、卸载失败或卸载项未清除均拒绝继续，不强杀、不留下第二个已注册副本。旧目录只清理已知程序文件，不递归删除额外文件。卸载后新安装失败时可重试，无自动回滚程序文件。
 - 程序安装目录与用户数据目录独立；更换盘符不移动或删除现有配置、凭据、数据库及恢复材料。升级／换位置前仍须备份、显式停止核心并退出所有窗口。
 - 支持 NSIS `/D=完整目录` 覆盖默认／记忆位置，必须放在命令行最后，路径含空格也不要给 `/D=` 的值加引号。首次或同目录安装可用 `/S`；静默模式不授权跨目录迁移（默认拒绝，退出码2），须交互确认，或先手动卸载再静默安装。
