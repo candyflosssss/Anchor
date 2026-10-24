@@ -5,10 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -57,6 +60,14 @@ func TestHostInstanceStartupAndExit(t *testing.T) {
 		t.Fatalf("first launch: %v", err)
 	}
 	t.Cleanup(host.Close)
+	raw, err := os.ReadFile(filepath.Join(dir, "desktop-host.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var endpoint hostEndpoint
+	if err := json.Unmarshal(raw, &endpoint); err != nil || endpoint.ProcessID != uint32(os.Getpid()) {
+		t.Fatal("activation metadata must identify the GUI host process", err, endpoint.ProcessID)
+	}
 	second, err := AcquireHost(t.Context(), dir, window.Show)
 	if err != nil || second != nil {
 		t.Fatalf("launch before window ready: host=%v err=%v", second != nil, err)
@@ -81,6 +92,64 @@ func TestHostInstanceStartupAndExit(t *testing.T) {
 		t.Fatalf("restart after exit: %v", err)
 	}
 	next.Close()
+}
+
+func TestHostActivationDelegatesForegroundBeforeShowing(t *testing.T) {
+	for _, processID := range []uint32{12345, 0, ^uint32(0)} {
+		t.Run(fmt.Sprintf("pid=%d", processID), func(t *testing.T) {
+			var granted atomic.Uint32
+			var requests atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
+				if r.Method != http.MethodPost || r.URL.Path != "/activate" || r.Header.Get("Authorization") != "Bearer "+strings.Repeat("a", 64) {
+					t.Error("activation lost its authenticated request")
+				}
+				if processID == 12345 && granted.Load() != processID {
+					t.Error("window was shown before delegating foreground eligibility")
+				}
+				w.WriteHeader(http.StatusNoContent)
+			}))
+			defer server.Close()
+			port := server.Listener.Addr().(*net.TCPAddr).Port
+			data, err := json.Marshal(hostEndpoint{Port: port, Token: strings.Repeat("a", 64), ProcessID: processID})
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "desktop-host.json")
+			if err := os.WriteFile(path, data, 0600); err != nil {
+				t.Fatal(err)
+			}
+			allow := func(pid uint32) {
+				if pid == 0 || pid == ^uint32(0) {
+					t.Fatal("foreground eligibility must target a specific host")
+				}
+				granted.Store(pid)
+			}
+			if err := activateHost(t.Context(), server.Client(), path, allow); err != nil || requests.Load() != 1 {
+				t.Fatal("activation failed", err)
+			}
+			if processID != 12345 && granted.Load() != 0 {
+				t.Fatal("legacy/invalid PID delegated foreground eligibility")
+			}
+		})
+	}
+}
+
+func TestHostActivationRejectsInvalidMetadataBeforeForegroundGrant(t *testing.T) {
+	for _, data := range []string{
+		`{"port":0,"token":"` + strings.Repeat("a", 64) + `","process_id":12345}`,
+		`{"port":12345,"token":"short","process_id":12345}`,
+		`{"port":12345,"token":"` + strings.Repeat("a", 64) + `","process_id":-1}`,
+		`{"port":12345,"token":"` + strings.Repeat("a", 64) + `","process_id":4294967296}`,
+	} {
+		path := filepath.Join(t.TempDir(), "desktop-host.json")
+		if err := os.WriteFile(path, []byte(data), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if err := activateHost(t.Context(), http.DefaultClient, path, func(uint32) { t.Fatal("invalid metadata granted foreground eligibility") }); err == nil {
+			t.Fatal("invalid metadata accepted")
+		}
+	}
 }
 
 func TestHostInstanceUnavailableDoesNotDuplicate(t *testing.T) {

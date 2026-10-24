@@ -29,8 +29,9 @@ type HostInstance struct {
 }
 
 type hostEndpoint struct {
-	Port  int    `json:"port"`
-	Token string `json:"token"`
+	Port      int    `json:"port"`
+	Token     string `json:"token"`
+	ProcessID uint32 `json:"process_id,omitempty"`
 }
 
 // AcquireHost starts the first GUI's activation listener, or activates the
@@ -62,7 +63,7 @@ func AcquireHostWithReload(ctx context.Context, dir string, activate func() bool
 		if err == nil {
 			return startHost(lock, endpoint, activate, dataDir, reload)
 		}
-		if activateHost(ctx, client, endpoint) == nil {
+		if activateHost(ctx, client, endpoint, allowHostForeground) == nil {
 			return nil, nil
 		}
 		select {
@@ -92,7 +93,7 @@ func startHost(lock *platform.Lock, endpoint string, activate func() bool, dataD
 	if _, err = rand.Read(secret[:]); err != nil {
 		return nil, err
 	}
-	data := hostEndpoint{Port: listener.Addr().(*net.TCPAddr).Port, Token: hex.EncodeToString(secret[:])}
+	data := hostEndpoint{Port: listener.Addr().(*net.TCPAddr).Port, Token: hex.EncodeToString(secret[:]), ProcessID: uint32(os.Getpid())}
 	encoded, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -138,7 +139,10 @@ func startHost(lock *platform.Lock, endpoint string, activate func() bool, dataD
 	return instance, nil
 }
 
-func activateHost(ctx context.Context, client *http.Client, path string) error {
+func activateHost(ctx context.Context, client *http.Client, path string, allowForeground func(uint32)) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	encoded, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -152,6 +156,13 @@ func activateHost(ctx context.Context, client *http.Client, path string) error {
 		return err
 	}
 	request.Header.Set("Authorization", "Bearer "+data.Token)
+	// The launch triggered by Explorer owns Windows foreground eligibility.
+	// Delegate it to the existing GUI before Wails tries SetForegroundWindow.
+	// Old metadata without a PID still uses the existing activation path.
+	// Never pass ASFW_ANY (all processes) through this host-specific grant.
+	if data.ProcessID != 0 && data.ProcessID != ^uint32(0) {
+		allowForeground(data.ProcessID)
+	}
 	response, err := client.Do(request)
 	if err != nil {
 		return err
