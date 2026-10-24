@@ -53,6 +53,8 @@ desktop.14 起，`Quit` 普通关闭请求由 OnBeforeClose 拦截：只有系�
 
 托盘由 Go 宿主的 `internal/desktoptray` 管理：Windows 使用原生通知图标和独立锁定线程的消息循环；Linux 使用 D-Bus StatusNotifierItem，并在隐藏前确认当前进程已注册到可用的 StatusNotifierHost。没有可用托盘时允许宿主真正退出，后台核心继续服务，用户从应用入口重新打开，不留下无法恢复的隐藏窗口。托盘只在 GUI 模式启动，`--core` 和安装 helper 不创建托盘。
 
+Windows 主窗口／任务栏图标与托盘图标分别加载：托盘使用 Go 嵌入的 ICO，Wails v2.15.0 主窗口从 EXE 资源表读取 `RT_GROUP_ICON` ID 3。当前源码将同一 `desktop/branding/anchor.ico` 编译为 `cmd/anchor-desktop/rsrc_windows_amd64.syso` 并纳入版本控制，普通 Go 构建与安装包构建都会自动链接；修改 ICO 后执行 `go generate ./desktop/branding`（固定 go-winres v0.3.3）并提交生成资源。该文件只参与 Windows AMD64 构建，资源测试核对组 ID、全部图像尺寸与原始图像字节，避免只有托盘有图标。2026-10-25 源码修复需更新宿主；资源／交叉链接验证不代表 Windows 任务栏实机验收。
+
 ExitDesktop 和已经批准的安装更新共用宿主退出回调：先设置原子退出标记，再调用 Quit，绕过隐藏，确保更新 helper 不会卡在等待窗口退出。ExitDesktop 不要求核心在线，更新交接中返回 conflict；未绑定宿主退出回调时返回 unsupported。宿主退出会清理托盘。最小化 / 最大化 / 还原 / 托盘是本机窗口展示行为，不增加 CLI 管理指令。定向 Go 测试覆盖关闭隐藏、无托盘退出、显式退出及更新交接保护；Windows / Linux 原生托盘、拖动、缩放及按钮行为仍需原生验收。
 
 ### 3.2 托盘完整退出（2026-10-17，已随 desktop.47 dev 发布）
