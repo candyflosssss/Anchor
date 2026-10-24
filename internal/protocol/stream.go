@@ -83,6 +83,11 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 		if payload != "[DONE]" {
 			m, e = Decode([]byte(payload))
 			if e == nil {
+				// Interpret an SSE event name when JSON omits the type. Native
+				// forwarding still uses the original event and payload bytes.
+				if _, exists := m["type"]; !exists && event != "" && from != "chat-completions" {
+					m["type"] = event
+				}
 				observation.firstGenerated(m, from)
 			}
 		}

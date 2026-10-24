@@ -121,7 +121,7 @@ func TestProbeSharesFirstOutputTimeout(t *testing.T) {
 }
 
 func TestGatewayFirstOutputTimeout(t *testing.T) {
-	for _, mode := range []string{"headers", "body", "heartbeat", "reasoning", "tool", "total"} {
+	for _, mode := range []string{"headers", "body", "heartbeat", "reasoning", "reasoning-event", "reasoning-item", "reasoning-part", "reasoning-empty", "tool", "total"} {
 		t.Run(mode, func(t *testing.T) {
 			f := setup(t)
 			var calls atomic.Int32
@@ -150,6 +150,16 @@ func TestGatewayFirstOutputTimeout(t *testing.T) {
 				io.WriteString(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"r\"}}\n\n")
 				if mode == "reasoning" || mode == "total" {
 					io.WriteString(w, "data: {\"type\":\"response.reasoning_summary_text.delta\",\"delta\":\"thinking\"}\n\n")
+				}
+				switch mode {
+				case "reasoning-event":
+					io.WriteString(w, "event: response.reasoning_summary_text.delta\ndata: {\"delta\":\"thinking\"}\n\n")
+				case "reasoning-item":
+					io.WriteString(w, "data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"reasoning\",\"summary\":[{\"type\":\"summary_text\",\"text\":\"thinking\"}]}}\n\n")
+				case "reasoning-part":
+					io.WriteString(w, "data: {\"type\":\"response.reasoning_summary_part.added\",\"part\":{\"type\":\"summary_text\",\"text\":\"thinking\"}}\n\n")
+				case "reasoning-empty":
+					io.WriteString(w, "data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"reasoning\",\"summary\":[],\"encrypted_content\":\"\"}}\n\n")
 				}
 				if mode == "tool" {
 					io.WriteString(w, "data: {\"type\":\"response.function_call_arguments.delta\",\"delta\":\"{}\"}\n\n")
@@ -189,7 +199,11 @@ func TestGatewayFirstOutputTimeout(t *testing.T) {
 			if mode == "body" {
 				stream = "false"
 			}
-			resp := localizedRequest(t, "POST", f.gateway.URL+"/v1/responses", f.token, "zh-CN", `{"model":"public","input":"test","stream":`+stream+`}`)
+			input := `"test"`
+			if mode == "reasoning-item" {
+				input = `[{"type":"reasoning","encrypted_content":"synthetic-history","summary":[]},{"role":"user","content":"test"}]`
+			}
+			resp := localizedRequest(t, "POST", f.gateway.URL+"/v1/responses", f.token, "zh-CN", `{"model":"public","input":`+input+`,"stream":`+stream+`}`)
 			raw := text(t, resp)
 			if err := f.core.logs.Flush(t.Context()); err != nil {
 				t.Fatal(err)
@@ -202,7 +216,7 @@ func TestGatewayFirstOutputTimeout(t *testing.T) {
 				t.Fatalf("replayed request: %+v", row)
 			}
 			switch mode {
-			case "reasoning", "tool":
+			case "reasoning", "reasoning-event", "reasoning-item", "reasoning-part", "tool":
 				if row.Status != "succeeded" || !strings.Contains(raw, "response.completed") {
 					t.Fatalf("output did not stop timeout: %+v %s", row, raw)
 				}
@@ -220,6 +234,59 @@ func TestGatewayFirstOutputTimeout(t *testing.T) {
 				if mode != "headers" && (row.HTTP == nil || *row.HTTP != 200) {
 					t.Fatalf("actual HTTP overwritten: %+v", row)
 				}
+			}
+		})
+	}
+}
+
+func TestGatewayFirstOutputTimeoutSurvivesClientDisconnect(t *testing.T) {
+	for _, writeFailure := range []bool{false, true} {
+		name := "disconnect"
+		if writeFailure {
+			name = "write-failure"
+		}
+		t.Run(name, func(t *testing.T) {
+			f := setup(t)
+			up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				io.Copy(io.Discard, r.Body)
+				w.Header().Set("Content-Type", "text/event-stream")
+				io.WriteString(w, "data: {\"type\":\"response.created\",\"response\":{\"id\":\"r\"}}\n\n")
+				w.(http.Flusher).Flush()
+				<-r.Context().Done()
+			}))
+			defer up.Close()
+			f.add(t, "p", up.URL, "synthetic")
+			p, _ := f.store.Provider("p")
+			p.FirstTokenTimeoutSeconds = 1
+			if _, err := f.store.PutProvider(p, p.Revision, nil); err != nil {
+				t.Fatal(err)
+			}
+			f.model(t, state.Candidate{ProviderID: "p", Model: "actual"})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			req := httptest.NewRequest("POST", f.gateway.URL+"/v1/responses", strings.NewReader(`{"model":"public","input":"test","stream":true}`)).WithContext(ctx)
+			req.Header.Set("Authorization", "Bearer "+f.token)
+			disconnect := context.CancelFunc(cancel)
+			if writeFailure {
+				disconnect = func() {}
+			}
+			w := &completionDisconnectWriter{ResponseRecorder: httptest.NewRecorder(), cancel: disconnect, fail: writeFailure, marker: "upstream_first_token_timeout"}
+			f.core.Gateway().ServeHTTP(w, req)
+			if (ctx.Err() == context.Canceled) == writeFailure {
+				t.Fatal("unexpected client cancellation state")
+			}
+			if err := f.core.logs.Flush(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+			row, err := f.core.logs.Detail(t.Context(), w.Header().Get("X-Anchor-Request-ID"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if row.Status != "failed" || row.Code != "upstream_first_token_timeout" || row.Evidence["anchor_error_id"] != "upstream_first_token_timeout" || row.Evidence["timeout_kind"] != "first_token" || row.Evidence["first_token_timeout_seconds"] != "1" || row.Delivery != "partial" || row.HTTP == nil || *row.HTTP != 200 {
+				t.Fatalf("client disconnect overwrote first output timeout: %+v", row)
+			}
+			if row.AttemptCount != 1 || row.Attempts[0].Code != row.Code || row.Attempts[0].Outcome != "failed" {
+				t.Fatalf("root/attempt timeout disagreement: %+v", row)
 			}
 		})
 	}

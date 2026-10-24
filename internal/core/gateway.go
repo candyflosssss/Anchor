@@ -302,7 +302,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 			}
 		} else if retry {
 			outcome = "retry"
-		} else if r.Context().Err() != nil {
+		} else if r.Context().Err() != nil && (t == nil || !t.firstOutputTimedOut) {
 			outcome = "cancelled"
 		}
 		stage := "dispatch"
@@ -364,11 +364,12 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 	defer cancel()
 	sseStarted := false
 	firstFailure := func() bool {
-		if !errors.Is(context.Cause(ctx), errFirstOutputTimeout) || r.Context().Err() != nil {
+		if !errors.Is(context.Cause(ctx), errFirstOutputTimeout) {
 			return false
 		}
 		status, code = 504, "upstream_first_token_timeout"
 		if t := trace(r); t != nil {
+			t.firstOutputTimedOut = true
 			t.row.Code, t.row.Status = code, "failed"
 			t.row.Evidence["anchor_error_id"] = string(apierror.UpstreamFirstTokenTimeout)
 			t.row.Evidence["timeout_kind"] = "first_token"
@@ -552,6 +553,9 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 		delivery := &translationDeliveryWriter{Writer: protocol.HTTPStreamWriter(w), delivered: &delivered}
 		result, translateErr := translationAttempt.TranslateStream(ctx, delivery, resp.Body, protocol.StreamOptions{Language: apierror.LanguageOf(w), OnFirstOutput: first.observe, ErrorWriter: delivery, FailureID: func() apierror.ID {
 			if errors.Is(context.Cause(ctx), errFirstOutputTimeout) {
+				// Record the cause before writing the error frame: a client may
+				// close immediately upon receiving it.
+				firstFailure()
 				return apierror.UpstreamFirstTokenTimeout
 			}
 			return ""

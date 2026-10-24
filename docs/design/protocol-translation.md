@@ -124,4 +124,8 @@ AttemptOptions.ClientMetadata 只接受类型化的 AnthropicVersion/AnthropicBe
 
 网关在每个候选派发前启动总期限与首字期限，同候选补/v1及历史密文恢复共享原期限，不重新计时。协议层 StreamOptions.OnFirstOutput 只报告第一次实际生成：文本、思考、工具参数或音频；响应头、角色声明、心跳及空事件不计。该通知在下游写入之前发出，不改变既有TTFT指标或缓存/内容。网络计时/取消和连接释放仍归网关。首字后只取消首字计时，剩余生成继续受总期限；非流式无法从普通JSON增量确认生成，等待完整响应。
 
+2026-10-25 当前源码修复（未打包／未发布）：Responses 首字检测除既有 delta 外，也识别 output_item added/done、reasoning_summary/content part added/done、text/reasoning/tool done 及 completed/incomplete output 快照内的已知非空内容；推理 summary/content 与非空 encrypted_content 均可解除首字期限。空 reasoning/message、空 part、仅工具名／ID／状态及未知元数据不计。Responses／Anthropic JSON 缺失 type 时，SSE event 名参与同一解析流程，显式 JSON type 优先；原生载荷与事件名仍原样转发，跨协议仍遵循现有内容支持及拒绝规则。新增识别只通知计时器，不将完整项／推理密文伪装成正文首字，不补造指标。旧版可出现「已转发内容但未停止首字计时」；升级核心后对新请求生效。
+
 首字超时为504/upstream_first_token_timeout，当前请求不重放。已提交SSE时保留HTTP200，由协议层按客户端协议/语言编码一个固定错误事件；ErrorWriter 由网关提供独立15秒写期限，避免上游取消后连错误帧也被请求context拦截。不合成成功终止，仍记录真实上游HTTP与失败日志。路径类型检查、恢复和内容限制保持。probe/chat 复用同一首字限制，仍保留诊断各自10/120秒总上限；目录/余额查询不应用生成首字计时。
+
+2026-10-25 当前源码：网关确认 first-token cause 后，在写错误帧前保存该原因；客户端因收到错误而立即断开或错误帧写入失败时，根请求仍保留 failed/upstream_first_token_timeout，与尝试日志一致。首字超时前的真实客户端取消保持 cancelled/client_cancelled；不改 HTTP 200 的已提交事实、并发／恢复预算或历史记录。

@@ -16,7 +16,7 @@ type Observation struct {
 	Reasoning      bool
 }
 
-// output records usable generated content, not stream envelopes or reasoning.
+// generated notifies the network owner without changing delivery metrics.
 func (o *Observation) generated() {
 	if o != nil && o.onFirstOutput != nil {
 		notify := o.onFirstOutput
@@ -171,5 +171,8 @@ func (o *Observation) firstGenerated(m Object, p string) {
 	}
 	probe := Observation{onFirstOutput: o.onFirstOutput}
 	probe.event(m, p)
+	if probe.onFirstOutput != nil && p == "responses" && responsesGeneratedContent(m) {
+		probe.generated()
+	}
 	o.onFirstOutput = probe.onFirstOutput
 }

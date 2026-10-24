@@ -21,6 +21,7 @@ type requestTrace struct {
 	unknownCost             bool
 	written                 int64
 	writeFailed             bool
+	firstOutputTimedOut     bool
 	encryptedContextRetried bool
 }
 
@@ -73,7 +74,9 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 			// event, while usage and log bookkeeping are still running. Keep a
 			// response that was fully written successful; failed writes and
 			// requests interrupted before completion remain cancellations.
-			if r.Context().Err() != nil && (t.row.Status != "succeeded" || t.writeFailed) {
+			// A timeout failure frame can itself make the client disconnect.
+			// Preserve the confirmed upstream cause rather than blaming that close.
+			if r.Context().Err() != nil && !t.firstOutputTimedOut && (t.row.Status != "succeeded" || t.writeFailed) {
 				t.row.Status = "cancelled"
 				t.row.Code = "client_cancelled"
 				delete(t.row.Evidence, "anchor_error_id")
@@ -82,7 +85,7 @@ func (s *Server) recordRequests(next http.Handler) http.Handler {
 				t.row.Status = "failed"
 				t.row.Code = "request_interrupted"
 			}
-			if t.writeFailed && r.Context().Err() == nil {
+			if t.writeFailed && r.Context().Err() == nil && !t.firstOutputTimedOut {
 				t.row.Status = "failed"
 				t.row.Code = "client_write_failed"
 				delete(t.row.Evidence, "anchor_error_id")

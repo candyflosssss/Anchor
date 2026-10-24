@@ -68,7 +68,7 @@ func (s *Server) forward(w http.ResponseWriter, r *http.Request, translation *pr
 		outcome := "failed"
 		if result.success {
 			outcome = "succeeded"
-		} else if r.Context().Err() != nil {
+		} else if r.Context().Err() != nil && !t.firstOutputTimedOut {
 			outcome = "cancelled"
 		}
 		t.row.Evidence["encrypted_context_recovery"] = outcome

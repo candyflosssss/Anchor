@@ -58,6 +58,8 @@
 
 2026-10-13 当前源码（未发布）修正完成响应的取消误判：协议正常结束且响应写入成功后，即使客户端在日志／用量收尾前断开，也保留 succeeded/complete；尚未完成或写入失败时的客户端取消仍保存 cancelled。已经写出 HTTP 200 数据的失败请求保存 partial；没有写出数据则 none。success/complete 只表示本机写入没有报错，不代表最终用户确认收到。历史记录不自动重判；总 TPS 仅对成功且总输出与总耗时已确认的记录计算，不以首字后的区间作为依据。旧 pending 在核心重新打开数据库时改为 interrupted/core_interrupted，交付结果 unknown；NORMAL WAL 在突然断电时可能丢失最近批次，不承诺断电零损失。
 
+2026-10-25 当前源码修复（未打包／未发布）：已确认首字超时后，网关在发送本地错误帧前保存原因；客户端收到错误后立即断开或错误帧写入失败，不再覆盖根请求为 client_cancelled/client_write_failed。根请求及尝试保留 failed/upstream_first_token_timeout，evidence 保留 timeout_kind=first_token 与两类期限秒数，实际已收到的上游 HTTP 200 与 partial 交付分别记录；首字超时前的真实取消仍保存 cancelled/client_cancelled。字段结构和查询权限不变，旧日志不回填。首字检测补齐完整内容项／part／done 及 SSE event 类型后停止首字计时；既有 time_to_first_output/text 指标不扩展到完整快照或思考内容，null 不能作为「没有收到思考」的证据，详见[首字期限契约](protocol-translation.md#显式首字期限2026-10-22当前源码未发布)。
+
 2026-10-16 当前源码（未发布）：服务档位采用原值优先、可识别值附加标注的方式，代理及推理测试共用以下 `evidence` 口径：
 
 - `requested_service_tier` 是入站 JSON 值的规范化标签，未传为 `unspecified`；固定映射策略仍单独记录在 `mapping_service_tier`。`sent_service_tier` 取固定策略及协议转换后的实际派发请求体，未派发为 `not_sent`、未带参数为 `unspecified`。派发表示进入网络发送步骤，不证明上游收到。

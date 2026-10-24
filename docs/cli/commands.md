@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-24
+- 最近核对：2026-10-25
+- 2026-10-25 当前源码（未打包／未发布）：补齐生成流首字检测，已确认首字超时不再因客户端收到错误后断开而被日志记为客户端取消；命令、参数及输出字段不变，见下方日志说明。
 - 2026-10-24 desktop.71 dev 已发布：模型单行横向拖动与家族玻璃底卡；同版包含 LAN API／gateway Key 管理、Skills 页面整理和思考深度错误归类。此交付轮无新增命令或参数，详见[发行记录](../release/desktop.md#model-glass-71)。
 - 2026-10-23 实现，已随 desktop.71 dev 发布：日志详情／导出可用固定类别 `unsupported_reasoning_effort` 区分上游不支持请求推理强度；不改强度或重试，不回填历史，稳定错误码仍为 `upstream_rejected`，无新增命令或参数。
 - 2026-10-22 实现，已随 desktop.71 dev 发布：新增独立应用 API 端口／LAN 设置、gateway Key 签发管理，以及日志调用 Key 归属；见[应用 API 服务](#应用-api-服务与调用-key2026-10-22当前源码未发布)。
@@ -867,6 +868,8 @@ anchor [--data-dir DIR] --context SSH_NAME update upgrade --approve
 ## 12. 请求与系统日志（当前源码；基础能力自 desktop.16 dev）
 
 需要升级并正常重启到支持日志的核心；旧版不会补采历史。使用所选 Context、owner 管理授权及实例身份核验。日志独立于累计 usage，配置日志保留不删除累计用量。
+
+2026-10-25 当前源码（未打包／未发布）：已确认的首字超时保留 `status=failed/code=upstream_first_token_timeout`；客户端收到超时错误后立即断开不会再将其覆盖为 `cancelled/client_cancelled`。`logs list/follow/detail/export` 共用该结果，`--errors-only` 可包含这类失败；超时前的真实客户端取消保持原语义，历史记录不重判。首字检测同时补齐已知非空内容快照及 SSE event 类型识别，默认期限和首字指标字段不变，详见[协议契约](../design/protocol-translation.md#显式首字期限2026-10-22当前源码未发布)。
 
 ```text
 anchor logs list|follow|export [--kind requests|system] [--since 1h | --from RFC3339 --to RFC3339] [--errors-only] [--limit 50]
