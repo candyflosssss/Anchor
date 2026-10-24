@@ -17,18 +17,11 @@ func exitWithLocalCore(ctx context.Context, window *desktop.WindowLifecycle, ses
 	}
 	var dialogErr error
 	out := session.ExitWithLocalCore(func(instanceID string) bool {
-		message := "本机核心未运行。是否退出 Anchor（窗口和托盘）？\n不会停止远程设备上的核心。"
-		approve := "退出 Anchor"
-		if instanceID != "" {
-			approve = "停止核心并退出"
-			message = fmt.Sprintf("是否停止本机核心并退出 Anchor（窗口和托盘）？\n\n目标：本机\n实例：%s\n\n将停止本机代理服务，并按既有规则尝试恢复托管配置；依赖它的 Agent 请求会受影响。不会停止远程设备上的核心。", instanceID)
-		}
-		button, err := wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
-			Type: wailsruntime.WarningDialog, Title: "退出 Anchor", Message: message,
-			Buttons: []string{"取消", approve}, DefaultButton: "取消", CancelButton: "取消",
+		approved, err := confirmLocalCoreExit(instanceID, func(options wailsruntime.MessageDialogOptions) (string, error) {
+			return wailsruntime.MessageDialog(ctx, options)
 		})
 		dialogErr = err
-		return err == nil && button == approve
+		return approved
 	})
 	if out.Problem == nil && dialogErr == nil {
 		return
@@ -44,4 +37,19 @@ func exitWithLocalCore(ctx context.Context, window *desktop.WindowLifecycle, ses
 	_, _ = wailsruntime.MessageDialog(ctx, wailsruntime.MessageDialogOptions{
 		Type: wailsruntime.ErrorDialog, Title: "未退出 Anchor", Message: message, Buttons: []string{"确定"},
 	})
+}
+
+func confirmLocalCoreExit(instanceID string, dialog func(wailsruntime.MessageDialogOptions) (string, error)) (bool, error) {
+	message := "本机核心未运行。是否退出 Anchor（窗口和托盘）？\n不会停止远程设备上的核心。"
+	if instanceID != "" {
+		message = fmt.Sprintf("是否停止本机核心并退出 Anchor（窗口和托盘）？\n\n目标：本机\n实例：%s\n\n将停止本机代理服务，并按既有规则尝试恢复托管配置；依赖它的 Agent 请求会受影响。不会停止远程设备上的核心。", instanceID)
+	}
+	// Wails v2 on Windows/Linux ignores custom button labels. WarningDialog
+	// only offers OK; QuestionDialog offers native Yes/No and returns these
+	// English identifiers even when the OS displays translated button labels.
+	button, err := dialog(wailsruntime.MessageDialogOptions{
+		Type: wailsruntime.QuestionDialog, Title: "退出 Anchor", Message: message,
+		Buttons: []string{"Yes", "No"}, DefaultButton: "No", CancelButton: "No",
+	})
+	return err == nil && button == "Yes", err
 }
