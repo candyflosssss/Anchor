@@ -12,7 +12,6 @@ import { modelAvailability, visibleModels } from './model-availability.model';
 import { effectiveRouteMultiplier, modelSources, sourceID, routingRules, routeID } from './model-routing.model';
 import type { ModelRoutingController } from './use-model-routing';
 import { useRouteDrag } from './use-route-drag';
-import { useModelBoardPan } from './use-model-board-pan';
 import { modelFamily } from './model-appearance';
 import { ModelSettingsDialog } from './model-settings.view';
 import './models.css';
@@ -119,7 +118,6 @@ export function ModelsView({ summaries, loading, disabled, rates, routing, onOpe
   const [settingsID, setSettingsID] = useState<string | null>(null);
   const groups = aggregateModels(summaries), pending = loading || summaries.some(s => s.workspace === undefined);
   const split = visibleModels(groups);
-  const { panning, ...boardPan } = useModelBoardPan();
   const readFailed = summaries.some(s => s.workspace === null);
   const locked = disabled || rates.busy || routing.busy;
   return <div className="workspace models-workspace">
@@ -130,6 +128,6 @@ export function ModelsView({ summaries, loading, disabled, rates, routing, onOpe
     {routing.error && <p className="feedback error-feedback" role="alert">{routing.error}</p>}
     {routing.needsRead && <p className="card-hint">保存结果需要核对，请重新读取配置后继续修改。</p>}
     {!groups.length ? <div className="empty-state"><ArrowLeftRight size={32} /><h2>{pending ? '正在读取模型映射' : readFailed ? '无法确认模型映射' : '还没有模型映射'}</h2>{!pending && <Button disabled={locked} onClick={onShowProviders}>前往供应商</Button>}</div>
-      : <section className={`model-grid${panning ? ' is-panning' : ''}`} aria-label="模型别名" tabIndex={0} {...boardPan}>{[...split.visible, ...split.unavailable].map(g => <ModelCard key={g.alias} group={g} disabled={disabled || rates.busy} rates={rates} routing={routing} onOpen={onOpen} settings={() => setSettingsID(g.alias)} />)}</section>}
+      : <section className="model-grid" aria-label="模型别名" tabIndex={0}>{[...split.visible, ...split.unavailable].map(g => <ModelCard key={g.alias} group={g} disabled={disabled || rates.busy} rates={rates} routing={routing} onOpen={onOpen} settings={() => setSettingsID(g.alias)} />)}</section>}
   </div>;
 }

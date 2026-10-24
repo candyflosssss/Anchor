@@ -618,7 +618,7 @@ test('model sections show individual Key cards with a consistent default layout 
   expect(modelBoxes).toHaveLength(2);
   expect(modelBoxes[1].y).toBe(modelBoxes[0].y);
   expect(modelBoxes[1].x).toBeGreaterThanOrEqual(modelBoxes[0].x + modelBoxes[0].width);
-  expect(modelBoxes[0].width).toBeLessThanOrEqual(300);
+  expect(modelBoxes[0].width).toBeGreaterThanOrEqual(334);
   const header = await card.locator('.model-section-header').evaluate(node => {
     const title = node.querySelector('.model-title')!.getBoundingClientRect();
     const toolbar = node.querySelector('.route-toolbar')!.getBoundingClientRect();
@@ -677,12 +677,13 @@ test('multiple scoped Keys drag independently across providers and persist after
   await expect(model.getByLabel('来源 Key unrelated', { exact: true })).toHaveCount(0);
   await expect(model.locator('details')).toHaveCount(0);
   const expectVerticalCards = async () => {
+    const modelBox = await model.boundingBox();
     const boxes = await cards.evaluateAll(nodes => nodes.map(node => {
       const { x, y, width, height } = node.getBoundingClientRect();
       return { x, y, width, height };
     }));
     for (const [i, box] of boxes.entries()) {
-      expect(box!.width).toBeLessThanOrEqual(300);
+      expect(box!.width).toBeCloseTo(modelBox!.width - 34, 0);
       expect(box!.x).toBe(boxes[0]!.x);
       if (i) expect(box!.y).toBeGreaterThanOrEqual(boxes[i - 1]!.y + boxes[i - 1]!.height);
     }
@@ -698,11 +699,13 @@ test('multiple scoped Keys drag independently across providers and persist after
   await expect(model.getByRole('button', { name:'按倍率', exact:true })).toBeEnabled();
   const expensive = model.getByRole('group', {name:'摸鱼AI · Key expensive', exact:true});
   const target = model.getByRole('group', {name:'备用供应商 · Key default', exact:true});
+  const sourceWidth = (await expensive.boundingBox())!.width;
   const from = await expensive.locator('.mapping-key-name').boundingBox(), to = await target.boundingBox();
   if (!from || !to) throw Error('missing Key geometry');
   await page.mouse.move(from.x+from.width/2,from.y+from.height/2); await page.mouse.down();
   await page.mouse.move(to.x+to.width/2,to.y+to.height/2,{steps:8});
   await expect(model.locator('.is-drag-placeholder')).toHaveCount(1);
+  expect((await page.locator('.route-drag-preview .mapping-key-card').boundingBox())!.width).toBeCloseTo(sourceWidth, 0);
   await expect(model.getByRole('group',{name:'摸鱼AI · Key cheap',exact:true})).toHaveCSS('opacity','1');
   await page.mouse.up();
   await expect(model.getByRole('button', { name:'按倍率', exact:true })).toBeEnabled();
@@ -731,8 +734,8 @@ test('multiple scoped Keys drag independently across providers and persist after
     }));
     expect(modelColumns[1].y).toBe(modelColumns[0].y);
     expect(modelColumns[1].x).toBeGreaterThanOrEqual(modelColumns[0].x + modelColumns[0].width);
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-light.png` });
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-detail.png`, clip: {
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/masonry-models-light.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/masonry-models-detail.png`, clip: {
       x: modelColumns[0].x, y: modelColumns[0].y,
       width: modelColumns[1].x + modelColumns[1].width - modelColumns[0].x,
       height: Math.max(...modelColumns.map(b => b.y + b.height)) - modelColumns[0].y,
@@ -740,10 +743,10 @@ test('multiple scoped Keys drag independently across providers and persist after
     await model.locator('.candidate-list').screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/vertical-compact-key-cards-detail.png` });
     await page.getByRole('button', { name: '深色', exact: true }).click();
     await expectVerticalCards();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-dark.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/masonry-models-dark.png` });
     await page.setViewportSize({ width: 600, height: 850 });
     await expectVerticalCards();
-    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/horizontal-models-narrow.png` });
+    await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_CAPTURE_DIR}/masonry-models-narrow.png` });
   }
 });
 
@@ -777,9 +780,9 @@ test('model routing previews pointer sorting and automatically saves rules with 
   expect(handle).toBeTruthy(); expect(target).toBeTruthy();
   await page.mouse.move(handle!.x + handle!.width / 2, handle!.y + handle!.height / 2);
   await page.mouse.down(); await page.mouse.move(target!.x + 40, target!.y + target!.height / 2, { steps: 8 });
-  await expect(card.locator('.route-drag-preview')).toBeVisible();
+  await expect(page.locator('.route-drag-preview')).toBeVisible();
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
-  await expect(card.locator('.route-drag-preview .mapping-key-name')).toHaveText('default');
+  await expect(page.locator('.route-drag-preview .mapping-key-name')).toHaveText('default');
   await page.mouse.up();
   await expect(card).toBeVisible();
   await expect(card.locator('.route-save-state')).toContainText('已自动保存');
@@ -812,7 +815,7 @@ test('whole Key cards drag from supplier text without opening editing and keep o
   await expect(model).toBeVisible();
   await page.mouse.move(origin!.x + 10, origin!.y + 8);
   await page.mouse.down(); await page.mouse.move(target!.x + target!.width / 2, target!.y + target!.height / 2, { steps: 10 });
-  await expect(model.locator('.route-drag-preview .mapping-key-card')).toBeVisible();
+  await expect(page.locator('.route-drag-preview .mapping-key-card')).toBeVisible();
   await page.mouse.up();
   await expect(model).toBeVisible();
   await expect(model.locator('.route-save-state')).toContainText('已自动保存');
@@ -830,9 +833,9 @@ test('model routing cancels pointer sorting and supports keyboard ordering (simu
   const grip = card.getByRole('button', { name: '拖动 摸鱼AI upstream-shared-one Key default', exact: true });
   const box = await grip.boundingBox();
   await page.mouse.move(box!.x + 10, box!.y + 10); await page.mouse.down(); await page.mouse.move(box!.x + 10, box!.y + 130, { steps: 6 });
-  await expect(card.locator('.route-drag-preview')).toBeVisible();
+  await expect(page.locator('.route-drag-preview')).toBeVisible();
   await page.keyboard.press('Escape'); await page.mouse.up();
-  await expect(card.locator('.route-drag-preview')).toHaveCount(0);
+  await expect(page.locator('.route-drag-preview')).toHaveCount(0);
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
   await grip.focus(); await page.keyboard.press('ArrowDown');
   await expect(card.locator('.route-save-state')).toContainText('已自动保存');
@@ -916,7 +919,7 @@ test('model routing does not retry an acknowledged write when reloading fails (s
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(1);
 });
 
-test('model board stays on one row and supports horizontal pointer and keyboard browsing (simulated host)', async ({ page }) => {
+test('model board forms responsive vertical masonry columns without horizontal overflow (simulated host)', async ({ page }) => {
   await host(page, true);
   await page.evaluate(() => {
     const api = window.go!.desktop!.Bridge!, read = api.ProviderWorkspace;
@@ -924,8 +927,10 @@ test('model board stays on one row and supports horizontal pointer and keyboard 
       const result = await read(input);
       if (result.data?.models.length) {
         const m = result.data.models[0];
+        const key = result.data.keys[0];
+        result.data.keys = Array.from({ length: 3 }, (_, i) => ({ ...key, id: `masonry-key-${i}`, enabled: true, state: 'ready' }));
         result.data.models = ['claude-opus-4.6', 'deepseek-v4.1-flash', 'gpt-6-astra', 'z-custom', 'z-gemini-3-pro', 'z-qwen3', 'z-unknown', 'z-unavailable'].map((id, i) => ({
-          ...m, id, key_ids: i === 7 ? ['missing'] : m.key_ids,
+          ...m, id, key_ids: i === 7 ? ['missing'] : result.data!.keys.slice(0, i % 3 + 1).map(k => k.id),
         }));
       }
       return result;
@@ -938,59 +943,49 @@ test('model board stays on one row and supports horizontal pointer and keyboard 
   await expect(board.locator('details')).toHaveCount(0);
   await expect(board.getByRole('article').last()).toHaveClass(/availability-unavailable/);
 
-  for (const width of [1440, 600]) {
+  for (const [width, columns] of [[1920, 4], [1440, 3], [1100, 2], [600, 1], [390, 1]]) {
     await page.setViewportSize({ width, height: 1000 });
     const geometry = await board.evaluate(el => ({
-      tops: Array.from(el.children).map(n => n.getBoundingClientRect().top),
+      cards: Array.from(el.children).map(n => {
+        const { x, y, width, height } = n.getBoundingClientRect();
+        return { x: Math.round(x), y, width, height };
+      }),
       overflows: el.scrollWidth > el.clientWidth,
       pageFits: document.documentElement.scrollWidth <= innerWidth,
-      widths: { page: document.documentElement.scrollWidth, viewport: innerWidth, board: el.clientWidth },
     }));
-    expect(new Set(geometry.tops).size).toBe(1);
-    expect(geometry.overflows).toBe(true);
+    const positions = [...new Set(geometry.cards.map(c => c.x))];
+    expect(positions).toHaveLength(columns);
+    expect(geometry.overflows, JSON.stringify(geometry)).toBe(false);
     expect(geometry.pageFits, JSON.stringify(geometry)).toBe(true);
-    await board.focus();
-    await page.keyboard.press('Home');
-    const box = await board.boundingBox();
-    if (!box) throw Error('missing model board geometry');
-    // Grab the non-interactive model heading; Key cards keep vertical sorting.
-    const x = box.x + 240, y = box.y + 18;
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x - 160, y, { steps: 8 });
-    await expect(board).toHaveClass(/is-panning/);
-    await page.mouse.up();
-    expect(await board.evaluate(el => el.scrollLeft)).toBeGreaterThan(100);
-    await expect(board).not.toHaveClass(/is-panning/);
-    await page.mouse.move(x - 160, y);
-    await page.mouse.down();
-    await page.mouse.move(x, y, { steps: 8 });
-    await page.mouse.up();
-    expect(await board.evaluate(el => el.scrollLeft)).toBeLessThan(10);
-    await board.focus();
-    await page.keyboard.press('ArrowRight');
-    expect(await board.evaluate(el => el.scrollLeft)).toBeGreaterThan(100);
-    await page.keyboard.press('End');
-    expect(await board.evaluate(el => el.scrollWidth - el.clientWidth - el.scrollLeft)).toBeLessThan(2);
-    await page.keyboard.press('Home');
-    expect(await board.evaluate(el => el.scrollLeft)).toBe(0);
-    if (process.env.ANCHOR_MAPPING_PREVIEW) {
-      await page.emulateMedia({ reducedMotion: 'no-preference' });
-      await board.getByRole('article').first().getByRole('heading').hover();
-      await expect.poll(() => board.getByRole('article').first().evaluate(el => getComputedStyle(el).translate)).toBe('0px -4px');
-      await board.evaluate(el => { el.blur(); el.scrollLeft = 0; });
-      await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/board-${width === 1440 ? 'light' : 'dark-narrow'}.png` });
-      if (width === 1440) await board.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/glass-light.png` });
-      await page.emulateMedia({ reducedMotion: 'reduce' });
-    }
-    if (width === 1440) {
-      await page.getByRole('button', { name: '深色', exact: true }).click();
-      if (process.env.ANCHOR_MAPPING_PREVIEW) {
-        await page.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/board-dark.png` });
-        await board.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/glass-dark.png` });
+    // Logical reading order follows each column from top to bottom, then right.
+    const ordered = [...geometry.cards].sort((a, b) => a.x - b.x || a.y - b.y);
+    expect(geometry.cards).toEqual(ordered);
+    for (const x of positions) {
+      const stack = geometry.cards.filter(c => c.x === x);
+      for (let i = 1; i < stack.length; i++) {
+        expect(stack[i].y - stack[i - 1].y - stack[i - 1].height).toBeCloseTo(20, 0);
       }
     }
+    // No card is split across columns, and sources keep a single vertical stack.
+    expect(await board.locator('.mapping-key-card').evaluateAll(nodes => nodes.every(node => {
+      const card = node.getBoundingClientRect(), model = node.closest('.model-card')!.getBoundingClientRect();
+      return node.getClientRects().length === 1 && card.left >= model.left && card.right <= model.right && card.top >= model.top && card.bottom <= model.bottom;
+    }))).toBe(true);
+    if (process.env.ANCHOR_MAPPING_PREVIEW) {
+      await page.screenshot({ animations: 'disabled', path: `${process.env.ANCHOR_MAPPING_PREVIEW}/masonry-${width}-light.png` });
+      await page.evaluate(() => document.documentElement.classList.add('dark'));
+      await page.screenshot({ animations: 'disabled', path: `${process.env.ANCHOR_MAPPING_PREVIEW}/masonry-${width}-dark.png` });
+      await page.evaluate(() => document.documentElement.classList.remove('dark'));
+    }
   }
+  // Column count responds to content width, including the sidebar at a fixed viewport.
+  await page.setViewportSize({ width: 1200, height: 1000 });
+  const columnCount = () => board.evaluate(el => new Set(Array.from(el.children).map(n => Math.round(n.getBoundingClientRect().x))).size);
+  await expect.poll(columnCount).toBe(2);
+  await page.locator('[data-sidebar=trigger]').click();
+  await expect.poll(columnCount).toBe(3);
+  await page.locator('[data-sidebar=trigger]').click();
+  await expect.poll(columnCount).toBe(2);
   expect(await page.evaluate(() => window.routingTest.calls.length)).toBe(0);
   expect(await page.evaluate(() => window.desktopTest.saves)).toBe(0);
 });

@@ -1,11 +1,9 @@
 .workspace.models-workspace { max-width: none; }
-.workspace .model-grid { position: relative; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: min(100%, 334px); gap: 20px; align-items: start; overflow-x: auto; overscroll-behavior-x: contain; padding: 12px 8px 32px; touch-action: pan-y; cursor: grab; }
+.workspace .model-grid { display: block; position: relative; column-width: 334px; column-gap: 20px; padding: 12px 8px; }
 .model-grid:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; border-radius: 4px; }
-.model-grid.is-panning { cursor: grabbing; user-select: none; }
-.model-grid .model-title { user-select: none; }
 .model-card {
   --model-accent: 215 16% 54%;
-  position: relative; isolation: isolate; min-width: 0; padding: 16px;
+  position: relative; isolation: isolate; min-width: 0; width: 100%; padding: 16px; margin-bottom: 20px; break-inside: avoid;
   border: 1px solid transparent; border-radius: 22px;
   background: radial-gradient(ellipse at 0% 0%, hsl(var(--model-accent) / .19), transparent 68%), linear-gradient(150deg, hsl(var(--card) / .92), hsl(var(--card) / .72));
   -webkit-backdrop-filter: blur(18px) saturate(135%); backdrop-filter: blur(18px) saturate(135%);
@@ -24,7 +22,6 @@
   .model-card:hover:not(.is-sorting) { translate: 0 -4px; box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), 0 5px 12px hsl(var(--model-accent) / .08), 0 18px 30px hsl(var(--model-accent) / .14); }
   .dark .model-card:hover:not(.is-sorting) { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .14), 0 6px 14px hsl(0 0% 0% / .2), 0 18px 32px hsl(var(--model-accent) / .13); }
 }
-.model-grid.is-panning .model-card { translate: none; }
 .model-card:focus-within { border-color: hsl(var(--ring) / .12); }
 .model-card > .model-section-header { padding-bottom: 14px; border-bottom: 1px solid hsl(var(--foreground) / .05); }
 .model-card .model-title h2 { color: color-mix(in srgb, hsl(var(--model-accent)) 27%, hsl(var(--foreground))); }
@@ -47,10 +44,10 @@
 .route-toolbar > select { width: auto; max-width: 100%; font-size: 12px; height: 32px; }
 .route-quick-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .route-quick-sort > span { font-size: 12px; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
-.model-card .candidate-list { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 300px; gap: 10px; padding: 0; margin: 0; list-style: none; }
+.model-card .candidate-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 0; margin: 0; list-style: none; }
 /* The route wrapper owns order only. Every source Key has its own visible card. */
 .mapping-candidate { display: contents; }
-.mapping-key-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(46px, 76px) 20px; align-items: center; gap: 8px 12px; min-width: 0; width: 100%; max-width: 300px; min-height: 80px; padding: 12px 10px 12px 14px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); box-shadow: 0 1px 2px hsl(var(--foreground) / .04), inset 0 1px 0 hsl(var(--background) / .5); transition: border-color 140ms, box-shadow 140ms, background-color 140ms; }
+.mapping-key-card { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(46px, 76px) 20px; align-items: center; gap: 8px 12px; min-width: 0; width: 100%; min-height: 80px; padding: 12px 10px 12px 14px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--card)); box-shadow: 0 1px 2px hsl(var(--foreground) / .04), inset 0 1px 0 hsl(var(--background) / .5); transition: border-color 140ms, box-shadow 140ms, background-color 140ms; }
 .dark .mapping-key-card { background: color-mix(in srgb, hsl(var(--card)) 70%, hsl(var(--muted))); }
 .mapping-key-card[data-sortable] { cursor: grab; touch-action: none; user-select: none; }
 .mapping-key-card[data-sortable]:hover { border-color: hsl(var(--muted-foreground) / .45); background: hsl(var(--muted) / .2); box-shadow: 0 2px 6px hsl(var(--foreground) / .07); }
