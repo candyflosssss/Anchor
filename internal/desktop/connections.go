@@ -20,6 +20,12 @@ func (b *Bridge) Connections() ConnectionProfilesResult {
 		return out
 	}
 	defer st.Close()
+	selected, err := st.DesktopSelection()
+	if err != nil {
+		out.Problem = problem(err, false)
+		return out
+	}
+	out.Data[0].Selected = selected == "@local"
 	if cfg, err := st.Settings(); err == nil {
 		out.Data[0].InstanceID = cfg.InstanceID
 	}
@@ -34,7 +40,7 @@ func (b *Bridge) Connections() ConnectionProfilesResult {
 			if c.SSHAuth == "password" {
 				auth = "password"
 			}
-			out.Data = append(out.Data, ConnectionProfile{Authentication: auth, Name: c.Name, Transport: "ssh", Target: c.SSHTarget, InstanceID: c.InstanceID, Active: s.remote != nil && s.remote.Profile.Name == c.Name})
+			out.Data = append(out.Data, ConnectionProfile{Authentication: auth, Name: c.Name, Transport: "ssh", Target: c.SSHTarget, InstanceID: c.InstanceID, Active: s.remote != nil && s.remote.Profile.Name == c.Name, Selected: selected == c.Name})
 		}
 	}
 	return out

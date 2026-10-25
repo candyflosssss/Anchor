@@ -370,6 +370,8 @@ type ConnectionProfile struct {
 	Target         string `json:"target"`
 	InstanceID     string `json:"instance_id"`
 	Active         bool   `json:"active"`
+	// Selected is the saved desktop target, even before authentication succeeds.
+	Selected bool `json:"selected,omitempty"`
 }
 type SSHConnectionInput struct {
 	Password          string `json:"password"`

@@ -22,6 +22,7 @@ export function ConnectionsView({ currentProfile, disabled, onConnected, onActiv
         <div className="min-w-0 flex-1"><strong>{profile.transport === 'local' ? '本机' : profile.name}</strong><p className="text-muted-foreground break-all">{profile.transport === 'local' ? '本机 Anchor 核心' : profile.target}</p>{profile.instance_id && <p className="text-xs text-muted-foreground break-all">实例 {profile.instance_id}</p>}</div>
         {profile.authentication === 'password' && <label className="text-xs">SSH 密码<Input type="password" autoComplete="off" aria-label={`${profile.name} 的 SSH 密码`} disabled={busy} value={c.passwords[profile.name] ?? ''} onChange={e => c.setPasswords(p => ({ ...p, [profile.name]: e.target.value }))} placeholder={profile.active ? '当前连接可直接复用' : '本次登录使用，不保存'} /></label>}
         {profile.active && <span className="text-xs text-muted-foreground">当前设备</span>}
+        {!profile.active && profile.selected && <span className="text-xs text-muted-foreground">已选设备（未连接）</span>}
         <Button variant="outline" disabled={busy} onClick={() => { void c.connect(profile.name); }}>{c.pending === profile.name && <LoaderCircle className="animate-spin" />}{profile.active ? '重新连接' : '连接'}</Button>
       </article>)}
     </section>

@@ -27,6 +27,7 @@
         "target": "developer@192.0.2.10",
         "instance_id": "remote-fixture",
         "active": true,
+        "selected": true,
         "authentication": "key"
       }
     ],

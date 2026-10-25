@@ -92,8 +92,13 @@ for (const stage of ['startup', 'disconnected'] as const) {
       await page.evaluate(() => { (window as unknown as { reconnectTest: { authFailed: boolean } }).reconnectTest.authFailed = true; });
     }
     await expect(page.getByRole('heading', { name: '当前设备暂不可用' })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('连接目标：dev-server（SSH：developer@192.0.2.10）', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /dev-server · 未连接/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /本机实例 · 未连接/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '恢复本机核心', exact: true })).toHaveCount(0);
     await page.getByRole('button', { name: '重新连接当前设备', exact: true }).click();
     await expect(page.getByRole('heading', { name: '设备连接', exact: true })).toBeVisible();
+    await expect(page.getByText('已选设备（未连接）', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { reconnectTest: { starts: number; calls: unknown[] } }).reconnectTest)).toMatchObject({ starts: 1, calls: [] });
     const device = page.locator('.connection-profile').filter({ hasText: 'dev-server' });
     const password = device.getByLabel('dev-server 的 SSH 密码');
@@ -128,6 +133,31 @@ test('offline local reconnect retries startup and also offers device management'
   await expect(page.getByRole('button', { name: /本机实例 · 已连接/ })).toBeVisible();
   await expect(page.getByRole('heading', { name: '供应商', exact: true })).toBeVisible();
 });
+
+for (const selection of ['local', 'legacy', 'ambiguous', 'unreadable']) {
+  test(`offline device identity handles ${selection} profiles without guessing`, async ({ page }) => {
+    await page.addInitScript(({ fixture, selection }) => {
+      const contract = fixture.contract;
+      const profiles = fixture.profiles.data.map(row => {
+        const profile = { ...row, selected: selection === 'ambiguous' || (selection === 'local' && row.transport === 'local') };
+        if (selection === 'legacy') delete (profile as { selected?: boolean }).selected;
+        return profile;
+      });
+      window.go = { desktop: { Bridge: new Proxy({}, { get: (_, key) => async () => key === 'Connections' && selection !== 'unreadable' ? ({ contract, data: profiles, problem: null }) : ({ contract, data: null, problem: { code: 'offline' } }) }) as DesktopBridge } };
+    }, { fixture, selection });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: '当前设备暂不可用' })).toBeVisible();
+    if (selection === 'local') {
+      await expect(page.getByText('连接目标：本机（此电脑）', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: /本机实例 · 未连接/ })).toBeVisible();
+    } else {
+      await expect(page.getByRole('button', { name: /设备待确认 · 未连接/ })).toBeVisible();
+      await expect(page.getByText('连接目标尚未确认，请前往设备连接查看或选择设备。', { exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: /本机实例 · 未连接/ })).toHaveCount(0);
+    }
+    await expect(page.getByRole('button', { name: '恢复本机核心', exact: true })).toHaveCount(0);
+  });
+}
 
 async function quickSwitchHost(page: import('@playwright/test').Page, authentication = 'key') {
   await page.addInitScript(({ fixture, authentication }) => {

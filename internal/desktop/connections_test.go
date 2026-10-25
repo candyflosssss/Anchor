@@ -330,6 +330,9 @@ func TestConnectionSharedFixture(t *testing.T) {
 	if fixture.Contract != Contract || fixture.Input.TrustNewHost || fixture.Session.Data.Transport != "ssh" || len(fixture.Profiles.Data) != 2 {
 		t.Fatal("connection fixture drift")
 	}
+	if !fixture.Profiles.Data[1].Selected || fixture.Profiles.Data[0].Selected {
+		t.Fatal("selected device fixture drift")
+	}
 }
 
 func TestPasswordDesktopConnectionPinsHostAndForgetsSecret(t *testing.T) {
@@ -370,6 +373,14 @@ func TestPasswordDesktopConnectionPinsHostAndForgetsSecret(t *testing.T) {
 	fb := NewBridge(fresh)
 	if r := fb.Start(); r.Problem == nil || r.Problem.Code != "ssh_auth" {
 		t.Fatalf("password survived restart: %+v", r.Problem)
+	}
+	profiles := fb.Connections()
+	if profiles.Problem != nil || len(profiles.Data) != 2 || !profiles.Data[1].Selected || profiles.Data[0].Selected || profiles.Data[1].Active || profiles.Data[1].Name != input.Name || profiles.Data[1].Target != input.Target {
+		t.Fatalf("failed authentication lost selected device: %+v", profiles)
+	}
+	encoded, err := json.Marshal(profiles)
+	if err != nil || bytes.Contains(encoded, []byte(input.Password)) {
+		t.Fatal("selected device disclosed password", err)
 	}
 	if r := fb.UseConnection(SelectConnection{Name: input.Name, Password: input.Password}); r.Problem != nil {
 		t.Fatalf("password reconnect: %+v", r.Problem)

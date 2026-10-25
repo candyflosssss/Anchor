@@ -303,6 +303,7 @@ export interface ConnectionProfile {
   target: string;
   instance_id: string;
   active: boolean;
+  selected?: boolean;
 }
 export interface SSHConnectionInput {
   password: string;
