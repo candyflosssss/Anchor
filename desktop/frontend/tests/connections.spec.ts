@@ -64,6 +64,71 @@ test('connection screen is usable when local core is offline', async ({ page }) 
   await expect(page.getByRole('button', { name: '添加并连接' })).toBeEnabled();
 });
 
+for (const stage of ['startup', 'disconnected'] as const) {
+  test(`offline reconnect opens password recovery after SSH auth failure at ${stage}`, async ({ page }) => {
+    await page.addInitScript(({ fixture, stage }) => {
+      const contract = fixture.contract;
+      const state = { starts: 0, authFailed: stage === 'startup', calls: [] as { name: string; password: string }[] };
+      Object.assign(window, { reconnectTest: state });
+      const failure = () => ({ contract, data: null, problem: { code: 'ssh_auth' } });
+      const operations = {
+        Start: async () => { state.starts++; return state.authFailed ? failure() : fixture.session; },
+        Status: async () => state.authFailed ? failure() : fixture.session,
+        Providers: async () => ({ contract, data: [], problem: null }),
+        Connections: async () => ({ contract, data: fixture.profiles.data.map(row => ({ ...row, authentication: row.transport === 'ssh' ? 'password' : 'owner' })), problem: null }),
+        UseConnection: async (input: { name: string; password: string }) => {
+          state.calls.push(input);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          if (input.name !== 'dev-server' || input.password !== 'reconnect-fixture-password') return failure();
+          state.authFailed = false;
+          return fixture.session;
+        },
+      };
+      window.go = { desktop: { Bridge: new Proxy(operations, { get: (target, key) => target[key as keyof typeof operations] ?? (async () => ({ contract, data: null, problem: { code: 'unsupported' } })) }) as unknown as DesktopBridge } };
+    }, { fixture, stage });
+    await page.goto('/');
+    if (stage === 'disconnected') {
+      await expect(page.getByRole('button', { name: /dev-server · 已连接/ })).toBeVisible();
+      await page.evaluate(() => { (window as unknown as { reconnectTest: { authFailed: boolean } }).reconnectTest.authFailed = true; });
+    }
+    await expect(page.getByRole('heading', { name: '当前设备暂不可用' })).toBeVisible({ timeout: 8000 });
+    await page.getByRole('button', { name: '重新连接当前设备', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '设备连接', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { reconnectTest: { starts: number; calls: unknown[] } }).reconnectTest)).toMatchObject({ starts: 1, calls: [] });
+    const device = page.locator('.connection-profile').filter({ hasText: 'dev-server' });
+    const password = device.getByLabel('dev-server 的 SSH 密码');
+    await password.fill('wrong-fixture-password');
+    await device.getByRole('button', { name: /^(重新连接|连接)$/ }).click();
+    await expect(password).toHaveValue('');
+    await expect(page.getByRole('alert')).toContainText('SSH 鉴权失败');
+    await password.fill('reconnect-fixture-password');
+    await device.getByRole('button', { name: /^(重新连接|连接)$/ }).click();
+    await expect(device.getByRole('button', { name: /^(重新连接|连接)$/ })).toBeDisabled();
+    await expect(password).toHaveValue('');
+    await expect(page.getByRole('button', { name: /dev-server · 已连接/ })).toBeVisible();
+    await page.getByRole('button', { name: '供应商', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '供应商', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain('fixture-password');
+  });
+}
+
+test('offline local reconnect retries startup and also offers device management', async ({ page }) => {
+  await page.addInitScript(() => {
+    let starts = 0;
+    const contract = 'anchor-desktop-v1';
+    const operations = {
+      Start: async () => ({ contract, data: ++starts === 1 ? null : { instance_id: 'local-fixture', profile_name: '@local', transport: 'local', target: '本机', source: 'reused', phase: 'ready', can_stop: true }, problem: starts === 1 ? { code: 'offline' } : null }),
+      Providers: async () => ({ contract, data: [], problem: null }),
+    };
+    window.go = { desktop: { Bridge: new Proxy(operations, { get: (target, key) => target[key as keyof typeof operations] ?? (async () => ({ contract, data: null, problem: { code: 'unsupported' } })) }) as unknown as DesktopBridge } };
+  });
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: '管理设备连接', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '重新连接当前设备', exact: true }).click();
+  await expect(page.getByRole('button', { name: /本机实例 · 已连接/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '供应商', exact: true })).toBeVisible();
+});
+
 async function quickSwitchHost(page: import('@playwright/test').Page, authentication = 'key') {
   await page.addInitScript(({ fixture, authentication }) => {
     const contract = fixture.contract;

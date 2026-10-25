@@ -62,7 +62,11 @@ export function App() {
         <h1 className="text-xl font-semibold">{session.restarting ? '正在重启核心…' : session.phase === 'starting' ? '正在连接核心…' : session.phase === 'stopped' ? '停服请求已接受' : '当前设备暂不可用'}</h1>
         {(session.error || session.phase === 'stopped') && <p className="my-4 text-sm text-muted-foreground">{session.error ? session.errorMessage : '核心正在处理退出与配置恢复。'}</p>}
         {session.phase !== 'starting' && <div className="flex flex-wrap gap-2">
-          <Button disabled={busy || session.stopping} onClick={() => void (session.error === 'unknown' ? session.check() : session.connect())}>{session.error === 'unknown' ? '检查核心状态' : '重新连接当前设备'}</Button>
+          <Button disabled={busy || session.stopping} onClick={() => {
+            if (session.error === 'ssh_auth') navigate('connections');
+            else void (session.error === 'unknown' ? session.check() : session.connect());
+          }}>{session.error === 'unknown' ? '检查核心状态' : '重新连接当前设备'}</Button>
+          <Button variant="outline" disabled={busy || session.stopping} onClick={() => navigate('connections')}>管理设备连接</Button>
           {session.target?.transport === 'local' && <Button variant="outline" disabled={busy || session.stopping || session.error === 'unknown'} onClick={() => setConfirmRestart(true)}>恢复本机核心</Button>}
         </div>}
       </section>}
