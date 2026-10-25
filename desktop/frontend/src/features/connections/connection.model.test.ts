@@ -20,6 +20,14 @@ describe('connection public contract', () => {
     expect(checkedProfiles([{ ...fixture.profiles.data[1], active: false }])[0]).toMatchObject({ selected: true, active: false });
     expect(checkedProfiles([fixture.profiles.data[0]])[0]).not.toHaveProperty('selected');
   });
+  it('distinguishes password storage capability from older hosts and rejects invalid markers', () => {
+    const row = fixture.profiles.data[1];
+    expect(checkedProfiles([{ ...row, password_saved: true }])[0].password_saved).toBe(true);
+    for (const missing of [undefined, null]) {
+      expect(checkedProfiles([{ ...row, password_saved: missing }])[0]).not.toHaveProperty('password_saved');
+    }
+    expect(() => checkedProfiles([{ ...row, password_saved: 'yes' } as never])).toThrow();
+  });
   it('selects public fields so unknown secrets cannot propagate', () => {
     const rows = checkedProfiles([{ ...fixture.profiles.data[1], token: 'synthetic-private', endpoint: 'http://arbitrary' } as never]);
     expect(JSON.stringify(rows)).not.toContain('synthetic-private');

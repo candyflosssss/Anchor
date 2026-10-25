@@ -22,6 +22,7 @@ type Options struct {
 	StartTimeout                                    time.Duration
 	SaveLogFile                                     func() (string, error)
 	Quit                                            func()
+	PasswordVault                                   connection.PasswordVault
 }
 type Session struct {
 	mu                   sync.Mutex

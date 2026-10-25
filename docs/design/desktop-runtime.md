@@ -6,7 +6,7 @@
 
 ## 1. 宿主接口
 
-规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Connections、ConnectSSH、UseConnection、Providers、SaveProvider、StopCore、RestartCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
+规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Connections、ConnectSSH、UseConnection、ForgetConnectionPassword、Providers、SaveProvider、StopCore、RestartCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
 
 每个结果带 `contract=anchor-desktop-v1`、data 与 problem；problem 仅含白名单 code，不返回原始错误、路径、管理令牌或供应商秘密。列表始终为数组。返回 Provider revision 为 1..Number.MAX_SAFE_INTEGER；写入 expected_revision 为 0..MAX_SAFE_INTEGER-1，且等于输入 provider.revision，超范围拒绝。SaveProvider 的 secret=null 保留、空字符串清除、非空替换；只入不出。写入发生网络/响应异常时返回 unknown，不自动重试；409 为 conflict、认证失败为 unauthorized。
 
@@ -161,10 +161,20 @@ Connections 仅返回公开档案（name、transport、authentication、target�
 
 2026-10-25 设备身份展示增量（源码，未打包）：ConnectionProfile 增加可选布尔 `selected`，由宿主读取独立的 desktop_context；默认无记录选中 @local，仅选中档案序列化 true，其余省略。它与 active 独立，保存的密码设备在重启后鉴权失败仍能返回名称和 SSH 目标，不把选中档案当成已连接、ready 或授权身份。断线面板、顶栏和设备切换弹层显示连接目标，设备页标记「已选设备（未连接）」；已有会话时优先使用已验证 SessionInfo，重启／停止仍只能使用原会话身份。旧宿主缺 selected、读取失败或目标不唯一时显示「设备待确认」，不从第一项、本机默认值或 active 猜测。查询取消／切换后丢弃迟到结果；不建立 SSH，不返回秘密，不改 CLI 的 current_context、输出或命令。
 
-宿主复用 internal/connection 与 CLI 相同的身份／授权／连接策略。密钥模式使用受限 OpenSSH 的 stdio 转发（ssh -W），不开放临时本机管理端口；密码模式使用内置 SSH 通道，首次明确同意后保存公开主机密钥，变化即拒绝。固定 bootstrap 命令只允许已验证 executable／端口；默认在 SSH 非交互 PATH 中查找，缺失时依次检查该账户的 ~/.local/bin/anchor、~/bin/anchor 和系统常见路径，指定路径不回退并支持 ~/。在不加载登录脚本的 POSIX shell 内执行，先检查 bootstrap --help，密钥和密码模式共用此策略；管理令牌保存在受权限保护 SQLite 凭据表，密码不保存。认证错误只返回白名单 code，不暴露 stderr／令牌。程序缺失（remote_anchor_missing）、引导不支持（remote_anchor_unsupported）、管理端口不匹配（remote_control_port）、核心未就绪（remote_core_not_ready）分别展示；其余引导失败／响应无效保留 remote_anchor。旧远端未提供细分诊断时保留通用错误。
+宿主复用 internal/connection 与 CLI 相同的身份／授权／连接策略。密钥模式使用受限 OpenSSH 的 stdio 转发（ssh -W），不开放临时本机管理端口；密码模式使用内置 SSH 通道，首次明确同意后保存公开主机密钥，变化即拒绝。固定 bootstrap 命令只允许已验证 executable／端口；默认在 SSH 非交互 PATH 中查找，缺失时依次检查该账户的 ~/.local/bin/anchor、~/bin/anchor 和系统常见路径，指定路径不回退并支持 ~/。在不加载登录脚本的 POSIX shell 内执行，先检查 bootstrap --help，密钥和密码模式共用此策略；管理令牌保存在受权限保护 SQLite 凭据表；SSH 密码默认不保存，显式选择后仅存系统凭据库（见下文）。认证错误只返回白名单 code，不暴露 stderr／令牌。程序缺失（remote_anchor_missing）、引导不支持（remote_anchor_unsupported）、管理端口不匹配（remote_control_port）、核心未就绪（remote_core_not_ready）分别展示；其余引导失败／响应无效保留 remote_anchor。旧远端未提供细分诊断时保留通用错误。
 
-切换先核验目标 ready 并保存独立 desktop_context，再替换当前连接；失败不破坏已有连接，不改 CLI current_context。保存的密码连接在下次启动要求重新输入。2026-10-25 源码修复：断线页收到 ssh_auth 时，「重新连接当前设备」进入设备连接页，复用已保存档案的本次密码输入与 UseConnection，不重复无密码 Start；其他错误仍按原流程重连，unknown 仍只读检查。断线页另提供「管理设备连接」入口，便于检查档案或选择其他设备。无新增桥接或 CLI 契约，未打包／原生验收。关闭宿主只关闭本次 SSH，不停止目标核心；StopCore 明确停止当前选中目标，升级安装则只停止本机核心，即使当前 UI 连接远端。旧授权失效后重新 SSH 签发仍必须匹配已绑定实例。远端必须预先安装支持 context bootstrap 的 Anchor，自动安装尚未实现。
+切换先核验目标 ready 并保存独立 desktop_context，再替换当前连接；失败不破坏已有连接，不改 CLI current_context。保存的密码连接默认在下次启动要求重新输入；显式记住密码后可从系统凭据库读取。2026-10-25 源码修复：断线页收到 ssh_auth 时，「重新连接当前设备」进入设备连接页，复用已保存档案的本次密码输入与 UseConnection，不重复无密码 Start；其他错误仍按原流程重连，unknown 仍只读检查。断线页另提供「管理设备连接」入口，便于检查档案或选择其他设备。无新增桥接或 CLI 契约，未打包／原生验收。关闭宿主只关闭本次 SSH，不停止目标核心；StopCore 明确停止当前选中目标，升级安装则只停止本机核心，即使当前 UI 连接远端。旧授权失效后重新 SSH 签发仍必须匹配已绑定实例。远端必须预先安装支持 context bootstrap 的 Anchor，自动安装尚未实现。
 
+
+## SSH 密码系统凭据库（2026-10-25 源码，未打包）
+
+- 桌面新连接和已保存密码档案均提供默认关闭的「记住密码」；ConnectSSH／UseConnection 增加可选 `remember_password`（省略／false不改变已存密码，true要求本次明确输入且成功鉴权、主机／实例校验与 ready后才保存）。不把空密码或掩码写入；写入后读取核对再标记成功，删除后核对条目确已不存在，避免系统提示取消却误报成功。输入提交即清空，前端持久化缓存与日志不保存密码。
+- Connections 的每行增加可选 `password_saved`（Go *bool，当前宿主均非null；false表示未保存，也表示宿主支持此能力，true是本机非秘密保存标记）。读取设备列表不访问／解锁系统凭据库，不返回密码。旧宿主缺少／返回null时界面隐藏保存选项；旧前端省略 remember_password 保持默认不保存，但已明确保存的档案仍可自动使用。
+- 宿主与 CLI 共用 internal/connection.Passwords，使用锁定的 github.com/zalando/go-keyring v0.2.6：Windows Credential Manager、Linux Secret Service 登录密钥环（不存在时使用默认密钥环别名）。服务命名空间 Anchor.SSH.Password.v1，账户键为数据目录、档案、SSH用户／地址／端口、固定主机密钥、Anchor实例的SHA256引用。SQLite meta只保存引用，不存密码；没有明文、前端localStorage或自带密钥文件回退。系统不存在、锁定、取消授权或密码超出系统限制时明确 credential_store。Windows单项密码限制2560bytes；更长密码仍可仅本次登录。
+- 未提供本次密码时，先复用可用的当前会话，或为已保存档案从凭据库读取并按原规则认证；本次输入优先，不勾选记住时不覆盖旧值。保存密码失效返回 ssh_auth，凭据缺失／读取失败不循环重试。系统解锁提示可能需要用户响应；当前适配库在此期间等待系统提示，不声称受SSH握手期限约束。仍校验固定SSH主机密钥与Anchor实例，不因保存密码自动接受新主机或重新绑定。
+- SessionResult 增加可选 warning:Problem；连接已ready、但密码存储未确认时 data有效、problem=null、warning.code=credential_store。前端发布成功会话并显示保存未确认提示；弹层保留提示，不把存储失败冒充SSH未连接。Start／Status不自动保存密码。其余失败沿用problem；原错误消息白名单增加credential_store。
+- ForgetConnectionPassword(SelectConnection)只使用name删除所选档案的系统密码及非秘密标记，不关闭连接或撤销远端管理授权；返回刷新后的ConnectionProfilesResult。已有密码时显示「忘记…的密码」，失败保留已保存状态，缺失项幂等。未获允许不会批量访问或清理系统凭据。
+- CLI同步提供context password save/status/forget，stdin不自动保存。完整语法、输出、失败与自动复用范围见[指令大全](../cli/commands.md)。此功能降低静态文件泄露风险，不能抵御当前用户账户已被控制；系统凭据库的加密、解锁策略由操作系统／用户配置决定，长期推荐密钥＋SSH Agent。
 
 ## 中文输入法桥接（2026-10-15，当前源码未打包）
 

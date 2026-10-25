@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/candyflosssss/Anchor/internal/client"
-	"github.com/candyflosssss/Anchor/internal/connection"
 	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/hostipc"
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -143,7 +142,7 @@ func (a App) remoteUpdate(ctx context.Context, dir, target string, args []string
 	}
 	ctx, cancel := context.WithTimeout(ctx, 6*time.Minute)
 	defer cancel()
-	live, err := connection.OpenWithPassword(ctx, st, profile, a.sshPassword)
+	live, err := a.passwords().Open(ctx, st, profile, a.sshPassword)
 	if err != nil {
 		return err
 	}

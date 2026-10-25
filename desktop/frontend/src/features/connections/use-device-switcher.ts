@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProblemCode, SessionInfo } from '../../desktop/contract.generated';
 import { DesktopProblem } from '../../desktop/transport';
-import { connections, type ConnectionProfile } from './connection.model';
+import { connections, passwordSaveWarning, type ConnectionProfile } from './connection.model';
 
 /** Lives outside the popover so dismissing it cannot discard a successful switch. */
 export function useDeviceSwitcher(onConnected: (info: SessionInfo) => void, onActivity: (busy: boolean) => void) {
@@ -9,6 +9,7 @@ export function useDeviceSwitcher(onConnected: (info: SessionInfo) => void, onAc
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<ProblemCode | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const alive = useRef(true), lock = useRef(false), generation = useRef(0);
   useEffect(() => {
     alive.current = true;
@@ -26,15 +27,16 @@ export function useDeviceSwitcher(onConnected: (info: SessionInfo) => void, onAc
       if (alive.current && epoch === generation.current) setLoading(false);
     }
   }, []);
-  async function connect(name: string, password = '') {
+  async function connect(name: string, password = '', remember = false) {
     if (lock.current) return false;
     lock.current = true; generation.current++;
-    setLoading(false); setPending(name); setError(null); onActivity(true);
+    setLoading(false); setPending(name); setError(null); setNotice(null); onActivity(true);
     try {
-      const info = await connections.use(name, password);
+      const result = await connections.use(name, password, remember);
       if (!alive.current) return false;
-      onConnected(info);
-      return true;
+      onConnected(result.info);
+      setNotice(result.passwordWarning ? passwordSaveWarning : null);
+      return !result.passwordWarning;
     } catch (e) {
       if (alive.current) setError(e instanceof DesktopProblem ? e.code : 'read_error');
       return false;
@@ -43,5 +45,5 @@ export function useDeviceSwitcher(onConnected: (info: SessionInfo) => void, onAc
       if (alive.current) { setPending(null); onActivity(false); }
     }
   }
-  return { profiles, loading, pending, error, refresh, connect };
+  return { profiles, loading, pending, error, notice, refresh, connect };
 }

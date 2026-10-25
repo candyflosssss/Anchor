@@ -46,7 +46,7 @@ func (a App) restart(ctx context.Context, dir, target string, args []string) err
 		if profile.Transport != "ssh" {
 			return errors.New("restart --context requires an SSH context")
 		}
-		live, err := connection.OpenWithPassword(ctx, st, profile, a.sshPassword)
+		live, err := a.passwords().Open(ctx, st, profile, a.sshPassword)
 		if err != nil {
 			return err
 		}

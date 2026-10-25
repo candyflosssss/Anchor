@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fixture from '../../contract/connections.json' with { type: 'json' };
-import type { DesktopBridge, SSHConnectionInput, SessionInfo } from '../src/desktop/contract.generated';
+import type { DesktopBridge, SSHConnectionInput, SessionInfo, SelectConnection } from '../src/desktop/contract.generated';
 
 test('UI enrolls, switches and preserves current device after failure', async ({ page }) => {
   await page.addInitScript(({ fixture }) => {
@@ -308,4 +308,108 @@ test('device password popover does not close or connect while accepting IME cand
   await page.getByRole('button', { name: /dev-server · 已连接/ }).click();
   await panel.press('Escape');
   await expect(panel).toBeHidden();
+});
+
+async function passwordVaultHost(page: import('@playwright/test').Page, created = true) {
+  const state = { created, saved: false, current: '', selected: created ? 'dev-server' : '@local', failSave: false, failForget: false, calls: [] as { method: string; input: SelectConnection | SSHConnectionInput | undefined }[] };
+  const contract = fixture.contract;
+  const local: SessionInfo = { ...fixture.session.data, instance_id: 'local-fixture', profile_name: '@local', transport: 'local', target: '本机', source: 'reused' };
+  const profiles = () => ({ contract, data: fixture.profiles.data.filter(row => row.transport === 'local' || state.created).map(row => ({ ...row, active: state.current === row.name, selected: state.selected === row.name, authentication: row.transport === 'ssh' ? 'password' : 'owner', password_saved: row.transport === 'ssh' && state.saved })), problem: null });
+  await page.exposeFunction('passwordVaultHost', async (method: string, input?: SelectConnection | SSHConnectionInput) => {
+    const failure = (code: string) => ({ contract, data: null, problem: { code } });
+    if (method === 'Connections') return profiles();
+    if (method === 'Providers') return { contract, data: [], problem: null };
+    if (method === 'Status') return { contract, data: state.current === '@local' ? local : fixture.session.data, problem: null };
+    if (method === 'Start') {
+      if (!state.created) { state.current = '@local'; return { contract, data: local, problem: null }; }
+      if (!state.saved) return failure('ssh_auth');
+      state.current = 'dev-server'; return fixture.session;
+    }
+    state.calls.push({ method, input });
+    if (method === 'ForgetConnectionPassword') {
+      if (state.failForget) return failure('credential_store');
+      state.saved = false; return profiles();
+    }
+    if (method === 'ConnectSSH' || method === 'UseConnection') {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      if (method === 'UseConnection' && input?.name === '@local') { state.current = state.selected = '@local'; return { contract, data: local, problem: null }; }
+      if (input?.password !== 'vault-fixture-password' && !(input?.password === '' && state.saved)) return failure('ssh_auth');
+      state.created = true; state.current = state.selected = 'dev-server';
+      if (input?.remember_password && !state.failSave) state.saved = true;
+      return { ...fixture.session, ...(input?.remember_password && state.failSave ? { warning: { code: 'credential_store' } } : {}) };
+    }
+    return failure('unsupported');
+  });
+  await page.addInitScript(() => {
+    const host = (window as unknown as { passwordVaultHost: (method: string, input?: unknown) => Promise<unknown> }).passwordVaultHost;
+    window.go = { desktop: { Bridge: new Proxy({}, { get: (_, method) => (input: unknown) => host(String(method), input) }) as DesktopBridge } };
+  });
+  await page.goto('/');
+  return state;
+}
+
+test('remembered device password survives GUI reload and forgetting keeps the current session', async ({ page }) => {
+  const state = await passwordVaultHost(page);
+  await page.getByRole('button', { name: '重新连接当前设备', exact: true }).click();
+  const device = page.locator('.connection-profile').filter({ hasText: 'dev-server' });
+  await device.getByLabel('dev-server 的 SSH 密码').fill('vault-fixture-password');
+  const remember = device.getByRole('checkbox', { name: '记住dev-server 本次输入的密码' });
+  await expect(remember).not.toBeChecked();
+  await remember.check();
+  await device.getByRole('button', { name: '连接', exact: true }).click();
+  await expect(device.getByText('已记住密码（系统凭据库）', { exact: true })).toBeVisible();
+  await expect(device.getByLabel('dev-server 的 SSH 密码')).toHaveValue('');
+  expect(state.calls.filter(call => call.method === 'UseConnection')).toHaveLength(1);
+  expect(state.calls[0].input).toMatchObject({ remember_password: true });
+  await page.reload();
+  await expect(page.getByRole('button', { name: /dev-server · 已连接/ })).toBeVisible();
+  await page.getByRole('button', { name: /dev-server · 已连接/ }).click();
+  await page.getByRole('button', { name: '切换到本机', exact: true }).click();
+  await page.getByRole('button', { name: /本机实例 · 已连接/ }).click();
+  await page.getByRole('button', { name: '切换到dev-server', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '切换设备' })).toBeHidden();
+  expect(state.calls.at(-1)?.input).toMatchObject({ name: 'dev-server', password: '' });
+  await page.getByRole('button', { name: '设备连接', exact: true }).click();
+  state.failForget = true;
+  await device.getByRole('button', { name: '忘记dev-server 的密码' }).click();
+  await expect(page.getByRole('alert')).toContainText('系统凭据库不可用');
+  await expect(device.getByText('已记住密码（系统凭据库）', { exact: true })).toBeVisible();
+  state.failForget = false;
+  await device.getByRole('button', { name: '忘记dev-server 的密码' }).click();
+  await expect(page.getByText('已忘记保存的密码。', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: /dev-server · 已连接/ })).toBeVisible();
+  expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }))).not.toContain('vault-fixture-password');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '当前设备暂不可用' })).toBeVisible();
+});
+
+test('new SSH device defaults to one-time password and can opt into system storage', async ({ page }) => {
+  const state = await passwordVaultHost(page, false);
+  await page.getByRole('button', { name: '设备连接', exact: true }).click();
+  await page.getByLabel('连接名称').fill('dev-server');
+  await page.getByLabel('SSH 目标').fill('developer@192.0.2.10');
+  await page.getByLabel('使用密码登录').check();
+  const remember = page.getByRole('checkbox', { name: /记住密码（系统凭据库）/ });
+  await expect(remember).not.toBeChecked();
+  await page.getByLabel('SSH 密码', { exact: true }).fill('vault-fixture-password');
+  await remember.check();
+  await page.getByRole('button', { name: '添加并连接', exact: true }).click();
+  await expect(page.getByText('已记住密码（系统凭据库）', { exact: true })).toBeVisible();
+  expect(state.calls.find(call => call.method === 'ConnectSSH')?.input).toMatchObject({ remember_password: true, password: 'vault-fixture-password' });
+  await expect(page.getByLabel('SSH 密码', { exact: true })).toHaveValue('');
+});
+
+test('header can remember a password and preserves ready state when system storage fails', async ({ page }) => {
+  const state = await passwordVaultHost(page);
+  state.failSave = true;
+  await page.getByRole('button', { name: /dev-server · 未连接/ }).click();
+  const panel = page.getByRole('dialog', { name: '切换设备' });
+  await panel.getByRole('button', { name: '切换到dev-server', exact: true }).click();
+  await panel.getByLabel('dev-server 的 SSH 密码').fill('vault-fixture-password');
+  await panel.getByRole('checkbox', { name: '记住密码（系统凭据库）', exact: true }).check();
+  await panel.getByRole('button', { name: '连接设备', exact: true }).click();
+  await expect(panel.getByText('设备已连接，但未能确认本次密码已保存。', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: /dev-server · 已连接/ })).toBeVisible();
+  await expect(panel.getByLabel('dev-server 的 SSH 密码')).toHaveValue('');
+  expect(state.saved).toBe(false);
 });

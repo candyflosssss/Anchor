@@ -14,16 +14,21 @@ export function DeviceSwitcher({ controller: c, current, connected, version, dis
 }) {
   const [passwordProfile, setPasswordProfile] = useState<ConnectionProfile | null>(null);
   const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
   const { refresh } = c;
   useEffect(() => { void refresh(); }, [refresh]);
-  async function connect(name: string, secret = '') {
+  async function connect(name: string, secret = '', save = false) {
     setPassword('');
-    if (await c.connect(name, secret)) close();
+    setRemember(false);
+    if (await c.connect(name, secret, save)) close();
   }
   function select(profile: ConnectionProfile) {
-    setPassword(''); setPasswordProfile(null);
+    setPassword(''); setRemember(false); setPasswordProfile(null);
     if (profile.name === current && connected) return;
-    if (profile.authentication === 'password') setPasswordProfile(profile);
+    if (profile.authentication === 'password') {
+      setPasswordProfile(profile);
+      if (profile.password_saved) void connect(profile.name);
+    }
     else void connect(profile.name);
   }
   return <>
@@ -42,12 +47,14 @@ export function DeviceSwitcher({ controller: c, current, connected, version, dis
       })}
     </div>
     {!c.loading && !c.profiles.length && !c.error && <p>暂无已保存设备，请前往设备连接添加。</p>}
-    {passwordProfile && <ImeForm className="grid gap-2 rounded-md border p-3" onSubmit={event => { event.preventDefault(); void connect(passwordProfile.name, password); }}>
-      <label className="grid gap-2">{passwordProfile.name} 的 SSH 密码<Input type="password" autoComplete="off" autoFocus required disabled={disabled || !!c.pending} value={password} onChange={e => setPassword(e.target.value)} /></label>
-      <p>仅本次连接使用，不保存。</p>
-      <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="ghost" disabled={!!c.pending} onClick={() => { setPassword(''); setPasswordProfile(null); }}>取消</Button><Button type="submit" size="sm" disabled={disabled || !!c.pending || !password}>连接设备</Button></div>
+    {passwordProfile && <ImeForm className="grid gap-2 rounded-md border p-3" onSubmit={event => { event.preventDefault(); void connect(passwordProfile.name, password, remember && !!password); }}>
+      <label className="grid gap-2">{passwordProfile.name} 的 SSH 密码<Input type="password" autoComplete="off" autoFocus required={!passwordProfile.password_saved} placeholder={passwordProfile.password_saved ? '留空使用已保存密码' : ''} disabled={disabled || !!c.pending} value={password} onChange={e => setPassword(e.target.value)} /></label>
+      {typeof passwordProfile.password_saved === 'boolean' && <label className="flex items-center gap-2"><input type="checkbox" checked={remember} disabled={disabled || !!c.pending || !password} onChange={e => setRemember(e.target.checked)} />记住密码（系统凭据库）</label>}
+      <p>{passwordProfile.password_saved ? '已保存密码留在系统凭据库，输入新密码可用于本次连接。' : '未勾选记住密码时仅本次使用，不保存。'}</p>
+      <div className="flex justify-end gap-2"><Button type="button" size="sm" variant="ghost" disabled={!!c.pending} onClick={() => { setPassword(''); setRemember(false); setPasswordProfile(null); }}>取消</Button><Button type="submit" size="sm" disabled={disabled || !!c.pending || (!password && !passwordProfile.password_saved)}>连接设备</Button></div>
     </ImeForm>}
     {c.pending && <p role="status">正在连接设备…</p>}
+    {c.notice && <p role="status">{c.notice}</p>}
     {c.error && <div role="alert" className="grid gap-2 text-destructive"><p>{desktopMessages[c.error]}</p><Button size="sm" variant="outline" disabled={disabled || !!c.pending} onClick={() => { void c.refresh(); }}>刷新设备列表</Button></div>}
     <Button variant="ghost" className="justify-start" disabled={disabled || !!c.pending} onClick={() => { close(); onManage(); }}><Settings2 />管理设备连接</Button>
   </>;

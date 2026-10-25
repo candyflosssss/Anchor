@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-10-25
+- 2026-10-25 当前源码未发布：新增 `context password save|status|forget NAME`，显式将 SSH 密码保存到系统凭据库；已保存时管理连接可复用，默认仍不保存，详见 §4。
 - 2026-10-25 desktop.72 dev 已发布：响应式模型瀑布流与 Windows 托盘退出／任务栏图标／前台激活修复；同版包含安装目录与生成流首字识别修复。本轮无新增命令或参数，详见[发行记录](../release/desktop.md#masonry-windows-72)。
 - 2026-10-25 已随 desktop.72 dev 发布：补齐生成流首字检测，已确认首字超时不再因客户端收到错误后断开而被日志记为客户端取消；命令、参数及输出字段不变，见下方日志说明。
 - 2026-10-24 desktop.71 dev 已发布：模型单行横向拖动与家族玻璃底卡；同版包含 LAN API／gateway Key 管理、Skills 页面整理和思考深度错误归类。此交付轮无新增命令或参数，详见[发行记录](../release/desktop.md#model-glass-71)。
@@ -54,7 +55,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | --- | --- |
 | `--data-dir DIR` | `os.UserConfigDir()/anchor`；Linux 通常为 `$XDG_CONFIG_HOME/anchor` 或 `~/.config/anchor`，Windows 通常为 `%AppData%/anchor`。存储本机实例、凭据和 Context；不同目录不共享默认 Context |
 | `--context NAME` | 未提供时使用 `context use` 选择的当前 Context；只适用于 `status`、`stop`、`provider`、`model`、`usage`、`logs`、`catalog`、`agent`、`skill`、`proxy`、`api` 管理动作（不含 token）。`restart` 是例外：只有显式提供 SSH Context 才操作远程，未提供仍操作本机，不受默认 Context 影响；其他本机操作显式提供非空 Context 会失败 |
-| `--ssh-password-stdin` | 从 stdin 读取本次 SSH 密码（最多 8192 bytes，去掉末尾 CR/LF，非空），仅本次使用，不保存；SSH add 时选择密码模式，已保存密码 Context 每次管理请求重新提供。不能与供应商 `--secret-stdin` 同用 |
+| `--ssh-password-stdin` | 从 stdin 读取 SSH 密码（最多 8192 bytes，去掉末尾 CR/LF，非空）；默认仅本次使用，SSH add 时选择密码模式。只有 `context password save NAME` 显式保存到系统凭据库；已记住密码的 Context 不提供 stdin 时自动读取，提供时优先使用本次输入且不自动覆盖保存值。不能与供应商 `--secret-stdin` 或 Skill `--content-stdin` 同用 |
 | `--json` | 当前接受此兼容选项，但正常查询/写操作本来就输出 JSON，不切换格式；帮助仍为文本 |
 
 推荐把全局选项放在命令之前。当前解析器也会从整条参数列表提取全局选项。值选项可写 `--name VALUE` 或 `--name=VALUE`；布尔选项关闭时用 `--name=false`，不要写 `--name false`。除表中指定的位置参数外，不添加额外位置参数。
@@ -101,6 +102,9 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `context list` | 列出 Context | 本机已初始化 |
 | `context inspect` | 查看已保存连接信息 | 本机；名称已登记 |
 | `context test` | 验证连接与实例身份 | 本机；名称已登记，核心在线 |
+| `context password save` | 核验并保存 SSH 密码至系统凭据库 | 已登记密码 SSH Context；`--ssh-password-stdin`；目标 ready |
+| `context password status` | 只读查看密码保存状态 | 已登记密码 SSH Context；不解锁凭据库 |
+| `context password forget` | 删除所选档案的已保存密码 | 本机；已登记密码 SSH Context；不停止当前连接 |
 | `status` | 查询核心状态 | 所选 Context 的核心在线 |
 | `stop --approve [--for-restart]` | 默认正常停服；显式维护交接保留托管状态 | 所选 Context 在线、已核验身份及管理授权；交接要求 desktop.35／兼容源码核心的 restart_handoff 能力 |
 | `provider list` | 列出供应商 | 所选 Context 的核心在线 |
@@ -244,6 +248,9 @@ anchor context use NAME
 anchor context list
 anchor context inspect NAME
 anchor context test NAME
+anchor --ssh-password-stdin context password save NAME
+anchor context password status NAME
+anchor context password forget NAME
 anchor [--context NAME] status
 ```
 
@@ -254,7 +261,14 @@ anchor [--context NAME] status
 - **`context test`**：连接指定实例并验证身份/API 主版本；返回实例信息，包括版本、平台、用户、监听地址和能力；新版核心另返回 process_id，旧核心没有该字段。不按 PID 判断授权或强杀进程。失败不重新绑定或切换目标。
 - **`status`**：无专属参数，查询显式或默认 Context，返回 `core`、`gateway`、`upstream_health`、`agent_management`；`core` / `gateway` 在运行生命周期中为 `starting`、`ready` 或 `stopping`，就绪前不接受管理写入或网关调用（可请求正常停服）；不会附带实例 ID、配置 revision 或网关地址；缺少 Context、不可达、认证失败或身份不一致均失败，不回退。
 
-SSH 参数：`--ssh-port` 默认 0（密钥模式使用 SSH 配置，密码模式为 22），范围 0..65535；`--identity-file` 默认为空（系统默认密钥／SSH Agent），`--remote-anchor` 默认 `anchor`（依次检查 SSH 的 PATH、`~/.local/bin/anchor`、`~/bin/anchor`、`/usr/local/bin/anchor`、`/usr/bin/anchor`；自定义路径只使用指定程序，支持 `~/`，只允许安全可执行路径，禁止 shell 语法），`--remote-control-port` 默认 17861、范围 1..65535，仅转发远端 IPv4 回环。`--trust-new-host` 默认 false；显式同意后记录首次主机密钥，变化时始终拒绝。密钥模式使用系统 OpenSSH，可用 Host 别名／SSH Agent；密码模式内置 SSH，使用 user@地址，不读取 SSH 配置／别名，密码不保存。失败分类包括 ssh_missing、ssh_host_key、ssh_auth、ssh_unreachable、remote_anchor_missing（当前 SSH 账户下找不到可执行程序）、remote_anchor_unsupported（引导帮助检查失败）、remote_control_port（已有管理地址不匹配）、remote_core_not_ready（核心启动／就绪失败）、remote_anchor（其余引导失败或响应无效）、tunnel_failed，不输出原始 SSH stderr。连接前通过 `context bootstrap --help` 检查能力，不签发令牌；旧远端 CLI 的未分类引导错误保留 remote_anchor。
+**`context password save|status|forget NAME`（2026-10-25 当前源码，未发布）**：本机档案凭据管理，不接受 `--context`，不改变桌面／CLI 当前选择，仅支持已登记且已固定主机密钥的密码 SSH Context。
+
+- `save` 必须用全局 `--ssh-password-stdin` 提供密码，先重新 SSH 登录、校验主机与原实例并确认核心 ready，再存入系统凭据库。连接核验总期限20秒；系统解锁／授权提示由凭据库处理，可能需要用户响应。认证／主机密钥／身份失败不保存；凭据库不可用、锁定、取消、权限或长度受限时返回非零 `credential_store`，不退回明文。Windows 凭据库单项密码上限2560 bytes，超出时仍可仅本次使用。
+- `status` 只读取本机非秘密的保存标记，不解锁凭据库、不建立 SSH；该标记不保证凭据未被用户在系统中删除。`forget` 删除该档案的系统凭据和标记，已忘记时幂等成功；删除失败保留标记并返回非零。不会停止已建立连接、撤销管理授权或删除设备档案。
+- 成功均输出 `{name, password_saved}`，不输出密码。Windows 使用凭据管理器，Linux 使用 Secret Service 默认密钥环（如 GNOME Keyring／兼容服务），需要当前用户的会话服务。凭据按数据目录、档案、SSH 用户／地址／端口、固定主机密钥及 Anchor 实例绑定；不共享到另一数据目录或新身份。SQLite 只存哈希引用，没有密码或可解密副本。
+- 桌面勾选「记住密码」与此接口共享存取逻辑。已显式保存后，源码 CLI 的 `context test`、业务管理、显式 SSH restart/update 在未提供本次密码时读取系统凭据库；本次 stdin 优先且不自动更新保存值。凭据缺失／密码失效报 ssh_auth，凭据库错误报 credential_store；可手动提供本次密码，或明确重新保存／忘记，不自动清除和反复重试。系统账户被控制时凭据仍可能被读取，长期使用推荐 SSH 密钥／Agent。
+
+SSH 参数：`--ssh-port` 默认 0（密钥模式使用 SSH 配置，密码模式为 22），范围 0..65535；`--identity-file` 默认为空（系统默认密钥／SSH Agent），`--remote-anchor` 默认 `anchor`（依次检查 SSH 的 PATH、`~/.local/bin/anchor`、`~/bin/anchor`、`/usr/local/bin/anchor`、`/usr/bin/anchor`；自定义路径只使用指定程序，支持 `~/`，只允许安全可执行路径，禁止 shell 语法），`--remote-control-port` 默认 17861、范围 1..65535，仅转发远端 IPv4 回环。`--trust-new-host` 默认 false；显式同意后记录首次主机密钥，变化时始终拒绝。密钥模式使用系统 OpenSSH，可用 Host 别名／SSH Agent；密码模式内置 SSH，使用 user@地址，不读取 SSH 配置／别名；默认不保存密码，系统凭据库的显式保存／忘记见下文。失败分类包括 ssh_missing、ssh_host_key、ssh_auth、ssh_unreachable、remote_anchor_missing（当前 SSH 账户下找不到可执行程序）、remote_anchor_unsupported（引导帮助检查失败）、remote_control_port（已有管理地址不匹配）、remote_core_not_ready（核心启动／就绪失败）、remote_anchor（其余引导失败或响应无效）、tunnel_failed，不输出原始 SSH stderr。连接前通过 `context bootstrap --help` 检查能力，不签发令牌；旧远端 CLI 的未分类引导错误保留 remote_anchor。
 
 **`context bootstrap`** 是执行所在机器的本机操作，不接受 `--context`。远端必须已安装支持此命令的 Anchor。安全初始化当前账户缺失状态；管理地址必须等于指定的 `127.0.0.1:PORT`，保留既有身份和配置；核心未运行时启动独立后台 `serve`，已运行则核验复用。默认新建网关为 127.0.0.1:17860；端口冲突／身份不符不会强杀或覆盖。成功 JSON 含 settings、access、token（manage，720 小时），必须显式 `--show-once`，只通过已认证 SSH 接收，不应打印或记录秘密。
 
@@ -815,7 +829,7 @@ anchor recover [--id ID]
 | 出站代理 / 内置 mihomo | proxy list/put/delete/bind；代理设置页及供应商详情 | Windows/Linux amd64；Key 支持继承、强制直连、指定代理；节点 YAML 导入，不含订阅刷新/测速 |
 | Skill 自动收录、原件清理、来源差异、固定版本链接 | skill 管理子命令（§14） | 常见目录项目自动发现，无须手动登记；自动收录保留原件；手动清理先核验归档再换链接；项目发现增量已随 desktop.68 dev 发布，未自动安装 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
-| SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test；远端须已安装新版 Anchor，自动安装待实现 |
+| SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test 与 context password save/status/forget；系统凭据库显式可选，远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 请求级协议翻译层；同协议受控原生透传、跨协议无状态文本／函数／SSE／用量及既有 Responses → Chat 桥；不支持内容明确报错，见[翻译层契约](../design/protocol-translation.md) |
 | Codex统一重试 | agent codex-settings [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
@@ -855,7 +869,7 @@ anchor [--data-dir DIR] --context SSH_NAME update upgrade --approve
 - upgrade：本机 CLI 一步检查／下载／准备／交接／验证，默认源配置同 check（未配置 alpha）；desktop：同流程更新桌面 runtime，首次渠道按调用版本（dev 为 dev），已有配置优先。均需 --approve 和已初始化实例，最多6分钟；准备阶段旧服务运行，最终一次保留托管配置的 restart_handoff，等待正常排空最多10秒，核心交接上限30秒。已有流式请求可能中断，不承诺毫秒级／零中断。成功返回 `{ready:true,version,instance_id,process_id}`；无新版本返回 `{updated:false,current_version}`，退出0。启动／身份／哈希／版本错误退出1，不强杀、不盲目降级或重放。
 - 新程序放在 `DIR/updates/runtime/`，不写 `/usr/bin` 或覆盖 Windows 正在运行的文件；就绪后写 `<product>-active.json`，已支持此功能的安装程序下次启动转到新版本，损坏的 active 文件明确报错。系统包版本／Windows 卸载记录不会随 runtime 更新改变；卸载保留用户数据与版本缓存。旧宿主／CLI 需先引导升级，新源需同时提供运行程序；没有 runtime 的旧桌面 release 仍手动安装。Linux 可执行 `anchor update desktop --approve`；桌面程序本身也接受 `anchor-desktop update desktop --approve`。命令会请求同数据目录的运行中 GUI 自动重开，未打开 GUI 时仅升级核心与下次启动版本。
 - `--expected-instance`、`--control-port` 在准备与交接前核对本机身份，port 必须与 expected-instance 配套；`--expected-version`／`--expected-sha256` 必须一起传，冻结批准的版本和字节。check/download 也接受身份／端口 pin，供 SSH 固定目标检查。拒绝更新为比运行核心更旧的版本。显式 expected pins 不允许绕过来源／SHA256校验。
-- 显式 `--context SSH_NAME update check` 用被控机自己的配置和渠道检查 CLI 更新；`update upgrade --approve` 冻结检查的版本与 SHA256，在同一 SSH 账号执行身份／端口固定的新命令，下载与准备期间旧服务可用，完成后经管理连接再次核对同实例、新版本、PID和 ready。密钥／密码复用已有 SSH 连接规则，密码仅 stdin／会话内存；不把主控机安装包发往其他平台，不自动提权或引导安装旧远端。旧远端不支持时报 remote_anchor_unsupported，先手工引导一次。SSH 失败／响应损坏／目标不符归为 unknown，不自动重复更新；先重新检查状态。该路径当前面向既有 POSIX/Linux SSH 被控机，Windows SSH shell 不在本轮范围。
+- 显式 `--context SSH_NAME update check` 用被控机自己的配置和渠道检查 CLI 更新；`update upgrade --approve` 冻结检查的版本与 SHA256，在同一 SSH 账号执行身份／端口固定的新命令，下载与准备期间旧服务可用，完成后经管理连接再次核对同实例、新版本、PID和 ready。密钥／密码复用已有 SSH 连接规则，密码默认仅 stdin／会话内存，明确保存后可从本机系统凭据库读取；不把主控机安装包发往其他平台，不自动提权或引导安装旧远端。旧远端不支持时报 remote_anchor_unsupported，先手工引导一次。SSH 失败／响应损坏／目标不符归为 unknown，不自动重复更新；先重新检查状态。该路径当前面向既有 POSIX/Linux SSH 被控机，Windows SSH shell 不在本轮范围。
 - 网络代理：check/download 每次请求和重定向实时读取对应协议的 `HTTPS_PROXY`／`HTTP_PROXY`（含小写），再用 `ALL_PROXY`／`all_proxy`；未指定对应环境代理时，Windows 通过 WinHTTP 读取当前用户手动代理/PAC，PAC按URL解析并有界等待，失败可回退手动代理，仅自动发现失败可直连。HTTP-only设置不抑制HTTPS系统代理。`NO_PROXY`／`no_proxy` 同时适用于环境和系统代理，回环始终直连。支持 HTTP/HTTPS/SOCKS5 代理，非法明确配置失败，不静默直连。不使用第三方更新镜像。
 - 当前平台包最多256 MiB、清单2 MiB；check/download 整个操作最多5分钟。更新清单格式、签名限制及 dev 投放步骤见 [在线更新](../design/online-updates.md)。SHA256 仅是完整性校验，不能替代独立发布签名。
 

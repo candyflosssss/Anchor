@@ -19,7 +19,8 @@
         "target": "本机",
         "instance_id": "local-fixture",
         "active": false,
-        "authentication": "owner"
+        "authentication": "owner",
+        "password_saved": false
       },
       {
         "name": "dev-server",
@@ -28,7 +29,8 @@
         "instance_id": "remote-fixture",
         "active": true,
         "selected": true,
-        "authentication": "key"
+        "authentication": "key",
+        "password_saved": false
       }
     ],
     "problem": null

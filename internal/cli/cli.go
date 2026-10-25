@@ -35,6 +35,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
       [--remote-anchor anchor] [--remote-control-port 17861] [--trust-new-host]
   context bootstrap [--control-port 17861] --show-once  SSH account bootstrap (local only)
   context use NAME | context list | context inspect NAME | context test NAME
+  context password save|status|forget NAME  OS-keyring password; save requires --ssh-password-stdin
   settings key-cooldown [--enabled=true|false] [--failure-threshold 1..100] [--error-window-seconds 1..3600]
       [--cooldown-seconds 1..3600] [--rate-limit-seconds 1..3600] [--revision N]
   status                             Query selected context
@@ -195,9 +196,10 @@ Protocol conversion supports stateless text, function tools and streaming; unsup
 `
 
 type App struct {
-	In          io.Reader
-	Out, Err    io.Writer
-	sshPassword string
+	In            io.Reader
+	Out, Err      io.Writer
+	sshPassword   string
+	PasswordVault connection.PasswordVault
 }
 
 func (a App) output(v any) error { return json.NewEncoder(a.Out).Encode(v) }
@@ -392,7 +394,7 @@ func (a App) Run(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	live, err := connection.OpenWithPassword(ctx, store, c, a.sshPassword)
+	live, err := a.passwords().Open(ctx, store, c, a.sshPassword)
 	if err != nil {
 		return err
 	}
@@ -519,9 +521,11 @@ func (a App) access(s *state.Store, args []string) error {
 }
 func (a App) contexts(ctx context.Context, s *state.Store, args []string) error {
 	if len(args) == 0 {
-		return errors.New("context requires add, use, list, inspect or test")
+		return errors.New("context requires add, use, list, inspect, test or password")
 	}
 	switch args[0] {
+	case "password":
+		return a.contextPassword(ctx, s, args[1:])
 	case "add":
 		if len(args) < 2 {
 			return errors.New("context add requires a name")
@@ -605,7 +609,7 @@ func (a App) contexts(ctx context.Context, s *state.Store, args []string) error 
 		if args[0] == "inspect" {
 			return a.output(c)
 		}
-		live, err := connection.OpenWithPassword(ctx, s, c, a.sshPassword)
+		live, err := a.passwords().Open(ctx, s, c, a.sshPassword)
 		if err != nil {
 			return err
 		}
