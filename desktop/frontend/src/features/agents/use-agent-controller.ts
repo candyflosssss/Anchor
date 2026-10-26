@@ -36,7 +36,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
   function select(row: AgentRow) {
     if (busy || !data) return;
     const available = row.target ? availableAgentModels(data, row.target) : [];
-    setTargetId(row.id); setModel(available.find(m => m.id === row.binding?.model)?.id ?? available[0]?.id ?? '');
+    setTargetId(row.id); setModel(row.binding ? available.find(m => m.id === row.binding?.model)?.id ?? '' : available[0]?.id ?? '');
     setError(''); setNotice('');
   }
   async function write(action: () => Promise<AgentWorkspace>, affectedRow = targetId) {
@@ -57,7 +57,7 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
             const row = agentRows(v).find(r => r.id === affectedRow);
             if (row?.target) {
               const choices = availableAgentModels(v, row.target);
-              setModel(current => choices.some(m => m.id === current) ? current : choices.find(m => m.id === row.binding?.model)?.id ?? choices[0]?.id ?? '');
+              setModel(current => affectedRow === targetId ? choices.some(m => m.id === current) ? current : '' : row.binding ? choices.find(m => m.id === row.binding?.model)?.id ?? '' : choices[0]?.id ?? '');
             }
             setError(`${agentMessage(e)} 已重新读取当前状态。`);
           }
@@ -74,15 +74,28 @@ export function useAgentController(enabled: boolean, onActivity: (busy: boolean)
   const selected = expanded?.target;
   const binding = expanded?.binding;
   const availableModels = selected && data ? availableAgentModels(data, selected) : [];
+  function update(rebuild = false) {
+    if (busy || !selected?.supported || (rebuild ? selected.agent !== 'codex' || !['ready', 'config_unsupported'].includes(selected.status) : selected.status !== 'ready') || !availableModels.some(m => m.id === model)) return;
+    const input: EnrollAgent = { target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
+      model_scope: 'all-mapped', model_templates: {}, approved: true, ...(rebuild ? { rebuild: true } : {}) };
+    if (binding || rebuild || selected.agent === 'claude-desktop') setUpdateInput(input);
+    else void write(() => agentService.enroll(input));
+  }
+  function enableRow(row: AgentRow) {
+    if (busy || latch.current || !data) return;
+    if (!row.binding) { select(row); return; }
+    const choices = row.target ? availableAgentModels(data, row.target) : [];
+    const savedAvailable = choices.some(m => m.id === row.binding?.model);
+    if (row.id === targetId) {
+      if (choices.some(m => m.id === model)) update();
+      else setError('请选择可用的默认模型后开启托管。');
+      return;
+    }
+    if (!savedAvailable) { select(row); setError('已保存的默认模型不可用，请选择新的默认模型后开启托管。'); return; }
+    void write(() => agentService.manage({ binding_id: row.binding!.id, expected_revision: row.binding!.revision, action: 'enable' }), row.id);
+  }
   return { data, rows, expanded, availableModels, loading, busy, error, notice, selected, binding, model, setModel, disableTarget, setDisableTarget, updateInput, setUpdateInput,
-    read, select, cancel: () => { if (!busy) setTargetId(''); },
-    update: (rebuild = false) => {
-      if (busy || !selected?.supported || (rebuild ? selected.agent !== 'codex' || !['ready', 'config_unsupported'].includes(selected.status) : selected.status !== 'ready') || !availableModels.some(m => m.id === model)) return;
-      const input: EnrollAgent = { target_id: selected.id, model, expected_revision: binding?.revision ?? 0,
-        model_scope: 'all-mapped', model_templates: {}, approved: true, ...(rebuild ? { rebuild: true } : {}) };
-      if (binding || rebuild || selected.agent === 'claude-desktop') setUpdateInput(input);
-      else void write(() => agentService.enroll(input));
-    },
+    read, select, enableRow, update, cancel: () => { if (!busy) setTargetId(''); },
     confirmUpdate: () => updateInput && write(() => agentService.enroll(updateInput)),
     manage: (row: ManagedAgent, action: 'enable' | 'disable') => write(() => agentService.manage({ binding_id: row.id, expected_revision: row.revision, action }), rows.find(v => v.binding?.id === row.id)?.id),
   };
