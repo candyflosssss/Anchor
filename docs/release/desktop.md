@@ -1,10 +1,29 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-10-26。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.73](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.73)，发布于 `2026-10-26T14:23:08+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `b327afdf3463b57ba2f656588b85fb46d6b5da4b`、SOURCE dirty=false。
-- 包含 SSH 鉴权失败后的重新连接入口、未连接时设备名称与地址展示，以及可选系统凭据库记住／忘记密码；沿用 .72 的模型瀑布流和 Windows 桌面修复。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.74](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.74)，发布于 `2026-10-26T22:52:44+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `e1498651f6568f2c33fb8bb547c2971971d0c900`、SOURCE dirty=false。
+- 对话测试模型改为完整下拉列表，展开即可选择当前 Key 的全部候选；同版包含 .73 后已提交的 API 服务设置说明、Agent 所选默认模型启用和 DSH insert／命名分组兼容修复。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收 Windows 原生凭据库、双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="chat-model-dropdown-74"></a>
+
+## 对话测试模型完整列表 .74（已发布 dev）
+
+模型选择改为普通下拉框，展开直接列出所选 Key 的全部已存映射与远端目录候选；不需要输入搜索。目录读取失败时仍可选择已存模型，保留刷新重试入口，加载和空列表明确显示。相关交互详见[对话测试契约](../design/chat-testing.md)。同版包含 .73 后主线已提交的 API 服务设置说明、Agent 按所选默认模型启用以及 DSH 独立 insert／命名分组兼容修复。
+
+从独立干净 worktree 的 `e1498651f6568f2c33fb8bb547c2971971d0c900` 构建，SOURCE dirty=false，输入摘要 `a779760d148f0abdbc56b2a571087be97294402c02ff59e4b0b76a54ec2c1f15`；未纳入原工作区其他任务未提交内容。版本 `0.1.0-dev.desktop.74` 于 `2026-10-26T22:52:44+08:00` 发布为 dev prerelease，非 latest。产物和校验证据位于 `dist/desktop/0.1.0-dev.desktop.74/`。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.74_amd64.deb` | 29260548 | `1ede26276bb400238f02b0268ea5ee532bfc2cd9956dcb53d16274f12d483660` |
+| `Anchor-Desktop-0.1.0-dev.desktop.74-windows-amd64-setup.exe` | 31278414 | `afd649b81b3a364264c2ea71236ec0151760b7a0a57d4e522a62e6ef25592d7b` |
+
+TypeScript／Vite、Go／TS 契约比对、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译、NSIS `-WX` 和 deb 打包完成。复用模型选择功能阶段已通过的 typecheck、lint 和6项模拟宿主浏览器测试；未扩大为全量或 race 检查。11项同版附件包含两平台安装包、desktop runtime、CLI、两个更新清单、vendor对应源码、许可／构建元数据及 SHA256SUMS。嵌入前端／mihomo、deb载荷与runtime、源码输入摘要、ZIP CRC、本地哈希与GitHub附件digest均通过。
+
+默认dev源在隔离数据目录真实下载Linux runtime、旧客户端兼容deb及CLI，版本／目标／大小／SHA256和可执行版本均通过；Windows安装器、runtime和CLI的远端digest与本地匹配。证据见publication/preparation-verification.json、publication-verification.json与online-verification.json；BUILD.json保留构建时未发布／未原生验收的事实。下载验证首次因系统PSI超阈值被guard拦截，等待压力恢复后完成，未绕过资源限制。
+
+仅在线投放，未安装、重启或修改真实实例／Agent配置及用户更新设置，未请求付费上游；双平台原生窗口、系统安装器和真实SSH升级未验收。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 
 <a id="ssh-reconnect-73"></a>
 
