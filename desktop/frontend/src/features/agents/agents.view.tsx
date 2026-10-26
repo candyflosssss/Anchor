@@ -37,8 +37,8 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
             </button>
             <Switch aria-label={`${name} 托管`} checked={!!binding?.enabled} disabled={c.busy || !canToggle}
               onCheckedChange={checked => {
-                if (binding) { if (checked) void c.manage(binding, 'enable'); else c.setDisableTarget(binding); }
-                else c.select(row);
+                if (checked) c.enableRow(row);
+                else if (binding) c.setDisableTarget(binding);
               }} />
           </div>
           {open && <div id={panelId} className="agent-settings" role="region" aria-label={`${name} 托管设置`}>
@@ -53,15 +53,17 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
             {row.agent === 'claude-desktop' && <p className="card-hint">接管当前已应用的本地第三方配置，可能同时影响 Chat、Cowork 和 Code。请先在 Claude Desktop 开启 Developer Mode 并应用本地配置。公司策略和远程配置不接管；切换配置后需返回原配置才能继续更新。应用或恢复后请完全退出并重开 Claude Desktop。</p>}
             {(canConfigure || canRebuild) && <form onSubmit={e => { e.preventDefault(); c.update(); }}>
               <fieldset disabled={c.busy}>
+                {binding && !c.availableModels.some(m => m.id === binding.model) && <p className="field-error">已保存的默认模型「{binding.model}」{c.data!.models.some(m => m.id === binding.model) ? '在当前托管范围内不可用，请检查候选供应商或选择新的默认模型。' : '已删除，请选择新的默认模型。'}</p>}
                 <div className="field"><label htmlFor={`agent-default-${row.id}`}>默认模型</label>
                   <select id={`agent-default-${row.id}`} className="select-field w-full" value={c.model} onChange={e => c.setModel(e.target.value)}>
-                    <option value="">请选择</option>{c.data!.models.map(m => { const available = c.availableModels.some(v => v.id === m.id); return <option key={m.id} value={m.id} disabled={!available}>{m.id}{available ? '' : '（无启用的供应商）'}</option>; })}
+                    <option value="">请选择默认模型</option>{c.data!.models.map(m => { const available = c.availableModels.some(v => v.id === m.id); return <option key={m.id} value={m.id} disabled={!available}>{m.id}{available ? '' : '（无启用的供应商）'}</option>; })}
                   </select>
                 </div>
+                {binding && c.model && c.model !== binding.model && <p className="card-hint">{binding.enabled ? '更新配置' : '开启托管'}时将使用此模型：{c.model}。</p>}
                 {!c.availableModels.length && <p className="field-error">现有模型映射没有启用的候选供应商。请在模型映射中检查供应商状态。</p>}
               </fieldset>
               <div className="agent-settings-actions">
-                {canConfigure && <Button type="submit" disabled={c.busy || !c.availableModels.some(m => m.id === c.model)}>{binding ? '更新配置' : '开启托管'}</Button>}
+                {canConfigure && <Button type="submit" disabled={c.busy || !c.availableModels.some(m => m.id === c.model)}>{binding?.enabled ? '更新配置' : '开启托管'}</Button>}
                 {canRebuild && <Button type="button" variant="outline" disabled={c.busy || !c.availableModels.some(m => m.id === c.model)} onClick={() => c.update(true)}>备份并重建配置</Button>}
               </div>
             </form>}
@@ -69,10 +71,10 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
         </article>;
       })}</section>}
     </>}
-    <ConfirmAction open={!!c.updateInput} title={c.updateInput?.rebuild ? '备份并重建配置？' : '更新配置？'} busy={c.busy} onCancel={() => c.setUpdateInput(null)} onConfirm={() => { void c.confirmUpdate(); }}>
+    <ConfirmAction open={!!c.updateInput} title={c.updateInput?.rebuild ? '备份并重建配置？' : c.binding?.enabled ? '更新配置？' : '开启托管？'} busy={c.busy} onCancel={() => c.setUpdateInput(null)} onConfirm={() => { void c.confirmUpdate(); }}>
       <p className="break-all">{c.selected?.config_root}</p><p>默认模型：{c.updateInput?.model}</p>{c.updateInput?.rebuild
         ? <p>将先备份整个 config.toml，再替换为干净的托管配置，并同步最新模型列表。原来的其他设置也会从当前配置移除，完整原件和旧恢复记录保留在 Anchor 数据目录的 recovery 中。停用托管只清除新托管内容，不会自动恢复坏配置。完成后请重启 Codex。</p>
-        : <p>将使用当前选择更新连接配置，并同步最新模型列表。其他软件改过的托管字段也会重新应用，外部值会先保存，停用托管时恢复；其他设置不动。更新后请重启对应 Agent。</p>}
+        : <p>将使用当前选择更新连接配置，并同步最新模型列表。确认后开启或保持托管。其他软件改过的托管字段也会重新应用，外部值会先保存，停用托管时恢复；其他设置不动。更新后请重启对应 Agent。</p>}
       {c.selected?.agent === 'claude-desktop' && <p>此操作可能同时更改 Claude Desktop 的 Chat、Cowork 和 Code 请求去向及计费来源。将使用 Anchor 的绑定凭据和模型列表；原认证设置在停用时按字段恢复。请完全退出并重开 Claude Desktop，关闭窗口可能只是隐藏。</p>}
     </ConfirmAction>
     <ConfirmAction open={!!c.disableTarget} title="停用此 Agent 的托管？" busy={c.busy} onCancel={() => c.setDisableTarget(null)} onConfirm={() => { if (c.disableTarget) void c.manage(c.disableTarget, 'disable'); }}>

@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
         window.agentTest.enrolls.push(input);
         if (window.agentTest.failWrite) return { contract: f.contract, data: null, problem: { code: window.agentTest.failureCode ?? 'conflict' } };
         const target = data.targets.find(t => t.id === input.target_id)!;
-        data.bindings = [...data.bindings.filter(b => b.id !== target.id), { ...f.workspace.bindings[0], id: target.id, adapter_id: target.agent, config_root: target.config_root, model_scope: input.model_scope, model: input.model, model_templates: input.model_templates, revision: input.expected_revision + 1, status: 'applied' }];
+        data.bindings = [...data.bindings.filter(b => b.id !== target.id), { ...f.workspace.bindings[0], id: target.id, adapter_id: target.agent, config_root: target.config_root, model_scope: input.model_scope, model: input.model, model_templates: input.model_templates, enabled: true, revision: input.expected_revision + 1, status: 'applied' }];
         return result(data);
       },
       ManageAgent: async (input: ManageAgent) => {
@@ -80,6 +80,7 @@ test('compact platform list, unified configuration update and conditional disabl
   await dialog.getByRole('button', { name: '确认变更', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).not.toBeChecked();
   expect(await page.evaluate(() => window.agentTest.actions[0])).toEqual({ ...fixture.sync, expected_revision: 2, action: 'disable' });
+  await expect(page.getByRole('region', { name: 'Codex 托管设置' })).toHaveCount(0);
   await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).toBeChecked();
   expect(await page.evaluate(() => window.agentTest.actions[1])).toEqual({ ...fixture.sync, expected_revision: 3, action: 'enable' });
@@ -137,7 +138,10 @@ test('unavailable mapping is excluded from defaults without a redundant model li
   });
   await page.getByRole('button', { name: '重新识别' }).click();
   await openSettings(page);
-  await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
+  await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('');
+  await expect(page.getByText('已保存的默认模型「unavailable」', { exact: false })).toBeVisible();
+  await expect(page.getByRole('button', { name: '更新配置', exact: true })).toBeDisabled();
+  await page.getByLabel('默认模型', { exact: true }).selectOption('public');
   await expect(page.getByLabel('默认模型', { exact: true }).getByRole('option', { name: 'unavailable', exact: true })).toHaveCount(0);
   await expect(page.getByText('暂不可用：', { exact: false })).toHaveCount(0);
   await page.getByRole('button', { name: '更新配置', exact: true }).click();
@@ -375,4 +379,128 @@ test('Claude Desktop requires scope confirmation and stays independent from CLI'
   await page.getByRole('button', { name: '确认变更', exact: true }).click();
   await expect(desktop).not.toBeChecked();
   await expect(cli).toBeChecked();
+});
+
+async function deletedDefault(page: import('@playwright/test').Page) {
+  await page.evaluate(binding => {
+    window.agentTest.data.bindings = [{ ...binding, enabled: false, model: 'deleted-default', revision: 7 }];
+  }, fixture.workspace.bindings[0]);
+  await page.getByRole('button', { name: '重新识别', exact: true }).click();
+}
+
+for (const trigger of ['switch', 'button']) {
+  test('deleted default requires selection and confirmed enable through ' + trigger, async ({ page }) => {
+    await deletedDefault(page);
+    const toggle = page.getByRole('switch', { name: 'Codex 托管', exact: true });
+    await toggle.click();
+    await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('');
+    await expect(page.getByText('已保存的默认模型「deleted-default」已删除', { exact: false })).toBeVisible();
+    await expect(page.getByRole('button', { name: '开启托管', exact: true })).toBeDisabled();
+    await toggle.click();
+    expect(await page.evaluate(() => [window.agentTest.enrolls, window.agentTest.actions])).toEqual([[], []]);
+    await page.getByLabel('默认模型', { exact: true }).selectOption('public');
+    const enable = () => trigger === 'switch' ? toggle.click() : page.getByRole('button', { name: '开启托管', exact: true }).click();
+    await enable();
+    await expect(page.getByRole('alertdialog')).toContainText('开启托管？');
+    await expect(page.getByRole('alertdialog')).toContainText('默认模型：public');
+    expect(await page.evaluate(() => [window.agentTest.enrolls, window.agentTest.actions])).toEqual([[], []]);
+    await page.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(toggle).not.toBeChecked();
+    await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
+    await enable();
+    await page.getByRole('button', { name: '确认变更', exact: true }).click();
+    await expect(toggle).toBeChecked();
+    expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([{ ...fixture.update, expected_revision: 7 }]);
+    expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+    await openSettings(page);
+    await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
+    await expect(page.getByRole('button', { name: '更新配置', exact: true })).toBeVisible();
+  });
+}
+
+for (const failureCode of ['conflict', 'unknown'] as const) {
+  test('selected-model enable preserves draft and does not replay after ' + failureCode, async ({ page }) => {
+    await deletedDefault(page);
+    await openSettings(page);
+    await page.getByLabel('默认模型', { exact: true }).selectOption('public');
+    await page.evaluate(code => { window.agentTest.failWrite = true; window.agentTest.failureCode = code; }, failureCode);
+    await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
+    await page.getByRole('button', { name: '确认变更', exact: true }).click();
+    await expect(page.getByRole('alert')).toContainText('已重新读取');
+    await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
+    await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).not.toBeChecked();
+    expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([{ ...fixture.update, expected_revision: 7 }]);
+    expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+  });
+}
+
+test('expanded enable uses changed draft and other Agent switches never reuse it', async ({ page }) => {
+  await openSettings(page);
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await page.evaluate(binding => {
+    window.agentTest.data.bindings[0].enabled = false;
+    window.agentTest.data.models.push({ ...window.agentTest.data.models[0], id: 'changed-default' });
+    window.agentTest.data.targets.push({ ...window.agentTest.data.targets[0], id: 'dsh-fixture', agent: 'dsh', config_root: '/isolated/.dsh' });
+    window.agentTest.data.models[0].available_targets.push('dsh-fixture');
+    window.agentTest.data.bindings.push({ ...binding, id: 'other-binding', adapter_id: 'dsh', config_root: '/isolated/.dsh', model: 'missing-other', enabled: false });
+  }, fixture.workspace.bindings[0]);
+  await page.getByRole('button', { name: '重新识别', exact: true }).click();
+  await openSettings(page);
+  await page.getByLabel('默认模型', { exact: true }).selectOption('changed-default');
+  await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('默认模型：changed-default');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByRole('switch', { name: 'DSH Web 托管', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'DSH Web 托管设置' })).toBeVisible();
+  await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('');
+  expect(await page.evaluate(() => window.agentTest.enrolls.length)).toBe(1);
+  expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+  await openSettings(page);
+  await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('public');
+});
+
+for (const unavailable of [false, true]) {
+  test('collapsed saved default cannot enable when unavailable=' + unavailable, async ({ page }) => {
+    await deletedDefault(page);
+    if (unavailable) {
+      await page.evaluate(() => { window.agentTest.data.models.push({ ...window.agentTest.data.models[0], id: 'deleted-default', available_targets: [] }); });
+      await page.getByRole('button', { name: '重新识别', exact: true }).click();
+    }
+    await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
+    await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('');
+    await expect(page.getByRole('region', { name: 'Codex 托管设置' })).toContainText(unavailable ? '在当前托管范围内不可用' : '已删除');
+    expect(await page.evaluate(() => [window.agentTest.enrolls, window.agentTest.actions])).toEqual([[], []]);
+  });
+}
+
+test('expanded unchanged default uses the same confirmed form submission', async ({ page }) => {
+  await openSettings(page);
+  await page.getByRole('button', { name: '开启托管', exact: true }).click();
+  await page.evaluate(() => { window.agentTest.data.bindings[0].enabled = false; });
+  await page.getByRole('button', { name: '重新识别', exact: true }).click();
+  await openSettings(page);
+  await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('默认模型：public');
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(page.getByRole('switch', { name: 'Codex 托管', exact: true })).toBeChecked();
+  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([fixture.enroll, fixture.update]);
+  expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
+});
+
+test('failed enable reread clears an invalid draft without selecting another model', async ({ page }) => {
+  await deletedDefault(page);
+  await page.evaluate(() => {
+    window.agentTest.data.bindings[0].model = 'public';
+    window.agentTest.data.models.push({ ...window.agentTest.data.models[0], id: 'changed-default' });
+  });
+  await page.getByRole('button', { name: '重新识别', exact: true }).click();
+  await openSettings(page);
+  await page.getByLabel('默认模型', { exact: true }).selectOption('changed-default');
+  await page.getByRole('switch', { name: 'Codex 托管', exact: true }).click();
+  await page.evaluate(() => { window.agentTest.failWrite = true; window.agentTest.data.models.find(m => m.id === 'changed-default')!.available_targets = []; });
+  await page.getByRole('button', { name: '确认变更', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('已重新读取');
+  await expect(page.getByLabel('默认模型', { exact: true })).toHaveValue('');
+  expect(await page.evaluate(() => window.agentTest.enrolls)).toEqual([{ ...fixture.update, model: 'changed-default', expected_revision: 7 }]);
+  expect(await page.evaluate(() => window.agentTest.actions)).toEqual([]);
 });
