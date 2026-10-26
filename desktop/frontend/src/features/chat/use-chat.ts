@@ -46,8 +46,8 @@ export function useChatOptions(transport: ProviderTransport) {
       if (abort.signal.aborted) return;
       setCatalog(value);
       setModel(current => current || chatModels(workspace, keyId, value)[0] || '');
-      if (value.failure) setCatalogError('未能读取模型目录；仍可选择已存模型或手动填写上游模型 ID。');
-    }).catch(e => { if (!abort.signal.aborted) setCatalogError(chatProblem(e) + ' 也可以手动填写模型 ID。'); })
+      if (value.failure) setCatalogError('未能读取模型目录；可选择已存模型，或刷新目录重试。');
+    }).catch(e => { if (!abort.signal.aborted) setCatalogError(chatProblem(e) + ' 可选择已存模型，或刷新目录重试。'); })
       .finally(() => { if (!abort.signal.aborted) setCatalogLoading(false); });
     return () => abort.abort();
   }, [transport, providerId, workspace, keyId, catalogRevision]);

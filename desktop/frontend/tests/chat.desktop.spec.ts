@@ -31,7 +31,8 @@ async function host(page: Page, modelProtocol = '') {
       }, problem: null }),
       DiscoverProviderModels: async (input: { provider_id: string; key_id: string; expected_revision: number }) => ({ contract, data: state.catalogFails ? null : { ...catalog.success,
         provider_id: input.provider_id, revision: input.expected_revision, key_id: input.key_id,
-        models: [input.key_id === 'second' ? 'second-model' : 'demo-model'], entries: [{ id: input.key_id === 'second' ? 'second-model' : 'demo-model', key_ids: [input.key_id] }],
+        models: input.key_id === 'second' ? ['second-model'] : ['demo-model', 'remote-a', 'remote-z'],
+        entries: (input.key_id === 'second' ? ['second-model'] : ['demo-model', 'remote-a', 'remote-z']).map(id => ({ id, key_ids: [input.key_id] })),
         keys: [{ ...catalog.success.keys[0], id: input.key_id }],
       }, problem: state.catalogFails ? { code: 'read_error' } : null }),
       ProviderChat: async (input: ChatRequest) => {
@@ -107,19 +108,24 @@ test('leaving the page cancels even when start is still pending', async ({ page 
   await expect.poll(() => page.evaluate(() => window.chatTest.requests.some(r => r.action === 'cancel'))).toBe(true);
 });
 
-test('manual model, IME-safe Enter, multiline and no automatic retry', async ({ page }) => {
-  await host(page); await page.evaluate(() => { window.chatTest.catalogFails = true; });
+test('full model dropdown, catalog failure, IME-safe Enter, multiline and no automatic retry', async ({ page }) => {
+  await host(page);
+  const model = page.getByRole('combobox', { name: '对话模型', exact: true });
+  await expect(model.locator('option')).toHaveText(['demo-model', 'remote-a', 'remote-z']);
+  await model.selectOption('remote-z');
+  await send(page); await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => window.chatTest.requests.find(r => r.action === 'start')?.model)).toBe('remote-z');
+  await page.evaluate(() => { window.chatTest.catalogFails = true; window.chatTest.requests = []; });
   await page.getByRole('button', { name: '刷新对话模型目录' }).click();
-  await expect(page.getByText(/也可以手动填写模型 ID/)).toBeVisible();
-  const model = page.getByLabel('对话模型', { exact: true });
-  await model.fill(''); await model.pressSequentially('manual/model');
-  await expect(model).toHaveValue('manual/model'); await expect(model).toBeFocused();
+  await expect(page.getByText(/可选择已存模型，或刷新目录重试/)).toBeVisible();
+  await expect(model.locator('option')).toHaveText(['demo-model']);
+  await expect(model).toHaveValue('demo-model');
   const input = page.getByLabel('对话消息输入'); await input.fill('中文输入');
   await input.dispatchEvent('compositionstart'); await input.press('Enter');
   expect(await page.evaluate(() => window.chatTest.requests)).toHaveLength(0);
   await input.dispatchEvent('compositionend'); await input.press('Shift+Enter'); await input.press('Enter');
   await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
-  expect(await page.evaluate(() => window.chatTest.requests.find(r => r.action === 'start')?.model)).toBe('manual/model');
+  expect(await page.evaluate(() => window.chatTest.requests.find(r => r.action === 'start')?.model)).toBe('demo-model');
   await page.evaluate(() => { window.chatTest.mode = 'unknown'; }); await send(page, '结果未知');
   await expect(page.getByRole('alert')).toContainText('发送结果未知');
   expect(await page.evaluate(() => window.chatTest.requests.filter(r => r.action === 'start'))).toHaveLength(2);

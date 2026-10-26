@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, Copy, LoaderCircle, MessageSquare, RefreshCw, Send, Square, Trash2 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 import { ConfirmAction } from '../../components/shared/confirm-action';
 import { prototype, type ProviderEnvironment } from '../../desktop/environment';
 import { chatProtocol, chatReasoningLevels, DesktopChatTransport, type ChatTransport } from './chat.model';
@@ -31,9 +30,11 @@ export function ChatWorkspace({ environment }: { environment: ProviderEnvironmen
           {!options.keyId && <option value="">{options.loading ? '正在读取…' : '暂无启用的 Key'}</option>}
           {ready && (options.workspace!.keys.length ? options.workspace!.keys.filter(k => k.enabled).map(k => <option key={k.id} value={k.id}>{k.id} · {k.protocol}</option>) : <option value="anonymous">anonymous（无密钥）</option>)}
         </select></label>
-        <label className="min-w-0 space-y-1.5 text-sm"><span>模型</span><div className="flex min-w-0 gap-2"><Input aria-label="对话模型" list="chat-model-options" placeholder="选择或输入上游模型 ID" disabled={busy || !ready || !options.keyId} value={options.model} maxLength={256} onChange={e => options.setModel(e.target.value)} />
+        <label className="min-w-0 space-y-1.5 text-sm"><span>模型</span><div className="flex min-w-0 gap-2"><select aria-label="对话模型" className={selectClass} disabled={busy || !ready || !options.keyId || !options.models.length} value={options.model} onChange={e => options.setModel(e.target.value)}>
+          {!options.models.length && <option value="">{options.loading || options.catalogLoading ? '正在读取模型…' : '暂无可选模型'}</option>}
+          {options.models.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
           <Button variant="outline" size="icon" aria-label="刷新对话模型目录" disabled={busy || !ready || !options.keyId || options.catalogLoading} onClick={options.refreshCatalog}>{options.catalogLoading ? <LoaderCircle className="size-4 animate-spin motion-reduce:animate-none" /> : <RefreshCw className="size-4" />}</Button></div>
-          <datalist id="chat-model-options">{options.models.map(m => <option key={m} value={m} />)}</datalist>
         </label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">只显示 Key 标识，不显示密钥。切换目标会开始新对话；模型使用上游 ID，不经过公开模型的候选调度。</p>
