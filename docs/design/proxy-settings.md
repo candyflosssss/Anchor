@@ -52,7 +52,7 @@ HTTP、HTTPS 和 SOCKS5 以 URL 导入，支持认证；mihomo 导入单节点 Y
 - 同一份生产 dist 经单 worker Chromium 的2项隔离桥接交互测试通过，确认侧栏入口可点击且真实渲染代理页；不是原生窗口验收。详情与本地交付边界见[桌面发行说明](../release/desktop.md#本地代理集成包-48尚未公开发布安装)。
 - 没有公开发布、替换本机二进制、停真实核心或迁移真实状态；Windows 原生、安装器及付费上游仍未验收。
 
-## mihomo 监听端口（proxy-v1-ports，2026-10-27 当前源码未发布）
+## mihomo 监听端口（proxy-v1-ports，2026-10-27 已随 desktop.75 dev 发布）
 
 - 复用 `put` 及既有管理鉴权／实例核验／workspace revision。`ProxyProfile.listen_port` 为可选整数：新建默认 0；同类型编辑省略／null 保留，显式 0 恢复自动分配，1..65535 固定端口。切换类型省略时归零；HTTP/SOCKS5 不接受非零值。同一核心内不同 profile 固定端口不得重复，非法值不写入、不增加 revision。CLI `proxy put --listen-port PORT` 和 GUI 编辑器共用此校验。
 - schema9→10 事务新增非空 `listen_port`，默认 0，不改变既有节点秘密／绑定；新库同样为 schema10，旧二进制拒绝打开。列表始终返回配置端口；旧客户端省略字段仍保留已有端口。旧核心严格拒绝新增输入字段，需配套升级，不把旧版本的缺失字段显示为已知自动／未启动。
@@ -60,4 +60,4 @@ HTTP、HTTPS 和 SOCKS5 以 URL 导入，支持认证；mihomo 导入单节点 Y
 - 启动前检查目标端口能否绑定；端口占用或启动失败仍返回既有 `proxy_unavailable`，不改随机端口、不强杀其他进程、不降级直连。配置写入不启动节点，因此保存成功不能当作端口可用或上游连通。
 - 保留代际排空：同固定端口编辑时旧代有在途响应则保持监听，新请求在旧代关闭前失败；旧响应关闭后下次请求在固定端口启动新代。改成另一空闲端口／自动分配可允许新旧代并存。没有隐式重试，不中断旧 SSE。
 - 前端仍由 Model 白名单校验和摘取公开字段，Controller 管理读写与冲突／unknown 锁定，View 仅管理草稿、显示配置值与运行地址。监听端口与节点 YAML 中的远端服务器端口分开；此设置不开放 LAN、系统代理或 mihomo 控制器。
-- 规范源 `internal/state/proxies.go` 经桌面别名和现有生成器派生 TS；共享样例 `desktop/contract/proxies.json` 覆盖固定配置／运行端口及端口编辑。测试使用隔离状态与本机合成 HTTP 节点；原生窗口、安装和真实网络出口仍需单独验收。本轮不打包／发布。
+- 规范源 `internal/state/proxies.go` 经桌面别名和现有生成器派生 TS；共享样例 `desktop/contract/proxies.json` 覆盖固定配置／运行端口及端口编辑。测试使用隔离状态与本机合成 HTTP 节点；原生窗口、安装和真实网络出口仍需单独验收。端口能力已随 desktop.75 dev 同版打包／发布，未安装或做原生窗口／安装器验收。

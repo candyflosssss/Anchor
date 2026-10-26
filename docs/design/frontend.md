@@ -810,6 +810,6 @@ Agent Model 保持七个平台行，Claude CLI/Desktop 按各自 adapter_id + �
 Model统一校验可选password_saved并处理SessionResult.warning，hooks协调提交锁、结果发布、忘记与刷新，View只展示表单和状态；秘密存取统一通过受限Go桥接和共享connection层。旧宿主缺能力字段时隐藏记住选项。宿主、CLI、系统凭据库绑定范围及风险见[桌面运行契约](desktop-runtime.md#ssh-密码系统凭据库2026-10-25-源码未打包)。不代表已完成Windows原生凭据或两平台窗口验收。
 
 
-## 内置 mihomo 端口展示与编辑（2026-10-27，当前源码未发布）
+## 内置 mihomo 端口展示与编辑（2026-10-27，已随 desktop.75 dev 发布）
 
-代理设置的节点编辑器新增「监听端口（HTTP / SOCKS5）」：留空或 0 自动分配，固定端口范围 1..65535；外部代理仍通过 URL 配置端口，不显示此字段。节点列表显示配置端口、实际 `127.0.0.1:port`、运行／旧配置排空／尚未启动状态；旧核心缺失字段显示不可用，不猜测运行数据。沿用「重新读取」手动刷新，不新增后台轮询。固定端口重复、占用及旧代排空的行为见[代理契约](proxy-settings.md#mihomo-监听端口proxy-v1-ports2026-10-27-当前源码未发布)。原有 MVC、秘密不回显、revision 和 unknown 重读流程保持；CLI 同能力 `proxy put --listen-port`／`proxy list`。未打包或做两平台原生窗口验收。
+代理设置的节点编辑器新增「监听端口（HTTP / SOCKS5）」：留空或 0 自动分配，固定端口范围 1..65535；外部代理仍通过 URL 配置端口，不显示此字段。节点列表显示配置端口、实际 `127.0.0.1:port`、运行／旧配置排空／尚未启动状态；旧核心缺失字段显示不可用，不猜测运行数据。沿用「重新读取」手动刷新，不新增后台轮询。固定端口重复、占用及旧代排空的行为见[代理契约](proxy-settings.md#mihomo-监听端口proxy-v1-ports2026-10-27-已随-desktop75-dev-发布)。原有 MVC、秘密不回显、revision 和 unknown 重读流程保持；CLI 同能力 `proxy put --listen-port`／`proxy list`。已随 desktop.75 dev 同版打包发布，未安装或做两平台原生窗口验收。

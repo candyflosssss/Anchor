@@ -1,7 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-10-27
-- 2026-10-27 当前源码未发布：`proxy put --listen-port PORT` 设置内置 mihomo 回环混合端口；`proxy list` 显示配置值和实际运行端口，见 §15。首次打开自动迁移至 schema10，旧核心不可打开升级后的状态库。
+- 2026-10-27 已随 desktop.75 dev 发布：`proxy put --listen-port PORT` 设置内置 mihomo 回环混合端口；`proxy list` 显示配置值和实际运行端口，见 §15。首次打开自动迁移至 schema10，旧核心不可打开升级后的状态库。
 - 2026-10-26 已随 desktop.73 dev 发布：新增 `context password save|status|forget NAME`，显式将 SSH 密码保存到系统凭据库；已保存时管理连接可复用，默认仍不保存，详见 §4。
 - 2026-10-25 desktop.72 dev 已发布：响应式模型瀑布流与 Windows 托盘退出／任务栏图标／前台激活修复；同版包含安装目录与生成流首字识别修复。本轮无新增命令或参数，详见[发行记录](../release/desktop.md#masonry-windows-72)。
 - 2026-10-25 已随 desktop.72 dev 发布：补齐生成流首字检测，已确认首字超时不再因客户端收到错误后断开而被日志记为客户端取消；命令、参数及输出字段不变，见下方日志说明。

@@ -1,10 +1,31 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-26。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.74](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.74)，发布于 `2026-10-26T22:52:44+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `e1498651f6568f2c33fb8bb547c2971971d0c900`、SOURCE dirty=false。
-- 对话测试模型改为完整下拉列表，展开即可选择当前 Key 的全部候选；同版包含 .73 后已提交的 API 服务设置说明、Agent 所选默认模型启用和 DSH insert／命名分组兼容修复。
+- 更新：2026-10-27。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.75](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.75)，发布于 `2026-10-27T01:33:20+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1904c21562393d097b8b0c3ba29e2188feb67b97`、SOURCE dirty=false。
+- 内置 mihomo 节点可查看实际运行端口并设置固定监听端口；留空或 0 自动分配，CLI 同步支持 `proxy put --listen-port`。首次启动状态库 schema9→10，旧核心不能打开升级后的数据库。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="mihomo-ports-75"></a>
+
+## 内置 mihomo 端口显示与设置 .75（已发布 dev）
+
+代理设置的 mihomo 节点编辑器支持指定 HTTP／SOCKS5 混合监听端口，留空或 0 自动分配；节点列表回显配置值、实际 `127.0.0.1:port` 及运行／旧配置排空状态。CLI `proxy put --listen-port` 和 `proxy list` 使用同一核心校验。固定端口重复拒绝，实际占用不改随机端口、不降级直连；编辑保留旧响应，同端口新配置需等旧代排空。契约见[代理设置](../design/proxy-settings.md)。
+
+版本 `0.1.0-dev.desktop.75` 于 `2026-10-27T01:33:20+09:00` 发布为 dev prerelease，非 latest；干净构建 revision `1904c21562393d097b8b0c3ba29e2188feb67b97`，输入摘要 `9d1eaf9f8d02b41e3df7841d9211c6d1c5029ca0a3762509134c2b8e775b5a32`。未纳入原工作区未提交改动。**首次启动状态库 schema9→10，既有节点默认自动分配，旧核心不能打开升级后的库；升级前备份实例目录，核心、桌面与 CLI 配套升级。** 本轮未自动安装、启动迁移或修改真实配置。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.75_amd64.deb` | 29261840 | `f783c6ab3e53e4072471de859ec866f24f6a74b632b2386e22ade76f9df8c807` |
+| `Anchor-Desktop-0.1.0-dev.desktop.75-windows-amd64-setup.exe` | 31277336 | `33c8512eb0fdc14f531f015c523827788711276ef80ffa292af4b43f2035a51f` |
+
+Go／TS 契约比对、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译、NSIS `-WX` 和 deb 打包通过。复用功能阶段已通过的 Go 定向／状态与出站包测试、typecheck／lint、5 项前端单元测试和3项浏览器模拟桥接交互；本轮不重复全量、race 或原生窗口检查。
+
+11项附件包括两平台安装包、desktop runtime、独立 CLI、两个 flat 更新清单、vendor对应源码、许可／构建元数据和SHA256SUMS。嵌入的生产前端及固定 mihomo、deb载荷与runtime、源码输入摘要、ZIP CRC、全部附件远端大小／digest、构建tag与非latest均核对通过。默认dev源在隔离数据目录真实下载Linux runtime、旧版 .56 CLI取得的兼容deb及同版CLI，版本／目标／大小／SHA256核对通过，runtime与CLI可执行版本一致。证据保存在 `dist/desktop/0.1.0-dev.desktop.75/publication/` 的 preparation／publication／online-verification.json，BUILD.json保留构建时未发布／未原生验收的事实。
+
+构建准备阶段两次因依赖链接不适用于干净工作树／隔离容器而中止，改用工作树内独立依赖后重新完成干净构建；失败中间产物未上传。所有重操作串行受resource-guard限制，临时数据位于磁盘目录；没有修改宿主系统依赖或无关服务。
+
+入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。本轮仅在线投放，未安装、改用户更新配置或真实Agent配置，未请求付费上游；两平台原生窗口／安装器和真实SSH升级未验收。
 
 <a id="chat-model-dropdown-74"></a>
 

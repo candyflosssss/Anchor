@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-10-26。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.74](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.74)，发布于 `2026-10-26T22:52:44+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `e1498651f6568f2c33fb8bb547c2971971d0c900`、SOURCE dirty=false。
-- 对话测试模型改为完整下拉列表，展开即可选择当前 Key 的全部候选；同版包含 .73 后已提交的 API 服务设置说明、Agent 所选默认模型启用和 DSH insert／命名分组兼容修复。
+- 更新：2026-10-27。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.75](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.75)，发布于 `2026-10-27T01:33:20+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1904c21562393d097b8b0c3ba29e2188feb67b97`、SOURCE dirty=false。
+- 内置 mihomo 节点可查看实际运行端口并设置固定监听端口；留空或 0 自动分配，CLI 同步支持 `proxy put --listen-port`。首次启动状态库 schema9→10，旧核心不能打开升级后的数据库。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .75 在线投放（2026-10-27）
+
+内置mihomo端口显示与设置已投放，11附件摘要、构建tag与非latest核对通过；默认dev源Linux runtime、旧客户端兼容deb和CLI三条真实下载及版本／大小／SHA256校验通过。首次启动将状态库升级至schema10，旧核心不能打开升级后的库；本轮未安装或修改真实配置。详见[发行记录](../release/desktop.md#mihomo-ports-75)。
 
 ## .74 在线投放（2026-10-26）
 
