@@ -125,7 +125,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   agent sync|restore|enable|disable ID --revision N
   agent set-models ID --revision N --model DEFAULT --model-scope all-compatible|all-mapped|single
   proxy list                        List proxies, bindings and built-in mihomo status
-  proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] --revision N --approve
+  proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] [--listen-port PORT] --revision N --approve
   proxy delete ID --revision N --approve
   proxy bind PROVIDER [--key KEY] --mode direct|system|inherit|proxy [--proxy ID] --revision N --approve
       direct ignores application proxies (not OS/router interception); system requires an OS/environment proxy, never falls back direct.

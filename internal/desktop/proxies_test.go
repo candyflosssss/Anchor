@@ -15,6 +15,7 @@ func TestProxySharedContractAndRealBridge(t *testing.T) {
 		Contract   string         `json:"contract"`
 		Workspace  ProxyWorkspace `json:"workspace"`
 		Bind       ProxyAction    `json:"bind"`
+		PortPut    ProxyAction    `json:"port_put"`
 		SystemBind ProxyAction    `json:"system_bind"`
 	}
 	if e = json.Unmarshal(raw, &f); e != nil || f.Contract != Contract || f.Bind.Binding.Mode != "proxy" || f.SystemBind.Binding.Mode != "system" {
@@ -56,6 +57,35 @@ func TestProxySharedContractAndRealBridge(t *testing.T) {
 	}
 	if !found {
 		t.Fatal("system binding not persisted")
+	}
+	node := "{name: local, type: http, server: 127.0.0.1, port: 1234}"
+	portPut := f.PortPut
+	portPut.Profile.ID = "node"
+	portPut.Secret = &node
+	portPut.ExpectedRevision = result.Data.Revision
+	ports := b.ManageProxy(portPut)
+	if ports.Problem != nil || ports.Data == nil {
+		t.Fatal(ports)
+	}
+	found = false
+	for _, profile := range ports.Data.Profiles {
+		if profile.ID == "node" && profile.ListenPort != nil && *profile.ListenPort == *f.PortPut.Profile.ListenPort {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("port was not returned through real bridge")
+	}
+	portPut.ExpectedRevision = ports.Data.Revision
+	portPut.Secret = nil
+	portPut.Profile.ListenPort = nil
+	retained := b.ManageProxy(portPut)
+	if retained.Problem != nil {
+		t.Fatal(retained)
+	}
+	portPut.ExpectedRevision = ports.Data.Revision
+	if stale := b.ManageProxy(portPut); stale.Problem == nil || stale.Problem.Code != "conflict" {
+		t.Fatal(stale)
 	}
 	in.Approved = false
 	if x := b.ManageProxy(in); x.Problem == nil || x.Problem.Code != "invalid" {

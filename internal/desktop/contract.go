@@ -405,6 +405,7 @@ type ChatRequest = catalog.ChatRequest
 type ProxyProfile = state.ProxyProfile
 type ProxyBinding = state.ProxyBinding
 type ProxyTarget = state.ProxyTarget
+type ProxyListener = state.ProxyListener
 type ProxyEngine = state.ProxyEngine
 type ProxyWorkspace = state.ProxyWorkspace
 type ProxyAction = state.ProxyAction

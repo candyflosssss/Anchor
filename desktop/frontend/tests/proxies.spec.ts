@@ -38,15 +38,20 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('node editor does not read secrets back and Key routing overrides the supplier', async ({ page }) => {
+  await expect(page.getByText('127.0.0.1:17890 · 运行中', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '添加代理', exact: true }).click();
   await page.getByLabel('ID', { exact: true }).fill('new-node');
   await page.getByLabel('名称', { exact: true }).fill('测试节点');
+  await page.getByLabel('监听端口（HTTP / SOCKS5）', { exact: true }).fill('17892');
   const secret = 'type: http\nserver: 127.0.0.1\nport: 18888\npassword: synthetic-test-only';
   await page.getByRole('textbox', { name: '代理秘密配置' }).fill(secret);
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByRole('textbox', { name: '代理秘密配置' })).toHaveCount(0);
   const row = page.getByRole('listitem').filter({ hasText: 'new-node' });
+  await expect(row).toContainText('监听端口：17892');
   await row.getByRole('button', { name: '编辑', exact: true }).click();
+  await expect(page.getByLabel('监听端口（HTTP / SOCKS5）', { exact: true })).toHaveValue('17892');
+  await page.getByLabel('监听端口（HTTP / SOCKS5）', { exact: true }).fill('');
   await expect(page.getByRole('textbox', { name: '代理秘密配置' })).toHaveValue('');
   await page.getByRole('button', { name: '保存', exact: true }).click();
   await expect(page.getByRole('textbox', { name: '代理秘密配置' })).toHaveCount(0);
@@ -59,6 +64,8 @@ test('node editor does not read secrets back and Key routing overrides the suppl
   const actions = await page.evaluate(() => window.proxyTest.actions);
   expect(actions.map(a => a.expected_revision)).toEqual([4, 5, 6, 7]);
   expect(actions.every(a => a.approved)).toBe(true);
+  expect(actions[0].profile.listen_port).toBe(17892);
+  expect(actions[1].profile.listen_port).toBe(0);
   expect(actions[0].secret).toBe(secret);
   expect(actions[1].secret).toBeNull();
   expect(actions[2].binding.mode).toBe('inherit');
@@ -78,4 +85,24 @@ test('unknown writes lock mutations until an explicit reread without retrying', 
   await expect(key).toBeEnabled();
   await expect(key).toHaveValue('direct');
   expect(await page.evaluate(() => window.proxyTest.actions.length)).toBe(1);
+});
+
+
+test('port range and type switch prevent invalid listener settings from being submitted', async ({ page }) => {
+  await page.getByRole('listitem').filter({ hasText: 'edge' }).getByRole('button', { name: '编辑', exact: true }).click();
+  const port = page.getByLabel('监听端口（HTTP / SOCKS5）', { exact: true });
+  await expect(port).toHaveValue('17890');
+  for (const value of ['65536', '-1', '1.5']) {
+    await port.fill(value);
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    expect(await page.evaluate(() => window.proxyTest.actions.length)).toBe(0);
+  }
+  await page.getByRole('combobox', { name: /^类型/ }).selectOption('http');
+  await expect(port).toHaveCount(0);
+  await page.getByRole('textbox', { name: '代理秘密配置' }).fill('http://127.0.0.1:1234');
+  await page.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '代理秘密配置' })).toHaveCount(0);
+  const input = await page.evaluate(() => window.proxyTest.actions[0]);
+  expect(input.profile.kind).toBe('http');
+  expect(input.profile.listen_port).toBe(0);
 });

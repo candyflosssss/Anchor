@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -39,6 +40,7 @@ type entry struct {
 	engine    *engine
 	refs      int
 	retired   bool
+	profile   state.ProxyProfile
 }
 type Manager struct {
 	store   *state.Store
@@ -88,16 +90,24 @@ func (m *Manager) Status() state.ProxyEngine {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	n := 0
+	listeners := []state.ProxyListener{}
 	for _, v := range m.entries {
 		if v.engine != nil {
 			select {
 			case <-v.engine.done:
 			default:
 				n++
+				listeners = append(listeners, state.ProxyListener{ProfileID: v.profile.ID, Revision: v.profile.Revision, Port: v.engine.port, Retiring: v.retired})
 			}
 		}
 	}
-	return state.ProxyEngine{Available: Available(), Version: Version, Platform: runtime.GOOS + "/" + runtime.GOARCH, Running: n}
+	sort.Slice(listeners, func(i, j int) bool {
+		if listeners[i].ProfileID == listeners[j].ProfileID {
+			return listeners[i].Revision < listeners[j].Revision
+		}
+		return listeners[i].ProfileID < listeners[j].ProfileID
+	})
+	return state.ProxyEngine{Available: Available(), Version: Version, Platform: runtime.GOOS + "/" + runtime.GOARCH, Running: n, Listeners: listeners}
 }
 func (m *Manager) RoundTrip(req *http.Request) (*http.Response, error) {
 	r, ok := req.Context().Value(routeKey{}).(route)
@@ -142,7 +152,7 @@ func (m *Manager) RoundTrip(req *http.Request) (*http.Response, error) {
 			m.mu.Unlock()
 			return nil, ErrUnavailable
 		}
-		item = &entry{transport: m.base.Clone()}
+		item = &entry{transport: m.base.Clone(), profile: p.Profile}
 		proxyURL := p.Secret
 		if p.Profile.Kind == "mihomo" {
 			n := 0
@@ -155,7 +165,7 @@ func (m *Manager) RoundTrip(req *http.Request) (*http.Response, error) {
 				m.mu.Unlock()
 				return nil, ErrUnavailable
 			}
-			item.engine, proxyURL, e = startEngine(req.Context(), m.store.Dir, p.Secret)
+			item.engine, proxyURL, e = startEngine(req.Context(), m.store.Dir, p.Secret, *p.Profile.ListenPort)
 			if e != nil {
 				m.mu.Unlock()
 				return nil, ErrUnavailable

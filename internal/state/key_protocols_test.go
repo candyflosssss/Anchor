@@ -121,7 +121,7 @@ func TestV3MigratesEveryKeyProtocol(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if _, err := s.db.Exec(`DROP TABLE provider_platforms; DROP TABLE key_model_protocols; ALTER TABLE provider_keys DROP COLUMN protocol; PRAGMA user_version=3;`); err != nil {
+	if _, err := s.db.Exec(`DROP TABLE provider_platforms; DROP TABLE key_model_protocols; ALTER TABLE provider_keys DROP COLUMN protocol; ALTER TABLE proxy_profiles DROP COLUMN listen_port; PRAGMA user_version=3;`); err != nil {
 		t.Fatal(err)
 	}
 	dir := s.Dir

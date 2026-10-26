@@ -8,10 +8,11 @@ import (
 
 // Public proxy DTOs deliberately never contain a URL, credential or node configuration.
 type ProxyProfile struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Kind     string `json:"kind"`
-	Revision int64  `json:"revision"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Kind       string `json:"kind"`
+	Revision   int64  `json:"revision"`
+	ListenPort *int   `json:"listen_port,omitempty"`
 }
 type ProxyBinding struct {
 	ProviderID string `json:"provider_id"`
@@ -23,11 +24,18 @@ type ProxyTarget struct {
 	ProviderID string `json:"provider_id"`
 	KeyID      string `json:"key_id"`
 }
+type ProxyListener struct {
+	ProfileID string `json:"profile_id"`
+	Revision  int64  `json:"revision"`
+	Port      int    `json:"port"`
+	Retiring  bool   `json:"retiring"`
+}
 type ProxyEngine struct {
-	Available bool   `json:"available"`
-	Version   string `json:"version"`
-	Platform  string `json:"platform"`
-	Running   int    `json:"running"`
+	Available bool            `json:"available"`
+	Version   string          `json:"version"`
+	Platform  string          `json:"platform"`
+	Running   int             `json:"running"`
+	Listeners []ProxyListener `json:"listeners,omitempty"`
 }
 type ProxyWorkspace struct {
 	Revision int64          `json:"revision"`
@@ -61,13 +69,13 @@ func (s *Store) ProxyWorkspace() (ProxyWorkspace, error) {
 	if e = tx.QueryRow(`SELECT revision FROM proxy_revision`).Scan(&out.Revision); e != nil {
 		return out, e
 	}
-	rows, e := tx.Query(`SELECT id,name,kind,revision FROM proxy_profiles ORDER BY id`)
+	rows, e := tx.Query(`SELECT id,name,kind,revision,listen_port FROM proxy_profiles ORDER BY id`)
 	if e != nil {
 		return out, e
 	}
 	for rows.Next() {
 		var p ProxyProfile
-		if e = rows.Scan(&p.ID, &p.Name, &p.Kind, &p.Revision); e != nil {
+		if e = rows.Scan(&p.ID, &p.Name, &p.Kind, &p.Revision, &p.ListenPort); e != nil {
 			rows.Close()
 			return out, e
 		}
@@ -162,7 +170,7 @@ func (s *Store) ProxySecretFor(provider, key string) (*ProxySecret, error) {
 		return nil, ErrInvalid
 	}
 	p := &ProxySecret{}
-	e = tx.QueryRow(`SELECT id,name,kind,revision,secret FROM proxy_profiles WHERE id=?`, id).Scan(&p.Profile.ID, &p.Profile.Name, &p.Profile.Kind, &p.Profile.Revision, &p.Secret)
+	e = tx.QueryRow(`SELECT id,name,kind,revision,listen_port,secret FROM proxy_profiles WHERE id=?`, id).Scan(&p.Profile.ID, &p.Profile.Name, &p.Profile.Kind, &p.Profile.Revision, &p.Profile.ListenPort, &p.Secret)
 	if errors.Is(e, sql.ErrNoRows) {
 		e = ErrNotFound
 	}
@@ -193,9 +201,27 @@ func (s *Store) MutateProxy(in ProxyAction, normalize func(string, string, strin
 			return ErrInvalid
 		}
 		var old ProxySecret
-		err := tx.QueryRow(`SELECT kind,secret FROM proxy_profiles WHERE id=?`, p.ID).Scan(&old.Profile.Kind, &old.Secret)
+		err := tx.QueryRow(`SELECT kind,secret,listen_port FROM proxy_profiles WHERE id=?`, p.ID).Scan(&old.Profile.Kind, &old.Secret, &old.Profile.ListenPort)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
+		}
+		port := 0
+		if p.ListenPort != nil {
+			port = *p.ListenPort
+		} else if err == nil && old.Profile.Kind == p.Kind {
+			port = *old.Profile.ListenPort
+		}
+		if port < 0 || port > 65535 || (p.Kind != "mihomo" && port != 0) {
+			return ErrInvalid
+		}
+		if port != 0 {
+			var used int
+			if e = tx.QueryRow(`SELECT count(*) FROM proxy_profiles WHERE id<>? AND listen_port=?`, p.ID, port).Scan(&used); e != nil {
+				return e
+			}
+			if used != 0 {
+				return ErrInvalid
+			}
 		}
 		secret := ""
 		if in.Secret != nil {
@@ -216,7 +242,7 @@ func (s *Store) MutateProxy(in ProxyAction, normalize func(string, string, strin
 		if errors.Is(err, sql.ErrNoRows) && count >= 64 {
 			return ErrInvalid
 		}
-		_, e = tx.Exec(`INSERT INTO proxy_profiles(id,name,kind,revision,secret) VALUES(?,?,?,1,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,revision=proxy_profiles.revision+1,secret=excluded.secret`, p.ID, p.Name, p.Kind, secret)
+		_, e = tx.Exec(`INSERT INTO proxy_profiles(id,name,kind,revision,secret,listen_port) VALUES(?,?,?,1,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,kind=excluded.kind,revision=proxy_profiles.revision+1,secret=excluded.secret,listen_port=excluded.listen_port`, p.ID, p.Name, p.Kind, secret, port)
 	case "delete":
 		var count int
 		e = tx.QueryRow(`SELECT (SELECT count(*) FROM provider_proxy WHERE proxy_id=?)+(SELECT count(*) FROM key_proxy WHERE proxy_id=?)`, in.Profile.ID, in.Profile.ID).Scan(&count)

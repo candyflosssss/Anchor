@@ -208,7 +208,7 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状不变，agent/adapter_id 字�
 
 ## mihomo 核心子进程
 
-出站代理归核心 `internal/egress` 所有，不归桌面窗口：隐藏/关闭窗口不会单独停止代理，核心关闭统一回收。Windows 使用隐藏子进程与 KILL_ON_JOB_CLOSE Job；Linux 设置父进程死亡信号。每个活动 profile 代际有独立回环监听和认证，旧响应关闭后退役，UI 不获得端口认证及节点秘密。远程 Context 使用远程核心的 payload/进程，旧核心管理接口缺失返回 unsupported。详见 [proxy-v1](proxy-settings.md)。
+出站代理归核心 `internal/egress` 所有，不归桌面窗口：隐藏/关闭窗口不会单独停止代理，核心关闭统一回收。Windows 使用隐藏子进程与 KILL_ON_JOB_CLOSE Job；Linux 设置父进程死亡信号。每个活动 profile 代际有独立回环监听和认证，旧响应关闭后退役，UI 可读取运行端口，但不获得认证及节点秘密。远程 Context 使用远程核心的 payload/进程，旧核心管理接口缺失返回 unsupported。详见 [proxy-v1](proxy-settings.md)。
 
 ## Skill 中心库桥接（已随 desktop dev 发布）
 

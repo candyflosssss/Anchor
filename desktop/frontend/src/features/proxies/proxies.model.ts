@@ -8,16 +8,24 @@ export function bindingValue(workspace: ProxyWorkspace, provider: string, key: s
 export function bindingFromValue(provider: string, key: string, value: string): ProxyBinding {
   return { provider_id: provider, key_id: key, mode: value.startsWith('proxy:') ? 'proxy' : value, proxy_id: value.startsWith('proxy:') ? value.slice(6) : '' };
 }
+function validPort(port: number, automatic = false) {
+  return Number.isSafeInteger(port) && port >= (automatic ? 0 : 1) && port <= 65535;
+}
+export function listenPortValue(value: string): number | null {
+  if (value === '') return 0;
+  return /^\d+$/.test(value) && validPort(Number(value), true) ? Number(value) : null;
+}
 export function checkedWorkspace(data: ProxyWorkspace): ProxyWorkspace {
   if (!data || !Number.isSafeInteger(data.revision) || data.revision < 1 || !Array.isArray(data.profiles) || !Array.isArray(data.bindings) || !Array.isArray(data.targets) ||
-    data.profiles.some(p => !p.id || typeof p.name !== 'string' || !['http', 'socks5', 'mihomo'].includes(p.kind) || !Number.isSafeInteger(p.revision)) ||
+    data.profiles.some(p => !p.id || typeof p.name !== 'string' || !['http', 'socks5', 'mihomo'].includes(p.kind) || !Number.isSafeInteger(p.revision) || (p.listen_port != null && (!validPort(p.listen_port, true) || (p.kind !== 'mihomo' && p.listen_port !== 0)))) ||
     data.bindings.some(b => typeof b.provider_id !== 'string' || typeof b.key_id !== 'string' || typeof b.proxy_id !== 'string' || !['direct', 'system', 'inherit', 'proxy'].includes(b.mode)) ||
-    data.targets.some(t => typeof t.provider_id !== 'string' || typeof t.key_id !== 'string') || !data.engine || typeof data.engine.available !== 'boolean' || !Number.isSafeInteger(data.engine.running)) throw new DesktopProblem('read_error');
+    data.targets.some(t => typeof t.provider_id !== 'string' || typeof t.key_id !== 'string') || !data.engine || typeof data.engine.available !== 'boolean' || !Number.isSafeInteger(data.engine.running) ||
+    (data.engine.listeners !== undefined && (!Array.isArray(data.engine.listeners) || data.engine.listeners.some(l => typeof l.profile_id !== 'string' || !Number.isSafeInteger(l.revision) || !validPort(l.port) || typeof l.retiring !== 'boolean')))) throw new DesktopProblem('read_error');
   // Explicitly pick public fields; even a malformed remote response cannot put secrets in UI state.
-  return { revision: data.revision, profiles: data.profiles.map(p => ({ id: p.id, name: p.name, kind: p.kind, revision: p.revision })),
+  return { revision: data.revision, profiles: data.profiles.map(p => ({ id: p.id, name: p.name, kind: p.kind, revision: p.revision, listen_port: p.listen_port })),
     bindings: data.bindings.map(b => ({ provider_id: b.provider_id, key_id: b.key_id, mode: b.mode, proxy_id: b.proxy_id })),
     targets: data.targets.map(t => ({ provider_id: t.provider_id, key_id: t.key_id })),
-    engine: { available: data.engine.available, version: data.engine.version, platform: data.engine.platform, running: data.engine.running } };
+    engine: { available: data.engine.available, version: data.engine.version, platform: data.engine.platform, running: data.engine.running, listeners: data.engine.listeners?.map(l => ({ profile_id: l.profile_id, revision: l.revision, port: l.port, retiring: l.retiring })) } };
 }
 export const proxyModel = {
   async read() { return checkedWorkspace(await call(() => bridge().ProxyWorkspace())); },
@@ -32,7 +40,7 @@ export function proxyError(error: unknown) {
       case 'unsupported': return '当前核心不支持代理设置，请先升级核心。';
       case 'conflict': return '配置已被其他操作修改，请重新读取后再保存。';
       case 'referenced': return '此代理仍被供应商或 Key 引用，请先改为不使用应用代理、系统代理、继承或其他代理。';
-      case 'invalid': return '配置无效：检查 ID、代理 URL、节点 YAML 和节点名称。';
+      case 'invalid': return '配置无效：检查 ID、代理 URL、节点 YAML、节点名称和监听端口（0–65535，固定端口不可重复）。';
       case 'unknown': return '写入结果未知。请重新读取确认，不要直接重复提交。';
       case 'unauthorized': return '没有管理权限，请检查当前连接。';
     }

@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-26
+- 最近核对：2026-10-27
+- 2026-10-27 当前源码未发布：`proxy put --listen-port PORT` 设置内置 mihomo 回环混合端口；`proxy list` 显示配置值和实际运行端口，见 §15。首次打开自动迁移至 schema10，旧核心不可打开升级后的状态库。
 - 2026-10-26 已随 desktop.73 dev 发布：新增 `context password save|status|forget NAME`，显式将 SSH 密码保存到系统凭据库；已保存时管理连接可复用，默认仍不保存，详见 §4。
 - 2026-10-25 desktop.72 dev 已发布：响应式模型瀑布流与 Windows 托盘退出／任务栏图标／前台激活修复；同版包含安装目录与生成流首字识别修复。本轮无新增命令或参数，详见[发行记录](../release/desktop.md#masonry-windows-72)。
 - 2026-10-25 已随 desktop.72 dev 发布：补齐生成流首字检测，已确认首字超时不再因客户端收到错误后断开而被日志记为客户端取消；命令、参数及输出字段不变，见下方日志说明。
@@ -828,7 +829,7 @@ anchor recover [--id ID]
 | 用量与价格 | usage；provider workspace/price-put/price-import | GUI 累计统计、单价设置与导入预览；未知明确区分 |
 | 真实日志查询、详情、导出、保留管理 | logs list/stats/suggestions/detail/follow/export/settings/configure | 固定区间（`--from/--to`）、仅错误（`--errors-only`）及 stats 全范围错误汇总（`--include-errors`）已加入当前源码；GUI 图表选区见[日志设计](../design/logging.md)。显示块选择、顺序、预设与费用合块是本机外观偏好，无需 CLI，不影响后台采集保存 |
 | 日志按 Agent／绑定／项目／会话分类 | logs stats --group-by；list/follow/export 的归属筛选 | 基础能力 desktop.44 已发布；desktop.45 dev 已发布认证 Codex 原生线程及同机项目元数据关联，其他客户端仍需显式标签；历史不回填 |
-| 出站代理 / 内置 mihomo | proxy list/put/delete/bind；代理设置页及供应商详情 | Windows/Linux amd64；Key 支持继承、强制直连、指定代理；节点 YAML 导入，不含订阅刷新/测速 |
+| 出站代理 / 内置 mihomo | proxy list/put/delete/bind；代理设置页及供应商详情 | Windows/Linux amd64；Key 支持继承、强制直连、指定代理；节点 YAML 导入；监听端口可设，运行端口可查；不含订阅刷新/测速 |
 | Skill 自动收录、原件清理、来源差异、固定版本链接 | skill 管理子命令（§14） | 常见目录项目自动发现，无须手动登记；自动收录保留原件；手动清理先核验归档再换链接；项目发现增量已随 desktop.68 dev 发布，未自动安装 |
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test 与 context password save/status/forget；系统凭据库显式可选，远端须已安装新版 Anchor，自动安装待实现 |
@@ -1058,12 +1059,12 @@ anchor skill delete SKILL_ID --revision R --approve
 
 ```text
 anchor [--context NAME] proxy list
-anchor [--context NAME] proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] --revision N --approve
+anchor [--context NAME] proxy put ID --name NAME --kind http|socks5|mihomo [--secret-stdin] [--node NAME] [--listen-port PORT] --revision N --approve
 anchor [--context NAME] proxy delete ID --revision N --approve
 anchor [--context NAME] proxy bind PROVIDER [--key KEY] --mode direct|system|inherit|proxy [--proxy ID] --revision N --approve
 ```
 
-- `list` 不访问上游，输出 `revision/profiles/bindings/targets/engine`；profile 只含 ID、名称、类型、revision，没有代理 URL、认证或节点内容。engine 给出固定版本、平台、是否内置、运行节点数。
+- `list` 不访问上游，输出 `revision/profiles/bindings/targets/engine`；profile 只含 ID、名称、类型、revision、配置监听端口，没有代理 URL、认证或节点内容。engine 给出固定版本、平台、是否内置、运行节点数及可选运行端口快照。
 - 写入的 `--revision` 是 **proxy list 的 workspace revision**，不是供应商 revision；`--approve` 必须显式提供。成功输出更新后的整个 workspace。并发冲突先重新读取，不自动重试。断线写入结果未知时同样先读取。
 - `put`：ID 使用项目名称规则，名称非空且最多 100 bytes，类型必填。`--secret-stdin` 最多 64 KiB：`http` 接受带端口的 `http://` 或 `https://` URL；`socks5` 接受 `socks5://` / `socks5h://`；可在 URL 中包含认证。不要把秘密写进命令参数。编辑省略 `--secret-stdin` 保留原秘密（类型不可改变）；新建必须输入。
 - `mihomo` 接受单节点 YAML，或包含 `proxies` 的 Clash YAML；多节点必须 `--node NAME` 精确选中唯一节点。仅提取该节点，忽略根级规则、DNS、TUN、控制器。支持 http、socks5、ss、vmess、vless、trojan、hysteria2、tuic；拒绝文件证书、插件、代理链等外部引用。不接受订阅 URL、URI/Base64 列表，不自动刷新订阅。
@@ -1072,7 +1073,10 @@ anchor [--context NAME] proxy bind PROVIDER [--key KEY] --mode direct|system|inh
 - `direct`：仅关闭应用层代理，不保证绕过系统 TUN 或路由器透明代理，不保证特定公网出口。物理直连需在实际接管流量的系统/网关设置绕过规则，Anchor 不自动改路由和防火墙。
 - 兼容：模式新增但 JSON 结构、revision/approve 与 schema 不变；核心与桌面需配套升级，旧客户端会拒绝新枚举。切回旧核心前把 `system` 改回旧模式。示例：先 `anchor proxy list` 获取 revision，再 `anchor proxy bind PROVIDER --mode system --revision N --approve`；改为不使用应用代理用 `--mode direct`，Key 覆盖追加 `--key KEY`。详见[代理契约](../design/proxy-settings.md)。
 - `delete`：仍被引用返回 referenced，先解绑。供应商改名、删除和复制遵循外键/复制规则；复制 Key 时也复制其代理覆盖。
-- 默认最多 64 个 profile，16 个存活（含正在结束旧流）的 mihomo 节点子进程。节点按需启动、仅本机回环监听、随机认证，不需要管理员权限。编辑不切断旧 SSE，旧代最后一个响应关闭后回收；核心关闭回收全部子进程。
+- `--listen-port PORT` 仅用于 mihomo，范围 0..65535；0 自动分配，省略时同类型编辑保留原端口、新建默认 0。外部代理只能使用 0，实际地址与端口仍来自其秘密 URL。固定端口不得与其他 profile 重复。`proxy list` 的 `profiles[].listen_port` 为配置值，`engine.listeners[]` 提供 `profile_id/revision/port/retiring`，只包含存活进程，不含认证。尚未启动没有运行端口，配置保存不代表端口已绑定；使用时若端口被占用返回 `proxy_unavailable`，不换随机端口、不强杀占用者、不降级直连。
+- 同固定端口编辑时，旧代有在途响应则继续占用端口至 Body 关闭，新请求暂时报代理不可用，排空后下次请求启动新代；可改用其他空闲端口以便新旧代并存。读取状态不会启动节点。远程 Context 显示和设置远端核心端口；前端“重新读取”手动刷新状态。
+- 端口能力需配套升级核心／CLI／桌面；schema9→10 自动给既有节点补 0，保留秘密和绑定。旧客户端省略该字段仍保留原设置；旧核心拒绝新字段，不能用旧核心打开升级后的状态库。
+- 默认最多 64 个 profile，16 个存活（含正在结束旧流）的 mihomo 节点子进程。节点按需启动、仅本机回环监听（自动分配或指定端口）、随机认证，不需要管理员权限。编辑不切断旧 SSE，旧代最后一个响应关闭后回收；核心关闭回收全部子进程。
 - 固定 mihomo v1.19.32；正式构建入口自动校验并嵌入 Windows/Linux amd64 payload。直接 `go build` 且未准备 payload 时显示未内置，选用 mihomo 报错，但外部 HTTP/SOCKS5 仍可用。构建方法和 GPLv3 通知见 [代理设计](../design/proxy-settings.md) 与 [mihomo notice](../../third_party/mihomo/NOTICE.md)。秘密依赖实例目录权限保护，**不是静态加密**。
 
 

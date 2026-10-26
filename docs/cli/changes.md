@@ -1029,3 +1029,12 @@
 - 旧 → 新：源码已实现但安装版未含 → dev 在线更新可取得；公开 alpha.6 CLI 不变，桌面包不安装通用 CLI。
 - 兼容与迁移：通过设置 → 在线更新 → dev 升级桌面；需要独立 CLI 时下载同版附件，不修改真实配置或自动安装。
 - 验证：双平台生产编译／打包、11 附件远端摘要及默认 dev 源 runtime／旧客户端 deb／CLI 实际下载校验通过；Windows 原生凭据库和两平台窗口／安装验收未执行，详见[发行记录](../release/desktop.md#ssh-reconnect-73)。
+
+
+## 2026-10-27 — 内置 mihomo 监听端口（当前源码，未发布）
+
+- 类型：新增参数与公开输出字段。
+- 指令与参数：`proxy put ID --name NAME --kind mihomo [--listen-port PORT] [--secret-stdin] [--node NAME] --revision N --approve`；`proxy list` 查询配置和运行端口。
+- 旧 → 新：端口始终随机且不显示 → 每个 mihomo profile 可设置 0..65535（0 自动，省略保留同类型原设置），列表输出 `profiles[].listen_port` 及可选 `engine.listeners[]`（profile_id/revision/port/retiring）。外部 profile 只允许 0。重复固定端口拒绝；实际占用在按需启动时返回既有 proxy_unavailable，不直连或换端口。同固定端口编辑保留旧响应，排空前新请求可能失败。
+- 兼容与迁移：schema9→10 自动补 0，旧核心不能打开升级后的库；旧客户端省略字段仍保留设置，旧核心拒绝新输入字段，需要配套升级。无新命令、无控制器／LAN 监听、无认证回显，不修改系统代理或真实运行配置。
+- 验证：隔离状态迁移、端口校验／保留／恢复自动、真实 CLI／桌面桥接、内置进程端口／认证／占用／排空及前端校验和交互按任务记录中的实际结果登记；未打包／发布或做原生窗口验收。

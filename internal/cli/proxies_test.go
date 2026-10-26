@@ -58,4 +58,15 @@ func TestProxyCLIWorkflow(t *testing.T) {
 	run("", true, "proxy", "bind", "p", "--mode", "system", "--proxy", "edge", "--revision", "4", "--approve")
 	run("", true, "proxy", "bind", "p", "--mode", "direct", "--revision", "3", "--approve")
 	run("", false, "proxy", "bind", "p", "--key", "default", "--mode", "direct", "--revision", "4", "--approve")
+	if out := run("{name: local, type: http, server: 127.0.0.1, port: 1234}", false, "proxy", "put", "node", "--name", "Node", "--kind", "mihomo", "--listen-port", "17890", "--secret-stdin", "--revision", "5", "--approve"); !strings.Contains(out, `"listen_port":17890`) {
+		t.Fatal(out)
+	}
+	if out := run("", false, "proxy", "put", "node", "--name", "Renamed", "--kind", "mihomo", "--revision", "6", "--approve"); !strings.Contains(out, `"listen_port":17890`) {
+		t.Fatal(out)
+	}
+	run("", true, "proxy", "put", "node", "--name", "Node", "--kind", "mihomo", "--listen-port", "65536", "--revision", "7", "--approve")
+	if out := run("", false, "proxy", "put", "node", "--name", "Node", "--kind", "mihomo", "--listen-port", "0", "--revision", "7", "--approve"); !strings.Contains(out, `"listen_port":0`) {
+		t.Fatal(out)
+	}
+
 }

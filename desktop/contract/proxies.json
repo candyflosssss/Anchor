@@ -7,7 +7,8 @@
         "id": "edge",
         "name": "Example node",
         "kind": "mihomo",
-        "revision": 1
+        "revision": 1,
+        "listen_port": 17890
       }
     ],
     "bindings": [
@@ -48,7 +49,15 @@
       "available": true,
       "version": "v1.19.32",
       "platform": "linux/amd64",
-      "running": 0
+      "running": 1,
+      "listeners": [
+        {
+          "profile_id": "edge",
+          "revision": 1,
+          "port": 17890,
+          "retiring": false
+        }
+      ]
     }
   },
   "bind": {
@@ -86,6 +95,26 @@
       "provider_id": "demo",
       "key_id": "system",
       "mode": "system",
+      "proxy_id": ""
+    }
+  },
+  "port_put": {
+    "action": "put",
+    "expected_revision": 4,
+    "approved": true,
+    "profile": {
+      "id": "edge",
+      "name": "Example node",
+      "kind": "mihomo",
+      "revision": 1,
+      "listen_port": 17891
+    },
+    "secret": null,
+    "node_name": "",
+    "binding": {
+      "provider_id": "",
+      "key_id": "",
+      "mode": "",
       "proxy_id": ""
     }
   }

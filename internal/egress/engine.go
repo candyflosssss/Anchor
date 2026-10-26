@@ -115,6 +115,7 @@ type engine struct {
 	cmd  *exec.Cmd
 	done chan struct{}
 	dir  string
+	port int
 }
 
 func (e *engine) close() {
@@ -125,7 +126,7 @@ func (e *engine) close() {
 	<-e.done
 	_ = os.RemoveAll(e.dir)
 }
-func startEngine(ctx context.Context, root, secret string) (*engine, string, error) {
+func startEngine(ctx context.Context, root, secret string, listenPort int) (*engine, string, error) {
 	binary, e := executable(root)
 	if e != nil {
 		return nil, "", ErrUnavailable
@@ -149,7 +150,7 @@ func startEngine(ctx context.Context, root, secret string) (*engine, string, err
 		return nil, "", ErrUnavailable
 	}
 	password := hex.EncodeToString(token)
-	ln, e := net.Listen("tcp4", "127.0.0.1:0")
+	ln, e := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(listenPort)))
 	if e != nil {
 		return nil, "", ErrUnavailable
 	}
@@ -181,7 +182,7 @@ func startEngine(ctx context.Context, root, secret string) (*engine, string, err
 		_ = cmd.Wait()
 		return nil, "", ErrUnavailable
 	}
-	run := &engine{cmd: cmd, done: make(chan struct{}), dir: dir}
+	run := &engine{cmd: cmd, done: make(chan struct{}), dir: dir, port: port}
 	go func() { _ = cmd.Wait(); release(); close(run.done) }()
 	deadline := time.NewTimer(8 * time.Second)
 	defer deadline.Stop()

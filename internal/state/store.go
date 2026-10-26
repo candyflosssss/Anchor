@@ -71,7 +71,7 @@ func Open(dir string, create bool) (*Store, error) {
 	if err = db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
 		return fail(err)
 	}
-	if version > 9 {
+	if version > 10 {
 		return fail(errors.New("state schema is newer than this binary"))
 	}
 	if version == 0 {
@@ -180,6 +180,15 @@ CREATE TABLE IF NOT EXISTS proxy_profiles (id TEXT PRIMARY KEY, name TEXT NOT NU
 CREATE TABLE IF NOT EXISTS provider_proxy (provider_id TEXT PRIMARY KEY REFERENCES providers(id) ON UPDATE CASCADE ON DELETE CASCADE, mode TEXT NOT NULL, proxy_id TEXT REFERENCES proxy_profiles(id) ON DELETE RESTRICT);
 CREATE TABLE IF NOT EXISTS key_proxy (provider_id TEXT NOT NULL, key_id TEXT NOT NULL, mode TEXT NOT NULL, proxy_id TEXT REFERENCES proxy_profiles(id) ON DELETE RESTRICT, PRIMARY KEY(provider_id,key_id), FOREIGN KEY(provider_id,key_id) REFERENCES provider_keys(provider_id,id) ON UPDATE CASCADE ON DELETE CASCADE);
 PRAGMA user_version=9;
+COMMIT;`)
+		if err != nil {
+			return fail(err)
+		}
+	}
+	if version < 10 {
+		_, err = db.Exec(`BEGIN IMMEDIATE;
+ALTER TABLE proxy_profiles ADD COLUMN listen_port INTEGER NOT NULL DEFAULT 0;
+PRAGMA user_version=10;
 COMMIT;`)
 		if err != nil {
 			return fail(err)

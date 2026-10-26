@@ -147,6 +147,7 @@ export interface ProxyProfile {
   name: string;
   kind: string;
   revision: number;
+  listen_port?: number | null;
 }
 export interface ProxyBinding {
   provider_id: string;
@@ -158,11 +159,18 @@ export interface ProxyTarget {
   provider_id: string;
   key_id: string;
 }
+export interface ProxyListener {
+  profile_id: string;
+  revision: number;
+  port: number;
+  retiring: boolean;
+}
 export interface ProxyEngine {
   available: boolean;
   version: string;
   platform: string;
   running: number;
+  listeners?: ProxyListener[];
 }
 export interface ProxyWorkspace {
   revision: number;

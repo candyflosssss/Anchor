@@ -129,7 +129,7 @@ func TestPlatformSchemaFourMigration(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, e = s.db.Exec(`DROP TABLE provider_platforms; PRAGMA user_version=4`); e != nil {
+	if _, e = s.db.Exec(`DROP TABLE provider_platforms; ALTER TABLE proxy_profiles DROP COLUMN listen_port; PRAGMA user_version=4`); e != nil {
 		t.Fatal(e)
 	}
 	s.Close()
@@ -152,7 +152,7 @@ func TestPlatformSchemaFourMigration(t *testing.T) {
 	}
 	var v int
 	s.db.QueryRow(`PRAGMA user_version`).Scan(&v)
-	if v != 9 {
+	if v != 10 {
 		t.Fatal(v)
 	}
 }

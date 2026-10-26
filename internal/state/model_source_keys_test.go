@@ -25,7 +25,7 @@ func TestModelSourceKeysPersistenceAndValidation(t *testing.T) {
 	if bad.Validate() == nil {
 		t.Fatal("duplicate key IDs accepted")
 	}
-	if _, err = s.db.Exec(`PRAGMA user_version=5`); err != nil {
+	if _, err = s.db.Exec(`ALTER TABLE proxy_profiles DROP COLUMN listen_port; PRAGMA user_version=5`); err != nil {
 		t.Fatal(err)
 	}
 	migrated, err := Open(s.Dir, false)
@@ -39,7 +39,7 @@ func TestModelSourceKeysPersistenceAndValidation(t *testing.T) {
 	}
 	var version int
 	migrated.db.QueryRow(`PRAGMA user_version`).Scan(&version)
-	if version != 9 {
+	if version != 10 {
 		t.Fatal(version)
 	}
 	m.Candidates[0].KeyIDs = nil

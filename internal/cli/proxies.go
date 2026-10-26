@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"flag"
 	"io"
 
 	"github.com/candyflosssss/Anchor/internal/client"
@@ -32,6 +33,7 @@ func (a *App) proxies(ctx context.Context, c *client.Client, args []string) erro
 	name := f.String("name", "", "display name (put)")
 	kind := f.String("kind", "", "http, socks5 or mihomo (put)")
 	input := f.Bool("secret-stdin", false, "read proxy URL or Clash YAML from stdin; omit to retain existing secret")
+	listenPort := f.Int("listen-port", 0, "mihomo loopback mixed port, 0 for automatic; omitted retains existing port")
 	node := f.String("node", "", "node name when importing a multi-node Clash YAML")
 	key := f.String("key", "", "Key ID; omitted for supplier default (bind)")
 	mode := f.String("mode", "", "direct (no application proxy), system (require OS/environment proxy), proxy, or inherit for a Key (bind)")
@@ -46,6 +48,11 @@ func (a *App) proxies(ctx context.Context, c *client.Client, args []string) erro
 	switch args[0] {
 	case "put":
 		in.Profile = state.ProxyProfile{ID: args[1], Name: *name, Kind: *kind}
+		f.Visit(func(v *flag.Flag) {
+			if v.Name == "listen-port" {
+				in.Profile.ListenPort = listenPort
+			}
+		})
 		in.NodeName = *node
 		if *input {
 			b, e := io.ReadAll(io.LimitReader(a.In, (64<<10)+1))

@@ -305,3 +305,63 @@ func TestHTTPSConnectProxy(t *testing.T) {
 		t.Fatal(string(b), e)
 	}
 }
+
+func TestMihomoFixedPortStatusDrainAndConflict(t *testing.T) {
+	if !Available() {
+		t.Skip("pinned payload not prepared")
+	}
+	m, s := testManager(t)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "fixed-port") }))
+	defer upstream.Close()
+	host, port, _ := net.SplitHostPort(strings.TrimPrefix(upstream.URL, "http://"))
+	raw := fmt.Sprintf("{name: local, type: http, server: %s, port: %s}", host, port)
+	free, e := net.Listen("tcp4", "127.0.0.1:0")
+	if e != nil {
+		t.Fatal(e)
+	}
+	fixed := free.Addr().(*net.TCPAddr).Port
+	free.Close()
+	profile := state.ProxyProfile{ID: "edge", Name: "Edge", Kind: "mihomo", ListenPort: &fixed}
+	mutate(t, s, state.ProxyAction{Action: "put", Profile: profile, Secret: &raw})
+	bind(t, s, "", "proxy")
+	resp := get(t, m, "http://example.invalid/fixed")
+	defer resp.Body.Close()
+	status := m.Status()
+	if status.Running != 1 || len(status.Listeners) != 1 || status.Listeners[0].Port != fixed || status.Listeners[0].ProfileID != "edge" || status.Listeners[0].Retiring {
+		t.Fatal(status)
+	}
+	// Same-port edits preserve the old response, and fail closed until it drains.
+	mutate(t, s, state.ProxyAction{Action: "put", Profile: profile})
+	w, _ := s.ProxyWorkspace()
+	m.Reconcile(w.Profiles)
+	if !m.Status().Listeners[0].Retiring {
+		t.Fatal("retiring listener not reported")
+	}
+	req, _ := http.NewRequestWithContext(WithRoute(context.Background(), "p", "default"), "GET", "http://example.invalid/blocked", nil)
+	if _, e = m.RoundTrip(req); !errors.Is(e, ErrUnavailable) {
+		t.Fatal("occupied fixed port did not fail closed", e)
+	}
+	data, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if string(data) != "fixed-port" || m.Status().Running != 0 {
+		t.Fatal("old response disrupted or listener leaked")
+	}
+	resp = get(t, m, "http://example.invalid/reconfigured")
+	resp.Body.Close()
+	if m.Status().Listeners[0].Revision != 2 || m.Status().Listeners[0].Port != fixed {
+		t.Fatal(m.Status())
+	}
+	m.Close()
+	occupied, e := net.Listen("tcp4", net.JoinHostPort("127.0.0.1", fmt.Sprint(fixed)))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer occupied.Close()
+	if run, _, e := startEngine(context.Background(), s.Dir, raw, fixed); e == nil {
+		run.close()
+		t.Fatal("occupied external port accepted")
+	}
+	if len(m.Status().Listeners) != 0 {
+		t.Fatal("closed engine still reported")
+	}
+}
