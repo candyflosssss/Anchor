@@ -65,6 +65,9 @@ func (e StructuredEditor) parse(raw []byte) (*yaml.Node, error) {
 		return nil, ErrUnsafe
 	}
 	if e.DSH {
+		if err := validateDSHInserts(root); err != nil {
+			return nil, err
+		}
 		seen := map[string]bool{}
 		for _, row := range root.Content {
 			if row.Kind != yaml.MappingNode {
