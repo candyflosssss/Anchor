@@ -1652,6 +1652,7 @@ test('application API saves listener settings, issues a Key once, revokes and lo
       return { contract: 'anchor-desktop-v1', data: structuredClone(workspace), problem: null };
     };
     api.IssueAPIKey = async input => {
+      await new Promise(resolve => setTimeout(resolve, 500));
       const access = { id: 'caller-phone', label: input.label, scope: 'gateway', revoked: false, expires_at: 0 };
       workspace.keys.push(access);
       return { contract: 'anchor-desktop-v1', data: { access, token: 'a'.repeat(43) }, problem: null };
@@ -1664,24 +1665,85 @@ test('application API saves listener settings, issues a Key once, revokes and lo
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
   const section = page.getByRole('region', { name: 'API 服务', exact: true });
   await expect(section.getByLabel('API 端口')).toHaveValue('17862');
+  await expect(section.getByText('未启用', { exact: true })).toBeVisible();
+  await expect(section.getByLabel('应用名称')).toHaveCount(0);
+  await expect(section.getByRole('button', { name: '保存设置', exact: true })).toBeDisabled();
+  if (process.env.ANCHOR_API_CAPTURE_DIR) await section.screenshot({ path: `${process.env.ANCHOR_API_CAPTURE_DIR}/api-disabled.png` });
   await section.getByRole('switch', { name: '启用 API 服务', exact: true }).click();
   await section.getByRole('switch', { name: '允许局域网调用', exact: true }).click();
   await section.getByLabel('API 端口').fill('18762');
-  await section.getByRole('button', { name: '保存监听设置', exact: true }).click();
-  await expect(section.getByText('监听设置待生效', { exact: false })).toBeVisible();
-  await section.getByLabel('名称', { exact: true }).fill('手机助手');
-  await section.getByRole('button', { name: '签发 Key（仅显示一次）', exact: true }).click();
-  await expect(section.getByLabel('新 API Key')).toHaveValue('a'.repeat(43));
+  await expect(section.getByText('有未保存的更改')).toBeVisible();
+  await expect(section.getByText('未启用', { exact: true })).toBeVisible();
+  await section.getByRole('button', { name: '保存设置', exact: true }).click();
+  await expect(section.getByText('设置已保存，待重启生效', { exact: true })).toBeVisible();
+  await expect(section.getByText('运行中', { exact: true })).toHaveCount(0);
+  if (process.env.ANCHOR_API_CAPTURE_DIR) await section.screenshot({ path: `${process.env.ANCHOR_API_CAPTURE_DIR}/api-pending.png` });
+
+  // Simulate a core restart: only the returned live snapshot may expose URLs.
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!;
+    const read = api.APIService;
+    api.APIService = async () => {
+      const result = await read();
+      if (result.data) result.data = { ...result.data, active_address: '0.0.0.0:18762', restart_required: false, base_urls: ['http://127.0.0.1:18762/v1', 'http://192.168.1.20:18762/v1'] };
+      return result;
+    };
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => {} } });
+  });
+  await section.getByRole('button', { name: '重新读取', exact: true }).click();
+  await expect(section.getByText('运行中', { exact: true })).toBeVisible();
+  await expect(section.getByText('设置已保存，待重启生效', { exact: true })).toHaveCount(0);
+  await section.getByRole('button', { name: '复制接入地址 http://192.168.1.20:18762/v1', exact: true }).click();
+  await expect(section.getByText('已复制', { exact: true })).toBeVisible();
+
+  await section.getByRole('button', { name: '创建 Key', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('应用名称').fill('丢弃的草稿');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await section.getByRole('button', { name: '创建 Key', exact: true }).click();
+  await expect(dialog.getByLabel('应用名称')).toHaveValue('');
+  await expect(dialog.getByLabel('有效期（天）')).toHaveValue('30');
+  if (process.env.ANCHOR_API_CAPTURE_DIR) await dialog.screenshot({ path: `${process.env.ANCHOR_API_CAPTURE_DIR}/api-create.png` });
+  await dialog.getByLabel('应用名称').fill('手机助手');
+  await dialog.getByRole('button', { name: '创建 Key', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: '正在创建…', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: '关闭创建 Key', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByLabel('API Key', { exact: true })).toHaveValue('a'.repeat(43));
   expect(await page.evaluate(() => JSON.stringify({ ...localStorage }))).not.toContain('a'.repeat(43));
-  await section.getByRole('button', { name: '关闭显示', exact: true }).click();
-  await expect(section.getByLabel('新 API Key')).toHaveCount(0);
-  await section.getByRole('button', { name: '撤销', exact: true }).click();
-  await section.getByRole('button', { name: '确认撤销', exact: true }).click();
+  await dialog.getByRole('button', { name: '复制 Key', exact: true }).click();
+  await expect(dialog.getByText('已复制', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByLabel('API Key', { exact: true })).toHaveCount(0);
+  await expect(section.getByRole('button', { name: '创建 Key', exact: true })).toBeFocused();
+  await section.getByRole('button', { name: '创建 Key', exact: true }).click();
+  await expect(dialog.getByLabel('API Key', { exact: true })).toHaveCount(0);
+  await expect(dialog.getByLabel('应用名称')).toHaveValue('');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+
+  for (const theme of ['浅色', '深色']) {
+    await page.getByRole('region', { name: '外观', exact: true }).getByRole('button', { name: theme, exact: true }).click();
+    await expect(section).toBeVisible();
+    if (process.env.ANCHOR_API_CAPTURE_DIR) await section.screenshot({ path: `${process.env.ANCHOR_API_CAPTURE_DIR}/api-${theme === '浅色' ? 'light' : 'dark'}.png` });
+  }
+  await page.setViewportSize({ width: 700, height: 1000 });
+  await expect(section.getByRole('button', { name: '创建 Key', exact: true })).toBeVisible();
+  expect(await section.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+  if (process.env.ANCHOR_API_CAPTURE_DIR) await section.screenshot({ path: `${process.env.ANCHOR_API_CAPTURE_DIR}/api-narrow.png` });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await section.getByRole('button', { name: '撤销 手机助手', exact: true }).click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm).toContainText('撤销「手机助手」');
+  await confirm.getByRole('button', { name: '确认变更', exact: true }).click();
   await expect(section.getByText('已撤销', { exact: true })).toBeVisible();
   await page.evaluate(() => { window.desktopTest.writeError = 'unknown'; });
-  await section.getByRole('button', { name: '保存监听设置', exact: true }).click();
+  await section.getByLabel('API 端口').fill('18763');
+  await section.getByRole('button', { name: '保存设置', exact: true }).click();
   await expect(section.getByRole('alert')).toContainText('操作结果未知');
-  await expect(section.getByRole('button', { name: '保存监听设置', exact: true })).toBeDisabled();
+  await expect(section.getByRole('button', { name: '保存设置', exact: true })).toBeDisabled();
+  await expect(section.getByRole('button', { name: '创建 Key', exact: true })).toBeDisabled();
   await section.getByRole('button', { name: '重新读取', exact: true }).click();
-  await expect(section.getByRole('button', { name: '保存监听设置', exact: true })).toBeEnabled();
+  await expect(section.getByRole('button', { name: '创建 Key', exact: true })).toBeEnabled();
+  await expect(section.getByLabel('API 端口')).toHaveValue('18762');
 });
