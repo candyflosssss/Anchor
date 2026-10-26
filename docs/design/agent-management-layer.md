@@ -353,7 +353,7 @@ Codex 目录与上游 portable settings 使用不同的推理档位表示。导�
 
 Claude 仅写用户 settings.json 的 model/availableModels、Anthropic 基址、Binding auth 与模型默认环境变量，暂时禁用原 API key/helper 和云平台选项；停用按原字段恢复。基址使用网关 origin，避免 SDK 重复 /v1；自定义默认别名提供 custom model option，网关发现不能保证任意别名进入原生选择器。项目、策略、CLI 覆盖与实际程序连接不作探测。
 
-DSH 仅写已有 profiles/web 下 cordis.patch.yml：llm-pi-ai 的 Anchor 命名路由通过 openai-completions、/v1 基址和 Authorization Binding token，agent-default-model 指向公开映射。已存在路由只改本绑定字段，缺失行按整行所有权创建/恢复。保留未知插件、其他路由和 YAML 注释/标量标签，拒绝含 insert、别名/合并或重复键的复杂文档。
+DSH 仅写已有 profiles/web 下 cordis.patch.yml：llm-pi-ai 的 Anchor 命名路由通过 openai-completions、/v1 基址和 Authorization Binding token，agent-default-model 指向公开映射。已存在路由只改本绑定字段，缺失行按整行所有权创建/恢复。保留未知插件、其他路由和 YAML 注释/标量标签。当前源码允许与模型插件无关的字面量 insert 列表，并保留原有顺序、分组及标量标签；不把 insert 展平为 ID 覆盖。分组识别覆盖 `group: true` 和插件名称 `cordis:group`／`@deepseek-ai/cordis-plugin-group`；名称匹配时即使 `group` 省略或为 `false`，仍递归检查子项、记录分组拓扑，后续 config 覆盖同样拒绝。具名分组实际挂载子项的依据为固定上游 [Group](https://github.com/deepseek-ai/deepseek-harness/blob/86a402200d95fecef4529d969836f1fe13c6cb0d/vendor/loader/src/config/group.ts)，不以标记省略推断其 config 是普通插件数据。插入项（含嵌套分组）或插入目标引用 llm-pi-ai／agent-default-model、混合插入与覆盖字段、动态或非列表 insert、重复插入 ID、无法静态检查的分组或通过后续覆盖改变插入分组拓扑仍拒绝。相同校验位于结构编辑器解析入口，覆盖发现、计划、验证、同步和条件恢复；别名/合并或重复键继续拒绝。
 
 两个新适配器的配置含受限网关 token，原子发布前设置当前用户权限；不写供应商密钥，管理 DTO 不暴露 token。DSH 自定义 header 不提供客户端日志脱敏保证。Claude/Codex 重启客户端；DSH 默认值需新会话。Gemini/OpenCode、其他 profile、真实客户端端到端和原生 Windows 仍未验收。
 

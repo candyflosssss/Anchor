@@ -63,7 +63,7 @@ func (a StructuredAgent) Inspect(b state.Binding) (Inspection, error) {
 		return Inspection{}, err
 	}
 	editor := StructuredEditor{DSH: a.DSH}
-	root, err := editor.parse(raw)
+	_, err = editor.parse(raw)
 	if err != nil {
 		return Inspection{}, err
 	}
@@ -82,11 +82,6 @@ func (a StructuredAgent) Inspect(b state.Binding) (Inspection, error) {
 			id = "dsh-desktop"
 		}
 		limits = []string{a.profile() + " profile only; home patches and runtime overrides are not probed", "configuration only; with HMR disabled fully quit and restart the client (closing the Desktop window may only hide it); start a new session to use the changed default model; no real upstream verification"}
-		for _, row := range root.Content {
-			if insert := nodeKey(row, "insert"); insert != nil {
-				return Inspection{}, errors.New("DSH insert patches are not supported by this adapter revision")
-			}
-		}
 	}
 	return Inspection{AdapterID: id, AdapterVersion: "1", ConfigPath: path, Exists: exists, Support: "configuration_only", EffectiveConnection: "unknown", Reload: reload, Limitations: limits}, nil
 }
