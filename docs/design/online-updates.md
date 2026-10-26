@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-10-25。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.72](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.72)，发布于 `2026-10-25T03:22:46+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `307f82c0f9e48032492cc59a4f86c6408f602ecf`、SOURCE dirty=false。
-- 模型映射改为按列自上而下的响应式瀑布流；Windows 托盘退出确认、任务栏图标和双击唤醒窗口的前台权限交接修复已包含。保留模型家族玻璃配色及逐 Key 排序；同版包含安装目录父级缺失与生成流首字识别修复。
+- 更新：2026-10-26。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.73](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.73)，发布于 `2026-10-26T14:23:08+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `b327afdf3463b57ba2f656588b85fb46d6b5da4b`、SOURCE dirty=false。
+- 包含 SSH 鉴权失败后的重新连接入口、未连接时设备名称与地址展示，以及可选系统凭据库记住／忘记密码；沿用 .72 的模型瀑布流和 Windows 桌面修复。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收 Windows 原生凭据库、双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .73 在线投放（2026-10-26）
+
+SSH 鉴权失败后的重新连接入口、离线设备名称／地址与系统凭据库显式记住／忘记密码已投放。11 附件远端摘要、tag 与非 latest 核对通过；默认 dev 源实际下载 Linux runtime、兼容旧客户端的 deb 与独立 CLI，版本／目标／大小／SHA256 及运行程序版本验证通过。仅在线投放，未安装或实机验收；详见[发行记录](../release/desktop.md#ssh-reconnect-73)。
 
 ## .72 在线投放（2026-10-25）
 

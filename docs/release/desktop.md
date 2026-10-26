@@ -1,10 +1,27 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-25。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.72](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.72)，发布于 `2026-10-25T03:22:46+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `307f82c0f9e48032492cc59a4f86c6408f602ecf`、SOURCE dirty=false。
-- 模型映射改为按列自上而下的响应式瀑布流；Windows 托盘退出确认、任务栏图标和双击唤醒窗口的前台权限交接修复已包含。保留模型家族玻璃配色及逐 Key 排序；同版包含安装目录父级缺失与生成流首字识别修复。
+- 更新：2026-10-26。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.73](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.73)，发布于 `2026-10-26T14:23:08+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `b327afdf3463b57ba2f656588b85fb46d6b5da4b`、SOURCE dirty=false。
+- 包含 SSH 鉴权失败后的重新连接入口、未连接时设备名称与地址展示，以及可选系统凭据库记住／忘记密码；沿用 .72 的模型瀑布流和 Windows 桌面修复。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收 Windows 原生凭据库、双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="ssh-reconnect-73"></a>
+
+## SSH 重连与密码记忆 .73（已发布 dev）
+
+2026-10-26 发布前核对：GitHub 当时线上最新 dev 为 .72，构建提交 `307f82c`，不包含后续 SSH 重连入口、未鉴权时设备身份及系统凭据库的修复；旧版截图仍出现「已保存的密码连接需重新填写本次密码」和「本机实例 · 未连接」。推送源码不会更新已安装的桌面程序。
+
+版本 `0.1.0-dev.desktop.73` 从独立干净 worktree 的 `b327afdf3463b57ba2f656588b85fb46d6b5da4b` 构建，SOURCE dirty=false，输入摘要 `8017d13f0b0b5ce04956f88e8ef9a00ef6371d188273bed01c011e1a6b4a1117`。包含已提交的重新连接入口修复、离线目标设备名称／SSH 地址及可选系统凭据库存储；不包含随后另行提交的 API 设置界面调整。
+
+TypeScript／Vite、Go／TS 契约比对、Windows AMD64 和 Ubuntu24.04 AMD64 生产编译、NSIS `-WX` 和 deb 打包均完成。11 项同版发布附件（两平台安装包、desktop runtime、CLI、两个更新清单、vendor 对应源码、许可／构建元数据和校验清单）位于 `dist/desktop/0.1.0-dev.desktop.73/publication/`。嵌入前端／mihomo、deb 与 runtime 内容一致、源码输入摘要、ZIP CRC 和本地附件 SHA256 核对通过；证据见 `preparation-verification.json`。功能阶段已执行的 Go 定向测试、41 项前端单测、25 项浏览器连接／重启测试及隔离 Linux Secret Service 实测沿用原记录；本次未重复扩大测试范围。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `Anchor-Desktop-0.1.0-dev.desktop.73-windows-amd64-setup.exe` | 31273817 | `8207671abf851fa16e52684ffa21ab8104e759960948b72fcff7a1b81facfe4d` |
+| `anchor-desktop_0.1.0-dev.desktop.73_amd64.deb` | 29256796 | `eb1b235fb168d9c7e71fd6aff0c6c22c7bc7bc9c50c4028207b95a21851d36dc` |
+
+经用户明确授权，于 `2026-10-26T14:23:08+08:00` 发布为 dev prerelease，非 latest。11 附件远端大小／digest、tag 与构建提交及非 latest 状态通过；默认 dev 源实际下载 Linux runtime、旧客户端兼容 deb 和 CLI，版本／目标／大小／SHA256 及运行程序版本通过。证据见 `publication-verification.json` 和 `online-verification.json`。应用内可通过「设置 → 在线更新 → dev · 快速测试」取得 .73。未安装或修改真实实例／Agent 配置，未完成 Windows 原生凭据库和两平台窗口／安装器验收。系统账户被控制时凭据仍有泄露风险。
 
 <a id="masonry-windows-72"></a>
 

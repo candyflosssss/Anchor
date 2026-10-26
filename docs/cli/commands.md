@@ -1,7 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-25
-- 2026-10-25 当前源码未发布：新增 `context password save|status|forget NAME`，显式将 SSH 密码保存到系统凭据库；已保存时管理连接可复用，默认仍不保存，详见 §4。
+- 最近核对：2026-10-26
+- 2026-10-26 已随 desktop.73 dev 发布：新增 `context password save|status|forget NAME`，显式将 SSH 密码保存到系统凭据库；已保存时管理连接可复用，默认仍不保存，详见 §4。
 - 2026-10-25 desktop.72 dev 已发布：响应式模型瀑布流与 Windows 托盘退出／任务栏图标／前台激活修复；同版包含安装目录与生成流首字识别修复。本轮无新增命令或参数，详见[发行记录](../release/desktop.md#masonry-windows-72)。
 - 2026-10-25 已随 desktop.72 dev 发布：补齐生成流首字检测，已确认首字超时不再因客户端收到错误后断开而被日志记为客户端取消；命令、参数及输出字段不变，见下方日志说明。
 - 2026-10-24 desktop.71 dev 已发布：模型单行横向拖动与家族玻璃底卡；同版包含 LAN API／gateway Key 管理、Skills 页面整理和思考深度错误归类。此交付轮无新增命令或参数，详见[发行记录](../release/desktop.md#model-glass-71)。
@@ -261,7 +261,7 @@ anchor [--context NAME] status
 - **`context test`**：连接指定实例并验证身份/API 主版本；返回实例信息，包括版本、平台、用户、监听地址和能力；新版核心另返回 process_id，旧核心没有该字段。不按 PID 判断授权或强杀进程。失败不重新绑定或切换目标。
 - **`status`**：无专属参数，查询显式或默认 Context，返回 `core`、`gateway`、`upstream_health`、`agent_management`；`core` / `gateway` 在运行生命周期中为 `starting`、`ready` 或 `stopping`，就绪前不接受管理写入或网关调用（可请求正常停服）；不会附带实例 ID、配置 revision 或网关地址；缺少 Context、不可达、认证失败或身份不一致均失败，不回退。
 
-**`context password save|status|forget NAME`（2026-10-25 当前源码，未发布）**：本机档案凭据管理，不接受 `--context`，不改变桌面／CLI 当前选择，仅支持已登记且已固定主机密钥的密码 SSH Context。
+**`context password save|status|forget NAME`（2026-10-26 已随 desktop.73 dev 发布）**：本机档案凭据管理，不接受 `--context`，不改变桌面／CLI 当前选择，仅支持已登记且已固定主机密钥的密码 SSH Context。
 
 - `save` 必须用全局 `--ssh-password-stdin` 提供密码，先重新 SSH 登录、校验主机与原实例并确认核心 ready，再存入系统凭据库。连接核验总期限20秒；系统解锁／授权提示由凭据库处理，可能需要用户响应。认证／主机密钥／身份失败不保存；凭据库不可用、锁定、取消、权限或长度受限时返回非零 `credential_store`，不退回明文。Windows 凭据库单项密码上限2560 bytes，超出时仍可仅本次使用。
 - `status` 只读取本机非秘密的保存标记，不解锁凭据库、不建立 SSH；该标记不保证凭据未被用户在系统中删除。`forget` 删除该档案的系统凭据和标记，已忘记时幂等成功；删除失败保留标记并返回非零。不会停止已建立连接、撤销管理授权或删除设备档案。

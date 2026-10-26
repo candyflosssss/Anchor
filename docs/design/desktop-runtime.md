@@ -159,14 +159,16 @@ ProviderAllowance 增量接受 balance-summary，返回 account 或 key scope �
 
 Connections 仅返回公开档案（name、transport、authentication、target、instance_id、active），包括内置 @local。ConnectSSH 输入安全连接字段和可选瞬时 password；UseConnection 输入名称与可选本次密码。SessionInfo 增加 profile_name、transport、target。2026-10-21 源码新增可选 `version`，来自已认证连接的核心 Instance.Version，随 Start／Status／切换／重启返回，不使用宿主版本替代。旧宿主缺失或核心未提供时显示“未提供”；不为未连接档案探测或缓存版本。规范 DTO 由 Go 生成 TS，共享样例为 desktop/contract/connections.json。
 
-2026-10-25 设备身份展示增量（源码，未打包）：ConnectionProfile 增加可选布尔 `selected`，由宿主读取独立的 desktop_context；默认无记录选中 @local，仅选中档案序列化 true，其余省略。它与 active 独立，保存的密码设备在重启后鉴权失败仍能返回名称和 SSH 目标，不把选中档案当成已连接、ready 或授权身份。断线面板、顶栏和设备切换弹层显示连接目标，设备页标记「已选设备（未连接）」；已有会话时优先使用已验证 SessionInfo，重启／停止仍只能使用原会话身份。旧宿主缺 selected、读取失败或目标不唯一时显示「设备待确认」，不从第一项、本机默认值或 active 猜测。查询取消／切换后丢弃迟到结果；不建立 SSH，不返回秘密，不改 CLI 的 current_context、输出或命令。
+2026-10-25 设备身份展示增量（2026-10-26 已随 desktop.73 dev 发布）：ConnectionProfile 增加可选布尔 `selected`，由宿主读取独立的 desktop_context；默认无记录选中 @local，仅选中档案序列化 true，其余省略。它与 active 独立，保存的密码设备在重启后鉴权失败仍能返回名称和 SSH 目标，不把选中档案当成已连接、ready 或授权身份。断线面板、顶栏和设备切换弹层显示连接目标，设备页标记「已选设备（未连接）」；已有会话时优先使用已验证 SessionInfo，重启／停止仍只能使用原会话身份。旧宿主缺 selected、读取失败或目标不唯一时显示「设备待确认」，不从第一项、本机默认值或 active 猜测。查询取消／切换后丢弃迟到结果；不建立 SSH，不返回秘密，不改 CLI 的 current_context、输出或命令。
 
 宿主复用 internal/connection 与 CLI 相同的身份／授权／连接策略。密钥模式使用受限 OpenSSH 的 stdio 转发（ssh -W），不开放临时本机管理端口；密码模式使用内置 SSH 通道，首次明确同意后保存公开主机密钥，变化即拒绝。固定 bootstrap 命令只允许已验证 executable／端口；默认在 SSH 非交互 PATH 中查找，缺失时依次检查该账户的 ~/.local/bin/anchor、~/bin/anchor 和系统常见路径，指定路径不回退并支持 ~/。在不加载登录脚本的 POSIX shell 内执行，先检查 bootstrap --help，密钥和密码模式共用此策略；管理令牌保存在受权限保护 SQLite 凭据表；SSH 密码默认不保存，显式选择后仅存系统凭据库（见下文）。认证错误只返回白名单 code，不暴露 stderr／令牌。程序缺失（remote_anchor_missing）、引导不支持（remote_anchor_unsupported）、管理端口不匹配（remote_control_port）、核心未就绪（remote_core_not_ready）分别展示；其余引导失败／响应无效保留 remote_anchor。旧远端未提供细分诊断时保留通用错误。
 
-切换先核验目标 ready 并保存独立 desktop_context，再替换当前连接；失败不破坏已有连接，不改 CLI current_context。保存的密码连接默认在下次启动要求重新输入；显式记住密码后可从系统凭据库读取。2026-10-25 源码修复：断线页收到 ssh_auth 时，「重新连接当前设备」进入设备连接页，复用已保存档案的本次密码输入与 UseConnection，不重复无密码 Start；其他错误仍按原流程重连，unknown 仍只读检查。断线页另提供「管理设备连接」入口，便于检查档案或选择其他设备。无新增桥接或 CLI 契约，未打包／原生验收。关闭宿主只关闭本次 SSH，不停止目标核心；StopCore 明确停止当前选中目标，升级安装则只停止本机核心，即使当前 UI 连接远端。旧授权失效后重新 SSH 签发仍必须匹配已绑定实例。远端必须预先安装支持 context bootstrap 的 Anchor，自动安装尚未实现。
+切换先核验目标 ready 并保存独立 desktop_context，再替换当前连接；失败不破坏已有连接，不改 CLI current_context。保存的密码连接默认在下次启动要求重新输入；显式记住密码后可从系统凭据库读取。2026-10-25 源码修复：断线页收到 ssh_auth 时，「重新连接当前设备」进入设备连接页，复用已保存档案的本次密码输入与 UseConnection，不重复无密码 Start；其他错误仍按原流程重连，unknown 仍只读检查。断线页另提供「管理设备连接」入口，便于检查档案或选择其他设备。该重连入口修复无新增桥接或 CLI 契约，已随 desktop.73 dev 发布，未原生验收。关闭宿主只关闭本次 SSH，不停止目标核心；StopCore 明确停止当前选中目标，升级安装则只停止本机核心，即使当前 UI 连接远端。旧授权失效后重新 SSH 签发仍必须匹配已绑定实例。远端必须预先安装支持 context bootstrap 的 Anchor，自动安装尚未实现。
 
 
-## SSH 密码系统凭据库（2026-10-25 源码，未打包）
+<a id="ssh-密码系统凭据库2026-10-25-源码未打包"></a>
+
+## SSH 密码系统凭据库（2026-10-26 已随 desktop.73 dev 发布）
 
 - 桌面新连接和已保存密码档案均提供默认关闭的「记住密码」；ConnectSSH／UseConnection 增加可选 `remember_password`（省略／false不改变已存密码，true要求本次明确输入且成功鉴权、主机／实例校验与 ready后才保存）。不把空密码或掩码写入；写入后读取核对再标记成功，删除后核对条目确已不存在，避免系统提示取消却误报成功。输入提交即清空，前端持久化缓存与日志不保存密码。
 - Connections 的每行增加可选 `password_saved`（Go *bool，当前宿主均非null；false表示未保存，也表示宿主支持此能力，true是本机非秘密保存标记）。读取设备列表不访问／解锁系统凭据库，不返回密码。旧宿主缺少／返回null时界面隐藏保存选项；旧前端省略 remember_password 保持默认不保存，但已明确保存的档案仍可自动使用。
