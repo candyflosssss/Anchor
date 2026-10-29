@@ -13,7 +13,7 @@ import (
 )
 
 // translateStream is independent of HTTP. Optional flushing is a writer capability.
-func translateStream(w io.Writer, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping, options StreamOptions) (usage Usage, streamErr error) {
+func translateStream(w io.Writer, body io.Reader, from, to, model string, observation *Observation, mapping *ChatMapping, options StreamOptions, diagnostics *Diagnostics) (usage Usage, streamErr error) {
 	r := Result{ID: fmt.Sprintf("resp_anchor_%d", time.Now().UnixNano()), Model: model}
 	emit := &emitter{w: w, p: to, r: &r}
 	same := from == to
@@ -53,6 +53,16 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 	index := map[int]int{}
 	chatText := -1
 	chatReasoning := -1
+	anthropicStarted, anthropicFinished := false, false
+	anthropicClosed := map[int]bool{}
+	anthropicStartArgs := map[int]string{}
+	anthropicUsage := Object{}
+	mergeAnthropicUsage := func(update Object) {
+		for k, v := range update {
+			anthropicUsage[k] = v
+		}
+		r.Usage = ReadUsage(Object{"usage": anthropicUsage}, "anthropic")
+	}
 	add := func(up int, item Item) (int, error) {
 		if i, ok := index[up]; ok {
 			return i, nil
@@ -62,7 +72,7 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 		}
 		i := len(r.Items)
 		index[up] = i
-		if from == "chat-completions" && to == "responses" {
+		if from != "responses" && to == "responses" {
 			mapping.restore(&item)
 		}
 		r.Items = append(r.Items, item)
@@ -130,16 +140,10 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 				}
 			case "anthropic":
 				if m["type"] == "message_start" {
-					r.Usage = ReadUsage(obj(m["message"]), from)
+					mergeAnthropicUsage(obj(obj(m["message"])["usage"]))
 				}
 				if m["type"] == "message_delta" {
-					if u := obj(m["usage"]); u != nil {
-						if full := ReadUsage(Object{"usage": u}, "anthropic"); full.Known {
-							r.Usage = full
-						} else {
-							r.Usage.Output = num(u["output_tokens"])
-						}
-					}
+					mergeAnthropicUsage(obj(m["usage"]))
 				}
 				if m["type"] == "message_stop" {
 					terminal = true
@@ -262,73 +266,156 @@ func translateStream(w io.Writer, body io.Reader, from, to, model string, observ
 				}
 			}
 		case "anthropic":
-			switch str(m["type"]) {
+			typ := str(m["type"])
+			if typ != "message_start" && typ != "ping" && !anthropicStarted {
+				return ErrUnsupported
+			}
+			blockIndex := func() (int, error) {
+				n, ok := m["index"].(float64)
+				if !ok || n < 0 || n > 255 || n != float64(int(n)) {
+					return 0, ErrUnsupported
+				}
+				return int(n), nil
+			}
+			switch typ {
 			case "message_start":
-				r.Usage = ReadUsage(obj(m["message"]), from)
+				if anthropicStarted {
+					return ErrUnsupported
+				}
+				anthropicStarted = true
+				mergeAnthropicUsage(obj(obj(m["message"])["usage"]))
 			case "content_block_start":
+				up, err := blockIndex()
+				if err != nil || anthropicFinished {
+					return ErrUnsupported
+				}
+				if _, exists := index[up]; exists {
+					return ErrUnsupported
+				}
 				b := obj(m["content_block"])
 				x := Item{}
 				switch b["type"] {
 				case "text":
-				case "tool_use":
-					x.Tool = true
-					x.CallID = str(b["id"])
-					x.Name = str(b["name"])
-				default:
-					if !same {
+					if allowed(b, "type text") != nil {
 						return ErrUnsupported
 					}
-				}
-				i, e := add(int(num(m["index"])), x)
-				if e != nil {
-					return e
-				}
-				if t := str(b["text"]); t != "" {
-					if e = delta(i, t, false); e != nil {
-						return e
+					if _, ok := b["text"].(string); !ok {
+						return ErrUnsupported
 					}
-				}
-			case "content_block_delta":
-				i, ok := index[int(num(m["index"]))]
-				if !ok {
+				case "thinking":
+					if allowed(b, "type thinking signature") != nil {
+						return ErrUnsupported
+					}
+					if _, ok := b["thinking"].(string); !ok {
+						return ErrUnsupported
+					}
+					if b["signature"] != nil {
+						if _, ok := b["signature"].(string); !ok {
+							return ErrUnsupported
+						}
+					}
+					x.Reasoning = true
+					diagnostics.addDegradation(AnthropicThinkingPlaintext)
+				case "tool_use":
+					if allowed(b, "type id name input") != nil || str(b["id"]) == "" || str(b["name"]) == "" || obj(b["input"]) == nil {
+						return ErrUnsupported
+					}
+					x.Tool, x.CallID, x.Name = true, str(b["id"]), str(b["name"])
+					args, _ := json.Marshal(b["input"])
+					anthropicStartArgs[up] = string(args)
+				default:
 					return ErrUnsupported
 				}
-				d := obj(m["delta"])
-				switch d["type"] {
-				case "text_delta":
-					e = delta(i, str(d["text"]), false)
-				case "input_json_delta":
-					e = delta(i, str(d["partial_json"]), true)
-				default:
-					if !same {
-						return ErrUnsupported
-					}
+				i, err := add(up, x)
+				if err != nil {
+					return err
 				}
-				if e != nil {
-					return e
+				t := str(b["text"])
+				if x.Reasoning {
+					t = str(b["thinking"])
 				}
-			case "content_block_stop":
-				if i, ok := index[int(num(m["index"]))]; ok && r.Items[i].Tool && r.Items[i].Arguments == "" {
-					if e = delta(i, "{}", true); e != nil {
-						return e
-					}
-				}
-				if i, ok := index[int(num(m["index"]))]; ok {
-					if err := emit.closeItem(i); err != nil {
+				if t != "" {
+					if err := delta(i, t, false); err != nil {
 						return err
 					}
 				}
-			case "message_delta":
-				r.Finish = str(obj(m["delta"])["stop_reason"])
-				u := obj(m["usage"])
-				if _, ok := u["output_tokens"]; ok {
-					if full := ReadUsage(Object{"usage": u}, "anthropic"); full.Known {
-						r.Usage = full
-					} else {
-						r.Usage.Output = num(u["output_tokens"])
+			case "content_block_delta":
+				up, err := blockIndex()
+				i, ok := index[up]
+				if err != nil || !ok || anthropicClosed[up] || anthropicFinished {
+					return ErrUnsupported
+				}
+				d := obj(m["delta"])
+				x := r.Items[i]
+				var value any
+				switch d["type"] {
+				case "text_delta":
+					if x.Tool || x.Reasoning || allowed(d, "type text") != nil {
+						return ErrUnsupported
+					}
+					value = d["text"]
+				case "thinking_delta":
+					if !x.Reasoning || allowed(d, "type thinking") != nil {
+						return ErrUnsupported
+					}
+					value = d["thinking"]
+				case "signature_delta":
+					if !x.Reasoning || allowed(d, "type signature") != nil {
+						return ErrUnsupported
+					}
+					if _, ok := d["signature"].(string); !ok {
+						return ErrUnsupported
+					}
+					// Signature has no portable meaning; never label it as OpenAI ciphertext.
+				case "input_json_delta":
+					if !x.Tool || allowed(d, "type partial_json") != nil {
+						return ErrUnsupported
+					}
+					value = d["partial_json"]
+				default:
+					return ErrUnsupported
+				}
+				if d["type"] != "signature_delta" {
+					s, ok := value.(string)
+					if !ok {
+						return ErrUnsupported
+					}
+					if err := delta(i, s, x.Tool); err != nil {
+						return err
 					}
 				}
+			case "content_block_stop":
+				up, err := blockIndex()
+				i, ok := index[up]
+				if err != nil || !ok || anthropicClosed[up] || anthropicFinished {
+					return ErrUnsupported
+				}
+				if r.Items[i].Tool && r.Items[i].Arguments == "" {
+					if err := delta(i, anthropicStartArgs[up], true); err != nil {
+						return err
+					}
+				}
+				delete(anthropicStartArgs, up)
+				anthropicClosed[up] = true
+				if err := emit.closeItem(i); err != nil {
+					return err
+				}
+			case "message_delta":
+				if anthropicFinished || len(anthropicClosed) != len(index) {
+					return ErrUnsupported
+				}
+				r.Finish = str(obj(m["delta"])["stop_reason"])
+				switch r.Finish {
+				case "end_turn", "tool_use", "max_tokens", "stop_sequence":
+				default:
+					return ErrUnsupported
+				}
+				anthropicFinished = true
+				mergeAnthropicUsage(obj(m["usage"]))
 			case "message_stop":
+				if !anthropicFinished {
+					return ErrUnsupported
+				}
 				terminal = true
 			case "ping":
 			default:
@@ -586,6 +673,9 @@ func (e *emitter) delta(i int, s string, tool bool) error {
 	}
 	if tool {
 		return e.chat(Object{"tool_calls": []any{Object{"index": e.toolIndex(i), "function": Object{"arguments": s}}}}, nil, nil)
+	}
+	if e.r.Items[i].Reasoning {
+		return e.chat(Object{"reasoning_content": s}, nil, nil)
 	}
 	return e.chat(Object{"content": s}, nil, nil)
 }

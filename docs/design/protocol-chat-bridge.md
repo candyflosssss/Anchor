@@ -18,7 +18,7 @@
 
 ## 仍会明确拒绝
 
-跨协议图片／音频／文件、引用注解、托管工具、客户端 tool_search、未覆盖的 Responses reasoning → Chat 返回方向、自动截断、未知字段，以及不能无损解释的历史密文。Anthropic 的签名思考和供应商专有 thinking 参数不在此次修复范围。切换为原生 Responses 是否可用必须由该供应商验证，不能据转换成功推断。
+跨协议图片／音频／文件、引用注解、托管工具、客户端 tool_search、未覆盖的 Responses reasoning → Chat 返回方向、自动截断、未知字段，以及不能无损解释的历史密文。Anthropic 签名历史和供应商专有 thinking 参数继续拒绝；2026-10-29 起，Anthropic 上游明文 thinking → Chat reasoning_content 的展示转换及显式降级见 [Messages 桥接支持表](protocol-anthropic-bridge.md)。切换为原生 Responses 是否可用必须由该供应商验证，不能据转换成功推断。
 
 ## 错误与日志
 

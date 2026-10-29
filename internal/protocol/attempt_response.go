@@ -70,7 +70,14 @@ func (a *Attempt) TranslateResponse(body io.Reader) (Response, error) {
 		return fail(ResponseValidationReason(err), err)
 	}
 	out.Usage = result.Usage
-	if a.client == "responses" && a.upstream == "chat-completions" {
+	if a.upstream == "anthropic" {
+		for _, item := range result.Items {
+			if item.Reasoning {
+				out.Diagnostics.addDegradation(AnthropicThinkingPlaintext)
+			}
+		}
+	}
+	if a.client == "responses" && a.upstream != "responses" {
 		err = a.mapping.RestoreResult(&result)
 	}
 	if err != nil || result.CheckTarget(a.client) != nil {
@@ -171,7 +178,7 @@ func (a *Attempt) TranslateStream(ctx context.Context, w io.Writer, body io.Read
 	out := Response{Diagnostics: a.Diagnostics()}
 	out.Diagnostics.Stage = StageStream
 	out.Observation.onFirstOutput = options.OnFirstOutput
-	usage, err := translateStream(&contextWriter{ctx: ctx, w: w}, &contextReader{ctx: ctx, r: body}, a.upstream, a.client, a.public, &out.Observation, a.mapping, options)
+	usage, err := translateStream(&contextWriter{ctx: ctx, w: w}, &contextReader{ctx: ctx, r: body}, a.upstream, a.client, a.public, &out.Observation, a.mapping, options, &out.Diagnostics)
 	out.Observation.onFirstOutput = nil
 	out.Usage = usage
 	if err != nil {

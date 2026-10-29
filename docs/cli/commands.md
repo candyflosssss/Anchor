@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-27
+- 最近核对：2026-10-29
 - 2026-10-27 已随 desktop.75 dev 发布：`proxy put --listen-port PORT` 设置内置 mihomo 回环混合端口；`proxy list` 显示配置值和实际运行端口，见 §15。首次打开自动迁移至 schema10，旧核心不可打开升级后的状态库。
 - 2026-10-26 已随 desktop.73 dev 发布：新增 `context password save|status|forget NAME`，显式将 SSH 密码保存到系统凭据库；已保存时管理连接可复用，默认仍不保存，详见 §4。
 - 2026-10-25 desktop.72 dev 已发布：响应式模型瀑布流与 Windows 托盘退出／任务栏图标／前台激活修复；同版包含安装目录与生成流首字识别修复。本轮无新增命令或参数，详见[发行记录](../release/desktop.md#masonry-windows-72)。
@@ -834,7 +834,7 @@ anchor recover [--id ID]
 | SQLite、限流、路由、日志脱敏 | 内部机制 | 无需一一变成命令；暂无独立日志订阅；用量使用 usage |
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test 与 context password save/status/forget；系统凭据库显式可选，远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
-| Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 请求级协议翻译层；同协议受控原生透传、跨协议无状态文本／函数／SSE／用量及既有 Responses → Chat 桥；不支持内容明确报错，见[翻译层契约](../design/protocol-translation.md) |
+| Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 请求级协议翻译层；同协议受控原生透传、跨协议无状态文本／函数／SSE／用量、Responses → Chat 桥与 [Claude 工具／thinking 桥](../design/protocol-anthropic-bridge.md)；缓存提示、工具错误和明文思考降级可在 logs detail/export 查询，不支持内容明确报错，见[翻译层契约](../design/protocol-translation.md) |
 | Codex统一重试 | agent codex-settings [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
 | 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；desktop.57 已同版发布安装器／runtime／CLI feed，无数据库回滚，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |

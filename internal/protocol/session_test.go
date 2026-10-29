@@ -134,10 +134,7 @@ func TestTranslationSessionIsolation(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			target := "chat-completions"
-			if i%2 == 0 {
-				target = "responses"
-			}
+			target := []string{"responses", "chat-completions", "anthropic"}[i%3]
 			a, err := s.Prepare(AttemptOptions{Protocol: target, Model: fmt.Sprint(i), PublicModel: "public"})
 			if err != nil {
 				t.Error(err)
@@ -168,10 +165,11 @@ func TestTranslationSessionIsolation(t *testing.T) {
 		t.Fatalf("cross-request mapping leak: %s %v", r.Body, err)
 	}
 	// A failed candidate must not contaminate either the session or a later native one.
-	if _, err := s.Prepare(AttemptOptions{Protocol: "anthropic"}); err == nil {
-		t.Fatal("namespace unexpectedly supported")
+	failed := newTestSession(t, `{"model":"public","input":"hello","reasoning":{"effort":"high"},"tools":[{"type":"namespace","name":"functions","tools":[{"type":"function","name":"lookup","parameters":{}}]}]}`, "responses")
+	if _, err := failed.Prepare(AttemptOptions{Protocol: "anthropic"}); err == nil {
+		t.Fatal("unsupported reasoning options accepted")
 	}
-	if got := string(prepareTestAttempt(t, s, "responses").RequestBody()); !strings.Contains(got, `"type":"namespace"`) {
+	if got := string(prepareTestAttempt(t, failed, "responses").RequestBody()); !strings.Contains(got, `"type":"namespace"`) {
 		t.Fatal(got)
 	}
 }

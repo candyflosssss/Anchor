@@ -48,7 +48,8 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 ## 兼容与恢复
 
 - 明确报告 Full／Degraded／Unsupported：完整承载、保证发生变化、无法可靠表示。不能为了发出请求而静默删除未知字段、历史思考、工具或约束；保留既有错误码和默认降级策略。
-- 当前允许的 Responses → Chat 降级为 reasoning_summary_style、encrypted_reasoning_projection、custom_grammar_description，具体语义以支持表为准。grammar 文字描述不保留原生强制语法约束；可选密文输出投影的降级不允许丢弃非空历史密文。
+- 当前允许的 Responses → Chat 降级为 reasoning_summary_style、encrypted_reasoning_projection、custom_grammar_description；Messages 目标复用 custom_grammar_description。Messages 入口跨协议允许经过校验的缓存提示降级 prompt_cache_control、工具错误标志文本化 tool_result_error_text；Messages 返回明文 thinking 允许以 anthropic_thinking_plaintext 降级成独立推理内容，签名不得标为 OpenAI 密文，不承诺思考历史往返。具体语义以支持表为准。grammar 文字描述不保留原生强制语法约束；可选密文输出投影的降级不允许丢弃非空历史密文。
+- Messages 与 Chat 目标复用同一请求局部 namespace／custom 工具索引；不得维护另一套命名、历史重建和返回还原规则。Messages 原生 type=custom 仅代表客户端执行函数，不扩大到托管工具。
 - 密文不可解密时不伪造明文，不将思考作为正文。非空密文历史不能跨协议转换时必须拒绝；多模态、tool_search、签名思考等仅按已验证方向声明支持。
 - 保留明确的原生 Responses 密文拒绝恢复：未向客户端交付、同渠道至多一次、原期限内，由派生 Session 清理历史 reasoning，明确记录有损语义，不扩大触发或重试预算。
 - 区分已实现的原生预清理：仅派发副本中 input 顶层 reasoning 的 encrypted_content 显式为 null、非字符串或空串时删除该字段及该项 id；保留条目、summary、其他字段与非空密文，缺失字段不改。此操作不修改客户端历史、不额外请求、不消耗恢复预算、不记为拒绝后恢复。变更此例外须同步契约与保留边界测试。
@@ -62,6 +63,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 - 文本和可增量转换的参数边收边交付，不读完整回答后伪装流式。保持工具 ID、output_index 和事件顺序；正确处理参数分片、转义及 Unicode。
 - 仅对无法可靠增量解码的内容有界缓冲，如 custom 包装完整校验后的解包和 Anthropic 并行交错块。顺序块应在源项结束后推进，不等整份回答完成。
 - 单事件、累计输入、转换内容、工具／输出项数量及普通响应读取均须有明确上限；当前数值见设计契约。修改上限同步文档和边界测试，不引入无界队列或无必要后台 goroutine。
+- Messages 跨协议流须校验 message_start、块索引／类型／关闭及 message_delta 的有效结束原因；无参数增量时在块关闭回退开始帧 input，不能丢掉非空对象。原生与转换流逐字段合并 usage，保留未被后帧覆盖的缓存用量；不据此重写原生事件。
 - 缺少必要终止事件、非法结束原因、参数截断、断流、取消、超限或写失败时，不得合成成功完成事件。已完整写出的完成帧保留完成事实；写失败不能记成功。
 - 开始向客户端输出后不得重新请求上游并拼接另一份回答。阻塞读由网关取消网络请求／关闭响应体解除；同步转换无需另加读写协程。已有恢复检查的单次待决读不应被误写为完全无协程。
 

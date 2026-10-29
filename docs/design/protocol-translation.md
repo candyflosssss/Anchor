@@ -19,7 +19,7 @@ HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
 | --- | --- |
 | `internal/protocol/session.go` | 不可变的客户端原生请求与转换基线；每个候选独立 Prepare；请求编码与私有返回映射绑定 |
 | `ingress.go`、`client_tools.go` | 类型化 RequestInfo / Capabilities；无状态与工具执行边界校验；不访问模型库、不执行工具 |
-| `request.go`、`chat_request.go` | 现有协议结构适配与白名单校验；参数、输出格式、历史思考、工具身份和 custom 包装规则 |
+| `request.go`、`chat_request.go`、`anthropic_request.go` | 现有协议结构适配与白名单校验；参数、输出格式、历史思考、工具身份和 custom 包装规则 |
 | `attempt_response.go`、`response.go` | 有界读取、普通响应语义校验、工具还原和客户端编码；返回 Usage、Observation、Diagnostics |
 | `stream.go` | 同步增量 SSE 解析／编码，只依赖 reader/writer；工具分片、索引、终止、内容和数量上限 |
 | `stream_http.go` | 兼容旧 Stream 入口；HTTP 写期限和刷新适配到通用 writer，不参与协议语义 |
@@ -40,7 +40,7 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 每次 Prepare 都重新解码私有基线，设置本次上游模型及明确的模型档位策略，创建新的工具映射。请求体返回副本，映射不暴露给网关。Session 可以并发 Prepare；一个 Attempt 由一次上游尝试独占。失败或取消后，调用栈退出即可回收请求状态，无注册表或全局映射。
 
-跨协议继续使用现有 Responses 形状的内部请求桥及类型化输出；不能表达的原生字段在 Prepare 时拒绝，不把最小公共子集当成静默过滤器。下一轮工具结果通过客户端回传的声明、name/namespace、call_id 和历史调用重建映射，不依赖上次 HTTP 请求的进程内状态。碰撞、长名称与歧义身份继续由既有 Chat 适配器处理。
+跨协议继续使用现有 Responses 形状的内部请求桥及类型化输出；不能表达的原生字段在 Prepare 时拒绝，不把最小公共子集当成静默过滤器。下一轮工具结果通过客户端回传的声明、name/namespace、call_id 和历史调用重建映射，不依赖上次 HTTP 请求的进程内状态。碰撞、长名称与歧义身份由 Chat／Messages 共用的请求局部工具索引处理。
 
 同协议发送保留原生字段，保留原生响应字节；修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false，并应用下述原生 Responses 无效密文字段预清理与工具项 ID 规范化；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
 
@@ -129,3 +129,11 @@ AttemptOptions.ClientMetadata 只接受类型化的 AnthropicVersion/AnthropicBe
 首字超时为504/upstream_first_token_timeout，当前请求不重放。已提交SSE时保留HTTP200，由协议层按客户端协议/语言编码一个固定错误事件；ErrorWriter 由网关提供独立15秒写期限，避免上游取消后连错误帧也被请求context拦截。不合成成功终止，仍记录真实上游HTTP与失败日志。路径类型检查、恢复和内容限制保持。probe/chat 复用同一首字限制，仍保留诊断各自10/120秒总上限；目录/余额查询不应用生成首字计时。
 
 2026-10-25 当前源码：网关确认 first-token cause 后，在写错误帧前保存该原因；客户端因收到错误而立即断开或错误帧写入失败时，根请求仍保留 failed/upstream_first_token_timeout，与尝试日志一致。首字超时前的真实客户端取消保持 cancelled/client_cancelled；不改 HTTP 200 的已提交事实、并发／恢复预算或历史记录。
+
+## Claude / Messages 兼容增量（2026-10-29，当前源码未发布）
+
+详见 [Messages 桥接支持表](protocol-anthropic-bridge.md)。Responses → Messages 现在复用 namespace／custom／additional_tools 的私有映射，普通和流式返回还原身份；parallel_tool_calls 与 disable_parallel_tool_use 双向转换。Messages 入口支持普通工具显式 type=custom、metadata.user_id、经过校验的 cache_control 和 tool_result.is_error。跨协议缓存提示与错误标志的文本化分别记为 prompt_cache_control／tool_result_error_text，不修改原生派发。
+
+Messages 上游明文 thinking 转为 Responses reasoning summary／Chat reasoning_content，单独标记 anthropic_thinking_plaintext 降级，签名不伪装成 OpenAI 密文。带签名历史、redacted thinking、反向无签名思考和专有请求预算继续拒绝，不承诺思考历史跨协议往返。grammar 描述降级扩展到 Messages，既有安全类别和日志入口复用。
+
+跨协议 Messages 流校验块类型、索引和关闭边界，必须有有效 message_delta 和 message_stop；非空 content_block_start.input 在没有参数增量时于块关闭回退，参数增量仍优先。原生和转换流均逐字段合并 usage，保留前帧缓存用量；原生事件及载荷不变。重试预算、网络职责与原有资源上限保持。

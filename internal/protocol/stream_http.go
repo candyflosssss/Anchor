@@ -27,7 +27,7 @@ func StreamObservedOptions(w http.ResponseWriter, body io.Reader, from, to, mode
 	}
 	observation.onFirstOutput = options.OnFirstOutput
 	defer func() { observation.onFirstOutput = nil }()
-	return translateStream(HTTPStreamWriter(w), body, from, to, model, observation, mapping, options)
+	return translateStream(HTTPStreamWriter(w), body, from, to, model, observation, mapping, options, nil)
 }
 
 // HTTPStreamWriter supplies delivery deadlines and flushing at the HTTP edge.

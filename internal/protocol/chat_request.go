@@ -39,8 +39,8 @@ type toolIdentity struct {
 	custom          bool
 }
 
-// ChatMapping follows CPA's request-local declaration index: flatten namespace
-// tools and wrap freeform inputs, then restore their identity on the way back.
+// ChatMapping is the request-local flat-tool index shared by Chat and Messages:
+// flatten namespaces and wrap freeform inputs, then restore their identity.
 // This is an independent implementation; no CPA source or dependencies are used.
 type ChatMapping struct {
 	byChat     map[string]toolIdentity
@@ -134,6 +134,13 @@ func prepareChatRequest(m Object) (*ChatMapping, Object, error) {
 			delete(m, key)
 		}
 	}
+	mapping, err := prepareMappedTools(m)
+	return mapping, options, err
+}
+
+// Both Chat and Messages expose flat function tools. Keep one attempt-local
+// identity index for namespace/custom declarations, histories and forced choices.
+func prepareMappedTools(m Object) (*ChatMapping, error) {
 	// Responses Lite can carry tool declarations inline with the input history.
 	if input, ok := m["input"].([]any); ok {
 		kept := make([]any, 0, len(input))
@@ -145,7 +152,7 @@ func prepareChatRequest(m Object) (*ChatMapping, Object, error) {
 			}
 			children, ok := item["tools"].([]any)
 			if !ok || allowed(item, "type tools") != nil || m["tools"] != nil && arr(m["tools"]) == nil {
-				return nil, nil, conversionFailure("tools", ErrUnsupported)
+				return nil, conversionFailure("tools", ErrUnsupported)
 			}
 			m["tools"] = append(arr(m["tools"]), children...)
 		}
@@ -153,9 +160,9 @@ func prepareChatRequest(m Object) (*ChatMapping, Object, error) {
 	}
 	mapping := &ChatMapping{byChat: map[string]toolIdentity{}, byIdentity: map[toolIdentity]string{}}
 	if err := mapping.prepareTools(m); err != nil {
-		return nil, nil, conversionFailure("tools", err)
+		return nil, conversionFailure("tools", err)
 	}
-	return mapping, options, nil
+	return mapping, nil
 }
 
 func chatReasoningEffort(effort string) bool {

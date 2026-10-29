@@ -94,8 +94,12 @@ func ConvertRequestMapped(raw []byte, from, to string) ([]byte, *ChatMapping, er
 	}
 	var mapping *ChatMapping
 	var options Object
-	if to == "chat-completions" {
-		mapping, options, err = prepareChatRequest(m)
+	if to == "chat-completions" || to == "anthropic" {
+		if to == "anthropic" {
+			mapping, err = prepareMappedTools(m)
+		} else {
+			mapping, options, err = prepareChatRequest(m)
+		}
 		if err != nil {
 			return nil, nil, err
 		}
@@ -115,7 +119,7 @@ func ConvertRequestMapped(raw []byte, from, to string) ([]byte, *ChatMapping, er
 func toResponses(m Object, from string) (Object, error) {
 	keys := "model messages stream temperature top_p tools tool_choice max_tokens"
 	if from == "anthropic" {
-		keys += " system"
+		keys += " system metadata"
 	} else {
 		keys += " max_completion_tokens stream_options parallel_tool_calls service_tier reasoning_effort response_format metadata user safety_identifier prompt_cache_key prompt_cache_retention verbosity"
 	}
@@ -123,6 +127,11 @@ func toResponses(m Object, from string) (Object, error) {
 		return nil, err
 	}
 	out := Object{"model": m["model"], "store": false}
+	if from == "anthropic" {
+		if err := prepareAnthropicIngress(m, out); err != nil {
+			return nil, err
+		}
+	}
 	if from == "chat-completions" {
 		if err := chatIngressOptions(m, out); err != nil {
 			return nil, err
@@ -167,14 +176,18 @@ func toResponses(m Object, from string) (Object, error) {
 	}
 	for _, v := range messages {
 		msg := obj(v)
-		messageKeys := "role content tool_calls tool_call_id"
+		messageKeys := "role content"
 		if from == "chat-completions" {
+			messageKeys += " tool_calls tool_call_id"
 			messageKeys += " reasoning_content"
 		}
 		if err := allowed(msg, messageKeys); err != nil {
 			return nil, err
 		}
 		role := str(msg["role"])
+		if from == "anthropic" && role != "user" && role != "assistant" {
+			return nil, ErrUnsupported
+		}
 		switch role {
 		case "user", "assistant", "system", "developer", "tool":
 		default:
@@ -206,20 +219,38 @@ func toResponses(m Object, from string) (Object, error) {
 						if err := allowed(b, "type text"); err != nil {
 							return nil, err
 						}
+						if _, ok := b["text"].(string); !ok {
+							return nil, ErrUnsupported
+						}
 						input = append(input, Object{"role": role, "content": b["text"]})
 					case "tool_use":
 						if err := allowed(b, "type id name input"); err != nil {
 							return nil, err
 						}
+						if role != "assistant" || str(b["id"]) == "" || str(b["name"]) == "" || obj(b["input"]) == nil {
+							return nil, ErrUnsupported
+						}
 						args, _ := json.Marshal(b["input"])
 						input = append(input, Object{"type": "function_call", "call_id": b["id"], "name": b["name"], "arguments": string(args)})
 					case "tool_result":
-						if err := allowed(b, "type tool_use_id content"); err != nil {
+						if err := allowed(b, "type tool_use_id content is_error"); err != nil {
 							return nil, err
+						}
+						if role != "user" || str(b["tool_use_id"]) == "" {
+							return nil, ErrUnsupported
 						}
 						t, e := text(b["content"])
 						if e != nil {
 							return nil, e
+						}
+						if flag := b["is_error"]; flag != nil {
+							failed, ok := flag.(bool)
+							if !ok {
+								return nil, ErrUnsupported
+							}
+							if failed {
+								t = "[Tool execution failed]\n" + t
+							}
 						}
 						input = append(input, Object{"type": "function_call_output", "call_id": b["tool_use_id"], "output": t})
 					default:
@@ -266,8 +297,11 @@ func toResponses(m Object, from string) (Object, error) {
 		for _, v := range list {
 			t := obj(v)
 			if from == "anthropic" {
-				if err := allowed(t, "name description input_schema"); err != nil {
+				if err := allowed(t, "type name description input_schema"); err != nil {
 					return nil, err
+				}
+				if t["type"] != nil && t["type"] != "custom" || str(t["name"]) == "" || obj(t["input_schema"]) == nil {
+					return nil, ErrUnsupported
 				}
 				tools = append(tools, Object{"type": "function", "name": t["name"], "description": t["description"], "parameters": t["input_schema"]})
 			} else {
@@ -293,8 +327,22 @@ func toResponses(m Object, from string) (Object, error) {
 	if v := m["tool_choice"]; v != nil {
 		if from == "anthropic" {
 			c := obj(v)
-			if err := allowed(c, "type name"); err != nil {
+			if err := allowed(c, "type name disable_parallel_tool_use"); err != nil {
 				return nil, err
+			}
+			if flag := c["disable_parallel_tool_use"]; flag != nil {
+				disabled, ok := flag.(bool)
+				if !ok || c["type"] == "none" {
+					return nil, ErrUnsupported
+				}
+				out["parallel_tool_calls"] = !disabled
+			}
+			if c["type"] == "tool" {
+				if str(c["name"]) == "" {
+					return nil, ErrUnsupported
+				}
+			} else if c["name"] != nil {
+				return nil, ErrUnsupported
 			}
 			switch c["type"] {
 			case "auto":
@@ -361,11 +409,6 @@ func fromResponses(m Object, to string) (Object, error) {
 		}
 		if m["stream"] == true {
 			out["stream_options"] = Object{"include_usage": true}
-		}
-	}
-	if to == "anthropic" {
-		if _, ok := m["parallel_tool_calls"]; ok {
-			return nil, ErrUnsupported
 		}
 	}
 	messages := []any{}
@@ -557,6 +600,25 @@ func fromResponses(m Object, to string) (Object, error) {
 			out["tool_choice"] = Object{"type": typ}
 		} else {
 			out["tool_choice"] = v
+		}
+	}
+	if to == "anthropic" {
+		if flag, exists := m["parallel_tool_calls"]; exists && flag != nil {
+			parallel, ok := flag.(bool)
+			if !ok {
+				return nil, ErrUnsupported
+			}
+			if len(arr(out["tools"])) == 0 {
+				return out, nil
+			}
+			choice := obj(out["tool_choice"])
+			if choice == nil {
+				choice = Object{"type": "auto"}
+				out["tool_choice"] = choice
+			}
+			if choice["type"] != "none" {
+				choice["disable_parallel_tool_use"] = !parallel
+			}
 		}
 	}
 	return out, nil

@@ -102,7 +102,7 @@ func nativePolicyView(m Object, p string) Object {
 				}
 				projected = append(projected, Object{"type": "function", "name": obj(t["function"])["name"]})
 			} else {
-				if t == nil || t["type"] != nil {
+				if t == nil || (t["type"] != nil && t["type"] != "custom") {
 					projected = append(projected, Object{"type": "unsupported"})
 					continue
 				}
@@ -184,6 +184,9 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 			return nil, newTranslationError(s.client, o.Protocol, StageRequest, ConversionReason(err), err)
 		}
 		a.diagnostics.Degradations = requestDegradations(raw, o.Protocol)
+		if s.client == "anthropic" {
+			a.diagnostics.Degradations = append(a.diagnostics.Degradations, anthropicIngressDegradations(s.native)...)
+		}
 		if len(a.diagnostics.Degradations) > 0 {
 			a.diagnostics.Compatibility = Degraded
 		}

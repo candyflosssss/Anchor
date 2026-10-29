@@ -1047,3 +1047,11 @@
 - 旧 → 新：源码实现 → dev在线更新可取得；公开alpha.6 CLI不变。
 - 兼容与迁移：首次启动schema9→10，旧核心不能打开升级后的库；同类型编辑省略字段保留配置，端口0自动分配。安装前备份，核心／桌面／CLI配套升级。
 - 验证：双平台生产编译打包、11附件摘要和默认dev源runtime／旧客户端deb／CLI三条真实下载通过；未安装、改真实配置或验收原生窗口，见[发行记录](../release/desktop.md#mihomo-ports-75)。
+
+## 2026-10-29 — Claude / Messages 工具与流式兼容（当前源码，未发布）
+
+- 类型：协议数据面兼容增量；命令、参数、帮助和退出码保持。
+- 指令与参数：沿用 provider key-put / key-model-protocol 选择协议，logs detail/export 查询转换事实；数据面通过现有 HTTP 三协议入口调用，无需单独 CLI。
+- 旧 → 新：Messages 上游支持 Responses namespace／custom 工具与两轮身份还原；并行工具策略双向映射；Messages 入口支持普通工具 type=custom、metadata.user_id、受限 cache_control 和 tool_result.is_error。缓存提示与工具错误文本化分别标记 prompt_cache_control／tool_result_error_text；上游明文 thinking 分离为推理内容并标记 anthropic_thinking_plaintext。流式保留开始帧完整工具输入、合并分帧缓存用量，并拒绝损坏的块生命周期。
+- 兼容与迁移：需要升级处理请求的核心，无数据库或配置迁移。原生字段及 SSE 保留；签名历史、redacted thinking、多模态及专有预算的跨协议转换仍拒绝。没有新增重试或工具执行权限，grammar 仍只有描述约束；支持范围见 [Messages 桥接](../design/protocol-anthropic-bridge.md)。本轮未打包／发布。
+- 验证：协议回归与模拟 HTTP 网关验收覆盖普通／流式工具闭环、thinking 与正文分离、缓存／错误降级及日志脱敏；最终实际命令和执行结果见任务记录，未调用真实付费上游。

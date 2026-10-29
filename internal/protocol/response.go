@@ -174,7 +174,30 @@ func parseResponse(raw []byte, p string, probe bool) (Result, error) {
 			x := obj(v)
 			switch x["type"] {
 			case "text":
-				r.Items = append(r.Items, Item{Text: str(x["text"])})
+				if allowed(x, "type text citations") != nil || x["citations"] != nil && (arr(x["citations"]) == nil || len(arr(x["citations"])) > 0) {
+					return r, validationFailure("unsupported_content", ErrUnsupported)
+				}
+				t, ok := x["text"].(string)
+				if !ok {
+					return r, validationFailure("unsupported_content", ErrUnsupported)
+				}
+				r.Items = append(r.Items, Item{Text: t})
+			case "thinking":
+				if allowed(x, "type thinking signature") != nil {
+					return r, validationFailure("unsupported_content", ErrUnsupported)
+				}
+				t, ok := x["thinking"].(string)
+				if !ok {
+					return r, validationFailure("unsupported_content", ErrUnsupported)
+				}
+				if signature := x["signature"]; signature != nil {
+					if _, ok := signature.(string); !ok {
+						return r, validationFailure("unsupported_content", ErrUnsupported)
+					}
+				}
+				if !probe {
+					r.Items = append(r.Items, Item{Text: t, Reasoning: true})
+				}
 			case "tool_use":
 				args, _ := json.Marshal(x["input"])
 				r.Items = append(r.Items, Item{CallID: str(x["id"]), Name: str(x["name"]), Arguments: string(args), Tool: true})

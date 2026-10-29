@@ -23,9 +23,12 @@ const (
 type Degradation string
 
 const (
-	SummaryStyle         Degradation = "reasoning_summary_style"
-	EncryptedProjection  Degradation = "encrypted_reasoning_projection"
-	GrammarAsDescription Degradation = "custom_grammar_description"
+	SummaryStyle               Degradation = "reasoning_summary_style"
+	EncryptedProjection        Degradation = "encrypted_reasoning_projection"
+	GrammarAsDescription       Degradation = "custom_grammar_description"
+	PromptCacheControl         Degradation = "prompt_cache_control"
+	ToolResultErrorText        Degradation = "tool_result_error_text"
+	AnthropicThinkingPlaintext Degradation = "anthropic_thinking_plaintext"
 )
 
 // Diagnostics contains code-owned facts only. Dispatch and HTTP delivery belong
@@ -67,12 +70,12 @@ func ErrorDiagnostics(err error) Diagnostics {
 }
 
 func requestDegradations(raw []byte, to string) []Degradation {
-	if to != "chat-completions" {
+	if to != "chat-completions" && to != "anthropic" {
 		return nil
 	}
 	m, _ := Decode(raw)
 	var d []Degradation
-	if obj(m["reasoning"])["summary"] != nil {
+	if to == "chat-completions" && obj(m["reasoning"])["summary"] != nil {
 		d = append(d, SummaryStyle)
 	}
 	if len(arr(m["include"])) > 0 {
@@ -101,4 +104,18 @@ func requestDegradations(raw []byte, to string) []Degradation {
 		d = append(d, GrammarAsDescription)
 	}
 	return d
+}
+
+// addDegradation keeps response-time losses visible together with request facts.
+func (d *Diagnostics) addDegradation(label Degradation) {
+	if d == nil {
+		return
+	}
+	for _, existing := range d.Degradations {
+		if existing == label {
+			return
+		}
+	}
+	d.Degradations = append(d.Degradations, label)
+	d.Compatibility = Degraded
 }
