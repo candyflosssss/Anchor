@@ -1,6 +1,6 @@
 import { isValidModelId } from '../../lib/identifier';
 import { validRoutingRule } from '../models/model-routing.model';
-import type { Action, Price, Probe, Workspace, KeyRateCache } from '../../desktop/contract.generated';
+import type { Action, Price, Probe, Workspace, KeyRateCache, KeyStatus } from '../../desktop/contract.generated';
 import { protocolName, ProviderProblem, type Provider } from './provider.model';
 export type { Action, Price, Probe, Workspace };
 export function actionFor(p: Pick<Provider, 'id' | 'revision'>, action: string, fields: Partial<Action> = {}): Action {
@@ -45,6 +45,10 @@ export function checkedWorkspace(w: Workspace): Workspace {
     return { provider_id, model, requests, failures, elapsed_ms, known, input_tokens, output_tokens, cache_read, cache_write };
   }) };
 }
+export function keyNeedsRecovery(key: Pick<KeyStatus, 'state' | 'failures' | 'error_score'>): boolean {
+  return key.failures > 0 || (key.error_score ?? 0) > 0 || ['degraded', 'invalid', 'cooling', 'half-open'].includes(key.state);
+}
+
 export const healthText: Record<string, string> = { degraded: '已降权', ready: '可调度', disabled: '已停用', cooling: '冷却中', invalid: '认证失效', 'half-open': '等待单次探测' };
 
 export const isValidModelAlias = isValidModelId;

@@ -10,7 +10,7 @@ export type DetailTab = 'overview' | 'keys' | 'models' | 'usage' | 'account';
 export type ProviderDialog =
   | { kind: 'mapping-batch'; operation: MappingBatchOperation; workspace: Workspace; ids: string[] }
   | { kind: 'test'; model?: string; keyId?: string; keyIds?: string[] }
-  | { kind: 'rename' } | { kind: 'copy' } | { kind: 'delete' }
+  | { kind: 'rename' } | { kind: 'copy' } | { kind: 'delete' } | { kind: 'key-reset-all' }
   | { kind: 'key'; keyId?: string }
   | { kind: 'mapping'; alias?: string; upstream?: string; tools?: boolean; streaming?: boolean };
 export type HealthCode = 'loading' | 'error' | 'disabled' | 'no-enabled-key' | 'auth' | 'degraded' | 'unmapped' | 'anonymous' | 'test-failed' | 'untested' | 'ready';

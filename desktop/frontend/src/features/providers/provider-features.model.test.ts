@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import probeFixture from '../../../../contract/provider-probe.json';
 import mapping from '../../../../contract/provider-model-mapping.json';
 import fixture from '../../../../contract/provider-workspace.json';
-import { actionFor, catalogImportPlan, checkedWorkspace, type Workspace } from './provider-features.model';
+import { actionFor, catalogImportPlan, checkedWorkspace, keyNeedsRecovery, type Workspace } from './provider-features.model';
 import { MockProviderTransport } from './provider.mock';
 describe('provider first priority contract', () => {
   it('reads the shared fixture and strips secrets from public DTOs', () => {
@@ -89,4 +89,35 @@ describe('catalog import planning', () => {
 it('preserves the shared HTML failure in persisted workspace results', () => {
   const value = { ...structuredClone(fixture), probe: probeFixture.html_failure.result };
   expect(checkedWorkspace(value).probe?.failure).toBe('unexpected_html');
+});
+
+
+describe('recover all provider Keys', () => {
+  it('offers recovery for failures, error scores and scheduling restrictions', () => {
+    for (const state of ['invalid', 'cooling', 'half-open', 'degraded']) expect(keyNeedsRecovery({ state, failures: 0 })).toBe(true);
+    expect(keyNeedsRecovery({ state: 'disabled', failures: 1 })).toBe(true);
+    expect(keyNeedsRecovery({ state: 'ready', failures: 0, error_score: 25 })).toBe(true);
+    for (const state of ['ready', 'disabled']) expect(keyNeedsRecovery({ state, failures: 0 })).toBe(false);
+  });
+
+  it('resets all health without changing enabled flags, revisions or other providers', async () => {
+    const transport = new MockProviderTransport();
+    const signal = new AbortController().signal;
+    const rows = await transport.list(signal);
+    const p = rows.find(p => p.id === '备用供应商')!;
+    const other = rows.find(row => row.id !== p.id)!;
+    const otherBefore = await transport.workspace(other.id, signal);
+    let w = await transport.action(actionFor(p, 'key-put', { target: 'disabled', secret: 'synthetic', enabled: false }), signal);
+    const current = { ...p, revision: w.revision };
+    await expect(transport.action(actionFor(current, 'key-reset-all'), signal)).rejects.toMatchObject({ code: 'invalid' });
+    await expect(transport.action(actionFor(p, 'key-reset-all', { approved: true }), signal)).rejects.toMatchObject({ code: 'conflict' });
+    await expect(transport.action(actionFor(current, 'key-reset-all', { approved: true, target: 'primary' }), signal)).rejects.toMatchObject({ code: 'invalid' });
+    const enabled = w.keys.map(k => k.enabled);
+    w = await transport.action(actionFor(current, 'key-reset-all', { approved: true }), signal);
+    expect(w.revision).toBe(current.revision);
+    expect(w.keys.map(k => k.enabled)).toEqual(enabled);
+    expect(w.keys.every(k => !keyNeedsRecovery(k) && k.retry_at === 0 && k.test === null)).toBe(true);
+    expect(w.keys.find(k => k.id === 'disabled')?.state).toBe('disabled');
+    expect(await transport.workspace(other.id, signal)).toEqual(otherBefore);
+  });
 });

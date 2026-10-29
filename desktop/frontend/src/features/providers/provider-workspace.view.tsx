@@ -1,6 +1,6 @@
 import { ProviderBalanceCell } from './provider-balance.view';
 import type { ProviderBalance } from './provider-balance.model';
-import { ChevronRight, Copy, Download, KeyRound, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RefreshCw, Search, Server, TextCursorInput, Trash2, Unplug } from 'lucide-react';
+import { ChevronRight, Copy, Download, KeyRound, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, Power, RefreshCw, RotateCcw, Search, Server, TextCursorInput, Trash2, Unplug } from 'lucide-react';
 import type { MouseEvent, ReactNode } from 'react';
 import { Button } from '../../components/ui/button';
 import { Switch } from '../../components/ui/switch';
@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/input';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { StatusBadge } from '../../components/shared/status-badge';
 import { MenuItem, Popover } from '../../components/shared/popover-menu';
+import { keyNeedsRecovery } from './provider-features.model';
 import { HealthPill } from './provider-detail.view';
 import { type Provider } from './provider.model';
 import { formatAgo, type ProviderSummary } from './provider-summary.model';
@@ -37,6 +38,7 @@ export function ProviderList({ c, summaries, balances, onRefreshBalance, onEdit,
           <TableCell className="text-sm">{loaded ? s!.modelCount || <span className="cell-hint">未映射</span> : '—'}</TableCell>
           <TableCell className="col-wide">{s?.lastTest ? <span className={s.lastTest.failure ? 'cell-hint text-destructive' : 'cell-hint'}>{s.lastTest.failure ? '失败 · ' : ''}{formatAgo(s.lastTest.at)}</span> : <span className="cell-hint">{loaded ? '未测试' : '—'}</span>}</TableCell>
           <TableCell className="text-right"><div className="row-actions">
+            {s?.workspace?.keys.some(keyNeedsRecovery) && <Button variant="outline" size="sm" disabled={c.blocked || !!c.dialog || !!c.editor} aria-label={`${p.id} 恢复所有 Key`} onClick={() => c.openProvider(p.id, 'keys', { kind: 'key-reset-all' })}><RotateCcw />恢复所有 Key</Button>}
             <Button variant="ghost" size="icon" disabled={c.blocked} title="测试连通" aria-label={`测试 ${p.id}`} onClick={() => c.openQuickTest(p.id)}><Play /></Button>
             <Button variant="ghost" size="icon" disabled={c.blocked} title="编辑配置" aria-label={`编辑 ${p.id}`} onClick={() => onEdit(p)}><Pencil /></Button>
             <Popover menu label={`${p.id} 的更多操作`} disabled={c.blocked} trigger={props => <Button variant="ghost" size="icon" title="更多操作" aria-label={`更多操作 ${p.id}`} {...props}><MoreHorizontal /></Button>}>

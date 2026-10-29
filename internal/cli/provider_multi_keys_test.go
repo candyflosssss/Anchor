@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/candyflosssss/Anchor/internal/catalog"
 	"github.com/candyflosssss/Anchor/internal/core"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
@@ -53,5 +54,20 @@ func TestProviderMultiKeyAddressCLI(t *testing.T) {
 	keys, err := store.ProviderKeys("p")
 	if err != nil || len(keys) != 2 || keys[0].Protocol != "anthropic" || keys[1].Protocol != "chat-completions" || keys[0].Secret != "synthetic-cli-key" {
 		t.Fatal("address edit changed Keys")
+	}
+	resetArgs := []string{"provider", "key-reset-all", "--id", "p", "--revision", "4"}
+	var rejected bytes.Buffer
+	app := App{Out: &rejected, Err: io.Discard}
+	if err := app.Run(context.Background(), append([]string{"--data-dir", dir}, resetArgs...)); err == nil {
+		t.Fatal("reset without approval succeeded")
+	}
+	var workspace catalog.Workspace
+	if err := json.Unmarshal([]byte(run(append(resetArgs, "--approve")...)), &workspace); err != nil || workspace.Revision != 4 || len(workspace.Keys) != 2 {
+		t.Fatal("reset all workspace", workspace, err)
+	}
+	for _, key := range workspace.Keys {
+		if key.State != "ready" || key.Failures != 0 || key.ErrorScore != 0 || key.RetryAt != 0 || key.Test != nil {
+			t.Fatal("key was not reset", key)
+		}
 	}
 }

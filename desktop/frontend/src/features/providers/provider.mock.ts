@@ -268,7 +268,12 @@ export class MockProviderTransport implements ProviderTransport {
         p.revision++; break;
       }
       case 'key-delete': if (!a.approved) throw fixtureError('invalid'); this.deleteKey(w, a.target); p.has_secret = !!w.keys.length; p.revision++; break;
-      case 'key-reset': { const k = w.keys.find(k => k.id === a.target); if (!a.approved || !k) throw fixtureError('invalid'); k.failures = 0; k.retry_at = 0; k.state = k.enabled ? 'ready' : 'disabled'; break; }
+      case 'key-reset': case 'key-reset-all': {
+        const keys = a.action === 'key-reset-all' ? w.keys : w.keys.filter(k => k.id === a.target);
+        if (!a.approved || (a.action === 'key-reset-all' ? !!a.target : !keys.length)) throw fixtureError('invalid');
+        for (const k of keys) { k.failures = 0; if (k.error_score != null) k.error_score = 0; k.retry_at = 0; k.test = null; k.state = k.enabled ? 'ready' : 'disabled'; }
+        break;
+      }
       case 'strategy': w.strategy = a.strategy; p.revision++; break;
       case 'model-put': {
         const speeds = a.speed_variants ?? [];

@@ -14,7 +14,7 @@ import { StatusBadge } from '../../components/shared/status-badge';
 import { ConfirmAction } from '../../components/shared/confirm-action';
 import { MenuItem, Popover } from '../../components/shared/popover-menu';
 import { ProviderPricingView } from './provider-pricing.view';
-import { healthText, type Action, type Probe, type Workspace } from './provider-features.model';
+import { healthText, keyNeedsRecovery, type Action, type Probe, type Workspace } from './provider-features.model';
 import { protocolName, type Provider } from './provider.model';
 import { formatAgo, type DetailTab, type ProviderSummary, type Tone } from './provider-summary.model';
 import type { ProviderController } from './use-provider-controller';
@@ -58,6 +58,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
         <span className="provider-url mono" title={p.base_urls.join('\n')}>{p.base_urls[0]}{p.base_urls.length > 1 ? ` +${p.base_urls.length - 1}` : ''}</span>
       </div>
       <div className="detail-actions">
+        {w?.keys.some(keyNeedsRecovery) && <Button variant="outline" disabled={blocked || f.needsRead} onClick={() => c.openDialog({ kind: 'key-reset-all' })}><RotateCcw />恢复所有 Key</Button>}
         <Button disabled={blocked || !w} onClick={() => c.openDialog({ kind: 'test' })}><Play />测试连通</Button>
         <Button variant="outline" disabled={blocked} onClick={onEdit}><Pencil />编辑配置</Button>
         <label className="key-toggle" data-state={p.enabled ? 'checked' : 'unchecked'}><Switch className="key-toggle-switch" checked={p.enabled} disabled={blocked || !!c.editor} aria-label={`供应商 ${p.id} 启用状态`} onCheckedChange={() => c.toggleProvider(p)} /><span>{p.enabled ? '已启用' : '已停用'}</span></label>
@@ -154,7 +155,7 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
             <Switch className="key-toggle-switch" checked={k.enabled} disabled={disabled} aria-label={`Key ${k.id} 启用状态`} onCheckedChange={enabled => void f.run('key-put', { target: k.id, enabled })} />
             <span>{k.enabled ? '已启用' : '已停用'}</span>
           </label>
-          {(k.failures > 0 || k.state === 'degraded' || k.state === 'invalid' || k.state === 'cooling' || k.state === 'half-open') && <Button size="sm" variant="ghost" disabled={disabled} aria-label={`恢复 Key ${k.id}`} onClick={() => ask({ action: 'key-reset', title: `重置 ${k.id} 的健康状态？`, body: '清除失败计数及自动调度限制；不会改变已保存密钥。', fields: { target: k.id } })}><RotateCcw />恢复</Button>}
+          {keyNeedsRecovery(k) && <Button size="sm" variant="ghost" disabled={disabled} aria-label={`恢复 Key ${k.id}`} onClick={() => ask({ action: 'key-reset', title: `重置 ${k.id} 的健康状态？`, body: '清除失败计数及自动调度限制；不会改变已保存密钥。', fields: { target: k.id } })}><RotateCcw />恢复</Button>}
           <Button size="sm" variant="ghost" disabled={disabled} title={`编辑 Key ${k.id}`} aria-label={`编辑 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'key', keyId: k.id })}><Pencil /></Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`删除 Key ${k.id}`} onClick={() => ask({ action: 'key-delete', title: `删除 Key ${k.id}？`, body: '删除后无法恢复此密钥，并会移除它对应的模型来源。其他 Key 提供的同名模型会保留；没有剩余来源的模型映射会一并删除。若模型仍是已启用 Agent 的默认模型，需先更换默认模型或停用该 Agent。', fields: { target: k.id } })}><Trash2 /></Button>
         </td>

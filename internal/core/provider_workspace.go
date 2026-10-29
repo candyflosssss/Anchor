@@ -154,25 +154,35 @@ func (s *Server) providerAction(w http.ResponseWriter, r *http.Request) {
 		}
 	case "key-model-protocol":
 		err = s.Store.PutKeyModelProtocol(p.ID, p.Revision, in.Target, in.Model, in.Protocol)
-	case "key-reset":
-		if !in.Approved {
+	case "key-reset", "key-reset-all":
+		if !in.Approved || (in.Action == "key-reset-all" && in.Target != "") {
 			err = state.ErrInvalid
 			break
 		}
 		keys, e := s.Store.ProviderKeys(p.ID)
-		err = e
-		found := false
-		for _, k := range keys {
-			if k.ID == in.Target {
-				found = true
-			}
-		}
-		if !found {
-			err = state.ErrNotFound
+		if e != nil {
+			err = e
 			break
 		}
+		if in.Action == "key-reset" {
+			found := false
+			for _, k := range keys {
+				if k.ID == in.Target {
+					found = true
+				}
+			}
+			if !found {
+				err = state.ErrNotFound
+				break
+			}
+		}
+		// Reset the current snapshot together; preserve enabled flags and other providers.
 		s.mu.Lock()
-		delete(s.health, healthID(p, in.Target))
+		for _, k := range keys {
+			if in.Action == "key-reset-all" || k.ID == in.Target {
+				delete(s.health, healthID(p, k.ID))
+			}
+		}
 		s.mu.Unlock()
 	case "test":
 		if !in.Approved || in.Model == "" || len(in.Model) > 256 || strings.ContainsAny(in.Model, "\r\n") {

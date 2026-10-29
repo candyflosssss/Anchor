@@ -149,3 +149,55 @@ test('a Key dialog shows automatic conflict recovery and waits for a deliberate 
   await expect(page.getByRole('button', { name: '编辑 Key second', exact: true })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
+
+
+test('only affected providers offer recovery of all Keys and cancellation preserves health', async ({ page }) => {
+  await page.goto('/');
+  const listAction = page.getByRole('button', { name: '备用供应商 恢复所有 Key', exact: true });
+  await expect(listAction).toBeVisible();
+  await expect(page.getByRole('button', { name: '摸鱼AI 恢复所有 Key', exact: true })).toHaveCount(0);
+  await listAction.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('全部 2 个 Key');
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  const recover = page.getByRole('button', { name: '恢复所有 Key', exact: true });
+  await expect(recover).toBeVisible();
+  await expect(page.getByRole('button', { name: '恢复 Key primary', exact: true })).toBeVisible();
+  await recover.click();
+  const confirm = dialog.getByRole('button', { name: '确认恢复', exact: true });
+  await confirm.click();
+  await expect(dialog.getByRole('button', { name: '正在恢复…', exact: true })).toBeDisabled();
+  await expect(dialog).toBeHidden();
+  await expect(recover).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '恢复 Key primary', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('switch', { name: 'Key primary 启用状态', exact: true })).toBeChecked();
+  await page.getByRole('button', { name: '返回供应商列表', exact: true }).click();
+  await expect(listAction).toHaveCount(0);
+});
+
+test('a conflicted reset of all Keys requires confirmation again after rereading', async ({ page }) => {
+  await openKeys(page, 'conflict', '备用供应商');
+  await page.getByRole('button', { name: '恢复所有 Key', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '确认恢复', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('刚才的操作未保存');
+  await expect(page.getByRole('button', { name: '恢复 Key primary', exact: true, includeHidden: true })).toHaveCount(1);
+  await expect(dialog.getByRole('button', { name: '确认恢复', exact: true })).toBeEnabled();
+  await dialog.getByRole('button', { name: '确认恢复', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('button', { name: '恢复所有 Key', exact: true })).toHaveCount(0);
+});
+
+test('an unknown reset of all Keys locks resubmission until an explicit reread', async ({ page }) => {
+  await openKeys(page, 'unknown', '备用供应商');
+  await page.getByRole('button', { name: '恢复所有 Key', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: '确认恢复', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('写入结果未知');
+  await expect(dialog.getByRole('button', { name: '确认恢复', exact: true })).toBeDisabled();
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  await page.getByRole('alert').getByRole('button', { name: '重新读取', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '恢复所有 Key', exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Key 调度策略')).toBeEnabled();
+});

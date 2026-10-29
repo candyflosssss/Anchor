@@ -21,7 +21,7 @@ export function ProviderDialogs({ c }: { c: ProviderController }) {
   return <Shell key={`${p.id}:${d.kind}`} c={c} d={d} />;
 }
 
-const titles: Record<ProviderDialog['kind'], string> = { 'mapping-batch': '批量操作模型映射', test: '测试连通', rename: '改名', copy: '复制为新供应商', delete: '删除供应商', key: 'Key', mapping: '模型映射' };
+const titles: Record<ProviderDialog['kind'], string> = { 'key-reset-all': '恢复所有 Key', 'mapping-batch': '批量操作模型映射', test: '测试连通', rename: '改名', copy: '复制为新供应商', delete: '删除供应商', key: 'Key', mapping: '模型映射' };
 
 function Shell({ c, d }: { c: ProviderController; d: Exclude<ProviderDialog, { kind: 'mapping-batch' }> }) {
   const [tried, setTried] = useState(false);
@@ -38,6 +38,10 @@ function Shell({ c, d }: { c: ProviderController; d: Exclude<ProviderDialog, { k
     : d.kind === 'rename' ? <RenameBody c={c} run={run} />
     : d.kind === 'copy' ? <CopyBody c={c} run={run} />
     : d.kind === 'delete' ? <DeleteBody c={c} run={run} />
+    : d.kind === 'key-reset-all' ? <>
+      <div className="editor-fields"><p>恢复「{c.selected?.id}」全部 {f.data.keys.length} 个 Key 的健康状态，清除失败计数、错误分数、冷却限制和最近测试记录。密钥内容及启停设置保持不变。</p><p className="warning-copy">若上游密钥本身已失效，恢复后仍可能再次失败，需要更新密钥。</p></div>
+      <Footer c={c}><Button disabled={c.blocked || f.needsRead} onClick={() => void run('key-reset-all', {})}>{f.busy ? '正在恢复…' : '确认恢复'}</Button></Footer>
+    </>
     : d.kind === 'key' ? <KeyBody c={c} d={d} run={run} />
     : <MappingBody c={c} d={d} run={run} />;
   return <Dialog open onOpenChange={open => { if (!open) close(); }}>

@@ -65,6 +65,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   provider key-delete|key-reset --id ID --revision N --target KEY --approve
       key-delete removes only this Key's mapping sources; other Keys and providers keep shared models.
       Removing the last source deletes the model; enabled Binding defaults still block deletion.
+  provider key-reset-all --id ID --revision N --approve  Reset all Key health; preserve enabled flags
   provider strategy --id ID --revision N --strategy round-robin|priority
   provider chat --id ID --revision N --key KEY --model MODEL [--reasoning-effort LEVEL] --approve
       Read a JSON user/assistant message array from stdin; print the final transient reply.
@@ -916,7 +917,7 @@ func Main(ctx context.Context, args []string) int {
 
 func (a App) providerFeature(ctx context.Context, c *client.Client, args []string) error {
 	switch args[0] {
-	case "delete", "rename", "copy", "key-put", "key-delete", "key-reset", "key-model-protocol", "strategy", "test", "model-put", "model-delete", "price-put", "price-import":
+	case "delete", "rename", "copy", "key-put", "key-delete", "key-reset", "key-reset-all", "key-model-protocol", "strategy", "test", "model-put", "model-delete", "price-put", "price-import":
 	default:
 		return errors.New("unknown provider command")
 	}

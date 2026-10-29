@@ -48,6 +48,10 @@ func TestPriorityWorkspaceBridgeReadWrite(t *testing.T) {
 	if strings.Contains(string(raw), "synthetic") {
 		t.Fatal("secret leaked")
 	}
+	reset := b.ProviderAction(Action{ProviderID: "p", ExpectedRevision: 2, Action: "key-reset-all", Approved: true})
+	if reset.Problem != nil || reset.Data == nil || reset.Data.Revision != 2 || len(reset.Data.Keys) != 2 {
+		t.Fatal(reset)
+	}
 	conflict := b.ProviderAction(Action{ProviderID: "p", ExpectedRevision: 1, Action: "strategy", Strategy: "priority"})
 	if conflict.Problem == nil || conflict.Problem.Code != "conflict" {
 		t.Fatal(conflict)

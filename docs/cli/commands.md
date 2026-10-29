@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-10-29
+- 最近核对：2026-10-30
 - 2026-10-27 已随 desktop.75 dev 发布：`proxy put --listen-port PORT` 设置内置 mihomo 回环混合端口；`proxy list` 显示配置值和实际运行端口，见 §15。首次打开自动迁移至 schema10，旧核心不可打开升级后的状态库。
 - 2026-10-26 已随 desktop.73 dev 发布：新增 `context password save|status|forget NAME`，显式将 SSH 密码保存到系统凭据库；已保存时管理连接可复用，默认仍不保存，详见 §4。
 - 2026-10-25 desktop.72 dev 已发布：响应式模型瀑布流与 Windows 托盘退出／任务栏图标／前台激活修复；同版包含安装目录与生成流首字识别修复。本轮无新增命令或参数，详见[发行记录](../release/desktop.md#masonry-windows-72)。
@@ -118,7 +118,7 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `provider put` | 条件更新供应商 | 核心在线；当前 revision |
 | `provider workspace` | 查询 Key 状态、映射、用量与价格 | 核心在线；已存供应商 |
 | `provider delete` / `rename` / `copy` | 删除、改名、复制供应商 | 核心在线；当前 revision；删除/改名须 approve |
-| `provider key-put` / `key-delete` / `key-reset` / `key-model-protocol` | 多 Key 管理、默认协议与模型覆盖、状态恢复 | 核心在线；当前 revision；删除/恢复须 approve |
+| `provider key-put` / `key-delete` / `key-reset` / `key-reset-all` / `key-model-protocol` | 多 Key 管理、默认协议与模型覆盖、状态恢复 | 核心在线；当前 revision；删除/恢复须 approve |
 | `provider strategy` | 配置轮流或优先使用 Key | 核心在线；当前 revision |
 | `provider chat` | 固定供应商／Key／上游模型的多轮文本推理 | 核心在线；当前 revision、准确启用 Key、stdin 消息数组；须 approve；当前源码新增，未发布 |
 | `provider test` | 显式最小推理测试 | 核心在线；已存供应商/模型 ID；须 approve |
@@ -355,6 +355,7 @@ anchor provider key-put --id ID --revision N --target KEY [--secret-stdin] [--di
 anchor provider key-model-protocol --id ID --revision N --target KEY --model UPSTREAM [--protocol PROTOCOL|inherit]
 anchor provider key-delete --id ID --revision N --target KEY --approve
 anchor provider key-reset --id ID --revision N --target KEY --approve
+anchor provider key-reset-all --id ID --revision N --approve
 anchor provider strategy --id ID --revision N --strategy round-robin|priority
 anchor provider test --id ID --revision N --model UPSTREAM [--target KEY] --approve
 anchor provider model-put --id ID --revision N --target ALIAS --model UPSTREAM
@@ -376,6 +377,7 @@ anchor usage
 | key-put | target 必填，最多64个 Key；新 Key 必须有非空 stdin 秘密，已有 Key 省略或空 stdin 保留秘密；默认 enabled，`--disabled` 停用；替换秘密只经 stdin，删除用 key-delete；protocol 省略/空值保留已有 Key 协议，新 Key 默认 responses；可显式选 responses / chat-completions / anthropic |
 | key-model-protocol | target 必填已存 Key，model 为实际模型名（不是公开别名，1..256 UTF-8 字节，无首尾空白/控制/格式字符）；protocol 为上述三协议；省略、空值或 inherit 删除覆盖，恢复动态继承 Key 默认值；不修改模型映射 |
 | key-delete / key-reset | target 与 approve 必填；delete 在同一事务删除指定 Key、秘密和对应模型来源：共享来源列表只移除该 Key，来源耗尽才移除候选；保留其他 Key／供应商提供的同名模型。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免意外转为匿名。仅失去全部候选时删除公开模型；已启用 Binding 默认模型引用仍返回409 referenced并整体回滚。受影响模型 revision 加一，失去本供应商候选时清理其价格，供应商 revision 加一；reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
+| key-reset-all | 2026-10-30 当前源码未发布；id、当前 revision 与 approve 必填，不接受非空 target。一次清除当前供应商全部已存 Key 在该配置版本的内存失败计数、错误分数、冷却限制及最近测试；不修改密钥、协议、enabled、供应商 revision 或其他供应商。无已存 Key 时成功返回空工作台；重复执行安全。输出为恢复后的 workspace；版本过期返回409，未批准或携带 target 返回400，管理错误非零退出。上游凭据真正失效时仍需更新 Key；GUI 在列表与详情有异常 Key 时显示「恢复所有 Key」，确认后复用同一核心动作。写入结果未知须先重新读取，不自动重放。 |
 | strategy | 默认 round-robin，另可 priority；前者在可用 Key 中轮询，后者按 Key ID 顺序；都跳过停用或冷却 Key |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/降权 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
 | model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段不参与运行时加权／低价策略，但参与桌面「按倍率」快速排序。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
@@ -822,7 +824,7 @@ anchor recover [--id ID]
 | 桌面实时快速测试 | provider models --id ID --revision N --key KEY；provider test --id ID --revision N --target KEY --model MODEL --approve | 弹窗先按 Key 查可用模型，在当前页显示临时流式文本；开始／轮询／停止为桌面展示生命周期，无新增 CLI 子命令。CLI test 继续同步返回原有 Probe，语法／输出／退出码不变 |
 | 应用 API 端口、LAN 与调用 Key | api settings/configure/keys/issue/revoke；设置 → API 服务 | 独立监听默认关闭／17862；监听保存后重启生效，Key 管理即时生效；日志按 access_key 区分 |
 | 模型推理与模型目录数据面 | HTTP 三协议网关；provider test | 数据面供 Agent 调用，CLI test 仅最小诊断请求 |
-| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／Key 默认收起后置，渠道始终按保存顺序展示并可拖动；快速倍率排序含隐藏模型倍率，未知后置；低延迟排序经确认对可用渠道各测一次首字时间。CLI 用 model routing 保存顺序、provider test 测试；无专用一键排序命令。冷却设置见 settings key-cooldown（§16） |
+| 供应商／Key 启停、多 Key 与恢复 | provider put；provider workspace/key-put/key-delete/key-reset/key-reset-all/strategy；settings key-cooldown | 供应商 enabled 与 Key 的 key-put --disabled／默认 enabled 独立控制；key-reset-all 一次恢复当前供应商所有 Key 的健康状态，保持启停设置；GUI 列表／详情直接展示供应商开关，Key 页独立开关；模型映射按限定来源显示当前可用／不可用／待确认及无有效渠道警示；不可用模型／Key 默认收起后置，渠道始终按保存顺序展示并可拖动；快速倍率排序含隐藏模型倍率，未知后置；低延迟排序经确认对可用渠道各测一次首字时间。CLI 用 model routing 保存顺序、provider test 测试；无专用一键排序命令。冷却设置见 settings key-cooldown（§16） |
 | 平台自动识别与列表余额（首次识别持久缓存为当前源码未发布增量） | provider detect-platform/balance-summary；platform-put 默认 auto | 创建时自动识别一次并持久缓存成功或失败，旧供应商首次查询补齐；GUI「重新探测」与 detect-platform 才更新识别。余额／倍率数据按既有策略刷新，切页复用上次余额。NewAPI 金额按站点比例换算，JSON单位可能由quota变为USD/CNY，详见平台兼容查询 |
 | 平台配置、账户余额与 Key 额度 | provider platform/platform-put/balance/key-quota | desktop.22 GUI「供应商 → 账户与余额」同等操作，复用核心兼容层；账单由 CLI 提供，当前源码 GUI 已接入分组倍率；额度保留原始单位。desktop.57 dev GUI 已发布：供应商详情／新增模型步骤识别 NewAPI 后直接输入用户令牌，保存后自动以新 revision 查询倍率（effective-rate），无需手选平台／替换模式；沿用既有命令 |
 | 模型参考能力与估算 | catalog providers/models/model/estimate | 核心和桌面方法、映射设置及显式默认值导入、日志逐请求比价与价格缓存维护已随 desktop.57 交付，详见§6、§12、§13 |
