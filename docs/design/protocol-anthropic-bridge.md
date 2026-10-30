@@ -20,7 +20,7 @@
 
 Messages 上游的明文 thinking 在 Responses 客户端返回为独立 reasoning summary，在 Chat 客户端返回为 reasoning_content；普通与流式路径一致。每次出现此转换，诊断记录 `anthropic_thinking_plaintext` 和 degraded。签名不会被标为 OpenAI encrypted_content，也不会混进正文或诊断。
 
-这是明文展示转换，无法保留 Anthropic 的签名验证和推理历史连续性。带签名的 Messages 历史、redacted_thinking、不透明历史密文、Responses／Chat 明文思考回放到 Messages 继续拒绝；不能把本轮输出支持理解为签名历史的跨协议往返。thinking／budget_tokens／output_config 等专有请求参数继续仅原生保留，不按模型名猜测预算或改写强度。引用注解、图片、音频、文件和托管工具也不在本轮跨协议支持范围。
+这是明文展示转换，无法保留 Anthropic 的签名验证和推理历史连续性。带签名的 Messages 历史、redacted_thinking、不透明历史密文、Responses／Chat 非空明文思考回放到 Messages 继续拒绝；不能把本轮输出支持理解为签名历史的跨协议往返。thinking／budget_tokens／output_config 等专有请求参数继续仅原生保留，不按模型名猜测预算或改写强度。引用注解、图片、音频、文件和托管工具也不在本轮跨协议支持范围。
 
 ## 流式与用量
 
@@ -39,3 +39,22 @@ Messages → 其他协议分别跟踪文本、thinking 和工具块，校验索�
 - [cc-switch ddcb111：Messages 流状态](https://github.com/farion1231/cc-switch/blob/ddcb111765be66ed9e7e43e240497fd2c9576688/src-tauri/src/proxy/providers/streaming_codex_anthropic.rs)：块生命周期、开始帧工具参数回退与用量合并。
 
 本轮没有采用参考项目的思考签名载体、模型名称预算推断、托管工具扩展或恢复机制。验收使用协议测试和隔离 HTTP 模拟上游，覆盖普通／流式两轮工具闭环、安全诊断和拒绝边界；实际命令和结果见任务记录。未调用真实付费上游、未修改 Agent 配置，也未声称 Claude 官方服务或任一中转站已通过实测。
+
+## OpenAI 请求选项规范化（2026-10-31，当前源码未发布）
+
+此前 Messages 目标仅准备工具映射，Responses 的顶层选项随后直接进入共用消息编码器；普通文本声明、传输元数据等也可能被笼统归为 `request_content`。现在由 `anthropic_egress.go` 先执行目标专属校验，再复用消息编码和工具映射；错误码仍为既有 candidate_conversion_unsupported，固定类别区分真实内容和选项问题，不输出用户字段或原文。
+
+| 选项／历史 | 当前行为 |
+| --- | --- |
+| Responses text.format.type=text／Chat response_format.type=text | 规范化为 Messages 默认文本输出；空对象／null 不改变行为。结构化输出、verbosity 或未知格式约束以 text_format 拒绝 |
+| reasoning.effort=none／Chat reasoning_effort=none | 明确发送 thinking.type=disabled；其他强度以 reasoning_options 拒绝，不按模型名选择预算或假装已映射 |
+| reasoning.summary=auto／concise／detailed | Messages 没有同等样式选择器，省略并记录 reasoning_summary_style；未知值拒绝 |
+| Responses client_metadata | 仅接受字符串映射，省略非空值并记录 client_metadata_omitted；不转发、改装为 metadata 或写入日志 |
+| stream_options.reasoning_summary_delivery=sequential_cutoff | 省略并记录 reasoning_summary_delivery；未知选项／值拒绝，不转发 Responses SSE 选项 |
+| include=[reasoning.encrypted_content] | 可选返回投影不发送，记录 encrypted_reasoning_projection；不生成或丢弃已有密文，未知 include 拒绝 |
+| truncation=disabled | 等价于不自动截断；auto／未知值以 truncation 拒绝 |
+| 空 reasoning 历史项 | 校验既有字段及 summary/content part 结构后，不生成 Messages 内容块；非空明文以 reasoning_history 拒绝，非空／非法密文以 encrypted_reasoning_history 拒绝 |
+
+空／null 传输选项不产生降级；原生请求仍保留上述字段。每个 Attempt 独立处理私有副本，失败候选不污染下一次准备；不清理客户端历史、不触发额外请求或重试。此修复不扩展多模态、签名思考、结构化输出或任意推理强度支持，也不等于运行中的桌面核心已升级。
+
+验证包括协议选项／拒绝边界、原生保留与候选隔离，以及本地模拟 HTTP 上游的 Responses／Chat × 普通／流式派发、降级日志脱敏和发送前拒绝；执行结果以任务记录为准。没有请求真实付费上游或修改 Agent 配置。

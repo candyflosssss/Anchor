@@ -149,3 +149,9 @@ xAI 的 Responses `output_tokens`／Chat `completion_tokens` 可以只表示可�
 所有调用复用 `ReadUsage`：普通响应、原生和转换 SSE 的完成／用量尾帧、probe、日志、可见输出 Token 指标及参考费用。跨协议按目标已有格式编码包含式用量；**原生 JSON／SSE 仍逐字保留上游内容**，仅内部观察及记账规范化。不新增重试、模型名判断、供应商开关、CLI 或新的外部错误类别；也不扩展 Responses reasoning／密文／托管搜索工具的跨协议支持。
 
 参考本机 sub2api 对应的 [xAI 用量说明](https://github.com/Wei-Shaw/sub2api/blob/49a39b6dc1abed30fd227611e8af1108bc427610/backend/internal/pkg/xai/usage.go)和[回归样例](https://github.com/Wei-Shaw/sub2api/blob/49a39b6dc1abed30fd227611e8af1108bc427610/backend/internal/pkg/xai/usage_test.go)，在 Anchor 独立实现；不复制依赖，也不采用其按部分差额补齐的宽松策略。验证覆盖两种上游 × 三种客户端的普通／流式转换、原生保留、无名称依赖的模拟 HTTP 派发、日志 Token／参考费用与脱敏。具体执行结果见任务记录；未调用真实付费 xAI，也未打包或替换运行版本。
+
+## OpenAI → Messages 请求准备（2026-10-31，当前源码未发布）
+
+Messages 目标增加 `anthropic_egress.go` 选项适配器，在共用消息编码前校验 Responses 形状的请求。普通 text、disabled truncation、空推理历史可规范化，effort=none 显式关闭 thinking；字符串客户端元数据、已知摘要交付选项、summary 样式及可选密文返回投影按固定标签显式降级。实际推理强度、格式要求、非空推理历史和密文的拒绝分别使用既有安全类别，不再统归正文错误。具体支持及拒绝边界见 [Messages 请求选项规范化](protocol-anthropic-bridge.md#openai-请求选项规范化2026-10-31当前源码未发布)。
+
+原生路径、Session／Attempt 隔离、私有工具映射、网络与重试预算保持原契约；未知字段不做宽松过滤，不把该增量解释成 GPT 加密思考可在 Claude 上继续。没有新增管理功能或 CLI 契约。

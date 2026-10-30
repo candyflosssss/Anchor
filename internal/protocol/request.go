@@ -96,7 +96,7 @@ func ConvertRequestMapped(raw []byte, from, to string) ([]byte, *ChatMapping, er
 	var options Object
 	if to == "chat-completions" || to == "anthropic" {
 		if to == "anthropic" {
-			mapping, err = prepareMappedTools(m)
+			mapping, options, err = prepareAnthropicRequest(m)
 		} else {
 			mapping, options, err = prepareChatRequest(m)
 		}
@@ -461,14 +461,14 @@ func fromResponses(m Object, to string) (Object, error) {
 				messages = append(messages, message)
 			}
 		case "reasoning":
-			if to != "chat-completions" {
-				return nil, ErrUnsupported
-			}
 			t, err := chatHistoryReasoning(item)
 			if err != nil {
 				return nil, err
 			}
 			if t != "" {
+				if to != "chat-completions" {
+					return nil, conversionFailure("reasoning_history", ErrUnsupported)
+				}
 				messages = append(messages, Object{"role": "assistant", "content": "", "reasoning_content": t})
 			}
 		case "function_call":
