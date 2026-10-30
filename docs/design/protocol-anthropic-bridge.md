@@ -1,6 +1,6 @@
 # Claude / Anthropic Messages 桥接
 
-2026-10-29 当前源码，未打包／未发布。沿用 `/v1/messages`、`/v1/responses` 和 `/v1/chat/completions`，不新增协议、管理开关或 CLI。总边界见[请求级协议翻译层](protocol-translation.md)；供应商协议仍通过[现有 CLI](../cli/commands.md)选择。
+2026-10-31，已随 desktop.76 dev 发布。沿用 `/v1/messages`、`/v1/responses` 和 `/v1/chat/completions`，不新增协议、管理开关或 CLI。总边界见[请求级协议翻译层](protocol-translation.md)；供应商协议仍通过[现有 CLI](../cli/commands.md)选择。
 
 ## 请求和工具
 
@@ -40,7 +40,9 @@ Messages → 其他协议分别跟踪文本、thinking 和工具块，校验索�
 
 本轮没有采用参考项目的思考签名载体、模型名称预算推断、托管工具扩展或恢复机制。验收使用协议测试和隔离 HTTP 模拟上游，覆盖普通／流式两轮工具闭环、安全诊断和拒绝边界；实际命令和结果见任务记录。未调用真实付费上游、未修改 Agent 配置，也未声称 Claude 官方服务或任一中转站已通过实测。
 
-## OpenAI 请求选项规范化（2026-10-31，当前源码未发布）
+<a id="openai-请求选项规范化2026-10-31当前源码未发布"></a>
+
+## OpenAI 请求选项规范化（2026-10-31，desktop.76 dev 已发布）
 
 此前 Messages 目标仅准备工具映射，Responses 的顶层选项随后直接进入共用消息编码器；普通文本声明、传输元数据等也可能被笼统归为 `request_content`。现在由 `anthropic_egress.go` 先执行目标专属校验，再复用消息编码和工具映射；错误码仍为既有 candidate_conversion_unsupported，固定类别区分真实内容和选项问题，不输出用户字段或原文。
 
@@ -55,6 +57,6 @@ Messages → 其他协议分别跟踪文本、thinking 和工具块，校验索�
 | truncation=disabled | 等价于不自动截断；auto／未知值以 truncation 拒绝 |
 | 空 reasoning 历史项 | 校验既有字段及 summary/content part 结构后，不生成 Messages 内容块；非空明文以 reasoning_history 拒绝，非空／非法密文以 encrypted_reasoning_history 拒绝 |
 
-空／null 传输选项不产生降级；原生请求仍保留上述字段。每个 Attempt 独立处理私有副本，失败候选不污染下一次准备；不清理客户端历史、不触发额外请求或重试。此修复不扩展多模态、签名思考、结构化输出或任意推理强度支持，也不等于运行中的桌面核心已升级。
+空／null 传输选项不产生降级；原生请求仍保留上述字段。每个 Attempt 独立处理私有副本，失败候选不污染下一次准备；不清理客户端历史、不触发额外请求或重试。此修复不扩展多模态、签名思考、结构化输出或任意推理强度支持，已随 desktop.76 投放；已有安装仍需通过在线更新安装新版核心。
 
 验证包括协议选项／拒绝边界、原生保留与候选隔离，以及本地模拟 HTTP 上游的 Responses／Chat × 普通／流式派发、降级日志脱敏和发送前拒绝；执行结果以任务记录为准。没有请求真实付费上游或修改 Agent 配置。

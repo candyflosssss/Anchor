@@ -150,7 +150,9 @@ xAI 的 Responses `output_tokens`／Chat `completion_tokens` 可以只表示可�
 
 参考本机 sub2api 对应的 [xAI 用量说明](https://github.com/Wei-Shaw/sub2api/blob/49a39b6dc1abed30fd227611e8af1108bc427610/backend/internal/pkg/xai/usage.go)和[回归样例](https://github.com/Wei-Shaw/sub2api/blob/49a39b6dc1abed30fd227611e8af1108bc427610/backend/internal/pkg/xai/usage_test.go)，在 Anchor 独立实现；不复制依赖，也不采用其按部分差额补齐的宽松策略。验证覆盖两种上游 × 三种客户端的普通／流式转换、原生保留、无名称依赖的模拟 HTTP 派发、日志 Token／参考费用与脱敏。具体执行结果见任务记录；未调用真实付费 xAI，也未打包或替换运行版本。
 
-## OpenAI → Messages 请求准备（2026-10-31，当前源码未发布）
+<a id="openai--messages-请求准备2026-10-31当前源码未发布"></a>
+
+## OpenAI → Messages 请求准备（2026-10-31，desktop.76 dev 已发布）
 
 Messages 目标增加 `anthropic_egress.go` 选项适配器，在共用消息编码前校验 Responses 形状的请求。普通 text、disabled truncation、空推理历史可规范化，effort=none 显式关闭 thinking；字符串客户端元数据、已知摘要交付选项、summary 样式及可选密文返回投影按固定标签显式降级。实际推理强度、格式要求、非空推理历史和密文的拒绝分别使用既有安全类别，不再统归正文错误。具体支持及拒绝边界见 [Messages 请求选项规范化](protocol-anthropic-bridge.md#openai-请求选项规范化2026-10-31当前源码未发布)。
 

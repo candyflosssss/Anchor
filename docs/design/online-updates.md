@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-10-27。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.75](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.75)，发布于 `2026-10-27T01:33:20+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1904c21562393d097b8b0c3ba29e2188feb67b97`、SOURCE dirty=false。
-- 内置 mihomo 节点可查看实际运行端口并设置固定监听端口；留空或 0 自动分配，CLI 同步支持 `proxy put --listen-port`。首次启动状态库 schema9→10，旧核心不能打开升级后的数据库。
+- 更新：2026-10-31。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.76](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.76)，发布于 `2026-10-31T02:09:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c4479303ab22c6fb25e8395e0b86ebced0a10630`、SOURCE dirty=false。
+- 修复 OpenAI → Claude 的请求选项准备：普通文本、Codex 已知传输选项与空推理历史可正确处理；不能映射的推理强度、非空历史密文及格式约束返回具体类别。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .76 在线投放（2026-10-31）
+
+修复 OpenAI → Claude 的请求选项准备：普通文本、Codex 已知传输选项与空推理历史可正确处理；不能映射的推理强度、非空历史密文及格式约束返回具体类别。沿用 schema10。 两平台安装包、runtime、CLI 与清单同版投放；11 附件远端摘要及 Linux 三条默认源下载通过。仅投放，未安装或原生验收；详见[发行记录](../release/desktop.md#claude-options-76)。
 
 ## .75 在线投放（2026-10-27）
 

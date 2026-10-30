@@ -1,10 +1,29 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-27。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.75](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.75)，发布于 `2026-10-27T01:33:20+09:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1904c21562393d097b8b0c3ba29e2188feb67b97`、SOURCE dirty=false。
-- 内置 mihomo 节点可查看实际运行端口并设置固定监听端口；留空或 0 自动分配，CLI 同步支持 `proxy put --listen-port`。首次启动状态库 schema9→10，旧核心不能打开升级后的数据库。
+- 更新：2026-10-31。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.76](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.76)，发布于 `2026-10-31T02:09:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c4479303ab22c6fb25e8395e0b86ebced0a10630`、SOURCE dirty=false。
+- 修复 OpenAI → Claude 的请求选项准备：普通文本、Codex 已知传输选项与空推理历史可正确处理；不能映射的推理强度、非空历史密文及格式约束返回具体类别。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="claude-options-76"></a>
+
+## OpenAI → Claude 请求选项修复 .76（已发布 dev）
+
+修复 OpenAI → Claude 的请求选项准备：普通文本、Codex 已知传输选项与空推理历史可正确处理；不能映射的推理强度、非空历史密文及格式约束返回具体类别。沿用 schema10。 effort=none 显式映射 thinking.type=disabled；客户端元数据、已知摘要交付选项和可选密文返回投影在校验后按固定标签记录降级。未知字段、实际推理强度及非空推理历史不做静默丢弃。详细支持范围见[Messages 桥接](../design/protocol-anthropic-bridge.md#openai-请求选项规范化2026-10-31当前源码未发布)。同版包含 .75 后主线已提交的 Claude namespace／custom 工具桥接、供应商全部 Key 恢复入口与 Grok 独立推理用量修复。
+
+版本 `0.1.0-dev.desktop.76` 于 `2026-10-31T02:09:18+08:00` 发布，构建提交 `c4479303ab22c6fb25e8395e0b86ebced0a10630`，输入摘要 `aa016f1419472bf8df2d73bbe8ee5077917d76ca558294453e130bc339c209f6`；从独立干净 worktree 构建，未纳入原工作区其他未提交改动。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.76_amd64.deb` | 29270036 | `3cdf340390ba3b28ef87faa8df4d9f632ca828464cc3a874380867112a9575e2` |
+| `Anchor-Desktop-0.1.0-dev.desktop.76-windows-amd64-setup.exe` | 31287130 | `1594930fa59c90681760ecabb7f0114d4d8479d2dc83c2d5f6e10166001dd77e` |
+
+复用功能阶段协议包全测、Responses／Chat × 普通／流式 HTTP 模拟上游及既有工具闭环验证；本轮完成 Go／TS 契约检查、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译、NSIS 和 deb 打包。11 附件包含两平台安装包、runtime、CLI、两份更新清单、含 Go vendor 与固定 mihomo 对应源码的归档、许可／构建元数据及校验清单。嵌入资源、deb 载荷／runtime、源码输入摘要与 ZIP CRC 通过。
+
+默认 dev 源在隔离数据目录实际下载 Linux runtime、旧客户端兼容 deb 与独立 CLI，版本／平台／字节／SHA256及运行程序版本通过；Windows 安装器、runtime 与 CLI 的 GitHub digest 与本地匹配。证据位于 `dist/desktop/0.1.0-dev.desktop.76/publication/`；BUILD.json 保留构建时未发布与未原生验收事实。
+
+仅在线投放，未安装或修改真实实例／Agent 配置；双平台原生窗口、安装器和真实 SSH 升级未验收。应用内选择 dev 即可更新。
 
 <a id="mihomo-ports-75"></a>
 
