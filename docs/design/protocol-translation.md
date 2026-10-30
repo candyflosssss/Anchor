@@ -137,3 +137,15 @@ AttemptOptions.ClientMetadata 只接受类型化的 AnthropicVersion/AnthropicBe
 Messages 上游明文 thinking 转为 Responses reasoning summary／Chat reasoning_content，单独标记 anthropic_thinking_plaintext 降级，签名不伪装成 OpenAI 密文。带签名历史、redacted thinking、反向无签名思考和专有请求预算继续拒绝，不承诺思考历史跨协议往返。grammar 描述降级扩展到 Messages，既有安全类别和日志入口复用。
 
 跨协议 Messages 流校验块类型、索引和关闭边界，必须有有效 message_delta 和 message_stop；非空 content_block_start.input 在没有参数增量时于块关闭回退，参数增量仍优先。原生和转换流均逐字段合并 usage，保留前帧缓存用量；原生事件及载荷不变。重试预算、网络职责与原有资源上限保持。
+
+## Grok / xAI 独立推理用量（2026-10-30，当前源码未发布）
+
+xAI 的 Responses `output_tokens`／Chat `completion_tokens` 可以只表示可见输出，`reasoning_tokens` 独立计数。例如输入32、可见输出9、推理94、总数135；此前 `ReadUsage` 因推理大于输出将整份用量判成未知，导致原生日志／费用缺失、跨协议输出缺少 usage，Messages 转换还可能报 missing_usage 或流式错误。
+
+协议层现在统一为“输出包含推理”的内部 Usage，且只接受明确的结构证据：输入、输出、推理及 total_tokens 均通过既有非负整数与范围校验，推理大于0，且 `total_tokens == input + output + reasoning`。满足时内部输出为103，推理详情仍为94、可见输出仍为9；推理小于可见输出、可见输出为0时也适用。已采用包含式输出的 OpenAI 回包（`total_tokens == input + output`）不再相加；规范化后重新编码／读取不会重复计数。
+
+缺失／null／字符串／小数／负数／超限 total_tokens 或只匹配部分差额时不猜测、不修补。若未经规范化的推理仍大于输出，沿用未知用量；其他已有合法用量的判定不扩展为全面 total 校验。缓存读写与显式零／未知区分保持，Anthropic 自身用量及缓存口径不变。
+
+所有调用复用 `ReadUsage`：普通响应、原生和转换 SSE 的完成／用量尾帧、probe、日志、可见输出 Token 指标及参考费用。跨协议按目标已有格式编码包含式用量；**原生 JSON／SSE 仍逐字保留上游内容**，仅内部观察及记账规范化。不新增重试、模型名判断、供应商开关、CLI 或新的外部错误类别；也不扩展 Responses reasoning／密文／托管搜索工具的跨协议支持。
+
+参考本机 sub2api 对应的 [xAI 用量说明](https://github.com/Wei-Shaw/sub2api/blob/49a39b6dc1abed30fd227611e8af1108bc427610/backend/internal/pkg/xai/usage.go)和[回归样例](https://github.com/Wei-Shaw/sub2api/blob/49a39b6dc1abed30fd227611e8af1108bc427610/backend/internal/pkg/xai/usage_test.go)，在 Anchor 独立实现；不复制依赖，也不采用其按部分差额补齐的宽松策略。验证覆盖两种上游 × 三种客户端的普通／流式转换、原生保留、无名称依赖的模拟 HTTP 派发、日志 Token／参考费用与脱敏。具体执行结果见任务记录；未调用真实付费 xAI，也未打包或替换运行版本。

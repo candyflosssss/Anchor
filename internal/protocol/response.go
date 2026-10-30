@@ -48,6 +48,13 @@ func ReadUsage(m Object, p string) Usage {
 		r.ReasoningKnown = true
 		r.Reasoning = num(details["reasoning_tokens"])
 	}
+	// xAI can report visible output and reasoning separately. Normalize only
+	// when the reported total proves that exact split; OpenAI-style inclusive
+	// output must not count reasoning twice. Never infer this from model names
+	// or repair missing/inconsistent totals by guessing a token count.
+	if p != "anthropic" && r.Reasoning > 0 && validToken(u["total_tokens"]) && num(u["total_tokens"]) == r.Input+r.Output+r.Reasoning {
+		r.Output += r.Reasoning
+	}
 	if r.Reasoning > r.Output {
 		return Usage{}
 	}
