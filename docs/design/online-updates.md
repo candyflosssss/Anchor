@@ -1,10 +1,14 @@
 # 在线更新 v1
 
 - 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.78](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.78)，发布于 `2026-11-01T02:58:13+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `2dceb77b44d6c513ee86655ffbee59f33f3d34bd`、SOURCE dirty=false。
-- 修复正常 Codex 请求继续被 Anthropic text_format／reasoning_options 拒绝的问题：low／medium／high／xhigh／max 同名映射 output_config.effort，已知 verbosity 记录样式降级。沿用 schema10。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.79](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.79)，发布于 `2026-11-01T04:12:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `8f2a808d592a3610fda6f5da164904362b36f62a`、SOURCE dirty=false。
+- 修复 Codex 会话中 user 后再次出现 developer 指令时，Anthropic 转换在本地以 request_content 拒绝的问题；保留全部文本，后置指令提升为顶层 system 时明确记录作用域降级。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .79 在线投放（2026-11-01）
+
+修复后置 developer 指令导致 Anthropic request_content 拒绝；实际会话输入已在本地离线复现并通过修复验证，指令和用户正文保留，作用域扩大明确降级。11附件远端摘要、tag 和非 latest 通过，默认 dev 源 Linux runtime／旧客户端 deb／CLI 三条真实下载与版本／大小／SHA256 校验通过。未安装或请求真实上游，详见[发行记录](../release/desktop.md#claude-instructions-79)。
 
 ## .78 在线投放（2026-11-01）
 

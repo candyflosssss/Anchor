@@ -5,19 +5,19 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.78**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.79**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.78 已发布为 GitHub prerelease**，修复正常 Codex 的推理强度和 verbosity 仍被 Anthropic 候选拒绝的问题；保留强度，样式要求显式降级。设置 → 在线更新 → dev 获取；实际核心需升至 .78。沿用 schema10，详见[构建与发布记录](docs/release/desktop.md#claude-controls-78)。
+**desktop.79 已发布为 GitHub prerelease**，修复 Codex 会话中途 developer 指令导致 Anthropic request_content 拒绝；实际会话输入已离线复现并验证文本保留。设置 → 在线更新 → dev 获取；实际核心需升至 .79。沿用 schema10，详见[构建与发布记录](docs/release/desktop.md#claude-instructions-79)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.78/Anchor-Desktop-0.1.0-dev.desktop.78-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.78/anchor-desktop_0.1.0-dev.desktop.78_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.78)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.79/Anchor-Desktop-0.1.0-dev.desktop.79-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.79/anchor-desktop_0.1.0-dev.desktop.79_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.79)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -107,7 +107,7 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 ### 在线更新（desktop.76 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认源已发布 `0.1.0-dev.desktop.78` 两平台安装器、runtime、CLI 和更新清单，包含 GPT → Claude 选项转换与安全诊断修复；三条默认源下载及 11 附件摘要通过。首次启动迁移至 schema10，升级前备份实例目录并配套更新核心、桌面与 CLI；本轮仅在线投放。详见[发行记录](docs/release/desktop.md#claude-options-76)。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认源已发布 `0.1.0-dev.desktop.79` 两平台安装器、runtime、CLI 和更新清单，包含 GPT → Claude 选项转换与安全诊断修复；三条默认源下载及 11 附件摘要通过。首次启动迁移至 schema10，升级前备份实例目录并配套更新核心、桌面与 CLI；本轮仅在线投放。详见[发行记录](docs/release/desktop.md#claude-options-76)。
 
 **desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.76` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema10，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
 

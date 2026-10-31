@@ -1,10 +1,31 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.78](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.78)，发布于 `2026-11-01T02:58:13+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `2dceb77b44d6c513ee86655ffbee59f33f3d34bd`、SOURCE dirty=false。
-- 修复正常 Codex 请求继续被 Anthropic text_format／reasoning_options 拒绝的问题：low／medium／high／xhigh／max 同名映射 output_config.effort，已知 verbosity 记录样式降级。沿用 schema10。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.79](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.79)，发布于 `2026-11-01T04:12:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `8f2a808d592a3610fda6f5da164904362b36f62a`、SOURCE dirty=false。
+- 修复 Codex 会话中 user 后再次出现 developer 指令时，Anthropic 转换在本地以 request_content 拒绝的问题；保留全部文本，后置指令提升为顶层 system 时明确记录作用域降级。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="claude-instructions-79"></a>
+
+## Codex 会话后置指令修复 .79（已发布 dev）
+
+03:58 的真实失败请求由 .78 核心处理，类别为 request_content。对应 Codex 0.163 本机会话是 developer → user → developer → user；旧编码器在会话内容之后遇到 system／developer 就拒绝。使用该会话的四条实际输入做本地无网络转换，修复前复现同类失败，修复后转换与逐条文本保留检查通过。请求顶层控制项为合成设置，未取得完整线上原始请求，不冒充完整 HTTP 请求重放或真实上游验收。私有输入没有打印、提交或随包发布。
+
+修复 Codex 会话中 user 后再次出现 developer 指令时，Anthropic 转换在本地以 request_content 拒绝的问题；保留全部文本，后置指令提升为顶层 system 时明确记录作用域降级。沿用 schema10。 system／developer 保持原相对顺序接在既有 instructions 后；非空后置指令记录 instruction_scope_hoisted，说明作用范围扩大，不宣称逐位置权限／时序完全等价。原生候选保留原位置；前缀与空后置内容不产生此降级。前版 effort／verbosity 支持与未知字段、非文本内容、历史密文拒绝边界保持，见 [Messages 桥接](../design/protocol-anthropic-bridge.md#会话中的后置指令2026-11-01当前源码未发布)。
+
+从干净隔离 worktree 的 `8f2a808d592a3610fda6f5da164904362b36f62a` 构建，SOURCE dirty=false，输入摘要 `b551d51edef7a0b075a1c49629e0392ac8a9096d244f2ba5a89f44f101178fca`；未纳入主工作区其他未提交内容。于 `2026-11-01T04:12:18+08:00` 发布为 dev prerelease，非 latest。产物和验证证据位于 `dist/desktop/0.1.0-dev.desktop.79/`。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.79_amd64.deb` | 29273296 | `9038421e7c86ac4e5601d10459623d729fb8367426b046d9a9a0f2664c23d8c3` |
+| `Anchor-Desktop-0.1.0-dev.desktop.79-windows-amd64-setup.exe` | 31290421 | `d1228c7cd7ec27b29b9daa1c3cd2245b1a593637f7655a258e0868a52fb5ed33` |
+
+修复验证包括实际会话输入的无网络转换与逐条文本保留、协议包全测、前缀／中途／空 system／developer 及原生候选隔离、24组带后置指令的普通／流式网关组合，以及两轮 custom 工具闭环。本轮 Go／TS 契约、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译、NSIS 和 deb 打包完成；未扩大为全仓库／race／浏览器验收。
+
+11 项同版附件包括两平台安装包、runtime、CLI、两个更新清单、Go vendor 与固定 mihomo 对应源码／vendor、许可元数据和 SHA256SUMS。嵌入前端／mihomo、deb 与 runtime 一致、源码输入摘要、本地哈希、metadata ZIP CRC 及 GitHub 全部远端大小／digest 通过；tag 指向构建提交并保持非 latest。默认 dev 源在隔离目录实际下载 Linux runtime、旧客户端兼容 deb 与 CLI，版本／平台／大小／SHA256 及运行程序版本通过；Windows 安装器／runtime／CLI 远端摘要与本地一致。
+
+仅在线投放，未安装、重启或修改真实实例／Agent 配置；实际处理请求的核心需升级至 .79，SSH 被控机需单独更新。离线输入通过不等于真实上游响应或用户会话已验收。未请求付费上游，双平台原生窗口、系统安装器及真实 SSH 升级未验收，BUILD.json 保留原始构建状态。证据见 publication 下 preparation-verification.json、publication-verification.json 和 online-verification.json。
 
 <a id="claude-controls-78"></a>
 

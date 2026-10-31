@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-11-01
+- 2026-11-01 已随 desktop.79 dev 同版投放：Responses／Chat 的后置 system／developer 指令按序合并至 Messages 顶层 system，保留文本并记录 instruction_scope_hoisted；修复真实会话的 request_content 拒绝。无新增命令参数，实际核心需更新至 .79，详见[发行记录](../release/desktop.md#claude-instructions-79)。
 - 2026-11-01 已随 desktop.78 dev 同版投放：Responses／Chat 的 low／medium／high／xhigh／max 同名映射 Anthropic output_config.effort，已知 verbosity 显式降级；修复正常客户端 text_format／reasoning_options 拒绝。无新增命令或参数，实际核心需更新至 .78，详见[发行记录](../release/desktop.md#claude-controls-78)。
 - 2026-11-01 已随 desktop.77 dev 同版投放：Responses／Chat → Anthropic 校验并省略字符串 prompt_cache_key，显式记录缓存亲和提示降级，修复 request_fields 拒绝。无新增命令或参数；安装后运行核心才生效，独立公开 alpha.6 不含。详见[发行记录](../release/desktop.md#claude-cache-key-77)。
 - 2026-10-31 desktop.76 dev 已发布：同版 CLI／runtime 包含 OpenAI → Claude 请求选项适配和具体拒绝类别；本次请求选项修复不新增命令或参数；已实现的供应商全部 Key 恢复入口及 Grok 用量修复随包交付。
