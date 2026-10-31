@@ -1,10 +1,31 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.77](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.77)，发布于 `2026-11-01T01:44:00+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `4bf86e9cf88f5dea432af0a7e36b0a14708c7c1f`、SOURCE dirty=false。
-- 修复 Codex 携带 prompt_cache_key 时 Anthropic 候选在本地被 request_fields 拒绝的问题；校验后省略缓存亲和提示并明确记录降级。沿用 schema10。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.78](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.78)，发布于 `2026-11-01T02:58:13+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `2dceb77b44d6c513ee86655ffbee59f33f3d34bd`、SOURCE dirty=false。
+- 修复正常 Codex 请求继续被 Anthropic text_format／reasoning_options 拒绝的问题：low／medium／high／xhigh／max 同名映射 output_config.effort，已知 verbosity 记录样式降级。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="claude-controls-78"></a>
+
+## 正常 Codex 强度与文本样式修复 .78（已发布 dev）
+
+本机实际运行核心已是 .77。2026-11-01 02:44 的失败日志分别为 text_format 与 reasoning_options，记录强度为 low 和 xhigh。缓存键修复只让请求越过第一层检查，原有仅 effort=none 的测试未覆盖正常组合。日志没有完整请求，不将后续合成回归描述为用户原会话重放。
+
+修复正常 Codex 请求继续被 Anthropic text_format／reasoning_options 拒绝的问题：low／medium／high／xhigh／max 同名映射 output_config.effort，已知 verbosity 记录样式降级。沿用 schema10。 强度映射与既有供应商对话测试入口一致，不降低 xhigh、不猜 token 预算、不额外开启 thinking。仅 verbosity 的 low／medium／high 校验后省略并记录 text_verbosity_omitted；原生字段保留，非法值、结构化格式、未映射强度和历史密文的拒绝边界保持。当前能力见 [Messages 桥接](../design/protocol-anthropic-bridge.md#正常-codex-强度与文本样式2026-11-01当前源码未发布)。
+
+从干净隔离 worktree 的 `2dceb77b44d6c513ee86655ffbee59f33f3d34bd` 构建，SOURCE dirty=false，输入摘要 `e282e23551f06eced1062d511693c4406eed9405a47590ed9b34d283ced441c9`；未纳入主工作区其他未提交改动。于 `2026-11-01T02:58:13+08:00` 发布为 dev prerelease，非 latest。产物及证据位于 `dist/desktop/0.1.0-dev.desktop.78/`。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.78_amd64.deb` | 29271804 | `a5f81ae00c5dab14433855a548d2c66ebb9b424a7d52d39e33831ba094d9beeb` |
+| `Anchor-Desktop-0.1.0-dev.desktop.78-windows-amd64-setup.exe` | 31292701 | `d6036d526300e923a94fdf3f0d5c9110fd284385cff0153718f8598beac65ca2` |
+
+修复前 low／xhigh＋verbosity 组合可复现 text_format 拒绝；修复后协议包全测、36 组协议选项、24 组 Responses／Chat 普通／流式网关组合、xhigh＋verbosity 两轮 custom 工具闭环，以及直接相关强度／候选隔离回归通过。两个旧测试的“high 必须拒绝”断言按新契约改用仍不支持的 minimal。本轮 Go／TS 契约、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译、NSIS 和 deb 打包完成，没有扩大为全仓库／race／浏览器验收。
+
+11 项附件同版包括安装包、runtime、CLI、两个更新清单、Go vendor 与固定 mihomo 对应源码／vendor、许可／构建元数据及 SHA256SUMS。嵌入前端／mihomo、deb 与 runtime 一致、源码输入摘要、本地哈希、metadata ZIP CRC 和全部 GitHub 远端大小／digest 核对通过；tag 指向构建提交，保持非 latest。默认 dev 源在隔离目录实际下载 Linux runtime、旧客户端兼容 deb 和 CLI，版本／平台／大小／SHA256 及运行程序版本通过；Windows 三项程序的远端 digest 与本地一致。证据见 publication 下 preparation-verification.json、publication-verification.json 和 online-verification.json。
+
+本轮只在线投放，没有安装、重启或修改真实实例／Agent 配置，没有请求付费上游或声称原会话已恢复。已有安装需把实际处理请求的核心升级至 .78，SSH 被控机需单独更新。原生窗口、系统安装器与真实 SSH 升级未验收，BUILD.json 保留原始构建验证状态。
 
 <a id="claude-cache-key-77"></a>
 

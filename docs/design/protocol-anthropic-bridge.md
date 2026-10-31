@@ -72,7 +72,9 @@ Responses／Chat → Messages 现在仅接受字符串或 null 的 `prompt_cache
 原生 Responses／Chat、Responses → Chat 继续保留原字段；准备 Messages 候选不会污染后续候选。非法类型仍以 `request_fields` 拒绝，其他未知字段、显式服务档位、真实推理强度、格式约束和历史密文的拒绝边界保持。回归覆盖两种客户端、普通／流式模拟 HTTP、降级诊断、日志脱敏、非法类型预派发拒绝及候选保留；实际执行情况见任务记录。已随 desktop.77 dev 投放；已有安装须通过在线更新安装新版核心。本轮未自动替换真实运行实例，也未请求真实付费上游。
 
 
-## 正常 Codex 强度与文本样式（2026-11-01，当前源码未发布）
+<a id="正常-codex-强度与文本样式2026-11-01当前源码未发布"></a>
+
+## 正常 Codex 强度与文本样式（2026-11-01，desktop.78 dev 已发布）
 
 本机运行核心确认为 desktop.77。2026-11-01 02:44 的真实失败日志已从 request_fields 变为 text_format 与 reasoning_options，所记录 effort 分别为 low 和 xhigh；日志未保存正文，因此只确认了实际类别与强度，未声称重放原始载荷。Codex 0.163 的正常请求可将 text.verbosity 与 reasoning.effort、缓存键等一起发送，原先只用 effort=none 的回归没有覆盖这组输入。实际请求无法通过后续校验，说明 desktop.77 的缓存键修复没有覆盖整个调用路径。
 
@@ -81,3 +83,5 @@ Messages 的公开 [effort 文档](https://platform.claude.com/docs/en/build-wit
 Messages 没有同等的 verbosity 字段；仅 low／medium／high 在校验后省略，记录 text_verbosity_omitted 降级。不改写提示词，不宣称等价保留了回答详略要求。空／null 不产生该降级，原生 Responses／Chat 保留原字段。未知 verbosity、结构化格式约束、minimal／default 等未映射强度，以及非空历史明文推理和密文仍明确拒绝。
 
 回归将两种入口、六种强度、三种 verbosity 与缓存／传输选项组合验证，并通过隔离 HTTP 上游检查普通／流式发送、日志降级和脱敏、非法类型拒绝、候选保留，以及 xhigh＋verbosity 的两轮 custom 工具调用。没有调用真实付费上游，也没有把模拟上游结果称为用户原会话恢复。
+
+已随 desktop.78 dev 同版投放；已有安装需更新实际处理请求的核心。两平台编译／打包及默认源下载通过，用户原会话与真实付费上游未在本轮验收。
