@@ -42,7 +42,7 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 跨协议继续使用现有 Responses 形状的内部请求桥及类型化输出；不能表达的原生字段在 Prepare 时拒绝，不把最小公共子集当成静默过滤器。下一轮工具结果通过客户端回传的声明、name/namespace、call_id 和历史调用重建映射，不依赖上次 HTTP 请求的进程内状态。碰撞、长名称与歧义身份由 Chat／Messages 共用的请求局部工具索引处理。
 
-同协议发送保留原生字段，保留原生响应字节；修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false，并应用下述原生 Responses 无效密文字段预清理与工具项 ID 规范化；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
+同协议发送保留原生字段，保留原生响应字节；修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false，并应用下述原生 Responses 无效密文字段预清理与工具项 ID 规范化；目标 Anthropic 缺省／null 输出预算时，按已保存映射的默认输出、最大输出、兼容回退4096补全必需 max_tokens；客户端显式预算保持原值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
 
 Responses／Chat → Messages 还允许校验并省略字符串 `prompt_cache_key`：非空值记录 `prompt_cache_key_omitted` 降级，空串／null 不记降级；Messages 不承诺相同的缓存亲和，不合成为 `cache_control` 或 metadata。该值不进入日志，原生 Responses／Chat 和 Responses → Chat 保留字段；非法类型、其他未知字段和显式服务档位仍按既有规则拒绝。详情见 [Messages 请求选项支持表](protocol-anthropic-bridge.md#缓存亲和提示兼容修复2026-11-01当前源码未发布)。
 
@@ -51,6 +51,8 @@ Responses／Chat → Messages 对公开强度 low／medium／high／xhigh／max 
 Responses／Chat → Messages 允许 system／developer 文本出现在会话中间：按输入相对顺序合并到顶层 system，保留 instructions 在前，不丢指令或会话正文。非空后置指令以 `instruction_scope_hoisted` 明确报告作用域扩大，前缀／空后置内容不记此项；不承诺逐位置权限语义等价。真实输入的本地无网络转换与文本保留边界见 [Messages 支持表](protocol-anthropic-bridge.md#会话中的后置指令2026-11-01当前源码未发布)。
 
 Messages 目标现对已校验的历史 reasoning 在当前 Attempt 副本中省略，以 `reasoning_history_omitted` 明确记录思考及其摘要连续性损失；assistant 的已知 phase 记录 `message_phase_omitted`。可见消息、工具调用／结果及 user／工具结果图片按限定标准转换并保留，图片精度选择器损失记录 `image_detail_omitted`；非法容器、其他不透明内容仍拒绝。原 Session、客户端历史、原生与 Responses → Chat 边界及网络／恢复预算不变。空 output_text annotations／logprobs 可规范化，非空仍拒绝。完整历史与图片保留验证见 [Messages 支持表](protocol-anthropic-bridge.md#已有会话的历史投影与图片2026-11-01当前源码未发布)。
+
+缺省 Messages 输出预算由 protocol.OutputTokenPolicy 承载保存的 Default／Maximum 声明，Session 依次选择默认输出、最大输出、旧回退4096；core 不自行改协议字段。记录 translation_max_output_tokens 和固定 translation_output_budget_source，候选隔离、无派发时不冒充发送。实际 max_tokens 结束保持 incomplete，不伪造完成或自动续写；详见 [Messages 输出预算](protocol-anthropic-bridge.md#缺省输出预算2026-11-01当前源码未发布)。
 
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
 

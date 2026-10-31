@@ -26,6 +26,12 @@ func recordTranslationDiagnostics(r *http.Request, d protocol.Diagnostics, dispa
 			labels[i] = string(label)
 		}
 		e["translation_degradations"] = strings.Join(labels, ",")
+		delete(e, "translation_max_output_tokens")
+		delete(e, "translation_output_budget_source")
+		if d.OutputTokens > 0 {
+			e["translation_max_output_tokens"] = strconv.FormatInt(d.OutputTokens, 10)
+			e["translation_output_budget_source"] = d.OutputTokenSource
+		}
 	}
 }
 

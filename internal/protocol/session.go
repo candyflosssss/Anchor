@@ -120,6 +120,7 @@ type AttemptOptions struct {
 	PublicModel string
 	// ServiceTier is explicit routing policy, never inferred from a vendor/model name.
 	ServiceTier    string
+	OutputTokens   OutputTokenPolicy
 	ClientMetadata RequestMetadata
 }
 
@@ -150,10 +151,10 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 	if o.ServiceTier != "" {
 		fields["service_tier"], _ = json.Marshal(o.ServiceTier)
 	}
-	if native && o.Protocol == "anthropic" {
-		if _, exists := fields["max_tokens"]; !exists {
-			fields["max_tokens"] = json.RawMessage("4096")
-		}
+	var outputTokens int64
+	var outputSource string
+	if o.Protocol == "anthropic" {
+		outputTokens, outputSource = prepareAnthropicOutputBudget(fields, native, o.OutputTokens)
 	}
 	if o.Protocol == "responses" {
 		fields["store"] = json.RawMessage("false")
@@ -166,7 +167,7 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 	}
 	raw, _ = json.Marshal(fields)
 	a := &Attempt{client: s.client, upstream: o.Protocol, public: o.PublicModel,
-		diagnostics: Diagnostics{Client: s.client, Upstream: o.Protocol, Stage: StageRequest, Compatibility: Full}}
+		diagnostics: Diagnostics{Client: s.client, Upstream: o.Protocol, Stage: StageRequest, Compatibility: Full, OutputTokens: outputTokens, OutputTokenSource: outputSource}}
 	if native {
 		a.body = raw
 		if o.Protocol == "anthropic" {

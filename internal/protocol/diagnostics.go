@@ -40,11 +40,13 @@ const (
 // Diagnostics contains code-owned facts only. Dispatch and HTTP delivery belong
 // to the gateway, which combines these facts with its transport observations.
 type Diagnostics struct {
-	Client, Upstream string
-	Stage            Stage
-	Category         string
-	Compatibility    Compatibility
-	Degradations     []Degradation
+	Client, Upstream  string
+	Stage             Stage
+	Category          string
+	Compatibility     Compatibility
+	Degradations      []Degradation
+	OutputTokens      int64
+	OutputTokenSource string
 }
 
 // TranslationError deliberately never renders the underlying error, which can

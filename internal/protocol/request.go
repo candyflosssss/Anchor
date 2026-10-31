@@ -395,7 +395,7 @@ func fromResponses(m Object, to string) (Object, error) {
 		}
 	}
 	if to == "anthropic" {
-		out["max_tokens"] = 4096
+		out["max_tokens"] = defaultAnthropicOutputTokens
 		if v, ok := m["max_output_tokens"]; ok {
 			out["max_tokens"] = v
 		}

@@ -72,7 +72,7 @@ DTO 由 Go 生成到 `desktop/contract.generated.ts`，共享离线样例 `deskt
 
 桌面通过 Model → Controller → View 使用这组方法。目录读取和显式刷新仅改变表单草稿：补充未设置值保留人工字段/默认值；替换草稿替换目录包含的声明并清除可能不再适用的默认思考值。保存才持久化。多个候选使用同一份设置，页面提示核对所有候选；单目录导入不能证明所有渠道真实能力。参考价格不是候选实际费用，目录刷新不后台覆盖已保存设置。
 
-Codex 的完整版本匹配目录模板仍是必要前提。生成目录时应用显式 context、text/image 输入模态/视觉、并行工具调用；effort 可以导出 none/minimal/low/medium/high/xhigh，其他或 null effort 会阻止同步，避免伪造/静默降级。非思考模型清空目录中的思考等级和默认值。模板指令与截断策略保留。toggle/budget 思考、输出预算、temperature、结构化输出等保存为能力/默认值元数据，目前不自动改写推理请求。更新目录需 `agent sync`，并重启 Agent；保存映射不热更新正在运行的会话。Agent 自动压缩策略没有添加到通用模型设置。
+Codex 的完整版本匹配目录模板仍是必要前提。生成目录时应用显式 context、text/image 输入模态/视觉、并行工具调用；effort 可以导出 none/minimal/low/medium/high/xhigh，其他或 null effort 会阻止同步，避免伪造/静默降级。非思考模型清空目录中的思考等级和默认值。模板指令与截断策略保留。toggle/budget 思考、temperature、结构化输出等继续保存为元数据。输出预算在目标为 Anthropic Messages 且客户端未指定／为null时，用已保存default_output_tokens，其次limits.output补全必需max_tokens；二者未知才回退4096，显式客户端预算保持，其他目标不注入。这是核心派发行为，不改写Codex目录或Agent文件。更新目录需 `agent sync`，并重启 Agent；保存映射不热更新正在运行的会话。Agent 自动压缩策略没有添加到通用模型设置。
 
 CLI 使用 `model settings --id ID [--file FILE]`，详见[指令大全](../cli/commands.md)。本轮验证使用隔离状态和模拟目录，没有修改真实 Agent 配置或调用真实付费上游。
 
@@ -103,3 +103,10 @@ CLI 使用 `model settings --id ID [--file FILE]`，详见[指令大全](../cli/
 2026-10-16 对照 models.dev、[OpenAI GPT-6.1 Sol 文档](https://developers.openai.com/api/docs/models/gpt-6.1-sol)与[定价页](https://developers.openai.com/api/docs/pricing)：规格 1,050,000，最大输出 128,000；输入 **>272,000**（含缓存）时整次请求切换高档，标准 USD/百万 tokens 的输入/输出/缓存读/缓存写从 2/10/0.1/2.5 变为 4/15/0.2/5。恰好 272,000 不跨档，500,000 已跨档。以上是参考规格，不硬编码模型名或收费倍数；共享离线样例为 `desktop/contract/context-pricing.json`。
 
 窗口配置本身不产生费用，`modeldev.Estimate` 按每次实际输入量选档，对整次输入、输出、缓存、思考按对应单价计算；不是只对超额部分加价，不用输出量触发输入档位。此建议不是代理的 token/费用硬限额，不修改自动压缩阈值；工具结果等仍可能超过客户端预算。供应商手工平价表和旧汇总估算不是分档账单，不能将汇总 token 数当作一条请求套档；本轮不追溯改写手工价或历史数据，也未接入逐请求实际账单。保存按既有机制同步已托管 Agent 目录，运行客户端仍需按其生命周期重载/重启；GET 不同步、不落库。
+
+
+### Messages 缺省输出预算消费（2026-11-01，当前源码未发布）
+
+已保存 default_output_tokens 是显式默认预算，limits.output 是最大能力；目标 Messages 需要 max_tokens，客户端未指定时按默认预算→最大能力→兼容4096补全，不把最大能力写回为默认预算。只读目录草稿、后台目录新鲜度和未保存导入不参与派发，不按名称猜上限，不覆盖客户端显式小／大预算。使用更高上限允许更多实际生成用量；用户需要较小默认支出边界时保存 default_output_tokens。多个候选仍须核对共享配置与真实渠道支持。
+
+当前核心对后续新请求读取已保存设置，无须为这项网关行为同步／重启Agent；其他Agent能力文件变更仍按原生命周期处理。日志详情的 translation_max_output_tokens／translation_output_budget_source 可核对准备预算，派发与完整生成状态分别看已有事实。普通／流式token截断不改为完整成功，不自动续写。

@@ -116,3 +116,14 @@ user 消息与 function/custom 工具结果中的 input_image 按标准 Messages
 对实际会话 input 做本地无网络验证：修复前复现 encrypted_reasoning_history；完整投影后逐项核对22条消息、51个调用、51个结果和7份图片，文本／参数／ID与图片解码字节均保持，后续原生 input 仍与原值一致。顶层请求控制项为合成设置，完整线上 HTTP 原请求及当前全部工具声明不可得，因此不称为完整线上请求重放；没有发送私有历史到付费上游。私有副本与临时测试不提交或打包，验证后删除。另以合成样例覆盖 malformed／unknown 拒绝、候选隔离、Chat 明文思考往返、图片顺序与非法媒体、普通／流式和工具闭环；实际执行结果见任务记录。
 
 已随 desktop.80 dev 同版投放；需升级实际处理请求的核心。真实 input 离线准备与文本／工具／图片保留、两平台打包和默认源下载通过；真实上游生成和用户会话最终结果未在本轮验收。
+
+
+## 缺省输出预算（2026-11-01，当前源码未发布）
+
+06:02 的实际请求由 desktop.80 核心处理，已成功派发并返回上游内容，但输出4096 Token后以max_tokens结束，客户端收到 incomplete_details.reason=max_output_tokens。其已保存模型配置 limits.output=128000、default_output_tokens=null。旧 Session／转换器在客户端未给预算时直接插入4096，没有消费已保存输出声明；前轮仅验证转换通过，没有覆盖真实推理输出超过4096的场景。
+
+现在目标为 Messages 时，缺省／null预算按下列顺序补全必需 max_tokens：客户端显式有效预算保持原值；否则已保存 default_output_tokens；再否则已保存 limits.output；二者都未知才保留兼容回退4096。这里 limits.output 是最大能力，在缺省预算时用作所需上限的回退，不把它登记成默认预算、不改数据库配置。客户端显式的小上限不被抬高，超出声明的大上限也不被偷偷压低；上游是否接受仍由其实际响应决定。规则适用于 Responses／Chat／Messages 三种入口到 Messages 的普通和流式请求，其他目标协议不注入。
+
+核心只向 AttemptOptions.OutputTokens 提供已保存 Default／Maximum，协议层负责字段与选择。无模型名猜测、派发时目录请求或额外上游调用。诊断新增 translation_max_output_tokens 与 translation_output_budget_source（client／model_default／model_limit／legacy_fallback），表示准备的预算，实际派发仍看 translation_dispatched；候选切换清掉旧预算事实。预算上限允许更长生成及相应实际用量，不代表请求必然用满，也不承诺回答完整。
+
+普通与流式的真实 max_tokens 结束仍编码 incomplete／max_output_tokens，不伪装 completed，不在内容已交付后自动续写或重放。回归覆盖已保存128000却发送4096的修复前复现、默认预算优先、显式小／大预算、null／未知声明、候选隔离、30组普通／流式网关组合和最终日志；未请求真实付费上游。

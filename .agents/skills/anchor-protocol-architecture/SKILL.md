@@ -43,6 +43,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 - 同协议保留受控原生路径及原生字段，不强制往返其他协议。仍执行鉴权、无状态、工具执行范围、能力校验和生命周期限制；顶层 tools 与 inline additional_tools 同样检查。
 - 原生路径允许设计契约明确列出的规范化，如路由 model／service_tier、Responses store=false、Anthropic 缺省 max_tokens；不得据此任意过滤字段。原生保留签名思考或多模态不代表跨协议支持。
 - 协议请求头只通过类型化非秘密元数据进入 Prepare，由协议层返回固定名单及副本；网关机械写入，不转发客户端认证或任意头。当前仅 Anthropic → Anthropic 保留 anthropic-version/重复 anthropic-beta；跨协议隔离，缺省版本沿用认证层默认。新增头/方向必须同步契约及认证隔离测试，不能从 beta 名称推断已支持能力。
+- Messages 必需的 max_tokens 在客户端缺省／null 时，按已保存映射的 default_output_tokens、limits.output、兼容回退4096依次选择；客户端显式上限始终保留，不擅自提高或压低。core 只投影已保存的类型化输出声明，协议层决定字段／优先级；不按模型名猜值、派发时不抓目录、不借输出最大能力伪造已知默认预算。原生／Responses／Chat 三入口到 Messages 共用该规则，目标 Responses／Chat 不注入默认预算。记录准备上限及固定来源标签，不把准备值冒充已派发；未知能力保留明确回退。max_tokens 结束继续输出 incomplete，不自动续写／重放已交付内容，也不伪装 completed。
 - 协议标准映射与供应商特性分开。不得按供应商或模型名称猜测 thinking、预算或 Token 字段；特殊行为须有已验证的显式能力配置及针对性测试，由适配器消费。
 - OpenAI 兼容用量统一采用“输出含推理”的内部口径。Responses／Chat 仅在合法整数 total_tokens 严格等于输入＋原始输出＋正数 reasoning_tokens 时，将独立推理计入输出；这是已验证的 xAI 结构兼容规则，不依赖名称或新增供应商开关。总数缺失、非法或不满足完整等式时不得按差额猜测／补齐；已有包含式用量不重复相加，reasoning 仍大于输出时保持未知。普通回包、SSE、探测及日志复用 ReadUsage，原生 JSON／SSE 不重写，Anthropic 的缓存用量口径不变。
 

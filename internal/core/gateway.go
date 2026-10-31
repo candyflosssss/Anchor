@@ -344,7 +344,7 @@ func (s *Server) forwardAttempt(w http.ResponseWriter, r *http.Request, translat
 		s.Log.Info("model request", "public_model", public, "provider", p.ID, "key_id", key.ID, "upstream_model", c.Model, "protocol", p.Protocol, "status", status, "success", success, "elapsed_ms", u.ElapsedMS, "requested_service_tier", requestedServiceTier(request), "sent_service_tier", sentTier, "fast_triggered", fastTriggered(observation.ServiceTier), "upstream_service_tier", reportedTier)
 	}()
 	var err error
-	translationAttempt, err = translation.Prepare(protocol.AttemptOptions{Protocol: p.Protocol, Model: c.Model, PublicModel: public, ServiceTier: routeModel.ServiceTier, ClientMetadata: protocol.RequestMetadata{AnthropicVersion: r.Header.Get("anthropic-version"), AnthropicBeta: r.Header.Values("anthropic-beta")}})
+	translationAttempt, err = translation.Prepare(protocol.AttemptOptions{Protocol: p.Protocol, Model: c.Model, PublicModel: public, ServiceTier: routeModel.ServiceTier, OutputTokens: modelOutputTokenPolicy(routeModel), ClientMetadata: protocol.RequestMetadata{AnthropicVersion: r.Header.Get("anthropic-version"), AnthropicBeta: r.Header.Values("anthropic-beta")}})
 	if err != nil {
 		translationFacts = protocol.ErrorDiagnostics(err)
 		reason := translationFacts.Category

@@ -569,6 +569,8 @@ anchor model settings --id ID --file FILE
 
 前置条件：选定已初始化、在线核心的 Context，使用管理凭据和正确实例身份；目标模型已存在。未提供 `--file` 时只读，返回 model_id、revision、display_name、candidate_count、configuration、reference、defaults_status、context_policy。读取会从已保存参考快照，或按所有候选上游精确 ID 自动匹配 models.dev（最多等待 8 秒）补充未设置值，作为草稿返回；不写库、不增加 revision、不同步 Agent，手工值保持不变。`defaults_status` 为 saved（保存响应/旧核心）、reference（使用已保存快照）、matched（新自动匹配）、unmatched（未找到唯一一致的条目）、unavailable（目录失败/超时/陈旧）或 incompatible（目录值与手工配置不兼容）。未匹配或失败仍返回现有配置，可重新读取重试或手工指定来源。速度变体可补基础能力，但不自动附加标准价格快照。提供文件时保存，文件为至多 1 MiB 的单个 `SaveModelSettings` JSON 对象，拒绝未知字段和多个 JSON 值，`model_id` 必须与 `--id` 完全相同。文件为本机 CLI 读取，保存作用于所选核心；不直接修改 Agent 配置。
 
+Messages 输出预算：`model settings` 保存的 `configuration.default_output_tokens` 在客户端未给输出上限时生效，其次使用已保存 `limits.output`，两者未知才保留4096；显式客户端预算不变，其他目标不注入。保存影响核心后续新请求，无须为这项网关行为同步Agent；较高上限允许更多实际生成用量。详情／导出的 `translation_max_output_tokens` 与 `translation_output_budget_source` 表示准备预算，仍须结合实际派发和generation_status判断结果。
+
 写入字段：`model_id`、当前 `expected_revision`、`display_name`、完整 `configuration`、`reference_action`、`reference_provider_id`、`reference_model_id`。configuration 中的 null/空数组表示未设置：limits.context/input/output；capabilities 的模态/视觉/附件/tool_call/reasoning/structured_output/temperature；streaming、parallel_tool_calls；supported_reasoning、default_reasoning；default_output_tokens、default_temperature。思考范围保留原生 effort/toggle/budget_tokens；默认值对应 value/enabled/budget_tokens，其他项为 null，必须在声明范围内。显示名与 configuration 是显式替换，不支持部分 patch。
 
 当前网关每个供应商／Key／候选模型通常仅尝试一次，可安全失败时切换其他Key或候选；desktop.58 已发布明确密文校验拒绝后的单次清理重试例外，规则见下文日志章节和[实施说明](../design/implementation.md#历史加密推理恢复2026-10-20当前源码未打包未发布)。Codex原生请求和流中断重试统一配置，默认5次；旧模型映射的 channel_retries 不再生效，写入该字段会报无效输入。参见下文 `agent codex-settings`。
