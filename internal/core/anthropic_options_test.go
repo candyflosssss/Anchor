@@ -15,9 +15,13 @@ import (
 )
 
 func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
-	for _, client := range []string{"responses", "chat-completions"} {
+	for _, clientEffort := range []string{
+		"responses:none", "responses:low", "responses:medium", "responses:high", "responses:xhigh", "responses:max",
+		"chat-completions:none", "chat-completions:low", "chat-completions:medium", "chat-completions:high", "chat-completions:xhigh", "chat-completions:max",
+	} {
+		client, effort, _ := strings.Cut(clientEffort, ":")
 		for _, stream := range []bool{false, true} {
-			t.Run(fmt.Sprintf("%s/stream=%t", client, stream), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s/%s/stream=%t", client, effort, stream), func(t *testing.T) {
 				f := setup(t)
 				var calls atomic.Int32
 				up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -28,8 +32,19 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 					}
 					body, _ := json.Marshal(m)
 					thinking, _ := m["thinking"].(map[string]any)
-					if r.URL.Path != "/messages" || m["model"] != "claude-up" || thinking["type"] != "disabled" || strings.Contains(string(body), "PRIVATE_METADATA") || strings.Contains(string(body), "PRIVATE_CACHE_KEY") || m["prompt_cache_key"] != nil || strings.Contains(string(body), "encrypted_content") {
+					if r.URL.Path != "/messages" || m["model"] != "claude-up" || strings.Contains(string(body), "PRIVATE_METADATA") || strings.Contains(string(body), "PRIVATE_CACHE_KEY") || m["prompt_cache_key"] != nil || strings.Contains(string(body), "encrypted_content") {
 						t.Errorf("invalid converted request: %s %s", r.URL.Path, body)
+					}
+					config, _ := m["output_config"].(map[string]any)
+					if effort == "none" {
+						if thinking["type"] != "disabled" || m["output_config"] != nil {
+							t.Error("wrong disabled reasoning", m)
+						}
+					} else if config["effort"] != effort || m["thinking"] != nil {
+						t.Error("effort lost or thinking budget invented", m)
+					}
+					if m["text"] != nil || m["verbosity"] != nil {
+						t.Error("forwarded verbosity", m)
 					}
 					if stream {
 						w.Header().Set("Content-Type", "text/event-stream")
@@ -61,12 +76,13 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 					m["client_metadata"] = protocol.Object{"private-key": "PRIVATE_METADATA"}
 					m["stream_options"] = protocol.Object{"reasoning_summary_delivery": "sequential_cutoff"}
 					m["include"] = []any{"reasoning.encrypted_content"}
-					m["text"] = protocol.Object{"format": protocol.Object{"type": "text"}}
-					m["reasoning"] = protocol.Object{"effort": "none", "summary": "auto"}
+					m["text"] = protocol.Object{"format": protocol.Object{"type": "text"}, "verbosity": "medium"}
+					m["reasoning"] = protocol.Object{"effort": effort, "summary": "auto"}
 				} else {
 					m["messages"] = []any{protocol.Object{"role": "user", "content": "PRIVATE_PROMPT"}}
 					m["response_format"] = protocol.Object{"type": "text"}
-					m["reasoning_effort"] = "none"
+					m["reasoning_effort"] = effort
+					m["verbosity"] = "medium"
 				}
 				raw, _ := json.Marshal(m)
 				resp := request(t, "POST", f.gateway.URL+"/v1"+protocol.Endpoint(client), f.token, string(raw))
@@ -81,27 +97,27 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "prompt_cache_key_omitted") || (client == "responses" && !strings.Contains(detail.Evidence["translation_degradations"], "client_metadata_omitted")) {
+				if detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "text_verbosity_omitted") || !strings.Contains(detail.Evidence["translation_degradations"], "prompt_cache_key_omitted") || (client == "responses" && !strings.Contains(detail.Evidence["translation_degradations"], "client_metadata_omitted")) {
 					t.Fatal(detail.Evidence)
 				}
 				stored, _ := json.Marshal(detail)
 				if strings.Contains(string(stored)+f.logs.String(), "PRIVATE_") {
 					t.Fatal("private content persisted")
 				}
-				// Invalid cache hints and real reasoning controls still fail before
+				// Invalid cache hints and unrepresentable reasoning controls fail before
 				// HTTP dispatch; neither their values nor arbitrary keys enter logs.
 				reasoningKey := "reasoning_effort"
-				var highReasoning any = "high"
+				var unsupportedReasoning any = "minimal"
 				if client == "responses" {
 					reasoningKey = "reasoning"
-					highReasoning = protocol.Object{"effort": "high"}
+					unsupportedReasoning = protocol.Object{"effort": "minimal"}
 				}
 				for _, tc := range []struct {
 					key, category string
 					value         any
 				}{
 					{"prompt_cache_key", "request_fields", protocol.Object{"PRIVATE_CACHE_FIELD": "PRIVATE_CACHE_KEY"}},
-					{reasoningKey, "reasoning_options", highReasoning},
+					{reasoningKey, "reasoning_options", unsupportedReasoning},
 				} {
 					prior := m[tc.key]
 					m[tc.key] = tc.value

@@ -87,9 +87,15 @@ func TestAnthropicEgressSafeOptionFailures(t *testing.T) {
 		{`"text":[]`, "text_format"},
 		{`"text":{"format":{"type":"json_object"}}`, "text_format"},
 		{`"text":{"format":{"type":"text","private-field":"PRIVATE_VALUE"}}`, "text_format"},
-		{`"text":{"verbosity":"low"}`, "text_format"},
+		{`"text":{"verbosity":"PRIVATE_VALUE"}`, "text_format"},
+		{`"text":{"verbosity":12}`, "text_format"},
+		{`"text":{"verbosity":[]}`, "text_format"},
+		{`"text":{"verbosity":{}}`, "text_format"},
+		{`"text":{"verbosity":"low","private-field":"PRIVATE_VALUE"}`, "text_format"},
 		{`"reasoning":[]`, "reasoning_options"},
-		{`"reasoning":{"effort":"high"}`, "reasoning_options"},
+		{`"reasoning":{"effort":"minimal"}`, "reasoning_options"},
+		{`"reasoning":{"effort":"default"}`, "reasoning_options"},
+		{`"reasoning":{"effort":"PRIVATE_VALUE"}`, "reasoning_options"},
 		{`"reasoning":{"effort":{}}`, "reasoning_options"},
 		{`"reasoning":{"summary":"PRIVATE_VALUE"}`, "reasoning_options"},
 		{`"input":[{"type":"reasoning","summary":[{"type":"summary_text","text":"PRIVATE_THOUGHT"}]}]`, "reasoning_history"},
@@ -118,6 +124,7 @@ func TestAnthropicEgressSafeOptionFailures(t *testing.T) {
 
 func TestAnthropicEgressEmptyOptionsAreFull(t *testing.T) {
 	for _, fields := range []string{
+		`"text":{"verbosity":null}`,
 		`"prompt_cache_key":""`,
 		`"prompt_cache_key":null`,
 		`"client_metadata":{},"stream_options":{},"include":[],"reasoning":{},"text":{}`,

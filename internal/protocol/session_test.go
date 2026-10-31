@@ -165,7 +165,7 @@ func TestTranslationSessionIsolation(t *testing.T) {
 		t.Fatalf("cross-request mapping leak: %s %v", r.Body, err)
 	}
 	// A failed candidate must not contaminate either the session or a later native one.
-	failed := newTestSession(t, `{"model":"public","input":"hello","reasoning":{"effort":"high"},"tools":[{"type":"namespace","name":"functions","tools":[{"type":"function","name":"lookup","parameters":{}}]}]}`, "responses")
+	failed := newTestSession(t, `{"model":"public","input":"hello","reasoning":{"effort":"minimal"},"tools":[{"type":"namespace","name":"functions","tools":[{"type":"function","name":"lookup","parameters":{}}]}]}`, "responses")
 	if _, err := failed.Prepare(AttemptOptions{Protocol: "anthropic"}); err == nil {
 		t.Fatal("unsupported reasoning options accepted")
 	}

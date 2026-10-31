@@ -29,6 +29,10 @@ func TestAnthropicGatewayMappedToolLoop(t *testing.T) {
 				if r.URL.Path != "/messages" || m["model"] != "claude-up" || r.Header.Get("Anthropic-Version") == "" {
 					t.Error(r.URL.Path, m)
 				}
+				config, _ := m["output_config"].(map[string]any)
+				if config["effort"] != "xhigh" || m["thinking"] != nil || m["text"] != nil {
+					t.Error("lost Codex controls", m)
+				}
 				if n == 2 {
 					history, _ := json.Marshal(m["messages"])
 					if !strings.Contains(string(history), `"tool_use_id":"c"`) || !strings.Contains(string(history), `"name":"functions__patch"`) || !strings.Contains(string(history), "PRIVATE_RESULT") {
@@ -73,7 +77,7 @@ func TestAnthropicGatewayMappedToolLoop(t *testing.T) {
 			}
 			f.model(t, state.Candidate{ProviderID: "p", Model: "claude-up"})
 			tools := `[{"type":"namespace","name":"functions","tools":[{"type":"custom","name":"patch"}]}]`
-			resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"public","input":"PRIVATE_PROMPT","stream":%t,"tools":%s}`, stream, tools))
+			resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"public","input":"PRIVATE_PROMPT","stream":%t,"tools":%s,"reasoning":{"effort":"xhigh","summary":"auto"},"text":{"format":{"type":"text"},"verbosity":"medium"},"prompt_cache_key":"PRIVATE_CACHE"}`, stream, tools))
 			wire := text(t, resp)
 			if resp.StatusCode != 200 {
 				t.Fatal(resp.StatusCode, wire)
@@ -107,7 +111,7 @@ func TestAnthropicGatewayMappedToolLoop(t *testing.T) {
 			}
 			history := []any{protocol.Object{"role": "user", "content": "PRIVATE_PROMPT"}, call, protocol.Object{"type": "custom_tool_call_output", "call_id": "c", "output": "PRIVATE_RESULT"}}
 			input, _ := json.Marshal(history)
-			resp = request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"public","input":%s,"stream":%t,"tools":%s}`, input, stream, tools))
+			resp = request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"public","input":%s,"stream":%t,"tools":%s,"reasoning":{"effort":"xhigh","summary":"auto"},"text":{"format":{"type":"text"},"verbosity":"medium"},"prompt_cache_key":"PRIVATE_CACHE"}`, input, stream, tools))
 			wire = text(t, resp)
 			if resp.StatusCode != 200 || calls.Load() != 2 || !strings.Contains(wire, "FINAL_REPLY") || !strings.Contains(wire, `"type":"reasoning"`) || strings.Contains(wire, "PRIVATE_SIGNATURE") {
 				t.Fatal(resp.StatusCode, calls.Load(), wire)

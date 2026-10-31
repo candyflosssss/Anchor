@@ -27,7 +27,7 @@ func TestPriorityProtocolRequestsAndTools(t *testing.T) {
 	for _, body := range []string{
 		`{"model":"m","input":"hi","tools":{}}`,
 		`{"model":"m","input":[{"role":"user","content":[{"type":"input_image","image_url":"x"}]}]}`,
-		`{"model":"m","input":"hi","reasoning":{"effort":"high"}}`,
+		`{"model":"m","input":"hi","reasoning":{"effort":"minimal"}}`,
 		`{"model":"m","input":"hi","tool_choice":{"type":"function","name":"f","extra":1}}`,
 	} {
 		if _, err := ConvertRequest([]byte(body), "responses", "anthropic"); err == nil {

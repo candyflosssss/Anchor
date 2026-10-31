@@ -1,8 +1,8 @@
 package protocol
 
 // prepareAnthropicRequest handles Responses options before the shared message
-// encoder. Do not turn model controls into guessed Claude budgets or silently
-// discard history just to make a request dispatchable.
+// encoder. Effort uses the documented output_config selector, independently
+// of thinking. Never guess a budget or discard history to make a request send.
 func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 	keys := "model input instructions stream temperature top_p tools tool_choice max_output_tokens store background parallel_tool_calls prompt_cache_key client_metadata stream_options include truncation text reasoning"
 	if err := allowed(m, keys); err != nil {
@@ -54,7 +54,10 @@ func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 	delete(m, "truncation")
 	if v := m["text"]; v != nil {
 		t := obj(v)
-		if allowed(t, "format") != nil {
+		if allowed(t, "format verbosity") != nil {
+			return nil, nil, conversionFailure("text_format", ErrUnsupported)
+		}
+		if verbosity := t["verbosity"]; verbosity != nil && verbosity != "low" && verbosity != "medium" && verbosity != "high" {
 			return nil, nil, conversionFailure("text_format", ErrUnsupported)
 		}
 		if v := t["format"]; v != nil {
@@ -72,10 +75,16 @@ func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 			return nil, nil, conversionFailure("reasoning_options", ErrUnsupported)
 		}
 		if effort := r["effort"]; effort != nil {
-			if effort != "none" {
+			switch effort {
+			case "none":
+				options["thinking"] = Object{"type": "disabled"}
+			case "low", "medium", "high", "xhigh", "max":
+				// Same protocol mapping as provider chat: effort is not a
+				// thinking toggle and does not imply a model-specific budget.
+				options["output_config"] = Object{"effort": effort}
+			default:
 				return nil, nil, conversionFailure("reasoning_options", ErrUnsupported)
 			}
-			options["thinking"] = Object{"type": "disabled"}
 		}
 		if summary := r["summary"]; summary != nil && summary != "auto" && summary != "concise" && summary != "detailed" {
 			return nil, nil, conversionFailure("reasoning_options", ErrUnsupported)
@@ -89,6 +98,9 @@ func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 func anthropicEgressDegradations(raw []byte) []Degradation {
 	m, _ := Decode(raw)
 	var d []Degradation
+	if obj(m["text"])["verbosity"] != nil {
+		d = append(d, TextVerbosityOmitted)
+	}
 	if str(m["prompt_cache_key"]) != "" {
 		d = append(d, PromptCacheKeyOmitted)
 	}

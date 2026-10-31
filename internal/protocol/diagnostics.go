@@ -23,6 +23,7 @@ const (
 type Degradation string
 
 const (
+	TextVerbosityOmitted       Degradation = "text_verbosity_omitted"
 	SummaryStyle               Degradation = "reasoning_summary_style"
 	EncryptedProjection        Degradation = "encrypted_reasoning_projection"
 	GrammarAsDescription       Degradation = "custom_grammar_description"

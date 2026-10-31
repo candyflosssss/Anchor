@@ -46,6 +46,8 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 Responses／Chat → Messages 还允许校验并省略字符串 `prompt_cache_key`：非空值记录 `prompt_cache_key_omitted` 降级，空串／null 不记降级；Messages 不承诺相同的缓存亲和，不合成为 `cache_control` 或 metadata。该值不进入日志，原生 Responses／Chat 和 Responses → Chat 保留字段；非法类型、其他未知字段和显式服务档位仍按既有规则拒绝。详情见 [Messages 请求选项支持表](protocol-anthropic-bridge.md#缓存亲和提示兼容修复2026-11-01当前源码未发布)。
 
+Responses／Chat → Messages 对公开强度 low／medium／high／xhigh／max 同名生成 `output_config.effort`，与供应商对话测试入口一致；不隐式开启 thinking 或猜预算，none 仍发送 disabled。经校验的 `text.verbosity=low|medium|high` 以 `text_verbosity_omitted` 明确降级；空／null 不记降级，未知值、结构化格式、minimal／default 及非空推理历史拒绝边界保持。正常客户端选项必须组合回归，不能只用 none 证明会话兼容；详见 [Messages 支持表](protocol-anthropic-bridge.md#正常-codex-强度与文本样式2026-11-01当前源码未发布)。
+
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
 
 ## 兼容策略与本轮实际行为变化

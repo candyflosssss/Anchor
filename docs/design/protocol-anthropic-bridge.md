@@ -20,7 +20,7 @@
 
 Messages 上游的明文 thinking 在 Responses 客户端返回为独立 reasoning summary，在 Chat 客户端返回为 reasoning_content；普通与流式路径一致。每次出现此转换，诊断记录 `anthropic_thinking_plaintext` 和 degraded。签名不会被标为 OpenAI encrypted_content，也不会混进正文或诊断。
 
-这是明文展示转换，无法保留 Anthropic 的签名验证和推理历史连续性。带签名的 Messages 历史、redacted_thinking、不透明历史密文、Responses／Chat 非空明文思考回放到 Messages 继续拒绝；不能把本轮输出支持理解为签名历史的跨协议往返。thinking／budget_tokens／output_config 等专有请求参数继续仅原生保留，不按模型名猜测预算或改写强度。引用注解、图片、音频、文件和托管工具也不在本轮跨协议支持范围。
+这是明文展示转换，无法保留 Anthropic 的签名验证和推理历史连续性。带签名的 Messages 历史、redacted_thinking、不透明历史密文、Responses／Chat 非空明文思考回放到 Messages 继续拒绝；不能把本轮输出支持理解为签名历史的跨协议往返。thinking／budget_tokens 等专有请求参数继续仅原生保留；output_config.effort 的公开强度选择器按下方规则跨协议映射，不按模型名猜测预算或改写强度。引用注解、图片、音频、文件和托管工具也不在本轮跨协议支持范围。
 
 ## 流式与用量
 
@@ -48,8 +48,8 @@ Messages → 其他协议分别跟踪文本、thinking 和工具块，校验索�
 
 | 选项／历史 | 当前行为 |
 | --- | --- |
-| Responses text.format.type=text／Chat response_format.type=text | 规范化为 Messages 默认文本输出；空对象／null 不改变行为。结构化输出、verbosity 或未知格式约束以 text_format 拒绝 |
-| reasoning.effort=none／Chat reasoning_effort=none | 明确发送 thinking.type=disabled；其他强度以 reasoning_options 拒绝，不按模型名选择预算或假装已映射 |
+| Responses text.format.type=text／Chat response_format.type=text | 规范化为 Messages 默认文本输出；空对象／null 不改变行为。verbosity 的 low／medium／high 校验后省略并记录 text_verbosity_omitted；结构化输出、非法 verbosity 或未知格式约束以 text_format 拒绝 |
+| reasoning.effort=none／Chat reasoning_effort=none | 明确发送 thinking.type=disabled；low／medium／high／xhigh／max 同名映射 output_config.effort，不隐式开启 thinking；minimal／default／未知强度以 reasoning_options 拒绝，不按模型名选择预算或改档 |
 | reasoning.summary=auto／concise／detailed | Messages 没有同等样式选择器，省略并记录 reasoning_summary_style；未知值拒绝 |
 | Responses client_metadata | 仅接受字符串映射，省略非空值并记录 client_metadata_omitted；不转发、改装为 metadata 或写入日志 |
 | stream_options.reasoning_summary_delivery=sequential_cutoff | 省略并记录 reasoning_summary_delivery；未知选项／值拒绝，不转发 Responses SSE 选项 |
@@ -70,3 +70,14 @@ Codex 0.163 的 [ResponsesApiRequest](https://github.com/openai/codex/blob/rust-
 Responses／Chat → Messages 现在仅接受字符串或 null 的 `prompt_cache_key`，校验后从当前 Attempt 的派发副本中省略；非空字符串记录 `prompt_cache_key_omitted` 和 degraded，缺失、空串或 null 不产生降级。Messages 没有对应的缓存亲和键，不把它改装成 `cache_control`、metadata 或网关会话身份，也不将键值写入错误或日志。这会失去该提示的缓存亲和，不承诺上游缓存命中。
 
 原生 Responses／Chat、Responses → Chat 继续保留原字段；准备 Messages 候选不会污染后续候选。非法类型仍以 `request_fields` 拒绝，其他未知字段、显式服务档位、真实推理强度、格式约束和历史密文的拒绝边界保持。回归覆盖两种客户端、普通／流式模拟 HTTP、降级诊断、日志脱敏、非法类型预派发拒绝及候选保留；实际执行情况见任务记录。已随 desktop.77 dev 投放；已有安装须通过在线更新安装新版核心。本轮未自动替换真实运行实例，也未请求真实付费上游。
+
+
+## 正常 Codex 强度与文本样式（2026-11-01，当前源码未发布）
+
+本机运行核心确认为 desktop.77。2026-11-01 02:44 的真实失败日志已从 request_fields 变为 text_format 与 reasoning_options，所记录 effort 分别为 low 和 xhigh；日志未保存正文，因此只确认了实际类别与强度，未声称重放原始载荷。Codex 0.163 的正常请求可将 text.verbosity 与 reasoning.effort、缓存键等一起发送，原先只用 effort=none 的回归没有覆盖这组输入。实际请求无法通过后续校验，说明 desktop.77 的缓存键修复没有覆盖整个调用路径。
+
+Messages 的公开 [effort 文档](https://platform.claude.com/docs/en/build-with-claude/effort) 和 [SDK 固定版本](https://github.com/anthropics/anthropic-sdk-go/blob/d38e929d2d031c5052818af00c0a276a2d7e498c/message.go) 已定义 output_config.effort=low／medium／high／xhigh／max；Anchor 的供应商对话测试入口已有相同映射。网关现在同名发送这些值，保留请求的强度选择，不把 xhigh 降为 high，不臆造 token 预算，也不额外开启 thinking。公开协议映射不表示每个旧模型或中转站都支持这些值；上游明确拒绝仍按既有错误返回，不自动改档或重试。
+
+Messages 没有同等的 verbosity 字段；仅 low／medium／high 在校验后省略，记录 text_verbosity_omitted 降级。不改写提示词，不宣称等价保留了回答详略要求。空／null 不产生该降级，原生 Responses／Chat 保留原字段。未知 verbosity、结构化格式约束、minimal／default 等未映射强度，以及非空历史明文推理和密文仍明确拒绝。
+
+回归将两种入口、六种强度、三种 verbosity 与缓存／传输选项组合验证，并通过隔离 HTTP 上游检查普通／流式发送、日志降级和脱敏、非法类型拒绝、候选保留，以及 xhigh＋verbosity 的两轮 custom 工具调用。没有调用真实付费上游，也没有把模拟上游结果称为用户原会话恢复。
