@@ -49,6 +49,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 ## 兼容与恢复
 
 - 明确报告 Full／Degraded／Unsupported：完整承载、保证发生变化、无法可靠表示。不能为了发出请求而静默删除未知字段、历史思考、工具或约束；保留既有错误码和默认降级策略。
+- Responses／Chat → Messages 可在校验 prompt_cache_key 为字符串后省略缓存亲和提示；非空字符串须记录 prompt_cache_key_omitted 降级，空串／null 不记降级。不得把该值改装成 Messages cache_control、metadata 或会话路由身份，也不得转发或写入诊断。原生 Responses／Chat 与 Responses → Chat 保留原字段；非法类型和其他未知字段继续拒绝。此例外不放宽 service_tier、推理强度、输出格式或历史密文边界。
 - Responses／Chat → Messages 请求先由协议适配器校验选项：普通 text 格式、disabled truncation 与空 reasoning 历史可规范化；effort=none 明确映射 thinking.type=disabled，其他强度不猜测预算。仅字符串 client_metadata、已知 sequential_cutoff 传输选项、reasoning summary 样式及可选密文返回投影可按既有安全类别显式降级；未知字段、格式／强度要求、非空明文推理历史与非空密文继续准确拒绝，不能冒充正文错误。此入口不更改原生保留、Session 基线、候选或恢复预算。
 - 当前允许的 Responses → Chat 降级为 reasoning_summary_style、encrypted_reasoning_projection、custom_grammar_description；Messages 目标复用 custom_grammar_description，并按上一条处理请求选项。Messages 入口跨协议允许经过校验的缓存提示降级 prompt_cache_control、工具错误标志文本化 tool_result_error_text；Messages 返回明文 thinking 允许以 anthropic_thinking_plaintext 降级成独立推理内容，签名不得标为 OpenAI 密文，不承诺思考历史往返。具体语义以支持表为准。grammar 文字描述不保留原生强制语法约束；可选密文输出投影的降级不允许丢弃非空历史密文。
 - Messages 与 Chat 目标复用同一请求局部 namespace／custom 工具索引；不得维护另一套命名、历史重建和返回还原规则。Messages 原生 type=custom 仅代表客户端执行函数，不扩大到托管工具。

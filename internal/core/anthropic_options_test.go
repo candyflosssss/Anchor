@@ -28,7 +28,7 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 					}
 					body, _ := json.Marshal(m)
 					thinking, _ := m["thinking"].(map[string]any)
-					if r.URL.Path != "/messages" || m["model"] != "claude-up" || thinking["type"] != "disabled" || strings.Contains(string(body), "PRIVATE_METADATA") || strings.Contains(string(body), "encrypted_content") {
+					if r.URL.Path != "/messages" || m["model"] != "claude-up" || thinking["type"] != "disabled" || strings.Contains(string(body), "PRIVATE_METADATA") || strings.Contains(string(body), "PRIVATE_CACHE_KEY") || m["prompt_cache_key"] != nil || strings.Contains(string(body), "encrypted_content") {
 						t.Errorf("invalid converted request: %s %s", r.URL.Path, body)
 					}
 					if stream {
@@ -55,7 +55,7 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 					t.Fatal(err)
 				}
 				f.model(t, state.Candidate{ProviderID: "p", Model: "claude-up"})
-				m := protocol.Object{"model": "public", "stream": stream}
+				m := protocol.Object{"model": "public", "stream": stream, "prompt_cache_key": "PRIVATE_CACHE_KEY"}
 				if client == "responses" {
 					m["input"] = []any{protocol.Object{"type": "reasoning", "summary": []any{}, "encrypted_content": nil}, protocol.Object{"role": "user", "content": "PRIVATE_PROMPT"}}
 					m["client_metadata"] = protocol.Object{"private-key": "PRIVATE_METADATA"}
@@ -74,30 +74,58 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 				if resp.StatusCode != 200 || !strings.Contains(wire, "FINAL_REPLY") || calls.Load() != 1 {
 					t.Fatal(resp.StatusCode, calls.Load(), wire)
 				}
-				f.core.logs.Flush(t.Context())
+				if err := f.core.logs.Flush(t.Context()); err != nil {
+					t.Fatal(err)
+				}
 				detail, err := f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
 				if err != nil {
 					t.Fatal(err)
 				}
-				if client == "responses" && (detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "client_metadata_omitted")) {
+				if detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "prompt_cache_key_omitted") || (client == "responses" && !strings.Contains(detail.Evidence["translation_degradations"], "client_metadata_omitted")) {
 					t.Fatal(detail.Evidence)
 				}
 				stored, _ := json.Marshal(detail)
 				if strings.Contains(string(stored)+f.logs.String(), "PRIVATE_") {
 					t.Fatal("private content persisted")
 				}
-				// A real reasoning control remains a clear local rejection, with
-				// no HTTP dispatch or silent weakening of the requested effort.
+				// Invalid cache hints and real reasoning controls still fail before
+				// HTTP dispatch; neither their values nor arbitrary keys enter logs.
+				reasoningKey := "reasoning_effort"
+				var highReasoning any = "high"
 				if client == "responses" {
-					m["reasoning"] = protocol.Object{"effort": "high"}
-				} else {
-					m["reasoning_effort"] = "high"
+					reasoningKey = "reasoning"
+					highReasoning = protocol.Object{"effort": "high"}
 				}
-				raw, _ = json.Marshal(m)
-				resp = request(t, "POST", f.gateway.URL+"/v1"+protocol.Endpoint(client), f.token, string(raw))
-				wire = text(t, resp)
-				if resp.StatusCode == 200 || !strings.Contains(wire, "reasoning_options") || calls.Load() != 1 {
-					t.Fatal(resp.StatusCode, calls.Load(), wire)
+				for _, tc := range []struct {
+					key, category string
+					value         any
+				}{
+					{"prompt_cache_key", "request_fields", protocol.Object{"PRIVATE_CACHE_FIELD": "PRIVATE_CACHE_KEY"}},
+					{reasoningKey, "reasoning_options", highReasoning},
+				} {
+					prior := m[tc.key]
+					m[tc.key] = tc.value
+					raw, _ = json.Marshal(m)
+					m[tc.key] = prior
+					resp = request(t, "POST", f.gateway.URL+"/v1"+protocol.Endpoint(client), f.token, string(raw))
+					wire = text(t, resp)
+					if resp.StatusCode != 400 || !strings.Contains(wire, tc.category) || calls.Load() != 1 {
+						t.Fatal(resp.StatusCode, calls.Load(), wire)
+					}
+					if err := f.core.logs.Flush(t.Context()); err != nil {
+						t.Fatal(err)
+					}
+					detail, err := f.core.logs.Detail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					if detail.AttemptCount != 0 || detail.HTTP != nil || detail.Evidence["translation_category"] != tc.category || detail.Evidence["translation_dispatched"] != "false" {
+						t.Fatal(detail)
+					}
+					stored, _ = json.Marshal(detail)
+					if strings.Contains(wire+string(stored)+f.logs.String(), "PRIVATE_") {
+						t.Fatal("private content persisted on rejection")
+					}
 				}
 			})
 		}

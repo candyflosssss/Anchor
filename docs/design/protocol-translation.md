@@ -44,6 +44,8 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 同协议发送保留原生字段，保留原生响应字节；修改路由选定的 model、明确的 service_tier，以及 Responses 的 store=false，并应用下述原生 Responses 无效密文字段预清理与工具项 ID 规范化；原生 Anthropic 省略 max_tokens 时保留既有 4096 默认值。原生 Chat 的 stream_options、原生 Anthropic 的签名思考／多模态等可以在相同协议中保留，**不意味着新增了这些能力的跨协议转换**。入口仍检查消息基本结构、鉴权、无状态限制、工具执行范围以及映射的 tools/streaming 能力。客户端 tool_search 仅沿用现有原生 Responses 受限透传，跨协议仍拒绝。
 
+Responses／Chat → Messages 还允许校验并省略字符串 `prompt_cache_key`：非空值记录 `prompt_cache_key_omitted` 降级，空串／null 不记降级；Messages 不承诺相同的缓存亲和，不合成为 `cache_control` 或 metadata。该值不进入日志，原生 Responses／Chat 和 Responses → Chat 保留字段；非法类型、其他未知字段和显式服务档位仍按既有规则拒绝。详情见 [Messages 请求选项支持表](protocol-anthropic-bridge.md#缓存亲和提示兼容修复2026-11-01当前源码未发布)。
+
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
 
 ## 兼容策略与本轮实际行为变化

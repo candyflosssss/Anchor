@@ -9,7 +9,7 @@ import (
 func TestAnthropicEgressOpenAIOptions(t *testing.T) {
 	for _, client := range []string{"responses", "chat-completions"} {
 		t.Run(client, func(t *testing.T) {
-			m := Object{"model": "public", "stream": true}
+			m := Object{"model": "public", "stream": true, "prompt_cache_key": "PRIVATE_CACHE_KEY"}
 			if client == "responses" {
 				m["input"] = []any{Object{"role": "user", "content": "hello"}, Object{"type": "reasoning", "summary": []any{}, "encrypted_content": nil}, Object{"role": "assistant", "content": "previous answer"}, Object{"role": "user", "content": "continue"}}
 				m["client_metadata"] = Object{"private-key": "PRIVATE_METADATA"}
@@ -30,30 +30,33 @@ func TestAnthropicEgressOpenAIOptions(t *testing.T) {
 			if obj(wire["thinking"])["type"] != "disabled" || wire["stream"] != true || wire["max_tokens"] != float64(4096) {
 				t.Fatal(wire)
 			}
-			for _, key := range []string{"client_metadata", "stream_options", "include", "truncation", "text", "reasoning"} {
+			for _, key := range []string{"client_metadata", "stream_options", "include", "truncation", "text", "reasoning", "prompt_cache_key"} {
 				if _, exists := wire[key]; exists {
 					t.Fatalf("forwarded %s", key)
 				}
 			}
-			if strings.Contains(string(a.RequestBody()), "PRIVATE_METADATA") {
-				t.Fatal("forwarded client metadata")
+			if strings.Contains(string(a.RequestBody()), "PRIVATE_") {
+				t.Fatal("forwarded private request hints")
 			}
 			d := a.Diagnostics()
 			if client == "responses" {
-				if len(arr(wire["messages"])) != 3 || len(d.Degradations) != 4 || d.Compatibility != Degraded {
+				if len(arr(wire["messages"])) != 3 || len(d.Degradations) != 5 || d.Compatibility != Degraded {
 					t.Fatal(wire, d)
 				}
-				for _, label := range []Degradation{"client_metadata_omitted", "reasoning_summary_delivery", SummaryStyle, EncryptedProjection} {
+				for _, label := range []Degradation{"client_metadata_omitted", "reasoning_summary_delivery", SummaryStyle, EncryptedProjection, PromptCacheKeyOmitted} {
 					if !hasDegradation(d, label) {
 						t.Fatal(d)
 					}
 				}
-			} else if d.Compatibility != Full {
+			} else if d.Compatibility != Degraded || len(d.Degradations) != 1 || !hasDegradation(d, PromptCacheKeyOmitted) {
 				t.Fatal(d)
 			}
 			// Preparing another candidate must still see every original option.
 			native := prepareTestAttempt(t, s, client)
 			nativeWire, _ := Decode(native.RequestBody())
+			if nativeWire["prompt_cache_key"] != "PRIVATE_CACHE_KEY" {
+				t.Fatal("candidate polluted native cache hint")
+			}
 			if client == "responses" && (obj(nativeWire["client_metadata"])["private-key"] != "PRIVATE_METADATA" || len(arr(nativeWire["input"])) != 4) {
 				t.Fatal("candidate polluted native history")
 			}
@@ -67,6 +70,10 @@ func TestAnthropicEgressOpenAIOptions(t *testing.T) {
 func TestAnthropicEgressSafeOptionFailures(t *testing.T) {
 	for _, tc := range []struct{ fields, reason string }{
 		{`"private-field":"PRIVATE_VALUE"`, "request_fields"},
+		{`"prompt_cache_key":12`, "request_fields"},
+		{`"prompt_cache_key":[]`, "request_fields"},
+		{`"prompt_cache_key":{"private-field":"PRIVATE_CACHE_KEY"}`, "request_fields"},
+		{`"prompt_cache_key":true`, "request_fields"},
 		{`"client_metadata":[]`, "request_fields"},
 		{`"client_metadata":{"private-field":12}`, "request_fields"},
 		{`"client_metadata":{"private-field":null}`, "request_fields"},
@@ -111,6 +118,8 @@ func TestAnthropicEgressSafeOptionFailures(t *testing.T) {
 
 func TestAnthropicEgressEmptyOptionsAreFull(t *testing.T) {
 	for _, fields := range []string{
+		`"prompt_cache_key":""`,
+		`"prompt_cache_key":null`,
 		`"client_metadata":{},"stream_options":{},"include":[],"reasoning":{},"text":{}`,
 		`"client_metadata":null,"stream_options":null,"include":null,"reasoning":null,"text":null,"truncation":null`,
 		`"text":{"format":{"type":"text"}},"truncation":"disabled","input":[{"type":"reasoning","summary":[],"encrypted_content":""},{"role":"user","content":"hello"}]`,
@@ -123,6 +132,21 @@ func TestAnthropicEgressEmptyOptionsAreFull(t *testing.T) {
 		a := prepareTestAttempt(t, newTestSession(t, string(raw), "responses"), "anthropic")
 		if a.Diagnostics().Compatibility != Full || len(a.Diagnostics().Degradations) != 0 || strings.Contains(string(a.RequestBody()), `"thinking"`) {
 			t.Fatal(string(a.RequestBody()), a.Diagnostics())
+		}
+	}
+}
+
+func TestAnthropicEgressCacheHintCandidateIsolation(t *testing.T) {
+	s := newTestSession(t, `{"model":"public","input":"hello","prompt_cache_key":"PRIVATE_CACHE_KEY"}`, "responses")
+	messages := prepareTestAttempt(t, s, "anthropic")
+	if !hasDegradation(messages.Diagnostics(), PromptCacheKeyOmitted) {
+		t.Fatal(messages.Diagnostics())
+	}
+	for _, target := range []string{"chat-completions", "responses"} {
+		a := prepareTestAttempt(t, s, target)
+		wire, _ := Decode(a.RequestBody())
+		if wire["prompt_cache_key"] != "PRIVATE_CACHE_KEY" || a.Diagnostics().Compatibility != Full || len(a.Diagnostics().Degradations) != 0 {
+			t.Fatal("changed cache hint support for", target, wire, a.Diagnostics())
 		}
 	}
 }

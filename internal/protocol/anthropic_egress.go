@@ -4,10 +4,18 @@ package protocol
 // encoder. Do not turn model controls into guessed Claude budgets or silently
 // discard history just to make a request dispatchable.
 func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
-	keys := "model input instructions stream temperature top_p tools tool_choice max_output_tokens store background parallel_tool_calls client_metadata stream_options include truncation text reasoning"
+	keys := "model input instructions stream temperature top_p tools tool_choice max_output_tokens store background parallel_tool_calls prompt_cache_key client_metadata stream_options include truncation text reasoning"
 	if err := allowed(m, keys); err != nil {
 		return nil, nil, conversionFailure("request_fields", err)
 	}
+	// This OpenAI cache-affinity hint has no Messages equivalent. Validate it
+	// before omission; never repurpose it as cache_control or user metadata.
+	if v := m["prompt_cache_key"]; v != nil {
+		if _, ok := v.(string); !ok {
+			return nil, nil, conversionFailure("request_fields", ErrUnsupported)
+		}
+	}
+	delete(m, "prompt_cache_key")
 	if v := m["client_metadata"]; v != nil {
 		metadata := obj(v)
 		if metadata == nil {
@@ -81,6 +89,9 @@ func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 func anthropicEgressDegradations(raw []byte) []Degradation {
 	m, _ := Decode(raw)
 	var d []Degradation
+	if str(m["prompt_cache_key"]) != "" {
+		d = append(d, PromptCacheKeyOmitted)
+	}
 	if len(obj(m["client_metadata"])) > 0 {
 		d = append(d, Degradation("client_metadata_omitted"))
 	}

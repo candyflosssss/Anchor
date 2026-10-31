@@ -26,6 +26,7 @@ const (
 	SummaryStyle               Degradation = "reasoning_summary_style"
 	EncryptedProjection        Degradation = "encrypted_reasoning_projection"
 	GrammarAsDescription       Degradation = "custom_grammar_description"
+	PromptCacheKeyOmitted      Degradation = "prompt_cache_key_omitted"
 	PromptCacheControl         Degradation = "prompt_cache_control"
 	ToolResultErrorText        Degradation = "tool_result_error_text"
 	AnthropicThinkingPlaintext Degradation = "anthropic_thinking_plaintext"
