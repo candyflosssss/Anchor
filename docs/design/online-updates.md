@@ -1,10 +1,14 @@
 # 在线更新 v1
 
 - 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.79](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.79)，发布于 `2026-11-01T04:12:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `8f2a808d592a3610fda6f5da164904362b36f62a`、SOURCE dirty=false。
-- 修复 Codex 会话中 user 后再次出现 developer 指令时，Anthropic 转换在本地以 request_content 拒绝的问题；保留全部文本，后置指令提升为顶层 system 时明确记录作用域降级。沿用 schema10。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.80](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.80)，发布于 `2026-11-01T05:56:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1af3b730c04ba9f595b04f3c79b1a44f8df41ad5`、SOURCE dirty=false。
+- 已有 Codex 会话切换 Anthropic 时，在派发副本显式省略无法跨协议使用的历史思考，保留可见消息、工具链和图片；同时支持已知消息阶段与空输出元数据，明确记录各项信息损失。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .80 在线投放（2026-11-01）
+
+旧 Codex 会话切换 Anthropic 使用明确有损的历史思考投影，可见消息／工具链／图片保留，客户端原历史不改。实际162项 input 已离线验证22条消息、51对调用结果和7张图片；旧思考及其摘要连续性丢失、消息阶段和图片精度选择器损失分别记录。11附件远端摘要／tag／非latest与默认源 runtime／旧客户端deb／CLI三条实际下载通过。未安装或验收真实上游，详见[发行记录](../release/desktop.md#claude-history-80)。
 
 ## .79 在线投放（2026-11-01）
 

@@ -101,7 +101,9 @@ Messages 只有请求顶层 system，没有逐消息 system／developer 角色�
 已随 desktop.79 dev 投放；安装后实际核心需升至 .79。本轮已验证真实本地输入准备分支和默认源下载，没有自动替换运行实例或验收真实上游响应。
 
 
-## 已有会话的历史投影与图片（2026-11-01，当前源码未发布）
+<a id="已有会话的历史投影与图片2026-11-01当前源码未发布"></a>
+
+## 已有会话的历史投影与图片（2026-11-01，desktop.80 dev 已发布）
 
 05:37 的真实失败由 desktop.79 核心处理，类别为 encrypted_reasoning_history，尚未派发。对应 Codex 0.163 会话在失败前保存162项 input：22条消息、38条 reasoning、51个函数调用及51个结果，含7份图片结果和7条带 phase 的历史回答。仅修顶层选项或单 user 输入不足以证明旧会话切换可用。
 
@@ -112,3 +114,5 @@ Messages 无法验证 OpenAI 推理密文，也不能直接接收无 Anthropic �
 user 消息与 function/custom 工具结果中的 input_image 按标准 Messages image.source 转换：PNG／JPEG／GIF／WebP data URL 校验 base64 后保留原数据与媒介类型，HTTP(S) URL 原样转发且本地不获取；保持与周围文本的顺序及 tool_use_id。file_id、未知媒体、音频或任意内容仍拒绝。detail 的 low／high／original 以 image_detail_omitted 记录精度选择器损失，auto／缺失／null 不记此项；不删除图片、不替换占位或捏造描述。参照 [Anthropic SDK 固定版本 image/tool_result 类型](https://github.com/anthropics/anthropic-sdk-go/blob/d38e929d2d031c5052818af00c0a276a2d7e498c/message.go)，上游模型是否支持仍由实际响应决定。
 
 对实际会话 input 做本地无网络验证：修复前复现 encrypted_reasoning_history；完整投影后逐项核对22条消息、51个调用、51个结果和7份图片，文本／参数／ID与图片解码字节均保持，后续原生 input 仍与原值一致。顶层请求控制项为合成设置，完整线上 HTTP 原请求及当前全部工具声明不可得，因此不称为完整线上请求重放；没有发送私有历史到付费上游。私有副本与临时测试不提交或打包，验证后删除。另以合成样例覆盖 malformed／unknown 拒绝、候选隔离、Chat 明文思考往返、图片顺序与非法媒体、普通／流式和工具闭环；实际执行结果见任务记录。
+
+已随 desktop.80 dev 同版投放；需升级实际处理请求的核心。真实 input 离线准备与文本／工具／图片保留、两平台打包和默认源下载通过；真实上游生成和用户会话最终结果未在本轮验收。

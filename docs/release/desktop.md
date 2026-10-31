@@ -1,10 +1,33 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.79](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.79)，发布于 `2026-11-01T04:12:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `8f2a808d592a3610fda6f5da164904362b36f62a`、SOURCE dirty=false。
-- 修复 Codex 会话中 user 后再次出现 developer 指令时，Anthropic 转换在本地以 request_content 拒绝的问题；保留全部文本，后置指令提升为顶层 system 时明确记录作用域降级。沿用 schema10。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.80](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.80)，发布于 `2026-11-01T05:56:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1af3b730c04ba9f595b04f3c79b1a44f8df41ad5`、SOURCE dirty=false。
+- 已有 Codex 会话切换 Anthropic 时，在派发副本显式省略无法跨协议使用的历史思考，保留可见消息、工具链和图片；同时支持已知消息阶段与空输出元数据，明确记录各项信息损失。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="claude-history-80"></a>
+
+## 已有会话的历史投影与图片 .80（已发布 dev）
+
+05:37 的真实失败由 .79 核心处理，类别为 encrypted_reasoning_history，尚未派发。对应旧会话有162项 input：22条可见消息、38条 reasoning、51个调用与51个结果，含7份图片结果及7条带 phase 的历史回答。此前选项与新会话输入回归未覆盖旧会话完整历史。本轮以实际 input 做本地无网络转换，修复前复现同类错误；修复后逐项核对可见文本、参数／调用配对和7张图片解码字节保留，后续原生 input 仍与原值一致。
+
+已有 Codex 会话切换 Anthropic 时，在派发副本显式省略无法跨协议使用的历史思考，保留可见消息、工具链和图片；同时支持已知消息阶段与空输出元数据，明确记录各项信息损失。沿用 schema10。 此策略会丢失旧模型的隐藏思考及思考摘要连续性：仅本次 Messages Attempt 私有副本省略已校验的 reasoning 块，以 reasoning_history_omitted 明确记录；不改客户端原历史、不伪造解密、不把思考当正文。其他候选、原生 Responses 的密文拒绝恢复及 Responses → Chat 的历史密文拒绝保持。非法结构、未知块、压缩历史和工具密文不因此被删除。
+
+已知 assistant phase 校验后省略并记录 message_phase_omitted；空 annotations／logprobs 可以规范化，非空仍拒绝。user 和 function/custom 工具结果的标准图片保留字节／URL、媒体类型、顺序及工具配对，detail 的低／高／原始精度选择器损失记录 image_detail_omitted，不删除图片或用占位替代。详细边界见 [Messages 支持表](../design/protocol-anthropic-bridge.md#已有会话的历史投影与图片2026-11-01当前源码未发布)。
+
+从干净隔离 worktree 的 `1af3b730c04ba9f595b04f3c79b1a44f8df41ad5` 构建，SOURCE dirty=false，输入摘要 `9b96e64e33870973b3115226299105aee369afef649f3e679f32c16d968c6340`；未混入主工作区其他未提交内容。于 `2026-11-01T05:56:27+08:00` 发布为 dev prerelease，非 latest。产物和证据位于 `dist/desktop/0.1.0-dev.desktop.80/`。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.80_amd64.deb` | 29277672 | `8343679976598e68dd9d75f4d64178a72895650d3150fd2ed6804a78d9aa2dcd` |
+| `Anchor-Desktop-0.1.0-dev.desktop.80-windows-amd64-setup.exe` | 31297321 | `b4f55dac1f6ea35247bf274fd5743e72a17926ed33b44b9fbae7af97f8df6dc0` |
+
+协议包全测、实际162项历史的离线转换／保留检查、非法结构／未知内容拒绝、Chat 明文思考再继续、24组带 reasoning 与后置指令的普通／流式网关请求、带思考／phase／图片结果的两轮 custom 工具闭环，以及原生密文恢复回归通过。一个旧 probe 测试要求拒绝空 logprobs，按明确空值兼容契约更新后协议全测通过。本轮 Go／TS 契约、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译、NSIS 和 deb 打包完成，没有扩大为全仓库／race／浏览器验收。
+
+11项附件同版包含安装包、runtime、CLI、两份更新清单、Go vendor 与固定 mihomo 对应源码／vendor、许可元数据及 SHA256SUMS。嵌入前端／mihomo、deb 与 runtime 一致、构建输入摘要、本地哈希、metadata ZIP CRC 与 GitHub 全部大小／digest 核对通过；tag 指向实际构建提交，保持非 latest。默认 dev 源在隔离目录实际下载 Linux runtime、兼容旧客户端的 deb 及 CLI，版本／平台／大小／SHA256及运行程序版本通过；Windows 三项程序远端摘要与本地一致。
+
+私有历史与临时重放测试验证后删除，不提交或打包；保留的 private-history-verification.json 只有固定结构及验证结果。顶层控制项为合成设置，完整线上 HTTP 请求／当前全部工具声明不可得，不称为完整线上请求重放。仅在线投放，没有安装、重启或修改真实实例／Agent 配置，没有请求真实付费上游；真实生成、原会话最终结果、双平台原生窗口／安装器及真实SSH升级未验收。实际处理请求的核心需更新至 .80，SSH 被控机单独更新。证据见 publication 下 preparation-verification.json、publication-verification.json 与 online-verification.json。
 
 <a id="claude-instructions-79"></a>
 
