@@ -33,11 +33,17 @@ func TestAnthropicGatewayMappedToolLoop(t *testing.T) {
 					t.Error("instruction content lost", m["system"])
 				}
 				config, _ := m["output_config"].(map[string]any)
+				if strings.Contains(fmt.Sprint(m), "PRIVATE_HISTORY") || strings.Contains(fmt.Sprint(m), "PRIVATE_CIPHER") {
+					t.Error("foreign reasoning leaked")
+				}
 				if config["effort"] != "xhigh" || m["thinking"] != nil || m["text"] != nil {
 					t.Error("lost Codex controls", m)
 				}
 				if n == 2 {
 					history, _ := json.Marshal(m["messages"])
+					if !strings.Contains(string(history), `"media_type":"image/png"`) || !strings.Contains(string(history), `"data":"aW1hZ2U="`) {
+						t.Error("tool image lost")
+					}
 					if !strings.Contains(string(history), `"tool_use_id":"c"`) || !strings.Contains(string(history), `"name":"functions__patch"`) || !strings.Contains(string(history), "PRIVATE_RESULT") {
 						t.Error(string(history))
 					}
@@ -80,7 +86,7 @@ func TestAnthropicGatewayMappedToolLoop(t *testing.T) {
 			}
 			f.model(t, state.Candidate{ProviderID: "p", Model: "claude-up"})
 			tools := `[{"type":"namespace","name":"functions","tools":[{"type":"custom","name":"patch"}]}]`
-			resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"public","input":[{"role":"developer","content":"FIRST_INSTRUCTION"},{"role":"user","content":"PRIVATE_PROMPT"},{"role":"developer","content":"TURN_INSTRUCTION"},{"role":"user","content":"CONTINUE"}],"stream":%t,"tools":%s,"reasoning":{"effort":"xhigh","summary":"auto"},"text":{"format":{"type":"text"},"verbosity":"medium"},"prompt_cache_key":"PRIVATE_CACHE"}`, stream, tools))
+			resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"public","input":[{"type":"reasoning","summary":[{"type":"summary_text","text":"PRIVATE_HISTORY"}],"encrypted_content":"PRIVATE_CIPHER"},{"role":"developer","content":"FIRST_INSTRUCTION"},{"role":"user","content":"PRIVATE_PROMPT"},{"role":"developer","content":"TURN_INSTRUCTION"},{"role":"user","content":"CONTINUE"}],"stream":%t,"tools":%s,"reasoning":{"effort":"xhigh","summary":"auto"},"text":{"format":{"type":"text"},"verbosity":"medium"},"prompt_cache_key":"PRIVATE_CACHE"}`, stream, tools))
 			wire := text(t, resp)
 			if resp.StatusCode != 200 {
 				t.Fatal(resp.StatusCode, wire)
@@ -112,7 +118,7 @@ func TestAnthropicGatewayMappedToolLoop(t *testing.T) {
 			if call["type"] != "custom_tool_call" || call["namespace"] != "functions" || call["input"] != "line\n雪😀" {
 				t.Fatal(call)
 			}
-			history := []any{protocol.Object{"role": "developer", "content": "FIRST_INSTRUCTION"}, protocol.Object{"role": "user", "content": "PRIVATE_PROMPT"}, call, protocol.Object{"role": "developer", "content": "TURN_INSTRUCTION"}, protocol.Object{"type": "custom_tool_call_output", "call_id": "c", "output": "PRIVATE_RESULT"}}
+			history := []any{protocol.Object{"type": "reasoning", "summary": []any{protocol.Object{"type": "summary_text", "text": "PRIVATE_HISTORY"}}, "encrypted_content": "PRIVATE_CIPHER"}, protocol.Object{"role": "developer", "content": "FIRST_INSTRUCTION"}, protocol.Object{"role": "user", "content": "PRIVATE_PROMPT"}, protocol.Object{"type": "message", "role": "assistant", "phase": "commentary", "content": "VISIBLE_PROGRESS"}, call, protocol.Object{"role": "developer", "content": "TURN_INSTRUCTION"}, protocol.Object{"type": "custom_tool_call_output", "call_id": "c", "output": []any{protocol.Object{"type": "input_text", "text": "PRIVATE_RESULT"}, protocol.Object{"type": "input_image", "image_url": "data:image/png;base64,aW1hZ2U=", "detail": "high"}}}}
 			input, _ := json.Marshal(history)
 			resp = request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"public","input":%s,"stream":%t,"tools":%s,"reasoning":{"effort":"xhigh","summary":"auto"},"text":{"format":{"type":"text"},"verbosity":"medium"},"prompt_cache_key":"PRIVATE_CACHE"}`, input, stream, tools))
 			wire = text(t, resp)
@@ -124,7 +130,7 @@ func TestAnthropicGatewayMappedToolLoop(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "anthropic_thinking_plaintext") {
+			if detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "reasoning_history_omitted") || !strings.Contains(detail.Evidence["translation_degradations"], "message_phase_omitted") || !strings.Contains(detail.Evidence["translation_degradations"], "image_detail_omitted") || !strings.Contains(detail.Evidence["translation_degradations"], "anthropic_thinking_plaintext") {
 				t.Fatal(detail.Evidence)
 			}
 			stored, _ := json.Marshal(detail)

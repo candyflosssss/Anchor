@@ -23,6 +23,9 @@ const (
 type Degradation string
 
 const (
+	ImageDetailOmitted         Degradation = "image_detail_omitted"
+	ReasoningHistoryOmitted    Degradation = "reasoning_history_omitted"
+	MessagePhaseOmitted        Degradation = "message_phase_omitted"
 	InstructionScopeHoisted    Degradation = "instruction_scope_hoisted"
 	TextVerbosityOmitted       Degradation = "text_verbosity_omitted"
 	SummaryStyle               Degradation = "reasoning_summary_style"

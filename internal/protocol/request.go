@@ -41,15 +41,17 @@ func text(v any) (string, error) {
 	var out strings.Builder
 	for _, v := range a {
 		m := obj(v)
-		if err := allowed(m, "type text annotations"); err != nil {
+		if err := allowed(m, "type text annotations logprobs"); err != nil {
 			return "", err
 		}
 		switch str(m["type"]) {
 		case "text", "input_text", "output_text":
-			if annotations, exists := m["annotations"]; exists && annotations != nil {
-				a, ok := annotations.([]any)
-				if !ok || len(a) > 0 {
-					return "", ErrUnsupported
+			for _, key := range []string{"annotations", "logprobs"} {
+				if metadata := m[key]; metadata != nil {
+					values, ok := metadata.([]any)
+					if !ok || len(values) > 0 {
+						return "", ErrUnsupported
+					}
 				}
 			}
 			t, ok := m["text"].(string)
@@ -438,6 +440,14 @@ func fromResponses(m Object, to string) (Object, error) {
 			if role != "user" && role != "assistant" && role != "system" && role != "developer" {
 				return nil, ErrUnsupported
 			}
+			if to == "anthropic" && role == "user" {
+				content, err := anthropicContent(item["content"])
+				if err != nil {
+					return nil, err
+				}
+				messages = append(messages, Object{"role": role, "content": content})
+				continue
+			}
 			t, e := text(item["content"])
 			if e != nil {
 				return nil, e
@@ -494,14 +504,18 @@ func fromResponses(m Object, to string) (Object, error) {
 			if err := allowed(item, "type id call_id output status"); err != nil {
 				return nil, err
 			}
-			t, e := text(item["output"])
-			if e != nil {
-				return nil, e
-			}
 			if to == "anthropic" {
-				messages = append(messages, Object{"role": "user", "content": []any{Object{"type": "tool_result", "tool_use_id": item["call_id"], "content": t}}})
+				content, err := anthropicContent(item["output"])
+				if err != nil {
+					return nil, err
+				}
+				messages = append(messages, Object{"role": "user", "content": []any{Object{"type": "tool_result", "tool_use_id": item["call_id"], "content": content}}})
 			} else {
-				messages = append(messages, Object{"role": "tool", "tool_call_id": item["call_id"], "content": t})
+				content, err := text(item["output"])
+				if err != nil {
+					return nil, err
+				}
+				messages = append(messages, Object{"role": "tool", "tool_call_id": item["call_id"], "content": content})
 			}
 		default:
 			return nil, ErrUnsupported

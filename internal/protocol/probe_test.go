@@ -48,9 +48,9 @@ func TestProbeTextMetadataDoesNotRequireConversion(t *testing.T) {
 			// The previous probe reused this conversion parser, which rejects
 			// metadata it cannot preserve in another protocol.
 			_, conversionErr := ParseResponse(raw, "responses")
-			if metadata == `"logprobs":null,"annotations":null` {
+			if metadata == `"logprobs":null,"annotations":null` || metadata == `"logprobs":[]` {
 				if conversionErr != nil {
-					t.Fatalf("null metadata conversion changed: %v", conversionErr)
+					t.Fatalf("empty metadata conversion changed: %v", conversionErr)
 				}
 			} else if !errors.Is(conversionErr, ErrUnsupported) {
 				t.Fatalf("conversion boundary changed: %v", conversionErr)

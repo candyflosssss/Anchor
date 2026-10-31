@@ -19,7 +19,7 @@ HTTP 入口 → protocol.NewSession → RequestInfo / CheckCapabilities
 | --- | --- |
 | `internal/protocol/session.go` | 不可变的客户端原生请求与转换基线；每个候选独立 Prepare；请求编码与私有返回映射绑定 |
 | `ingress.go`、`client_tools.go` | 类型化 RequestInfo / Capabilities；无状态与工具执行边界校验；不访问模型库、不执行工具 |
-| `request.go`、`chat_request.go`、`anthropic_request.go` | 现有协议结构适配与白名单校验；参数、输出格式、历史思考、工具身份和 custom 包装规则 |
+| `request.go`、`chat_request.go`、`anthropic_request.go`、`anthropic_history.go`、`anthropic_content.go` | 现有协议结构适配与白名单校验；参数、输出格式、历史思考、工具身份和 custom 包装规则 |
 | `attempt_response.go`、`response.go` | 有界读取、普通响应语义校验、工具还原和客户端编码；返回 Usage、Observation、Diagnostics |
 | `stream.go` | 同步增量 SSE 解析／编码，只依赖 reader/writer；工具分片、索引、终止、内容和数量上限 |
 | `stream_http.go` | 兼容旧 Stream 入口；HTTP 写期限和刷新适配到通用 writer，不参与协议语义 |
@@ -46,9 +46,11 @@ Session 复制入口字节，保留客户端协议。`PolicyFields` 是供旧日
 
 Responses／Chat → Messages 还允许校验并省略字符串 `prompt_cache_key`：非空值记录 `prompt_cache_key_omitted` 降级，空串／null 不记降级；Messages 不承诺相同的缓存亲和，不合成为 `cache_control` 或 metadata。该值不进入日志，原生 Responses／Chat 和 Responses → Chat 保留字段；非法类型、其他未知字段和显式服务档位仍按既有规则拒绝。详情见 [Messages 请求选项支持表](protocol-anthropic-bridge.md#缓存亲和提示兼容修复2026-11-01当前源码未发布)。
 
-Responses／Chat → Messages 对公开强度 low／medium／high／xhigh／max 同名生成 `output_config.effort`，与供应商对话测试入口一致；不隐式开启 thinking 或猜预算，none 仍发送 disabled。经校验的 `text.verbosity=low|medium|high` 以 `text_verbosity_omitted` 明确降级；空／null 不记降级，未知值、结构化格式、minimal／default 及非空推理历史拒绝边界保持。正常客户端选项必须组合回归，不能只用 none 证明会话兼容；详见 [Messages 支持表](protocol-anthropic-bridge.md#正常-codex-强度与文本样式2026-11-01当前源码未发布)。
+Responses／Chat → Messages 对公开强度 low／medium／high／xhigh／max 同名生成 `output_config.effort`，与供应商对话测试入口一致；不隐式开启 thinking 或猜预算，none 仍发送 disabled。经校验的 `text.verbosity=low|medium|high` 以 `text_verbosity_omitted` 明确降级；空／null 不记降级，未知值、结构化格式、minimal／default 及非法推理历史仍拒绝；Messages 历史思考的显式投影见下条。正常客户端选项必须组合回归，不能只用 none 证明会话兼容；详见 [Messages 支持表](protocol-anthropic-bridge.md#正常-codex-强度与文本样式2026-11-01当前源码未发布)。
 
 Responses／Chat → Messages 允许 system／developer 文本出现在会话中间：按输入相对顺序合并到顶层 system，保留 instructions 在前，不丢指令或会话正文。非空后置指令以 `instruction_scope_hoisted` 明确报告作用域扩大，前缀／空后置内容不记此项；不承诺逐位置权限语义等价。真实输入的本地无网络转换与文本保留边界见 [Messages 支持表](protocol-anthropic-bridge.md#会话中的后置指令2026-11-01当前源码未发布)。
+
+Messages 目标现对已校验的历史 reasoning 在当前 Attempt 副本中省略，以 `reasoning_history_omitted` 明确记录思考及其摘要连续性损失；assistant 的已知 phase 记录 `message_phase_omitted`。可见消息、工具调用／结果及 user／工具结果图片按限定标准转换并保留，图片精度选择器损失记录 `image_detail_omitted`；非法容器、其他不透明内容仍拒绝。原 Session、客户端历史、原生与 Responses → Chat 边界及网络／恢复预算不变。空 output_text annotations／logprobs 可规范化，非空仍拒绝。完整历史与图片保留验证见 [Messages 支持表](protocol-anthropic-bridge.md#已有会话的历史投影与图片2026-11-01当前源码未发布)。
 
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
 
@@ -103,7 +105,7 @@ Diagnostics 只含客户端／上游协议、request/response/stream 阶段、�
 
 新增 Session 测试覆盖三协议九种组合、同协议保留、普通／流式、明确零与未知用量、并发 Prepare／候选污染、请求拒绝／降级、顺序多块的提前交付、增量／取消／写失败、工具及事件／累计上限；既有适配器测试继续覆盖思考和输出格式、长名称、碰撞、歧义、custom 转义及密文恢复。网关用隔离 SQLite 与 httptest 上游跑普通和流式两轮并行 function/custom 工具闭环，包含候选切换、结果回传、最终答案和日志脱敏。实际执行命令与结果见本轮任务记录；没有真实供应商、Agent 配置、桌面安装或运行版本验收。
 
-跨协议的多模态、tool_search、签名思考、Responses 输出 reasoning/custom 的未实现方向，以及无法无损表示的未知字段仍不支持。详细 Responses → Chat 支持表见[现有桥接说明](protocol-chat-bridge.md)。
+除已验证的 Messages 目标 user／工具结果图片外，其他跨协议多模态、tool_search、签名思考、Responses 输出 reasoning/custom 的未实现方向，以及无法无损表示的未知字段仍不支持。详细 Responses → Chat 支持表见[现有桥接说明](protocol-chat-bridge.md)。
 
 
 ### 网关调度会话与重试边界（2026-10-21，当前源码未发布）

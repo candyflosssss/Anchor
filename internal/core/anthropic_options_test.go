@@ -35,7 +35,7 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 					if m["system"] != "FIRST_INSTRUCTION\nTURN_INSTRUCTION" || !strings.Contains(string(body), "PRIVATE_EARLY_PROMPT") || !strings.Contains(string(body), "PRIVATE_PROMPT") {
 						t.Error("lost instructions or conversation", m)
 					}
-					if r.URL.Path != "/messages" || m["model"] != "claude-up" || strings.Contains(string(body), "PRIVATE_METADATA") || strings.Contains(string(body), "PRIVATE_CACHE_KEY") || m["prompt_cache_key"] != nil || strings.Contains(string(body), "encrypted_content") {
+					if r.URL.Path != "/messages" || m["model"] != "claude-up" || strings.Contains(string(body), "PRIVATE_METADATA") || strings.Contains(string(body), "PRIVATE_CACHE_KEY") || m["prompt_cache_key"] != nil || strings.Contains(string(body), "encrypted_content") || strings.Contains(string(body), "PRIVATE_CIPHER") || strings.Contains(string(body), "PRIVATE_THOUGHT") {
 						t.Errorf("invalid converted request: %s %s", r.URL.Path, body)
 					}
 					config, _ := m["output_config"].(map[string]any)
@@ -76,9 +76,10 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 				m := protocol.Object{"model": "public", "stream": stream, "prompt_cache_key": "PRIVATE_CACHE_KEY"}
 				if client == "responses" {
 					m["input"] = []any{
-						protocol.Object{"type": "reasoning", "summary": []any{}, "encrypted_content": nil},
+						protocol.Object{"type": "reasoning", "summary": []any{protocol.Object{"type": "summary_text", "text": "PRIVATE_THOUGHT"}}, "encrypted_content": "PRIVATE_CIPHER"},
 						protocol.Object{"role": "developer", "content": "FIRST_INSTRUCTION"},
 						protocol.Object{"role": "user", "content": "PRIVATE_EARLY_PROMPT"},
+						protocol.Object{"role": "assistant", "phase": "commentary", "content": "VISIBLE_PROGRESS"},
 						protocol.Object{"role": "developer", "content": "TURN_INSTRUCTION"},
 						protocol.Object{"role": "user", "content": "PRIVATE_PROMPT"},
 					}
@@ -95,6 +96,8 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 						protocol.Object{"role": "user", "content": "PRIVATE_PROMPT"},
 					}
 					m["response_format"] = protocol.Object{"type": "text"}
+					history, _ := m["messages"].([]any)
+					m["messages"] = append(history[:2], append([]any{protocol.Object{"role": "assistant", "content": "VISIBLE_PROGRESS", "reasoning_content": "PRIVATE_THOUGHT"}}, history[2:]...)...)
 					m["reasoning_effort"] = effort
 					m["verbosity"] = "medium"
 				}
@@ -111,7 +114,7 @@ func TestAnthropicGatewayOpenAIOptions(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "instruction_scope_hoisted") || !strings.Contains(detail.Evidence["translation_degradations"], "text_verbosity_omitted") || !strings.Contains(detail.Evidence["translation_degradations"], "prompt_cache_key_omitted") || (client == "responses" && !strings.Contains(detail.Evidence["translation_degradations"], "client_metadata_omitted")) {
+				if detail.Evidence["translation_compatibility"] != "degraded" || !strings.Contains(detail.Evidence["translation_degradations"], "reasoning_history_omitted") || !strings.Contains(detail.Evidence["translation_degradations"], "instruction_scope_hoisted") || !strings.Contains(detail.Evidence["translation_degradations"], "text_verbosity_omitted") || !strings.Contains(detail.Evidence["translation_degradations"], "prompt_cache_key_omitted") || (client == "responses" && !strings.Contains(detail.Evidence["translation_degradations"], "client_metadata_omitted")) {
 					t.Fatal(detail.Evidence)
 				}
 				stored, _ := json.Marshal(detail)

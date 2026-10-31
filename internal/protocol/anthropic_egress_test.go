@@ -98,8 +98,6 @@ func TestAnthropicEgressSafeOptionFailures(t *testing.T) {
 		{`"reasoning":{"effort":"PRIVATE_VALUE"}`, "reasoning_options"},
 		{`"reasoning":{"effort":{}}`, "reasoning_options"},
 		{`"reasoning":{"summary":"PRIVATE_VALUE"}`, "reasoning_options"},
-		{`"input":[{"type":"reasoning","summary":[{"type":"summary_text","text":"PRIVATE_THOUGHT"}]}]`, "reasoning_history"},
-		{`"input":[{"type":"reasoning","summary":[],"encrypted_content":"PRIVATE_CIPHER"}]`, "encrypted_reasoning_history"},
 		{`"input":[{"type":"reasoning","summary":[],"encrypted_content":12}]`, "encrypted_reasoning_history"},
 		{`"input":[{"type":"reasoning","summary":[],"private-field":"PRIVATE_VALUE"}]`, "reasoning_history"},
 	} {

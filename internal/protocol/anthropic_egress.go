@@ -2,7 +2,8 @@ package protocol
 
 // prepareAnthropicRequest handles Responses options before the shared message
 // encoder. Effort uses the documented output_config selector, independently
-// of thinking. Never guess a budget or discard history to make a request send.
+// of thinking. Foreign reasoning history is projected explicitly with diagnostics;
+// visible conversation and tool history must remain intact.
 func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 	keys := "model input instructions stream temperature top_p tools tool_choice max_output_tokens store background parallel_tool_calls prompt_cache_key client_metadata stream_options include truncation text reasoning"
 	if err := allowed(m, keys); err != nil {
@@ -91,13 +92,16 @@ func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 		}
 	}
 	delete(m, "reasoning")
+	if err := prepareAnthropicHistory(m); err != nil {
+		return nil, nil, err
+	}
 	mapping, err := prepareMappedTools(m)
 	return mapping, options, err
 }
 
 func anthropicEgressDegradations(raw []byte) []Degradation {
 	m, _ := Decode(raw)
-	var d []Degradation
+	d := anthropicHistoryDegradations(m)
 	seenConversation := false
 	for _, value := range arr(m["input"]) {
 		item := obj(value)

@@ -14,6 +14,7 @@
 - namespace 展平为 Chat 函数名，支持 64 字节名称限制及碰撞隔离，逐请求／逐候选保存映射，返回恢复 name/namespace；未指定 namespace 时仅解析唯一的局部工具名，不猜测歧义身份。
 - custom 工具转为函数，参数为 `{"input":"原始自由文本"}`；历史调用／结果和强制 tool_choice 同步转换，响应恢复为 custom_tool_call。grammar 的 syntax/definition 保留在函数描述中，**降为提示词约束，不等于原生语法受限生成**。支持顶层 tools 与 Responses Lite 的 additional_tools 声明。
 - 流式保留 reasoning、正文、并行工具的独立 output_index；普通函数参数仍增量发送。custom 包装参数在已有 16 MiB 转换上限内有界缓冲，待完整 JSON 字符串校验成功后发送原始 input，避免分片转义／Unicode 被破坏或泄露 JSON 包装。缺失终止事件、非法／截断参数不发送 response.completed。
+- 历史／普通输出文本中的 annotations／logprobs 仅为空数组或 null 时可规范化；非空引用／采样信息及非法容器继续拒绝。此空值规则由共享文本校验器执行，不放宽 Responses → Chat 历史密文或图片边界。
 - 非流式同样恢复思考／工具身份；usage 转换保留已知 reasoning_tokens，未知不伪造零；probe 不把明文思考当作最终可见回复。
 
 ## 仍会明确拒绝

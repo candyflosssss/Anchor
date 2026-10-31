@@ -21,7 +21,7 @@
 
 Messages 上游的明文 thinking 在 Responses 客户端返回为独立 reasoning summary，在 Chat 客户端返回为 reasoning_content；普通与流式路径一致。每次出现此转换，诊断记录 `anthropic_thinking_plaintext` 和 degraded。签名不会被标为 OpenAI encrypted_content，也不会混进正文或诊断。
 
-这是明文展示转换，无法保留 Anthropic 的签名验证和推理历史连续性。带签名的 Messages 历史、redacted_thinking、不透明历史密文、Responses／Chat 非空明文思考回放到 Messages 继续拒绝；不能把本轮输出支持理解为签名历史的跨协议往返。thinking／budget_tokens 等专有请求参数继续仅原生保留；output_config.effort 的公开强度选择器按下方规则跨协议映射，不按模型名猜测预算或改写强度。引用注解、图片、音频、文件和托管工具也不在本轮跨协议支持范围。
+这是明文展示转换，无法保留 Anthropic 的签名验证和推理历史连续性。带签名的 Messages 历史、redacted_thinking、不透明历史密文、Responses／Chat 的历史思考在 Messages 派发副本中按下方显式投影策略省略并记录连续性损失；不能把本轮输出支持理解为签名历史的跨协议往返。thinking／budget_tokens 等专有请求参数继续仅原生保留；output_config.effort 的公开强度选择器按下方规则跨协议映射，不按模型名猜测预算或改写强度。非空引用注解、音频、文件和托管工具继续不在已验证的跨协议支持范围；user／工具结果图片的限定支持见下节。
 
 ## 流式与用量
 
@@ -56,7 +56,7 @@ Messages → 其他协议分别跟踪文本、thinking 和工具块，校验索�
 | stream_options.reasoning_summary_delivery=sequential_cutoff | 省略并记录 reasoning_summary_delivery；未知选项／值拒绝，不转发 Responses SSE 选项 |
 | include=[reasoning.encrypted_content] | 可选返回投影不发送，记录 encrypted_reasoning_projection；不生成或丢弃已有密文，未知 include 拒绝 |
 | truncation=disabled | 等价于不自动截断；auto／未知值以 truncation 拒绝 |
-| 空 reasoning 历史项 | 校验既有字段及 summary/content part 结构后，不生成 Messages 内容块；非空明文以 reasoning_history 拒绝，非空／非法密文以 encrypted_reasoning_history 拒绝 |
+| reasoning 历史项 | 校验字段及 summary/content part 后，Messages 派发副本省略历史思考块；非空明文摘要／思考或字符串密文记录 reasoning_history_omitted，空项不记损失。非法密文类型／未知字段仍拒绝；原生及 Chat 方向不变 |
 
 空／null 传输选项不产生降级；原生请求仍保留上述字段。每个 Attempt 独立处理私有副本，失败候选不污染下一次准备；不清理客户端历史、不触发额外请求或重试。此修复不扩展多模态、签名思考、结构化输出或任意推理强度支持，已随 desktop.76 投放；已有安装仍需通过在线更新安装新版核心。
 
@@ -81,7 +81,7 @@ Responses／Chat → Messages 现在仅接受字符串或 null 的 `prompt_cache
 
 Messages 的公开 [effort 文档](https://platform.claude.com/docs/en/build-with-claude/effort) 和 [SDK 固定版本](https://github.com/anthropics/anthropic-sdk-go/blob/d38e929d2d031c5052818af00c0a276a2d7e498c/message.go) 已定义 output_config.effort=low／medium／high／xhigh／max；Anchor 的供应商对话测试入口已有相同映射。网关现在同名发送这些值，保留请求的强度选择，不把 xhigh 降为 high，不臆造 token 预算，也不额外开启 thinking。公开协议映射不表示每个旧模型或中转站都支持这些值；上游明确拒绝仍按既有错误返回，不自动改档或重试。
 
-Messages 没有同等的 verbosity 字段；仅 low／medium／high 在校验后省略，记录 text_verbosity_omitted 降级。不改写提示词，不宣称等价保留了回答详略要求。空／null 不产生该降级，原生 Responses／Chat 保留原字段。未知 verbosity、结构化格式约束、minimal／default 等未映射强度，以及非空历史明文推理和密文仍明确拒绝。
+Messages 没有同等的 verbosity 字段；仅 low／medium／high 在校验后省略，记录 text_verbosity_omitted 降级。不改写提示词，不宣称等价保留了回答详略要求。空／null 不产生该降级，原生 Responses／Chat 保留原字段。未知 verbosity、结构化格式约束、minimal／default 等未映射强度，及非法思考历史仍明确拒绝；Messages 目标已校验历史思考的显式投影见下方已有会话支持表。
 
 回归将两种入口、六种强度、三种 verbosity 与缓存／传输选项组合验证，并通过隔离 HTTP 上游检查普通／流式发送、日志降级和脱敏、非法类型拒绝、候选保留，以及 xhigh＋verbosity 的两轮 custom 工具调用。没有调用真实付费上游，也没有把模拟上游结果称为用户原会话恢复。
 
@@ -99,3 +99,16 @@ Messages 只有请求顶层 system，没有逐消息 system／developer 角色�
 修复后的本地实际输入离线转换通过，并逐条核对指令／用户文本未丢失；私有输入不打印、不提交、不随包发布，也未发送给真实上游。另以无私有内容的样例覆盖两种入口、前缀／后置／空指令、原生候选隔离，以及含后置 developer 的24组普通／流式网关请求和两轮 custom 工具闭环。此结果证明请求准备分支通过，不代表实际付费上游响应或用户会话已验收。
 
 已随 desktop.79 dev 投放；安装后实际核心需升至 .79。本轮已验证真实本地输入准备分支和默认源下载，没有自动替换运行实例或验收真实上游响应。
+
+
+## 已有会话的历史投影与图片（2026-11-01，当前源码未发布）
+
+05:37 的真实失败由 desktop.79 核心处理，类别为 encrypted_reasoning_history，尚未派发。对应 Codex 0.163 会话在失败前保存162项 input：22条消息、38条 reasoning、51个函数调用及51个结果，含7份图片结果和7条带 phase 的历史回答。仅修顶层选项或单 user 输入不足以证明旧会话切换可用。
+
+Messages 无法验证 OpenAI 推理密文，也不能直接接收无 Anthropic 签名的思考历史。现在默认在目标为 Messages 的 Attempt 私有副本中，校验后省略整个 reasoning 块，包含其中的明文摘要／思考和密文；非空内容记录 reasoning_history_omitted，明确隐藏思考及其摘要连续性丢失，不解密、不伪造签名、不把它当作普通回答。客户端持久历史、Session 基线和后续原生候选保留原值；用户消息、可见回答、工具调用／结果和其他不透明载荷不因此移除。原生 Responses 密文拒绝后的单次恢复、Responses → Chat 历史密文拒绝继续独立保留。非法 reasoning 容器／摘要／密文类型／未知字段仍拒绝，不能借投影抹去非法内容。
+
+历史 assistant message 的 phase=commentary／final_answer 校验后省略，以 message_phase_omitted 记录阶段信息损失；未知值和非法角色继续拒绝。output_text 的 annotations／logprobs 仅为空数组或 null 时可规范化，非空或错误类型不得丢弃。
+
+user 消息与 function/custom 工具结果中的 input_image 按标准 Messages image.source 转换：PNG／JPEG／GIF／WebP data URL 校验 base64 后保留原数据与媒介类型，HTTP(S) URL 原样转发且本地不获取；保持与周围文本的顺序及 tool_use_id。file_id、未知媒体、音频或任意内容仍拒绝。detail 的 low／high／original 以 image_detail_omitted 记录精度选择器损失，auto／缺失／null 不记此项；不删除图片、不替换占位或捏造描述。参照 [Anthropic SDK 固定版本 image/tool_result 类型](https://github.com/anthropics/anthropic-sdk-go/blob/d38e929d2d031c5052818af00c0a276a2d7e498c/message.go)，上游模型是否支持仍由实际响应决定。
+
+对实际会话 input 做本地无网络验证：修复前复现 encrypted_reasoning_history；完整投影后逐项核对22条消息、51个调用、51个结果和7份图片，文本／参数／ID与图片解码字节均保持，后续原生 input 仍与原值一致。顶层请求控制项为合成设置，完整线上 HTTP 原请求及当前全部工具声明不可得，因此不称为完整线上请求重放；没有发送私有历史到付费上游。私有副本与临时测试不提交或打包，验证后删除。另以合成样例覆盖 malformed／unknown 拒绝、候选隔离、Chat 明文思考往返、图片顺序与非法媒体、普通／流式和工具闭环；实际执行结果见任务记录。
