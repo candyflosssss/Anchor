@@ -61,10 +61,12 @@ Messages → 其他协议分别跟踪文本、thinking 和工具块，校验索�
 
 验证包括协议选项／拒绝边界、原生保留与候选隔离，以及本地模拟 HTTP 上游的 Responses／Chat × 普通／流式派发、降级日志脱敏和发送前拒绝；执行结果以任务记录为准。没有请求真实付费上游或修改 Agent 配置。
 
-## 缓存亲和提示兼容修复（2026-11-01，当前源码未发布）
+<a id="缓存亲和提示兼容修复2026-11-01当前源码未发布"></a>
+
+## 缓存亲和提示兼容修复（2026-11-01，desktop.77 dev 已发布）
 
 Codex 0.163 的 [ResponsesApiRequest](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/codex-api/src/common.rs) 含有 `prompt_cache_key`，其[请求构造器](https://github.com/openai/codex/blob/rust-v0.163.0/codex-rs/core/src/client.rs)默认填入该值。前一轮 OpenAI 选项修复没有将它纳入 Messages 目标白名单；只增加此字段就能在派发前复现 `candidate protocol anthropic cannot represent request (request_fields)`。这是合成回归与固定版本客户端源码确认的缺口，尚未取得用户原始失败请求，不能据此断定唯一原因。
 
 Responses／Chat → Messages 现在仅接受字符串或 null 的 `prompt_cache_key`，校验后从当前 Attempt 的派发副本中省略；非空字符串记录 `prompt_cache_key_omitted` 和 degraded，缺失、空串或 null 不产生降级。Messages 没有对应的缓存亲和键，不把它改装成 `cache_control`、metadata 或网关会话身份，也不将键值写入错误或日志。这会失去该提示的缓存亲和，不承诺上游缓存命中。
 
-原生 Responses／Chat、Responses → Chat 继续保留原字段；准备 Messages 候选不会污染后续候选。非法类型仍以 `request_fields` 拒绝，其他未知字段、显式服务档位、真实推理强度、格式约束和历史密文的拒绝边界保持。回归覆盖两种客户端、普通／流式模拟 HTTP、降级诊断、日志脱敏、非法类型预派发拒绝及候选保留；实际执行情况见任务记录。修复没有自动替换运行核心，也未请求真实付费上游。
+原生 Responses／Chat、Responses → Chat 继续保留原字段；准备 Messages 候选不会污染后续候选。非法类型仍以 `request_fields` 拒绝，其他未知字段、显式服务档位、真实推理强度、格式约束和历史密文的拒绝边界保持。回归覆盖两种客户端、普通／流式模拟 HTTP、降级诊断、日志脱敏、非法类型预派发拒绝及候选保留；实际执行情况见任务记录。已随 desktop.77 dev 投放；已有安装须通过在线更新安装新版核心。本轮未自动替换真实运行实例，也未请求真实付费上游。

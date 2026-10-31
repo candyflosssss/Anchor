@@ -1,10 +1,29 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-10-31。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.76](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.76)，发布于 `2026-10-31T02:09:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c4479303ab22c6fb25e8395e0b86ebced0a10630`、SOURCE dirty=false。
-- 修复 OpenAI → Claude 的请求选项准备：普通文本、Codex 已知传输选项与空推理历史可正确处理；不能映射的推理强度、非空历史密文及格式约束返回具体类别。沿用 schema10。
+- 更新：2026-11-01。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.77](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.77)，发布于 `2026-11-01T01:44:00+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `4bf86e9cf88f5dea432af0a7e36b0a14708c7c1f`、SOURCE dirty=false。
+- 修复 Codex 携带 prompt_cache_key 时 Anthropic 候选在本地被 request_fields 拒绝的问题；校验后省略缓存亲和提示并明确记录降级。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="claude-cache-key-77"></a>
+
+## Anthropic 缓存亲和提示兼容修复 .77（已发布 dev）
+
+修复 Codex 携带 prompt_cache_key 时 Anthropic 候选在本地被 request_fields 拒绝的问题；校验后省略缓存亲和提示并明确记录降级。沿用 schema10。 Responses／Chat → Messages 接受字符串或 null 的缓存键，非空字符串记录 prompt_cache_key_omitted；不转发其值、不改装为 Messages 缓存断点或用户元数据。省略后不保留该提示的缓存亲和，不承诺上游缓存命中。原生请求与 Responses → Chat 保留原字段；非法类型、未知字段、真实推理强度、格式约束及非空历史密文继续明确拒绝。支持范围见[Messages 桥接](../design/protocol-anthropic-bridge.md#缓存亲和提示兼容修复2026-11-01当前源码未发布)。
+
+从干净隔离 worktree 的 `4bf86e9cf88f5dea432af0a7e36b0a14708c7c1f` 构建，SOURCE dirty=false，输入摘要 `26989bb8cfaf67675b4d7fb82a346d52dd07f8c23a2a98101bf16ee3b2821892`；未纳入原工作区其他任务未提交改动。于 `2026-11-01T01:44:00+08:00` 发布为 dev prerelease，非 latest。产物和证据位于 `dist/desktop/0.1.0-dev.desktop.77/`。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.77_amd64.deb` | 29272356 | `66a024eac7c23c8a49d45b384c901331e2198a144073413bc5a470879d27b579` |
+| `Anchor-Desktop-0.1.0-dev.desktop.77-windows-amd64-setup.exe` | 31286822 | `00788f42156e43b2b641712be85cca04adad4441fbc67d489f201712c2c1a739` |
+
+复用修复阶段在当前工作区和干净远端主线上已通过的协议包全测与 Anthropic 定向网关回归，包括 Responses／Chat × 普通／流式、非法类型发送前拒绝、日志脱敏和候选隔离。本轮完成 Go／TS 契约比对、TypeScript／Vite、Windows AMD64 与 Ubuntu24.04 AMD64 生产编译、NSIS 和 deb 打包。首轮复制依赖时展开工具入口链接造成 TypeScript 启动失败，修正任务自有依赖副本后重试成功；首轮未生成安装包，失败日志保留。
+
+11 项同版附件包括两平台安装包、desktop runtime、独立 CLI、两个更新清单、含 Go vendor 及固定 mihomo 对应源码／vendor 的源码包、许可／构建元数据和 SHA256SUMS。嵌入前端／mihomo、deb 与 runtime 载荷一致、对应源码输入摘要、本地哈希和 metadata ZIP CRC 核对通过；全部 GitHub 附件大小／digest、tag 指向构建提交及非 latest 状态通过。
+
+默认 dev 源在隔离数据目录实际下载 Linux runtime、旧客户端兼容 deb 与独立 CLI，版本／目标／大小／SHA256 及运行程序版本通过；Windows 安装器、runtime 和 CLI 的远端 digest 与本地匹配。证据见 publication/preparation-verification.json、publication-verification.json 和 online-verification.json；BUILD.json 保留构建时未发布／未原生验收的事实。仅投放，未安装或修改真实实例／Agent 配置，未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求真实付费上游。
 
 <a id="claude-options-76"></a>
 

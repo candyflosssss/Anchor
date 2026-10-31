@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-10-31。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.76](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.76)，发布于 `2026-10-31T02:09:18+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `c4479303ab22c6fb25e8395e0b86ebced0a10630`、SOURCE dirty=false。
-- 修复 OpenAI → Claude 的请求选项准备：普通文本、Codex 已知传输选项与空推理历史可正确处理；不能映射的推理强度、非空历史密文及格式约束返回具体类别。沿用 schema10。
+- 更新：2026-11-01。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.77](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.77)，发布于 `2026-11-01T01:44:00+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `4bf86e9cf88f5dea432af0a7e36b0a14708c7c1f`、SOURCE dirty=false。
+- 修复 Codex 携带 prompt_cache_key 时 Anthropic 候选在本地被 request_fields 拒绝的问题；校验后省略缓存亲和提示并明确记录降级。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .77 在线投放（2026-11-01）
+
+修复 Codex 缓存亲和键触发 Anthropic request_fields 拒绝；非空提示在校验后省略并显式记录降级，不承诺同等缓存亲和。11 附件远端摘要、构建 tag 和非 latest 状态通过；默认 dev 源 Linux runtime／旧客户端 deb／CLI 三条真实下载及版本／大小／SHA256 校验通过。仅投放，未安装或实机验收；详见[发行记录](../release/desktop.md#claude-cache-key-77)。
 
 ## .76 在线投放（2026-10-31）
 
