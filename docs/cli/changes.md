@@ -1,6 +1,6 @@
 # Anchor CLI 指令变更历史
 
-## 2026-11-01 — Messages 消费已保存输出预算（当前源码未发布）
+## 2026-11-01 — Messages 消费已保存输出预算（desktop.81 dev 已发布）
 
 - 类型：修改既有模型设置的生效行为；无新增命令、参数或配置字段。
 - 指令：`model settings --id ID --file FILE`；现有日志详情／导出入口。

@@ -1,10 +1,14 @@
 # 在线更新 v1
 
 - 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.80](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.80)，发布于 `2026-11-01T05:56:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1af3b730c04ba9f595b04f3c79b1a44f8df41ad5`、SOURCE dirty=false。
-- 已有 Codex 会话切换 Anthropic 时，在派发副本显式省略无法跨协议使用的历史思考，保留可见消息、工具链和图片；同时支持已知消息阶段与空输出元数据，明确记录各项信息损失。沿用 schema10。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.81](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.81)，发布于 `2026-11-01T06:18:49+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `475ee335fe752ee7d091c17171cd0fddb5cf85b6`、SOURCE dirty=false。
+- 修复 Anthropic 缺省输出预算固定4096的问题：客户端未指定时，按已保存默认输出预算、模型最大输出、兼容4096依次补全；显式客户端上限保留，增加准备预算与来源诊断。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+## .81 在线投放（2026-11-01）
+
+修复Messages缺省预算忽略已保存模型输出声明而固定4096的问题，优先保留客户端上限，再用模型默认／最大输出，未知才兼容回退。记录准备预算与来源，实际截断仍返回incomplete且不续写。11附件摘要／tag／非latest与默认源runtime／旧客户端deb／CLI三条实际下载通过。未自动安装或验收用户真实生成，详见[发行记录](../release/desktop.md#claude-output-budget-81)。
 
 ## .80 在线投放（2026-11-01）
 

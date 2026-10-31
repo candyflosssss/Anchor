@@ -1,10 +1,33 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.80](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.80)，发布于 `2026-11-01T05:56:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `1af3b730c04ba9f595b04f3c79b1a44f8df41ad5`、SOURCE dirty=false。
-- 已有 Codex 会话切换 Anthropic 时，在派发副本显式省略无法跨协议使用的历史思考，保留可见消息、工具链和图片；同时支持已知消息阶段与空输出元数据，明确记录各项信息损失。沿用 schema10。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.81](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.81)，发布于 `2026-11-01T06:18:49+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `475ee335fe752ee7d091c17171cd0fddb5cf85b6`、SOURCE dirty=false。
+- 修复 Anthropic 缺省输出预算固定4096的问题：客户端未指定时，按已保存默认输出预算、模型最大输出、兼容4096依次补全；显式客户端上限保留，增加准备预算与来源诊断。沿用 schema10。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
 - 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+
+<a id="claude-output-budget-81"></a>
+
+## Anthropic 缺省输出预算修复 .81（已发布 dev）
+
+06:02 的实际请求由 .80 核心处理，已派发至 Anthropic，输出4096 Token并以max_tokens结束，generation_status=incomplete。对应已保存映射limits.output=128000、default_output_tokens=null，旧 Session／转换器仍固定插入4096。此前仅请求转换回归没有验证缺省输出预算及超过4096的生成。
+
+修复 Anthropic 缺省输出预算固定4096的问题：客户端未指定时，按已保存默认输出预算、模型最大输出、兼容4096依次补全；显式客户端上限保留，增加准备预算与来源诊断。沿用 schema10。 Messages必需max_tokens由协议层基于保存的类型化声明选择，不按名称猜值、不在派发时查目录、不写回配置。最大能力只作为缺省预算回退，未伪造成已知默认值。更高上限允许更多实际输出用量；需要较小单次默认预算时保存default_output_tokens。普通／流式及三种入口共用，其他目标不注入，达到上限继续如实返回incomplete，不自动续写／重放已交付内容。规则见 [Messages 支持表](../design/protocol-anthropic-bridge.md#缺省输出预算2026-11-01当前源码未发布)。
+
+诊断增加translation_max_output_tokens和固定translation_output_budget_source（client／model_default／model_limit／legacy_fallback），只表示准备值，实际派发另看已有事实；候选切换清除旧值。模型设置说明、CLI大全与变更历史、模型参考目录及前端契约已同步，无新增命令／参数／配置字段。保存模型设置影响核心后续新请求；Agent能力文件仍按原流程同步。
+
+从干净隔离 worktree 的 `475ee335fe752ee7d091c17171cd0fddb5cf85b6` 构建，SOURCE dirty=false，输入摘要 `d697f5b315e6996c4096466c71aac366f0af0563019bc4bda3953fc903b3e796`；未纳入主工作区其他未提交内容。于 `2026-11-01T06:18:49+08:00` 发布为dev prerelease，非latest；产物和证据位于 `dist/desktop/0.1.0-dev.desktop.81/`。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.81_amd64.deb` | 29279564 | `4416073233124086ed01d73eb79948756467e65e8a54086bbcf1f70e14a57fe4` |
+| `Anchor-Desktop-0.1.0-dev.desktop.81-windows-amd64-setup.exe` | 31296874 | `b5ab850b107fa47a33349c0a3bb264f3160100b556c74f12e46d506148ca277f` |
+
+隔离模拟网关修复前复现保存128000却发4096；修复后协议包全测、18组预算优先级／null／候选隔离、30组Responses／Chat／Messages普通与流式网关组合，以及显式小／大预算、默认优先、真实截断与一次派发诊断通过。已有Anthropic历史／图片／工具和原生密文恢复定向回归保留。模型设置View原有7项单测通过；首轮发现其他默认值文案缺少“不自动改写请求”，明确补充未生效控制后通过，未修改测试断言。
+
+Go／TS契约、TypeScript／Vite、Windows AMD64与Ubuntu24.04 AMD64生产编译、NSIS／deb打包完成。11附件同版包括两平台安装包／runtime／CLI、两清单、Go vendor及固定mihomo对应源码／vendor、许可元数据和SHA256SUMS。嵌入前端／mihomo、deb与runtime一致、源码输入摘要、ZIP CRC、本地哈希与GitHub全部大小／digest通过；tag指向实际构建提交，保持非latest。默认dev源在隔离目录实际下载Linux runtime、旧客户端兼容deb与CLI，版本／目标／大小／SHA256和程序实际版本通过；Windows三项程序远端摘要与本地一致。
+
+仅在线投放，未安装或重启真实实例、未修改Agent配置或请求真实付费上游；真实用户会话最终生成、双平台原生窗口／系统安装器与真实SSH升级未验收，未扩大为全仓库／race／浏览器套件。实际处理请求的核心需升至.81，SSH被控机单独更新。证据见publication下preparation-verification.json、publication-verification.json和online-verification.json。
 
 <a id="claude-history-80"></a>
 

@@ -118,7 +118,9 @@ user 消息与 function/custom 工具结果中的 input_image 按标准 Messages
 已随 desktop.80 dev 同版投放；需升级实际处理请求的核心。真实 input 离线准备与文本／工具／图片保留、两平台打包和默认源下载通过；真实上游生成和用户会话最终结果未在本轮验收。
 
 
-## 缺省输出预算（2026-11-01，当前源码未发布）
+<a id="缺省输出预算2026-11-01当前源码未发布"></a>
+
+## 缺省输出预算（2026-11-01，desktop.81 dev 已发布）
 
 06:02 的实际请求由 desktop.80 核心处理，已成功派发并返回上游内容，但输出4096 Token后以max_tokens结束，客户端收到 incomplete_details.reason=max_output_tokens。其已保存模型配置 limits.output=128000、default_output_tokens=null。旧 Session／转换器在客户端未给预算时直接插入4096，没有消费已保存输出声明；前轮仅验证转换通过，没有覆盖真实推理输出超过4096的场景。
 
@@ -127,3 +129,5 @@ user 消息与 function/custom 工具结果中的 input_image 按标准 Messages
 核心只向 AttemptOptions.OutputTokens 提供已保存 Default／Maximum，协议层负责字段与选择。无模型名猜测、派发时目录请求或额外上游调用。诊断新增 translation_max_output_tokens 与 translation_output_budget_source（client／model_default／model_limit／legacy_fallback），表示准备的预算，实际派发仍看 translation_dispatched；候选切换清掉旧预算事实。预算上限允许更长生成及相应实际用量，不代表请求必然用满，也不承诺回答完整。
 
 普通与流式的真实 max_tokens 结束仍编码 incomplete／max_output_tokens，不伪装 completed，不在内容已交付后自动续写或重放。回归覆盖已保存128000却发送4096的修复前复现、默认预算优先、显式小／大预算、null／未知声明、候选隔离、30组普通／流式网关组合和最终日志；未请求真实付费上游。
+
+已随desktop.81 dev投放；需升级实际处理请求的核心。本轮模拟请求／两平台构建与默认源下载通过，未自动安装或验收用户真实生成。

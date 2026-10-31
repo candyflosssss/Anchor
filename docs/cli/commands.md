@@ -1,6 +1,7 @@
 # Anchor 最新 CLI 指令大全
 
 - 最近核对：2026-11-01
+- 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
 - 2026-11-01 已随 desktop.80 dev 同版投放：Messages 目标可对历史思考做显式有损投影，记录 reasoning_history_omitted；已知消息阶段和图片精度选择器损失另记录，可见消息／工具链／图片保留。客户端原历史不改，实际核心需更新至 .80，无新增命令或参数，详见[发行记录](../release/desktop.md#claude-history-80)。
 - 2026-11-01 已随 desktop.79 dev 同版投放：Responses／Chat 的后置 system／developer 指令按序合并至 Messages 顶层 system，保留文本并记录 instruction_scope_hoisted；修复真实会话的 request_content 拒绝。无新增命令参数，实际核心需更新至 .79，详见[发行记录](../release/desktop.md#claude-instructions-79)。
 - 2026-11-01 已随 desktop.78 dev 同版投放：Responses／Chat 的 low／medium／high／xhigh／max 同名映射 Anthropic output_config.effort，已知 verbosity 显式降级；修复正常客户端 text_format／reasoning_options 拒绝。无新增命令或参数，实际核心需更新至 .78，详见[发行记录](../release/desktop.md#claude-controls-78)。
