@@ -98,6 +98,23 @@ func prepareAnthropicRequest(m Object) (*ChatMapping, Object, error) {
 func anthropicEgressDegradations(raw []byte) []Degradation {
 	m, _ := Decode(raw)
 	var d []Degradation
+	seenConversation := false
+	for _, value := range arr(m["input"]) {
+		item := obj(value)
+		switch item["type"] {
+		case "reasoning", "additional_tools":
+			continue
+		}
+		if item["role"] == "system" || item["role"] == "developer" {
+			content, _ := text(item["content"])
+			if seenConversation && content != "" {
+				d = append(d, InstructionScopeHoisted)
+				break
+			}
+		} else {
+			seenConversation = true
+		}
+	}
 	if obj(m["text"])["verbosity"] != nil {
 		d = append(d, TextVerbosityOmitted)
 	}

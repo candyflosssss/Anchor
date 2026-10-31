@@ -23,6 +23,7 @@ const (
 type Degradation string
 
 const (
+	InstructionScopeHoisted    Degradation = "instruction_scope_hoisted"
 	TextVerbosityOmitted       Degradation = "text_verbosity_omitted"
 	SummaryStyle               Degradation = "reasoning_summary_style"
 	EncryptedProjection        Degradation = "encrypted_reasoning_projection"

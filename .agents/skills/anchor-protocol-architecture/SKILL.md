@@ -52,6 +52,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 - Responses／Chat → Messages 可在校验 prompt_cache_key 为字符串后省略缓存亲和提示；非空字符串须记录 prompt_cache_key_omitted 降级，空串／null 不记降级。不得把该值改装成 Messages cache_control、metadata 或会话路由身份，也不得转发或写入诊断。原生 Responses／Chat 与 Responses → Chat 保留原字段；非法类型和其他未知字段继续拒绝。此例外不放宽 service_tier、推理强度、输出格式或历史密文边界。
 - Responses／Chat → Messages 请求先由协议适配器校验选项：普通 text 格式、disabled truncation 与空 reasoning 历史可规范化；effort=none 明确映射 thinking.type=disabled；low／medium／high／xhigh／max 按公开 Messages 契约同名映射 output_config.effort，与供应商对话测试入口保持一致，不附带 thinking、不猜测预算或按模型名改档，目标模型是否支持仍由其明确回包决定。minimal／default／未知强度继续拒绝。已知 low／medium／high 的 text.verbosity 可校验后省略并记录 text_verbosity_omitted，不能把该例外扩大到结构化格式或未知约束。仅字符串 client_metadata、已知 sequential_cutoff 传输选项、reasoning summary 样式及可选密文返回投影可按既有安全类别显式降级；未知字段、不能表示的格式／强度要求、非空明文推理历史与非空密文继续准确拒绝，不能冒充正文错误。此入口不更改原生保留、Session 基线、候选或恢复预算。
 - 当前允许的 Responses → Chat 降级为 reasoning_summary_style、encrypted_reasoning_projection、custom_grammar_description；Messages 目标复用 custom_grammar_description，并按上一条处理请求选项。Messages 入口跨协议允许经过校验的缓存提示降级 prompt_cache_control、工具错误标志文本化 tool_result_error_text；Messages 返回明文 thinking 允许以 anthropic_thinking_plaintext 降级成独立推理内容，签名不得标为 OpenAI 密文，不承诺思考历史往返。具体语义以支持表为准。grammar 文字描述不保留原生强制语法约束；可选密文输出投影的降级不允许丢弃非空历史密文。
+- Responses／Chat → Messages 的 system／developer 文本按输入中的相对顺序合并到顶层 system，保留既有 instructions 在前；允许在 user／assistant／工具项之后出现指令，不丢正文或降为普通 user。非空后置指令因作用域扩大必须记录 instruction_scope_hoisted 降级；仅前缀指令或空后置内容不记此项。不得宣称局部时序／权限完全等价，原生及 Chat 目标仍保持自身规则，未知字段与不可表示内容继续拒绝。
 - Messages 与 Chat 目标复用同一请求局部 namespace／custom 工具索引；不得维护另一套命名、历史重建和返回还原规则。Messages 原生 type=custom 仅代表客户端执行函数，不扩大到托管工具。
 - 密文不可解密时不伪造明文，不将思考作为正文。非空密文历史不能跨协议转换时必须拒绝；多模态、tool_search、签名思考等仅按已验证方向声明支持。
 - 保留明确的原生 Responses 密文拒绝恢复：未向客户端交付、同渠道至多一次、原期限内，由派生 Session 清理历史 reasoning，明确记录有损语义，不扩大触发或重试预算。
@@ -75,7 +76,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 - 协议层返回固定、安全的客户端／目标协议、request／response／stream 阶段、错误类别、兼容性及降级事实；网关补充实际上游派发和客户端交付状态并持久化。
 - 网关可记录目录内错误身份、固定传输原因/阶段和供应商期限；有界读取最多16 KiB上游错误并完整还原响应体，协议层 ClassifyUpstreamError 将 code/type 映射为固定类别。推理强度拒绝仅按已知 unsupported_value/invalid_value 与固定 effort 参数路径，或完整已知错误模板及白名单强度枚举识别为 unsupported_reasoning_effort；参数路径、模型名及 message 均不入日志。不得根据此诊断自动改强度或重放，未知内容不入日志。
 - 不记录原始正文、提示词、思考、工具参数、凭据、任意用户字段名或未经处理的上游错误；包装错误也不能展开这些信息。外部错误或配置契约确需改变时，遵循适用 CLI 文档规则同步契约。
-- Codex 请求回归应组合验证正常客户端会一起发送的缓存键、元数据、include、文本样式和真实推理强度；不能只用 effort=none 或逐字段最小请求证明正常会话兼容。至少核对实际失败日志中的类别／强度与运行版本；日志不保存正文时不要把构造样例称为原始请求重放。
+- Codex 请求回归应组合验证正常客户端会一起发送的缓存键、元数据、include、文本样式和真实推理强度；不能只用 effort=none 或逐字段最小请求证明正常会话兼容。至少核对实际失败日志中的类别／强度与运行版本；内容阶段失败时在可读取的对应本机会话上做无网络的输入转换验证，核对实际角色顺序及文本保留；不得只用单 user 样例验证真实 Codex 会话。私有输入仅放任务自有磁盘临时目录，不打印、不提交或打包，完成后清理。日志不保存正文时不要把构造样例称为原始请求重放。
 - 按影响范围选择测试，覆盖已支持组合及拒绝边界、原生保留、普通／流式、思考正文分离、输出格式、工具定义与结果、namespace／custom／并行、长名碰撞歧义；工具变更验证定义 → 调用 → 客户端结果回传 → 最终答案的完整闭环。
 - 生命周期改动验证并发请求、候选切换、恢复隔离和取消清理；流式改动验证提前交付、参数截断、终止、上限、写失败及输出后不重放；诊断改动验证未知／零用量、阶段和脱敏。
 - 复用 `internal/protocol/session_test.go`、`chat_bridge_test.go`、`native_reasoning_test.go` 及 `internal/core/translation_gateway_test.go`、`encrypted_context_test.go`；使用隔离状态与模拟 HTTP 上游，不修改真实 Agent 配置或调用付费上游。

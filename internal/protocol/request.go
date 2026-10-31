@@ -443,9 +443,9 @@ func fromResponses(m Object, to string) (Object, error) {
 				return nil, e
 			}
 			if to == "anthropic" && (role == "system" || role == "developer") {
-				if len(messages) > 0 {
-					return nil, ErrUnsupported
-				}
+				// Messages has one request-wide system channel. Keep every
+				// instruction in source order; late instruction scope expansion
+				// is reported by anthropicEgressDegradations.
 				if prior := str(out["system"]); prior != "" {
 					t = prior + "\n" + t
 				}

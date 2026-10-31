@@ -12,6 +12,7 @@
 | Messages 普通自定义函数 | 接受省略 type 或 `type=custom` 的客户端执行工具；托管工具仍由能力检查拒绝 |
 | Messages system／文本块／工具声明／tool_result 中的 cache_control | 仅接受 ephemeral，ttl 可省略或为 5m／1h；跨协议不发送缓存断点，记录 `prompt_cache_control`；原生请求保留 |
 | Messages tool_result.is_error | 必须为布尔值；true 时将结果文本加上 `[Tool execution failed]\n`，记录 `tool_result_error_text`；false 不加前缀 |
+| Responses／Chat 后置 system／developer | 按原输入相对顺序合并到顶层 system，instructions 在前；非空指令晚于会话内容时记录 instruction_scope_hoisted，明确作用域扩大；前缀或空后置指令不记降级 |
 | Messages metadata.user_id | 映射到 Responses／Chat 的 user；未知 metadata 字段拒绝 |
 
 工具结果通过下一次请求携带的声明、历史、namespace／name／call_id 重新建立映射；没有跨 HTTP 请求的工具注册表。未知字段、非法角色和工具输入类型仍拒绝，不用宽松过滤来掩盖丢失。
@@ -85,3 +86,12 @@ Messages 没有同等的 verbosity 字段；仅 low／medium／high 在校验后
 回归将两种入口、六种强度、三种 verbosity 与缓存／传输选项组合验证，并通过隔离 HTTP 上游检查普通／流式发送、日志降级和脱敏、非法类型拒绝、候选保留，以及 xhigh＋verbosity 的两轮 custom 工具调用。没有调用真实付费上游，也没有把模拟上游结果称为用户原会话恢复。
 
 已随 desktop.78 dev 同版投放；已有安装需更新实际处理请求的核心。两平台编译／打包及默认源下载通过，用户原会话与真实付费上游未在本轮验收。
+
+
+## 会话中的后置指令（2026-11-01，当前源码未发布）
+
+运行核心为 desktop.78 的 03:58 真实请求仍以 request_content 在派发前失败。对应 Codex 0.163 本机会话保存了 developer → user → developer → user 四条输入；移除客户端对第三方接口本就不发送的 internal_chat_message_metadata_passthrough 后，在隔离任务目录对这些实际输入执行无网络转换，修复前重现相同类别。原转换器在已有 user／assistant／工具消息后遇到 system／developer 就直接拒绝，前几轮仅选项与单 user 测试没有覆盖这条分支。
+
+Messages 只有请求顶层 system，没有逐消息 system／developer 角色。现在按输入相对顺序收集这些文本，接在已有 instructions 后；保留全部指令和会话文本，继续合并相邻相同 Messages 角色。非空后置指令被提升为请求全局指令，作用范围扩大，必须记录 instruction_scope_hoisted 和 degraded；不声称保留了逐位置权限／时序语义。前缀指令及空后置内容不产生此降级。原生候选不改输入位置，Chat 目标不受影响；未知字段、非文本内容、历史推理／密文及格式约束仍按现有边界处理。
+
+修复后的本地实际输入离线转换通过，并逐条核对指令／用户文本未丢失；私有输入不打印、不提交、不随包发布，也未发送给真实上游。另以无私有内容的样例覆盖两种入口、前缀／后置／空指令、原生候选隔离，以及含后置 developer 的24组普通／流式网关请求和两轮 custom 工具闭环。此结果证明请求准备分支通过，不代表实际付费上游响应或用户会话已验收。

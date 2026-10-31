@@ -48,6 +48,8 @@ Responses／Chat → Messages 还允许校验并省略字符串 `prompt_cache_ke
 
 Responses／Chat → Messages 对公开强度 low／medium／high／xhigh／max 同名生成 `output_config.effort`，与供应商对话测试入口一致；不隐式开启 thinking 或猜预算，none 仍发送 disabled。经校验的 `text.verbosity=low|medium|high` 以 `text_verbosity_omitted` 明确降级；空／null 不记降级，未知值、结构化格式、minimal／default 及非空推理历史拒绝边界保持。正常客户端选项必须组合回归，不能只用 none 证明会话兼容；详见 [Messages 支持表](protocol-anthropic-bridge.md#正常-codex-强度与文本样式2026-11-01当前源码未发布)。
 
+Responses／Chat → Messages 允许 system／developer 文本出现在会话中间：按输入相对顺序合并到顶层 system，保留 instructions 在前，不丢指令或会话正文。非空后置指令以 `instruction_scope_hoisted` 明确报告作用域扩大，前缀／空后置内容不记此项；不承诺逐位置权限语义等价。真实输入的本地无网络转换与文本保留边界见 [Messages 支持表](protocol-anthropic-bridge.md#会话中的后置指令2026-11-01当前源码未发布)。
+
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。
 
 ## 兼容策略与本轮实际行为变化
