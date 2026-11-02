@@ -97,8 +97,13 @@ func TestLogReferenceCostCLI(t *testing.T) {
 			t.Fatal(raw, err)
 		}
 	}
+	var stats logbook.Stats
+	rawStats := run("logs", "stats")
+	if err = json.Unmarshal([]byte(rawStats), &stats); err != nil || stats.Summary.Requests != 1 || stats.Summary.CostUSD != nil || *stats.Summary.CostSamples != 0 || !strings.Contains(rawStats, `"cost_samples"`) {
+		t.Fatal("unknown final cost must not fall back to raw reference cost", rawStats, err)
+	}
 	var help bytes.Buffer
-	if err := (App{Out: &help, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil || !strings.Contains(help.String(), "reference_cost") || !strings.Contains(help.String(), "cost_adjustment") || !strings.Contains(help.String(), "under 3h old") {
+	if err := (App{Out: &help, Err: io.Discard}).Run(context.Background(), []string{"help"}); err != nil || !strings.Contains(help.String(), "reference_cost") || !strings.Contains(help.String(), "cost_adjustment") || !strings.Contains(help.String(), "under 3h old") || !strings.Contains(help.String(), "cost_usd") || !strings.Contains(help.String(), "cost_samples") {
 		t.Fatal(help.String(), err)
 	}
 }

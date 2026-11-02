@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import fixture from '../../../../contract/log-stats.json';
-import { bucketRange, chartInterval, chartPaths, checkedStats, errorStatsQuery, formatStat, statsQuery, validInterval } from './log-stats.model';
+import { bucketRange, chartInterval, chartPaths, checkedStats, errorStatsQuery, costObservation, formatMetric, formatStat, metricValue, statsQuery, validInterval } from './log-stats.model';
 import { initialFilters } from './log.model';
 import { logService } from './log.service';
 afterEach(() => vi.unstubAllGlobals());
@@ -104,4 +104,38 @@ it('reads through the controlled bridge and never falls back on unavailable host
   await expect(logService.stats(fixture.query)).rejects.toMatchObject({ code: 'unsupported' });
   vi.stubGlobal('window', { go: { desktop: { Bridge: { LogStats: async () => ({ contract: fixture.contract, data: fixture.stats, problem: null }) } } } });
   expect(await logService.stats(fixture.query)).toEqual(fixture.stats);
+});
+
+it('preserves final cost precision, known zero, partial coverage and older cores', () => {
+  const stats = checkedStats(structuredClone(fixture.stats));
+  expect(metricValue(stats.summary, 'cost')).toBe(0.000492);
+  expect(formatMetric(metricValue(stats.summary, 'cost'), 'cost', true)).toBe('0.000492');
+  expect(metricValue(stats.buckets[1].values, 'cost')).toBeNull();
+  expect(metricValue(stats.buckets[2].values, 'cost')).toBe(0);
+  expect(formatMetric(null, 'cost')).toBe('—');
+  expect(formatMetric(0, 'cost')).toBe('0');
+  expect(formatMetric(0.0000001, 'cost')).toBe('1.00e-7');
+  expect(costObservation(stats.summary)).toBe('2/3 次费用已知 · 仅已知小计');
+  expect(costObservation(stats.buckets[2].values)).toBe('1/1 次费用已知');
+  for (const v of [stats.summary, ...stats.buckets.map(b => b.values)]) {
+    Reflect.deleteProperty(v, 'cost_usd'); Reflect.deleteProperty(v, 'cost_samples');
+  }
+  expect(checkedStats(stats)).toBe(stats);
+  expect(metricValue(stats.summary, 'cost')).toBeNull();
+  expect(costObservation(stats.summary)).toContain('请更新核心版本');
+});
+it('rejects malformed costs and inconsistent cost sample counts', () => {
+  for (const change of [
+    (v: typeof fixture.stats.summary) => { v.cost_usd = '-1'; },
+    (v: typeof fixture.stats.summary) => { v.cost_usd = 'NaN'; },
+    (v: typeof fixture.stats.summary) => { v.cost_usd = '1/2'; },
+    (v: typeof fixture.stats.summary) => { v.cost_samples = 4; },
+    (v: typeof fixture.stats.summary) => { v.cost_samples = -1; },
+    (v: typeof fixture.stats.summary) => { v.cost_samples = 0; },
+    (v: typeof fixture.stats.summary) => { Reflect.deleteProperty(v, 'cost_usd'); },
+    (v: typeof fixture.stats.summary) => { Reflect.deleteProperty(v, 'cost_samples'); },
+  ]) {
+    const stats = structuredClone(fixture.stats); change(stats.summary);
+    expect(() => checkedStats(stats)).toThrow();
+  }
 });

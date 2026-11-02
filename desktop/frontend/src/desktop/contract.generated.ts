@@ -980,6 +980,8 @@ export interface StatsQuery {
   interval_ms: number;
 }
 export interface StatsValues {
+  cost_usd: string | null;
+  cost_samples?: number | null;
   requests: number;
   completed: number;
   errors: number;

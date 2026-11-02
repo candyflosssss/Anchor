@@ -30,6 +30,13 @@ func TestStatisticsFullRangeFiltersAndNulls(t *testing.T) {
 		r.Input = input
 		r.Output = output
 		r.ElapsedMS = elapsed
+		if id == "good" || id == "good2" {
+			usd := "0.000492"
+			if id == "good2" {
+				usd = "0"
+			}
+			r.ReferenceCost = &ReferenceCost{Currency: "USD", Adjustment: &CostAdjustment{USD: &usd}}
+		}
 		r.Metrics.CacheReadTokens = cache
 		r.Metrics.TimeToFirstOutputMS = first
 		if id == "good2" {

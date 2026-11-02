@@ -3,6 +3,7 @@ package logbook
 import (
 	"context"
 	"database/sql"
+	"math/big"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +18,9 @@ type StatsQuery struct {
 	IntervalMS    int64  `json:"interval_ms"`
 }
 type StatsValues struct {
+	CostUSD *string `json:"cost_usd"`
+	// Nil when an older core omitted the cost capability; new statistics always set it.
+	CostSamples        *int64   `json:"cost_samples,omitempty"`
 	Requests           int64    `json:"requests"`
 	Completed          int64    `json:"completed"`
 	Errors             int64    `json:"errors"`
@@ -121,6 +125,9 @@ func (q *StatsQuery) Validate() error {
 type statsAccumulator struct {
 	StatsValues
 	input, output, tpsOutput, tpsMS, cacheRead, cacheInput, latency, first int64
+
+	cost        big.Rat
+	costSamples int64
 }
 
 func ratio(n, d int64, scale float64) *float64 {
@@ -132,6 +139,12 @@ func ratio(n, d int64, scale float64) *float64 {
 }
 func (a *statsAccumulator) values() StatsValues {
 	v := a.StatsValues
+	costSamples := a.costSamples
+	v.CostSamples = &costSamples
+	if costSamples > 0 {
+		usd := strings.TrimRight(strings.TrimRight(a.cost.FloatString(30), "0"), ".")
+		v.CostUSD = &usd
+	}
 	if v.UsageSamples > 0 {
 		in, out, total := a.input, a.output, a.input+a.output
 		v.InputTokens = &in
@@ -205,12 +218,15 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 	// Stats uses [since,before), whereas the historical list includes before.
 	where = append(where, "created_at<?")
 	args = append(args, out.BeforeMS)
-	// Extract only numeric observations, never load attempts/evidence/body documents into memory.
+	// Extract only observations and the frozen final cost, never attempts/evidence/body documents.
 	rows, err := reader.QueryContext(ctx, `SELECT created_at,status,
  json_extract(document,'$.input'),json_extract(document,'$.output'),json_extract(document,'$.elapsed_ms'),
  json_extract(document,'$.metrics.cache_read_tokens'),
  COALESCE(json_extract(document,'$.metrics.time_to_first_output_ms'),json_extract(document,'$.metrics.time_to_first_text_ms')),
- COALESCE(json_extract(document,'$.attempt_count'),json_array_length(document,'$.attempts'),0), `+groupColumn+`
+ COALESCE(json_extract(document,'$.attempt_count'),json_array_length(document,'$.attempts'),0),
+ CASE WHEN json_extract(document,'$.reference_cost.currency')='USD'
+ AND json_type(document,'$.reference_cost.adjustment.usd')='text'
+ THEN json_extract(document,'$.reference_cost.adjustment.usd') END, `+groupColumn+`
  FROM requests WHERE `+strings.Join(where, " AND "), args...)
 	if err != nil {
 		return out, ErrUnavailable
@@ -219,17 +235,22 @@ func (s *Store) Statistics(ctx context.Context, q StatsQuery) (Stats, error) {
 	for rows.Next() {
 		var at, attempts int64
 		var status, group string
+		var cost sql.NullString
 		var input, output, elapsed, cache, first sql.NullInt64
-		if rows.Scan(&at, &status, &input, &output, &elapsed, &cache, &first, &attempts, &group) != nil {
+		if rows.Scan(&at, &status, &input, &output, &elapsed, &cache, &first, &attempts, &cost, &group) != nil {
 			return out, ErrUnavailable
 		}
 		i := (at - out.SinceMS) / out.IntervalMS
+		amount := statsCost(cost)
+		buckets[i].addCost(amount)
+		total.addCost(amount)
 		buckets[i].add(status, input, output, elapsed, cache, first, attempts)
 		total.add(status, input, output, elapsed, cache, first, attempts)
 		if q.GroupBy != "" {
 			if groups[group] == nil {
 				groups[group] = &statsAccumulator{}
 			}
+			groups[group].addCost(amount)
 			groups[group].add(status, input, output, elapsed, cache, first, attempts)
 		}
 	}

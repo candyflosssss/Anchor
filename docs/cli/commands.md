@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-11-01
+- 最近核对：2026-11-02
 - 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
 - 2026-11-01 已随 desktop.80 dev 同版投放：Messages 目标可对历史思考做显式有损投影，记录 reasoning_history_omitted；已知消息阶段和图片精度选择器损失另记录，可见消息／工具链／图片保留。客户端原历史不改，实际核心需更新至 .80，无新增命令或参数，详见[发行记录](../release/desktop.md#claude-history-80)。
 - 2026-11-01 已随 desktop.79 dev 同版投放：Responses／Chat 的后置 system／developer 指令按序合并至 Messages 顶层 system，保留文本并记录 instruction_scope_hoisted；修复真实会话的 request_content 拒绝。无新增命令参数，实际核心需更新至 .79，详见[发行记录](../release/desktop.md#claude-instructions-79)。
@@ -956,11 +956,13 @@ Agent 只从已验证绑定采集；绑定 ID 不是进程 ID。项目／会话�
 
 values 的 requests 包括 pending/cancelled；completed=succeeded+failed+interrupted，errors=failed+interrupted，error_rate=errors/completed×100，pending/cancelled 不计错误率分母。用量只累加输入输出均已知请求，input_tokens/output_tokens/total_tokens 是已知小计并带 usage_samples；总量不另加缓存或思考。tps 是成功且输出已知／总耗时>0样本的 sum(output)×1000/sum(elapsed_ms)，不是桶或请求速率简单平均；cache_hit_rate 是单次尝试且输入>0、0≤cache≤input已知样本的 sum(cache)/sum(input)×100。latency_ms 和 first_output_ms 是有效观测均值，首字回退旧正文首字，各指标带样本数。没有相应观测时为 null，明确观测零保留0；空桶不补造 TPS／用量／率。summary 使用同一查询原始累加器，非桶均值。统计受日志保留和 health 丢弃／写入失败限制，不代表永久消费账本，详见[日志趋势口径](../design/logging.md#9-请求趋势统计2026-10-16当前源码未打包)。
 
+2026-11-02 当前源码（未打包／未发布）：`logs stats` 的 summary、每个 bucket.values 与分类 groups[].values 新增 `cost_usd`（可空 USD 十进制字符串）和 `cost_samples`（费用已知请求数）。仅精确累加日志已保存的最终参考费用 `reference_cost.adjustment.usd`，已含供应商／分组倍率；不回退原始费用、不按当前价格补算历史、不重复累计尝试。无样本为 null／0，明确免费为字符串零／正样本数，部分已知为已知小计，仍受筛选范围及日志保留限制，不代表实际账单。无新增命令／参数，需升级核心才有字段；桌面「消费额」切换为展示入口，无独立CLI。详见[消费额统计](../design/logging.md#消费额统计2026-11-02当前源码未打包未发布)。
+
 `list` 输出 `{requests,events,next_cursor,latest,has_more,health}`，列表省略 attempts 及其他 evidence 大字段，仅保留下述五项档位证据，详情输出完整安全 Request。HTTP/用量/指标缺失为 null，明确报告零仍为0。根请求任一尝试用量未知时总量未知。尝试最多64项，attempt_count 保存实际总数。 2026-10-21 当前源码（未发布）在 `list/detail/follow/export` 的 Request 增加可选 `known_usage: {input, output, attempts}`，只累加输入输出均确认的尝试，保留已知零，无确认用量时省略。列表仍省略 attempts 明细但保留该小计；根 `input/output`、统计、总 TPS 与总费用仍要求完整用量。新记录的小计覆盖超过64项的已知尝试；旧记录在读取时从留存明细恢复，不写回历史，不补造截断用量。无新命令／参数，旧客户端可忽略字段，旧核心不返回小计，需升级核心后使用。
 
 2026-10-19 当前源码（未打包发布）：`logs list/detail/follow/export` 的请求记录新增可选 `reference_cost`，包含 `usd`（可空十进制字符串）、`currency=USD`、`basis=text_tokens`、未能计算时的 `reason`，以及价格来源、参考模型、目录版本、获取时间、陈旧标识和完整 `pricing` 快照。`detail/export` 的每次尝试新增可选 `reference_usd`。按每次尝试分别处理缓存、思考和长上下文分档，再合计根请求；任一次用量或所需单价不完整时总价为 null，明确免费为字符串零。无参考价格及旧日志不添加快照，不以当前价格回填历史。2026-10-20 当前源码新增价格缓存维护：核心启动时后台预取，成功缓存每小时更新，映射增删改提交后异步检查（供应商／Key 删除引起的映射清理同样覆盖）；新请求计价只用获取不足三小时的参考价。已选参考来源优先使用该身份的最新缓存，否则仅在已保存快照仍不足三小时时回退；超过一小时或刷新失败的回退标记 stale，不修改模型设置和历史费用。 后续源码保留上述 `usd` 为原始费用，增加 `reference_cost.adjustment`（最终 `usd/reason`、`supplier_multiplier/group_multiplier`、分组来源/观测时间/刷新失败快照、`supplier_mixed/group_mixed`、五类 `parts`）。每次尝试另有 `cost_adjustment`，根最终额按逐次原始额 × 供应商成本倍率 × Key 分组有效倍率求和，不将最后一次倍率套用全部请求。分组未知或用量不全最终为 null；倍率 0 不补未知用量。列表含乘区汇总，详情/导出含逐次快照；超出单条预算可能截断 attempts（有标记），总额保留。未记录的新项不回填。字段详见[日志设计](../design/logging.md)。桌面列选择与悬浮是纯展示，无需新增 CLI。
 
-已选参考来源时按其身份优先使用最新有效缓存，缺缓存时只回退到获取不足三小时的保存快照；没有保存来源时，仅使用核心内已缓存、获取不足三小时且所有候选精确匹配同一参考模型的目录。推理测试按实际上游模型匹配同一缓存。请求日志计价不获取或刷新网络目录；冷缓存、未知／歧义模型以及未显式选择参考价的加速映射不猜价。原始费用只估算文本 Token，最终费用另应用已记录的供应商/分组倍率；不包含未记录的平台附加系数、加速附加费，也不代表实际账单。命令和参数不变，须升级实际处理请求的核心才会采集新字段；`logs stats` 本轮不新增费用汇总。
+已选参考来源时按其身份优先使用最新有效缓存，缺缓存时只回退到获取不足三小时的保存快照；没有保存来源时，仅使用核心内已缓存、获取不足三小时且所有候选精确匹配同一参考模型的目录。推理测试按实际上游模型匹配同一缓存。请求日志计价不获取或刷新网络目录；冷缓存、未知／歧义模型以及未显式选择参考价的加速映射不猜价。原始费用只估算文本 Token，最终费用另应用已记录的供应商/分组倍率；不包含未记录的平台附加系数、加速附加费，也不代表实际账单。命令和参数不变，须升级实际处理请求的核心才会采集新字段；2026-10-19的参考费用增量未新增 stats 汇总；2026-11-02新增的消费额统计见上文。
 
 2026-10-16 增量（已随 desktop.41 dev 宿主／核心发布；独立公开 alpha.6 CLI 不含此增量）：代理及推理测试的 `logs list` / `logs follow` 在已有 `evidence` 字典中保留五项紧凑证据：`sent_service_tier`、`sent_service_tier_raw`、`upstream_service_tier`、`upstream_service_tier_raw`、`fast_triggered`。`logs detail REQUEST_ID` 与 `logs export` 仍返回完整安全证据，还包括入站 `requested_service_tier` / `requested_service_tier_raw` 与固定映射策略。派发字段取协议转换后的实际请求体，未派发为 `not_sent`、无档位参数为 `unspecified`；上游未报告时返回档位缺省。`*_raw` 为 JSON 标量文本，保留未知短名称、空字符串、null、布尔和数字，不把任意值强行解析成档位。字符串最多 128 UTF-8 字节、序列化后最多 256 字节，抑制对象／数组、控制字符与可识别凭据，不保存请求／响应正文。
 

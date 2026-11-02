@@ -4,10 +4,10 @@ import statsFixture from '../../contract/log-stats.json' with { type: 'json' };
 import { expect, test, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
 import fixture from '../../contract/logs.json' with { type: 'json' };
-import type { DesktopBridge, Query } from '../src/desktop/contract.generated';
+import type { DesktopBridge, Query, Stats } from '../src/desktop/contract.generated';
 const capture = process.env.ANCHOR_LOG_SCREENSHOTS;
 declare global { interface Window { logTest: { queries: Query[]; statsQueries: import('../src/desktop/contract.generated').StatsQuery[]; statsUnavailable: boolean; statsEmpty: boolean; exports: number; exportQueries: Query[]; settings: typeof fixture.settings; unavailable: boolean; paged: boolean; suggestionQueries: import('../src/desktop/contract.generated').SuggestionsQuery[]; suggestionsUnavailable: boolean; suggestionDelays: Record<string, number> } } }
-async function openLogs(page: Page, data = fixture, dimensions = false, stats = statsFixture) {
+async function openLogs(page: Page, data = fixture, dimensions = false, stats: { contract: string; stats: Stats } = statsFixture) {
   await page.addInitScript(({ f, sf, suggestions, df, dimensions }) => {
     window.logTest = { queries: [], statsQueries: [], statsUnavailable: false, statsEmpty: false, exports: 0, exportQueries: [], settings: f.settings, unavailable: false, paged: false, suggestionQueries: [], suggestionsUnavailable: false, suggestionDelays: {} };
     const result = <T,>(data: T) => ({ contract: f.contract, data, problem: null });
@@ -84,7 +84,7 @@ test('selected range scopes requests, errors, export and suggestions with clear 
   const range = page.getByRole('region', { name: '选中区间', exact: true });
   await expect(range).toContainText('1 次 / 1 类');
   await expect(range).toContainText('invalid_response');
-  await expect(range).toContainText('响应校验失败');
+  await expect(range).toContainText('上游返回了不受支持的内容。');
   await expect(page.getByRole('button', { name: '查看请求 fixture_success', exact: true })).toBeVisible();
   const selected = await page.evaluate(() => window.logTest.queries.at(-1)!);
   expect(selected.before_ms).toBeGreaterThan(selected.since_ms);
@@ -371,7 +371,7 @@ test('trend metrics, range, granularity, filter parity and keyboard inspection',
   const trends = page.getByRole('region', { name: '请求运行趋势' });
   await expect(trends.getByRole('button', { name: /已知用量/ })).toContainText('600');
   await expect(trends.locator('.log-chart-line')).not.toHaveCount(0);
-  for (const label of ['请求量', '总 TPS', '错误率', '缓存命中率', '平均耗时', '首字延迟']) {
+  for (const label of ['请求量', '消费额', '总 TPS', '错误率', '缓存命中率', '平均耗时', '首字延迟']) {
     await trends.getByRole('button', { name: new RegExp(label) }).click();
     await expect(trends.getByRole('slider')).toHaveAttribute('aria-label', new RegExp(label));
   }
@@ -939,4 +939,63 @@ test('refreshing and pausing logs preserve chart and row DOM until the query sco
   await expect(trends).toHaveAttribute('aria-busy', 'true');
   // Never present the previous provider's chart as results for the new filter.
   await expect(trends.getByRole('slider')).toHaveCount(0);
+});
+
+test('cost trend shows precise adjusted USD, partial coverage, known zero and missing samples', async ({ page }) => {
+  await openLogs(page);
+  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  const cost = trends.getByRole('button', { name: /消费额/ });
+  await expect(cost).toContainText('0.000492');
+  await cost.click();
+  await expect(cost).toHaveAttribute('aria-pressed', 'true');
+  await expect(trends.getByRole('status')).toHaveText('2/3 次费用已知 · 仅已知小计');
+  await expect(trends.locator('.log-chart-legend')).toContainText('USD · 参考费用');
+  await expect(trends.locator('.log-chart-line')).toHaveCount(1);
+  const chart = trends.getByRole('slider');
+  await chart.focus(); await page.keyboard.press('Home');
+  await expect(chart).toHaveAttribute('aria-valuetext', /1[/]2 次费用已知.*消费额 0[.]000492 USD/);
+  await expect(trends.getByRole('tooltip').locator('strong')).toHaveText('0.000492 USD');
+  // Sub-cent consumption uses a USD axis instead of the count-axis minimum of one.
+  const path = await trends.locator('.log-chart-line').getAttribute('d');
+  expect(Number(path!.match(/^M[0-9.]+,([0-9.]+)/)![1])).toBeLessThan(90);
+  await page.keyboard.press('ArrowRight');
+  await expect(chart).toHaveAttribute('aria-valuetext', /此时段无请求.*缺失值按 0 显示.*消费额 0 USD/);
+  await page.keyboard.press('ArrowRight');
+  await expect(trends.getByRole('tooltip').locator('strong')).toHaveText('0 USD');
+  await expect(trends.getByRole('tooltip')).toContainText('1/1 次费用已知');
+  await expect(trends.getByRole('tooltip')).not.toContainText('缺失值');
+  for (const theme of ['dark', 'light']) {
+    await page.evaluate(value => document.documentElement.classList.toggle('dark', value === 'dark'), theme);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    if (capture) await trends.screenshot({ path: resolve(capture, `cost-trend-${theme}.png`) });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(cost).toBeVisible();
+  expect(await trends.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  if (capture) await trends.screenshot({ path: resolve(capture, 'cost-trend-narrow.png') });
+});
+
+test('cost trend keeps missing historical costs unknown and explains older cores', async ({ page }) => {
+  await openLogs(page, fixture, true, dimensionsFixture);
+  const trends = page.getByRole('region', { name: '请求运行趋势' });
+  const cost = trends.getByRole('button', { name: /消费额/ });
+  await expect(cost).toContainText('—');
+  await cost.click();
+  await expect(trends.getByRole('status')).toHaveText('0/3 次费用已知 · 仅已知小计');
+  await page.evaluate(() => {
+    const api = window.go!.desktop!.Bridge!, read = api.LogStats;
+    api.LogStats = async q => {
+      const result = await read(q);
+      if (result.data) for (const values of [result.data.summary, ...result.data.buckets.map(b => b.values), ...(result.data.groups ?? []).map(g => g.values)]) {
+        Reflect.deleteProperty(values, 'cost_usd'); Reflect.deleteProperty(values, 'cost_samples');
+      }
+      return result;
+    };
+  });
+  await page.getByRole('button', { name: '刷新', exact: true }).click();
+  await expect(trends.getByRole('status')).toHaveText('当前核心未提供消费额统计，请更新核心版本');
+  await expect(cost).toContainText('—');
+  await trends.getByRole('button', { name: /请求量/ }).click();
+  await expect(trends.getByRole('slider')).toHaveAttribute('aria-label', /请求量趋势/);
 });

@@ -155,6 +155,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   version
 Normal output is JSON; logs export is JSONL, logs follow emits repeated JSON pages, agent token is raw secret.
 Logs include optional reference_cost: usd is original; adjustment stores supplier/group multipliers, final usd and token parts.
+logs stats includes cost_usd (known final reference USD subtotal) and cost_samples; missing costs stay unknown, not an actual bill.
 Reference prices refresh at core startup and hourly; mapping changes check the cache. New estimates require prices under 3h old.
 Key group rates refresh at startup/hourly and after configuration changes; rates older than 3h stay unknown for new costs/routing.
 Attempts retain reference_usd and cost_adjustment snapshots. Missing prices are omitted; unknown usage/rates stay null.

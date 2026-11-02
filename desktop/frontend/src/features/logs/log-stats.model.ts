@@ -1,7 +1,7 @@
 import type { Stats, StatsQuery, StatsValues } from '../../desktop/contract.generated';
 import { DesktopProblem } from '../../desktop/transport';
 import { identityQuery, type LogDimension, type LogFilters, type LogTimeRange } from './log.model';
-export type MetricID = 'requests' | 'tokens' | 'tps' | 'errors' | 'cache' | 'latency' | 'first';
+export type MetricID = 'requests' | 'cost' | 'tokens' | 'tps' | 'errors' | 'cache' | 'latency' | 'first';
 export const intervals = [
   { ms: 10000, label: '10 秒' }, { ms: 30000, label: '30 秒' }, { ms: 60000, label: '1 分钟' },
   { ms: 300000, label: '5 分钟' }, { ms: 900000, label: '15 分钟' }, { ms: 3600000, label: '1 小时' },
@@ -9,6 +9,7 @@ export const intervals = [
 ];
 export const metrics: { id: MetricID; label: string; unit: string; field: keyof StatsValues }[] = [
   { id: 'requests', label: '请求量', unit: '次', field: 'requests' },
+  { id: 'cost', label: '消费额', unit: 'USD', field: 'cost_usd' },
   { id: 'tokens', label: '已知用量', unit: 'Token', field: 'total_tokens' },
   { id: 'tps', label: '总 TPS', unit: 't/s', field: 'tps' },
   { id: 'errors', label: '错误率', unit: '%', field: 'error_rate' },
@@ -42,6 +43,13 @@ export function checkedStats(value: Stats): Stats {
     }
     for (const key of ['input_tokens', 'output_tokens', 'total_tokens', 'tps', 'error_rate', 'cache_hit_rate', 'latency_ms', 'first_output_ms'] as const) {
       if (v[key] !== null && (typeof v[key] !== 'number' || !Number.isFinite(v[key]) || v[key] < 0)) throw new DesktopProblem('read_error');
+    }
+    // Older cores omit cost_samples; keep their existing metrics readable.
+    if (v.cost_usd != null || v.cost_samples != null) {
+      if (typeof v.cost_samples !== 'number' || !Number.isSafeInteger(v.cost_samples) || v.cost_samples < 0 || v.cost_samples > v.requests
+        || (v.cost_usd !== null && (typeof v.cost_usd !== 'string' || v.cost_usd.length > 128
+          || !/^(0|[1-9][0-9]*)([.][0-9]{1,30})?$/.test(v.cost_usd) || !Number.isFinite(Number(v.cost_usd))))
+        || (v.cost_samples === 0) !== (v.cost_usd === null)) throw new DesktopProblem('read_error');
     }
     if ((v.error_rate ?? 0) > 100 || (v.cache_hit_rate ?? 0) > 100) throw new DesktopProblem('read_error');
   };
@@ -90,6 +98,19 @@ export { errorExplanation } from './log-error.model';
 export function formatStat(value: number | null, compact = false) {
   if (value === null) return '—';
   return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1, ...(compact ? { notation: 'compact' } : {}) }).format(value);
+}
+export function metricValue(values: StatsValues | undefined, metric: MetricID): number | null {
+  const value = values?.[metrics.find(m => m.id === metric)!.field];
+  return value == null ? null : Number(value);
+}
+export function formatMetric(value: number | null, metric: MetricID, compact = false) {
+  if (metric !== 'cost' || value === null) return formatStat(value, compact);
+  if (value > 0 && value < 0.000001) return value.toExponential(2);
+  return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 6, ...(compact && value >= 1000 ? { notation: 'compact' } : {}) }).format(value);
+}
+export function costObservation(values: StatsValues) {
+  if (values.cost_samples == null) return '当前核心未提供消费额统计，请更新核心版本';
+  return `${values.cost_samples}/${values.requests} 次费用已知${values.cost_samples < values.requests ? ' · 仅已知小计' : ''}`;
 }
 export function chartPaths(values: (number | null)[], max: number, width = 1000, height = 180, positions?: number[]): string[] {
   if (!values.length) return [];
