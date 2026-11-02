@@ -8,24 +8,36 @@ import (
 
 const DefaultCodexRetries = 5
 const MaxCodexRetries = 10
+const DefaultCodexCompactPercent = 90
 
 type CodexSettings struct {
-	Retries  int   `json:"retries"`
-	Revision int64 `json:"revision"`
+	Retries        int   `json:"retries"`
+	AutoCompact    bool  `json:"auto_compact"`
+	CompactPercent int   `json:"compact_percent"`
+	Revision       int64 `json:"revision"`
 }
 type SaveCodexSettings struct {
 	Retries          *int  `json:"retries"`
+	AutoCompact      *bool `json:"auto_compact"`
+	CompactPercent   *int  `json:"compact_percent"`
 	ExpectedRevision int64 `json:"expected_revision"`
 }
 
+func DefaultCodexSettings() CodexSettings {
+	return CodexSettings{Retries: DefaultCodexRetries, AutoCompact: true, CompactPercent: DefaultCodexCompactPercent, Revision: 1}
+}
+
 func (in SaveCodexSettings) Validate() error {
-	if in.Retries == nil || *in.Retries < 0 || *in.Retries > MaxCodexRetries || in.ExpectedRevision < 1 || in.ExpectedRevision >= 9007199254740991 {
+	if (in.Retries == nil && in.AutoCompact == nil && in.CompactPercent == nil) ||
+		(in.Retries != nil && (*in.Retries < 0 || *in.Retries > MaxCodexRetries)) ||
+		(in.CompactPercent != nil && (*in.CompactPercent < 1 || *in.CompactPercent > 99)) ||
+		in.ExpectedRevision < 1 || in.ExpectedRevision >= 9007199254740991 {
 		return ErrInvalid
 	}
 	return nil
 }
 func readCodexSettings(q interface{ QueryRow(string, ...any) *sql.Row }) (CodexSettings, error) {
-	out := CodexSettings{Retries: DefaultCodexRetries, Revision: 1}
+	out := DefaultCodexSettings()
 	var raw string
 	err := q.QueryRow(`SELECT value FROM meta WHERE key='codex_settings'`).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -34,7 +46,7 @@ func readCodexSettings(q interface{ QueryRow(string, ...any) *sql.Row }) (CodexS
 	if err != nil {
 		return out, err
 	}
-	if json.Unmarshal([]byte(raw), &out) != nil || out.Retries < 0 || out.Retries > MaxCodexRetries || out.Revision < 1 {
+	if json.Unmarshal([]byte(raw), &out) != nil || out.Retries < 0 || out.Retries > MaxCodexRetries || out.CompactPercent < 1 || out.CompactPercent > 99 || out.Revision < 1 {
 		return CodexSettings{}, ErrInvalid
 	}
 	return out, nil
@@ -56,7 +68,15 @@ func (s *Store) SaveCodexSettings(in SaveCodexSettings) (CodexSettings, error) {
 	if out.Revision != in.ExpectedRevision {
 		return out, ErrConflict
 	}
-	out.Retries = *in.Retries
+	if in.Retries != nil {
+		out.Retries = *in.Retries
+	}
+	if in.AutoCompact != nil {
+		out.AutoCompact = *in.AutoCompact
+	}
+	if in.CompactPercent != nil {
+		out.CompactPercent = *in.CompactPercent
+	}
 	out.Revision++
 	raw, err := json.Marshal(out)
 	if err != nil {

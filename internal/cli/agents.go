@@ -23,19 +23,30 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 	case "codex-settings":
 		f := a.flags("agent codex-settings")
 		retries := f.Int("retries", -1, "unified Codex request/stream retries, 0..10 (default 5)")
+		autoCompact := f.Bool("auto-compact", true, "automatically configure per-model compaction thresholds (default true)")
+		compactPercent := f.Int("compact-percent", 90, "compaction threshold as percent of declared context, 1..99 (default 90)")
 		revision := f.Int64("revision", 0, "expected settings revision (required when saving)")
 		if err := parse(f, args[1:]); err != nil {
 			return err
 		}
+		in := state.SaveCodexSettings{ExpectedRevision: *revision}
 		writing := false
 		f.Visit(func(flag *flag.Flag) {
-			if flag.Name == "retries" {
+			switch flag.Name {
+			case "retries":
+				in.Retries = retries
+				writing = true
+			case "auto-compact":
+				in.AutoCompact = autoCompact
+				writing = true
+			case "compact-percent":
+				in.CompactPercent = compactPercent
 				writing = true
 			}
 		})
 		if !writing {
 			if *revision != 0 {
-				return errors.New("--revision requires --retries")
+				return errors.New("--revision requires --retries, --auto-compact or --compact-percent")
 			}
 			v, err := c.CodexSettings(ctx)
 			if err != nil {
@@ -43,9 +54,8 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 			}
 			return a.output(v)
 		}
-		in := state.SaveCodexSettings{Retries: retries, ExpectedRevision: *revision}
 		if err := in.Validate(); err != nil {
-			return errors.New("--retries must be 0..10 and --revision is required")
+			return errors.New("--retries must be 0..10, --compact-percent must be 1..99 and --revision is required")
 		}
 		v, err := c.SaveCodexSettings(ctx, in)
 		if err != nil {

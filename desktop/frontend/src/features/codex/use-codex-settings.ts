@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CodexSettingsState } from '../../desktop/contract.generated';
 import { DesktopProblem } from '../../desktop/transport';
-import { codexSettingsError, codexSettingsService, parseRetries } from './codex-settings.model';
+import { codexSettingsError, codexSettingsService, parseCompactPercent, parseRetries } from './codex-settings.model';
 
 export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) => void) {
   const [state, setState] = useState<CodexSettingsState | null>(null);
   const [draft, setDraft] = useState('5'), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [needsRead, setNeedsRead] = useState(false);
+  const [autoCompact, setAutoCompact] = useState(true), [compactPercent, setCompactPercent] = useState('90');
   const epoch = useRef(0), lock = useRef(false);
   useEffect(() => {
     const lifecycle = { epoch, lock };
@@ -13,7 +14,7 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
     setState(null); setError(''); setNotice(''); setNeedsRead(false);
     lock.current = enabled; setBusy(enabled);
     if (enabled) void codexSettingsService.read().then(out => {
-      if (at === epoch.current) { setState(out); setDraft(String(out.settings.retries)); }
+      if (at === epoch.current) { setState(out); setDraft(String(out.settings.retries)); setAutoCompact(out.settings.auto_compact); setCompactPercent(String(out.settings.compact_percent)); }
     }).catch(e => { if (at === epoch.current) setError(codexSettingsError(e)); }).finally(() => {
       if (at === epoch.current) { lock.current = false; setBusy(false); }
     });
@@ -21,14 +22,14 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
   }, [enabled]);
   useEffect(() => { onActivity(busy); return () => onActivity(false); }, [busy, onActivity]);
   async function run(save: boolean) {
-    const retries = parseRetries(draft);
-    if (!enabled || lock.current || (save && (!state || needsRead || retries === null))) return;
+    const retries = parseRetries(draft), percent = parseCompactPercent(compactPercent);
+    if (!enabled || lock.current || (save && (!state || needsRead || retries === null || percent === null))) return;
     const at = epoch.current;
     lock.current = true; setBusy(true); setError(''); setNotice('');
     try {
-      const out = save ? await codexSettingsService.save({ retries, expected_revision: state!.settings.revision }) : await codexSettingsService.read();
+      const out = save ? await codexSettingsService.save({ retries, auto_compact: autoCompact, compact_percent: percent, expected_revision: state!.settings.revision }) : await codexSettingsService.read();
       if (at === epoch.current) {
-        setState(out); setDraft(String(out.settings.retries)); setNeedsRead(false);
+        setState(out); setDraft(String(out.settings.retries)); setAutoCompact(out.settings.auto_compact); setCompactPercent(String(out.settings.compact_percent)); setNeedsRead(false);
         if (save) setNotice(out.needs_sync.length ? '待同步' : '待重启');
       }
     } catch (e) {
@@ -38,5 +39,5 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
       }
     } finally { if (at === epoch.current) { lock.current = false; setBusy(false); } }
   }
-  return { state, draft, setDraft, busy, error, notice, needsRead, valid: parseRetries(draft) !== null, read: () => run(false), save: () => run(true) };
+  return { state, draft, setDraft, autoCompact, setAutoCompact, compactPercent, setCompactPercent, busy, error, notice, needsRead, valid: parseRetries(draft) !== null && parseCompactPercent(compactPercent) !== null, read: () => run(false), save: () => run(true) };
 }

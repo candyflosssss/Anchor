@@ -43,3 +43,37 @@ func TestCodexSettingsDefaultPersistenceAndConflict(t *testing.T) {
 		t.Fatal(got, out, err)
 	}
 }
+
+func TestCodexCompactionSettingsMigrationAndPartialUpdates(t *testing.T) {
+	s, err := Open(t.TempDir(), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	if _, err = s.db.Exec(`INSERT INTO meta(key,value) VALUES('codex_settings','{"retries":3,"revision":4}')`); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.CodexSettings()
+	if err != nil || !out.AutoCompact || out.CompactPercent != 90 || out.Retries != 3 || out.Revision != 4 {
+		t.Fatal(out, err)
+	}
+	disabled, percent := false, 80
+	out, err = s.SaveCodexSettings(SaveCodexSettings{AutoCompact: &disabled, CompactPercent: &percent, ExpectedRevision: out.Revision})
+	if err != nil || out.AutoCompact || out.CompactPercent != 80 || out.Retries != 3 {
+		t.Fatal(out, err)
+	}
+	for _, bad := range []int{0, 100, -1} {
+		if _, err = s.SaveCodexSettings(SaveCodexSettings{CompactPercent: &bad, ExpectedRevision: out.Revision}); !errors.Is(err, ErrInvalid) {
+			t.Fatal(bad, err)
+		}
+	}
+	retries := 7
+	out, err = s.SaveCodexSettings(SaveCodexSettings{Retries: &retries, ExpectedRevision: out.Revision})
+	if err != nil || out.AutoCompact || out.CompactPercent != 80 {
+		t.Fatal(out, err)
+	}
+	got, err := s.CodexSettings()
+	if err != nil || got != out {
+		t.Fatal(got, out, err)
+	}
+}

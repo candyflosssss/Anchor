@@ -9,6 +9,7 @@ import (
 	"math"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -88,6 +89,13 @@ func scalar(v any) (string, error) {
 	case string:
 		b, _ := json.Marshal(x)
 		return string(b), nil
+	case int64:
+		return strconv.FormatInt(x, 10), nil
+	case float64:
+		if math.IsNaN(x) || math.IsInf(x, 0) || math.Trunc(x) != x || math.Abs(x) >= 1<<53 {
+			return "", ErrUnsafe
+		}
+		return strconv.FormatInt(int64(x), 10), nil
 	case bool:
 		if x {
 			return "true", nil
@@ -198,7 +206,7 @@ func (TOMLEditor) Patch(b []byte, edits []Edit) ([]byte, error) {
 				replacement = key + " = " + v + nl
 			}
 			if found >= 0 {
-				// Only a one-line string/bool assignment may be rewritten.
+				// Only a one-line scalar assignment may be rewritten.
 				match := re.FindStringSubmatch(lines[found])
 				raw := strings.TrimSpace(match[1])
 				if strings.HasPrefix(raw, `"""`) || strings.HasPrefix(raw, `'''`) {

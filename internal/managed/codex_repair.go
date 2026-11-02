@@ -34,7 +34,7 @@ func (e *codexRepairEditor) Patch(raw []byte, edits []Edit) ([]byte, error) {
 		switch {
 		case len(edit.Path) == 1:
 			switch edit.Path[0] {
-			case "model", "model_provider", "web_search", "model_catalog_json":
+			case "model", "model_provider", "web_search", "model_catalog_json", "model_auto_compact_token_limit", "model_context_window":
 			default:
 				return nil, ErrUnsafe
 			}

@@ -440,3 +440,7 @@ Desktop 推理配置可同时影响 Chat/Cowork/Code 和计费来源，初次 GU
 Desktop Auto mode 的分类器默认调用精确 ID `claude-sonnet-5`；没有该映射或上游不接受相应 beta 头时可能阻止操作，不为此自动生成模型别名。
 
 尚未实现：messages/count_tokens、Claude 专属错误信号/上下文恢复、托管 tool search 执行、签名思考跨协议转换、独立角色模型配置、远程引擎网关布置及客户端版本自动探测。原生 Anthropic 请求头支持属于[协议层](protocol-translation.md#claude-请求头2026-10-22当前源码未发布)，不在托管适配器重复实现。
+
+## Codex 自动压缩阈值（2026-11-03 当前源码未发布）
+
+统一设置默认 auto_compact=true、compact_percent=90；生成目录按各模型最终已声明上下文计算90%的 auto_compact_token_limit。根级窗口／阈值覆盖进入条件恢复 journal，开启时移除、关闭时恢复原值。未知窗口不推测，旧 single 无目录保持原行为；自动同步不覆盖外部编辑，显式同步仍保存外部恢复基线。旧重试设置继承新默认值，CLI 和桌面共用核心规则，详见 [Codex统一设置](codex-retries.md)。本变更不增加协议压缩端点或上游恢复能力，重启 Codex 后由客户端按自身生命周期执行。

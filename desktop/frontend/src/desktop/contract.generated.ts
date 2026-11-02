@@ -127,10 +127,14 @@ export interface KeyCooldownSettingsResult {
 }
 export interface CodexSettings {
   retries: number;
+  auto_compact: boolean;
+  compact_percent: number;
   revision: number;
 }
 export interface SaveCodexSettings {
   retries: number | null;
+  auto_compact: boolean | null;
+  compact_percent: number | null;
   expected_revision: number;
 }
 export interface CodexSettingsState {

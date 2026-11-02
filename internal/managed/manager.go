@@ -78,14 +78,16 @@ func (m *Manager) gatewayFor(b state.Binding, useTemplates bool) (GatewayBinding
 		}
 	}
 	var retries *int
+	var codexSettings *state.CodexSettings
 	if b.AdapterID == "codex" {
 		retrySettings, err := m.Store.CodexSettings()
 		if err != nil {
 			return GatewayBinding{}, err
 		}
 		retries = &retrySettings.Retries
+		codexSettings = &retrySettings
 	}
-	return GatewayBinding{CodexRetries: retries, Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
+	return GatewayBinding{CodexSettings: codexSettings, CodexRetries: retries, Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
 }
 func (m *Manager) Add(b state.Binding) (state.Binding, error) {
 	m.mu.Lock()
@@ -297,7 +299,7 @@ func (m *Manager) Start() ([]Result, error) {
 					g, e = m.gateway(b)
 				}
 				if e == nil && b.AdapterID == "codex" && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
-					_, _, e = buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates)
+					_, _, e = buildGatewayCatalog(g)
 				}
 				if e == nil {
 					if _, stale := AdapterFor(b.AdapterID).Verify(b, g); stale != nil {
@@ -390,7 +392,7 @@ func (m *Manager) SetModels(id string, revision int64, model, scope string) (sta
 		return b, Result{}, errors.New("Codex model requires tools and streaming")
 	}
 	if len(g.Models) > 0 && g.CatalogVersion != "" {
-		if _, _, err = buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates); err != nil {
+		if _, _, err = buildGatewayCatalog(g); err != nil {
 			return b, Result{}, err
 		}
 	}

@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-11-02
+- 最近核对：2026-11-03
 - 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
 - 2026-11-01 已随 desktop.80 dev 同版投放：Messages 目标可对历史思考做显式有损投影，记录 reasoning_history_omitted；已知消息阶段和图片精度选择器损失另记录，可见消息／工具链／图片保留。客户端原历史不改，实际核心需更新至 .80，无新增命令或参数，详见[发行记录](../release/desktop.md#claude-history-80)。
 - 2026-11-01 已随 desktop.79 dev 同版投放：Responses／Chat 的后置 system／developer 指令按序合并至 Messages 顶层 system，保留文本并记录 instruction_scope_hoisted；修复真实会话的 request_content 拒绝。无新增命令参数，实际核心需更新至 .79，详见[发行记录](../release/desktop.md#claude-instructions-79)。
@@ -614,7 +614,7 @@ anchor model settings --id public --file base-window-settings.json
 
 正整数限制不超过安全整数，上下文不小于已声明输入/输出，默认输出不超过最大输出；temperature 默认值须声明支持且在0..2。保存不改变候选、倍率、Key 范围、调度或版本匹配 Codex 模板。普通 `model put` 保留本节 settings/reference（但其他旧字段仍按其完整替换语义）；供应商编辑同步 tools/streaming。返回的新模型 revision 也用于后续路由/供应商映射编辑。
 
-Codex 同步导出可应用上下文、text/image 输入、并行调用及可表示的 effort/default；DSH Web/Desktop 导出名称、上下文、text/image 输入、可表示的 effort/default 及显式默认输出，具体边界见下文 Agent 管理。其他能力/默认调用值仅保存元数据，不自动改写请求。版本匹配完整模板仍必需，只投影 Codex 可表示的 effort；max/default/null 保留在上游配置，不阻断导出、不改成其他档位。`agent sync` 后重启 Agent 才读取新目录，现有会话不热更新。详见[模型参考目录契约](../design/model-catalog.md)。
+Codex 同步导出可应用上下文、按统一设置计算的自动压缩阈值、text/image 输入、并行调用及可表示的 effort/default；DSH Web/Desktop 导出名称、上下文、text/image 输入、可表示的 effort/default 及显式默认输出，具体边界见下文 Agent 管理。其他能力/默认调用值仅保存元数据，不自动改写请求。版本匹配完整模板仍必需，只投影 Codex 可表示的 effort；max/default/null 保留在上游配置，不阻断导出、不改成其他档位。`agent sync` 后重启 Agent 才读取新目录，现有会话不热更新。详见[模型参考目录契约](../design/model-catalog.md)。
 
 ## 7. 本机授权
 
@@ -732,7 +732,7 @@ anchor agent disable ID --revision N
 ```
 
 - `ID` 与 `--revision` 必填；revision >= 1，从 list/inspect 获取。`apply` 另须已审核的 plan fingerprint，文件、目录计划、模型元数据或 revision 变化会拒绝，不自动重试。
-- `apply` 只对 enabled Binding 且网关就绪时执行；先持久恢复日志，再原子写目录（有目录时）、原子替换配置指针并配置层校验。返回 `{binding_id, operation_id, status}`。再次应用已接管目标不重置原值或重放文件写入。托管字段为根级 model/model_provider/web_search、可选 model_catalog_json 和独立带标记 provider（含命令认证）；不嵌入 token。
+- `apply` 只对 enabled Binding 且网关就绪时执行；先持久恢复日志，再原子写目录（有目录时）、原子替换配置指针并配置层校验。返回 `{binding_id, operation_id, status}`。再次应用已接管目标不重置原值或重放文件写入。托管字段为根级 model/model_provider/web_search、可选 model_catalog_json、目录自动压缩相关全局覆盖字段和独立带标记 provider（含命令认证）；不嵌入 token。
 - `restore` 仅恢复当前值仍等于 Anchor 写入值的字段；第三方值保留并报告 `conflict`。原值已恢复视为完成；被用户删除的配置不盲目重建；被基础配置或独立 `*.config.toml` profile 引用的 provider/目录不删除；目录只有仍等于 Anchor 写入内容且无引用时才删除；显式 sync 已保存外部目录基线时，条件恢复该基线而非删除。尚未接管的外部目录修改保留并报告冲突。返回状态和冲突字段路径，冲突时 CLI 输出 JSON 后以 1 退出。
 - `restore` 不修改 enabled 或 Binding revision，因此下次启动仍会接管。配置本来不存在时恢复可留下空文件，不删除可能已被其他工具引用的配置文件。
 - `enable` / `disable` 返回 `{binding, management}` 并递增 revision；enable 只批准后续接管，不立即改配置。当前源码在 enable 事务内检查默认模型存在；模型已删除时返回 `agent_model_unavailable`（HTTP 409），保留禁用状态、revision 和凭据，不自动改选模型。disable 先条件恢复再禁用凭据，即使出现已报告的第三方冲突也禁用授权，CLI 非零退出；真正的文件/日志 I/O 失败会中止禁用。已接受请求不承诺即时取消。
@@ -747,9 +747,15 @@ Codex 外部编辑保留了旧 Anchor 注释、并将项目或其他 provider �
 anchor agent codex-settings
 # 使用上一步读取的 settings.revision；这里假设尚未保存（revision=1）
 anchor agent codex-settings --retries 5 --revision 1
+# 自动配置开关和比例可独立保存，revision 使用上一步返回的新值
+anchor agent codex-settings --auto-compact=true --compact-percent 90 --revision 2
 ```
 
-无参数只读当前核心的统一Codex重试设置，返回 `settings`（`retries`、`revision`）和 `needs_sync`（待处理Binding ID数组）。默认5次，允许0–10整数，0关闭；次数不含首次请求。写入必须同时给出 `--retries` 和当前 `--revision`，过期版本返回conflict；未提供revision不会写入。保存统一控制Codex provider的 `request_max_retries` 和 `stream_max_retries`，两项分别受该次数限制，不是整个对话的总请求预算。
+无参数只读当前核心的统一 Codex 设置，返回 `settings`（`retries`、`auto_compact`、`compact_percent`、`revision`）和 `needs_sync`（待处理 Binding ID 数组）。重试默认5次，`--retries` 允许0–10整数，0关闭；次数不含首次请求，统一控制 provider 的 `request_max_retries` 和 `stream_max_retries`，两项分别受该次数限制，不是整个对话的总请求预算。
+
+2026-11-03 当前源码未发布：`--auto-compact=BOOL` 默认 true，开启自动配置压缩阈值；`--compact-percent N` 默认90，范围1–99整数。阈值按每个模型导出的 `context_window × N / 100` 向下取整（至少1 token），默认即0.9倍上下文。窗口来自模型显式设置或已声明的 Codex 元数据／本地模板，未知窗口不按名称猜测、不补造阈值，继续使用模板／Codex 默认行为。生成目录的各模型分别写入 `auto_compact_token_limit`，切换模型使用相应值；开启时将会覆盖目录值的根级 `model_context_window` 和 `model_auto_compact_token_limit` 保存为恢复基线并移除。关闭自动配置（`--auto-compact=false`）恢复这两个根级原值，目录回到原始模板／显式模型设置；这不代表关闭 Codex 自身的自动压缩。没有目录的旧 single 绑定保留 Codex 原有行为。
+
+保存时至少给出一个设置参数及当前 `--revision`，未给出的设置保持不变；过期版本返回 conflict，未提供 revision 不写入。已有重试设置自动继承开启、90%的默认值。
 
 保存后安全同步已启用且已接管的Codex，不修改其他Agent或未接管目标。部分同步失败仍返回已保存设置和非空 `needs_sync`，CLI输出结果后以非零退出；前往Agent页检查后显式同步并重启Codex。配置被外部修改时不会自动覆盖；之后接管的目标使用新值。管理写入结果未知时先重读，不自动重试。旧模型 `channel_retries` 不再生效，模型设置JSON需删除该字段。详细边界见 [Codex统一重试](../design/codex-retries.md)。
 

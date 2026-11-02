@@ -54,6 +54,12 @@ func TestCodexSettingsBridgeAndCLI(t *testing.T) {
 	run(true, "agent", "codex-settings", "--retries", "4", "--revision", "2")
 	run(true, "agent", "codex-settings", "--retries", "11", "--revision", "3")
 	run(true, "agent", "codex-settings", "--retries", "3")
+	if got := run(false, "agent", "codex-settings", "--auto-compact=false", "--compact-percent", "80", "--revision", "3"); !strings.Contains(got, `"auto_compact":false`) || !strings.Contains(got, `"compact_percent":80`) || !strings.Contains(got, `"retries":3`) {
+		t.Fatal(got)
+	}
+	run(true, "agent", "codex-settings", "--compact-percent", "100", "--revision", "4")
+	run(true, "agent", "codex-settings", "--auto-compact=false")
+	run(true, "agent", "codex-settings", "--revision", "4")
 }
 func TestSharedCodexSettingsFixture(t *testing.T) {
 	raw, err := os.ReadFile("../../desktop/contract/codex-settings.json")

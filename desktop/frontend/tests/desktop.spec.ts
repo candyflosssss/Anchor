@@ -50,7 +50,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
       SaveCodexSettings: async input => {
         counters.saves++;
         if (counters.writeError) return { contract, data: null, problem: { code: counters.writeError } };
-        codexState = { settings: { retries: input.retries!, revision: codexState.settings.revision + 1 }, needs_sync: [] };
+        codexState = { settings: { retries: input.retries ?? codexState.settings.retries, auto_compact: input.auto_compact ?? codexState.settings.auto_compact, compact_percent: input.compact_percent ?? codexState.settings.compact_percent, revision: codexState.settings.revision + 1 }, needs_sync: [] };
         return { contract, data: codexState, problem: null };
       },
       ProxyWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),

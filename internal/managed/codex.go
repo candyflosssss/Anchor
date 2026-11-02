@@ -12,6 +12,7 @@ import (
 )
 
 type GatewayBinding struct {
+	CodexSettings    *state.CodexSettings
 	CodexRetries     *int
 	BaseURL          string
 	Model            string
@@ -108,7 +109,7 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 	var catalogPath string
 	var e error
 	if len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
-		catalog, modelIDs, e = buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates)
+		catalog, modelIDs, e = buildGatewayCatalog(g)
 		if e != nil {
 			return Plan{}, e
 		}
@@ -123,6 +124,9 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 		paths = append(paths, []string{"model_catalog_json"})
 	} else if b.ModelScope == "all-compatible" {
 		return Plan{}, errors.New("all-compatible requires catalog metadata")
+	}
+	if catalogPath != "" {
+		paths = append(paths, []string{"model_auto_compact_token_limit"}, []string{"model_context_window"})
 	}
 	editor := TOMLEditor{}
 	values, e := editor.Values(raw, paths)
@@ -162,8 +166,19 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 		p.catalog = &catalogArtifact{Path: catalogPath, Written: catalog}
 		p.Fingerprint = fingerprint(append(append([]byte(p.configFingerprint+"\n"), catalog...), []byte(b.ModelScope+"\n"+g.CatalogVersion)...), true)
 	}
-	for i, path := range paths {
+	for i, path := range paths[:len(after)] {
 		p.Edits = append(p.Edits, Edit{Path: path, Before: values[i], After: Value{true, normalize(after[i])}})
+	}
+	if catalogPath != "" {
+		for i := len(after); i < len(paths); i++ {
+			// Global overrides shadow per-model limits, including after model switches.
+			// Disabled automation leaves the original value in place.
+			desired := values[i]
+			if codexCompactSettings(g).AutoCompact {
+				desired = Value{}
+			}
+			p.Edits = append(p.Edits, Edit{Path: paths[i], Before: values[i], After: desired})
+		}
 	}
 	if _, e = editor.Patch(raw, p.Edits); e != nil {
 		return Plan{}, e
@@ -199,11 +214,18 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 		if m["model_catalog_json"] != path {
 			return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "model_catalog_json")
 		}
+		if codexCompactSettings(g).AutoCompact {
+			for _, key := range []string{"model_auto_compact_token_limit", "model_context_window"} {
+				if _, exists := m[key]; exists {
+					return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", key)
+				}
+			}
+		}
 		raw, exists, err := readConfig(b.ConfigRoot, path)
 		if err != nil {
 			return out, err
 		}
-		expected, _, err := buildCatalogTemplates(g.Models, g.CatalogVersion, g.CatalogTemplates)
+		expected, _, err := buildGatewayCatalog(g)
 		if err != nil {
 			return out, err
 		}
@@ -245,5 +267,5 @@ func codexRetries(g GatewayBinding) int {
 	if g.CodexRetries != nil {
 		return *g.CodexRetries
 	}
-	return state.DefaultCodexRetries
+	return codexCompactSettings(g).Retries
 }

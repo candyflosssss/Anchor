@@ -18,14 +18,29 @@ func buildCatalog(models []state.Model, version string) ([]byte, []string, error
 }
 
 func buildCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage) ([]byte, []string, error) {
-	raw, ids, err := encodeCatalogTemplates(models, version, templates)
+	return buildCatalogWithSettings(models, version, templates, state.DefaultCodexSettings())
+}
+
+func buildGatewayCatalog(g GatewayBinding) ([]byte, []string, error) {
+	return buildCatalogWithSettings(g.Models, g.CatalogVersion, g.CatalogTemplates, codexCompactSettings(g))
+}
+
+func codexCompactSettings(g GatewayBinding) state.CodexSettings {
+	if g.CodexSettings != nil {
+		return *g.CodexSettings
+	}
+	return state.DefaultCodexSettings()
+}
+
+func buildCatalogWithSettings(models []state.Model, version string, templates map[string]json.RawMessage, settings state.CodexSettings) ([]byte, []string, error) {
+	raw, ids, err := encodeCatalogTemplates(models, version, templates, settings)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
 	}
 	return raw, ids, nil
 }
 
-func encodeCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage) ([]byte, []string, error) {
+func encodeCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage, settings state.CodexSettings) ([]byte, []string, error) {
 	entries := []map[string]json.RawMessage{}
 	ids := []string{}
 	metadataBytes := 0
@@ -144,6 +159,26 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 				if cfg.DefaultReasoning != nil && cfg.DefaultReasoning.Type == "effort" && codexReasoningEffort(cfg.DefaultReasoning.Value) {
 					set("default_reasoning_level", cfg.DefaultReasoning.Value)
 				}
+			}
+		}
+		if settings.AutoCompact {
+			var context *int64
+			if raw, ok := entry["context_window"]; ok {
+				if json.Unmarshal(raw, &context) != nil {
+					return nil, nil, ErrUnsafe
+				}
+			}
+			if context != nil && *context > 0 {
+				// Integer arithmetic avoids floating point rounding and overflow.
+				percent := int64(settings.CompactPercent)
+				if percent < 1 || percent > 99 {
+					return nil, nil, ErrUnsafe
+				}
+				limit := (*context/100)*percent + (*context%100)*percent/100
+				if limit < 1 {
+					limit = 1
+				}
+				set("auto_compact_token_limit", limit)
 			}
 		}
 		set("upgrade", nil)
