@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.81](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.81)，发布于 `2026-11-01T06:18:49+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `475ee335fe752ee7d091c17171cd0fddb5cf85b6`、SOURCE dirty=false。
-- 修复 Anthropic 缺省输出预算固定4096的问题：客户端未指定时，按已保存默认输出预算、模型最大输出、兼容4096依次补全；显式客户端上限保留，增加准备预算与来源诊断。沿用 schema10。
+- 更新：2026-11-03。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.82](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.82)，发布于 `2026-11-03T02:13:47+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `f8ab2667fa7b70c81a899d2ab4e1a64115fb4bb7`、SOURCE dirty=false。
+- Codex 自动压缩配置默认开启，阈值为各模型已声明有效上下文的90%；设置页及CLI可修改自动配置开关与1–99%的比例，旧设置继承新默认值。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+- 本机CLI／核心／GUI已更新至.82，托管凭据与恢复记录保留；未验收Windows原生窗口／系统安装器、真实SSH升级或付费上游压缩。
+
+## .82 在线投放与本机更新（2026-11-03）
+
+Codex自动配置压缩默认开启、各模型90%有效上下文阈值已投放；设置页与CLI均可修改开关／比例，保留外部编辑及恢复基线。未知窗口不猜测。11附件摘要、tag／非latest与默认源runtime／旧客户端deb／CLI三条实际下载通过；本机CLI／核心／GUI已更新，核心ready及托管目录核对通过，Codex仍需重启读取。未执行付费上游压缩或Windows原生验收，详见[发行记录](../release/desktop.md#codex-compaction-82)。
 
 ## .81 在线投放（2026-11-01）
 

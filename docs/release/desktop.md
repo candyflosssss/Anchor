@@ -1,10 +1,27 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-11-01。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.81](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.81)，发布于 `2026-11-01T06:18:49+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `475ee335fe752ee7d091c17171cd0fddb5cf85b6`、SOURCE dirty=false。
-- 修复 Anthropic 缺省输出预算固定4096的问题：客户端未指定时，按已保存默认输出预算、模型最大输出、兼容4096依次补全；显式客户端上限保留，增加准备预算与来源诊断。沿用 schema10。
+- 更新：2026-11-03。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.82](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.82)，发布于 `2026-11-03T02:13:47+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `f8ab2667fa7b70c81a899d2ab4e1a64115fb4bb7`、SOURCE dirty=false。
+- Codex 自动压缩配置默认开启，阈值为各模型已声明有效上下文的90%；设置页及CLI可修改自动配置开关与1–99%的比例，旧设置继承新默认值。
 - 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本轮仅在线投放，未安装或修改真实实例／Agent 配置；未验收双平台原生窗口、系统安装器或真实 SSH 升级，未请求付费上游。
+- 本机CLI／核心／GUI已更新至.82，托管凭据与恢复记录保留；未验收Windows原生窗口／系统安装器、真实SSH升级或付费上游压缩。
+
+<a id="codex-compaction-82"></a>
+
+## Codex 自动压缩配置 .82（已发布 dev，本机已更新）
+
+Codex 自动压缩配置默认开启，阈值为各模型已声明有效上下文的90%；设置页及CLI可修改自动配置开关与1–99%的比例，旧设置继承新默认值。 模型窗口或映射变化沿用已批准目标的自动同步；各模型分别导出 auto_compact_token_limit，切换模型读取相应阈值。开启时将会覆盖目录的根级 model_context_window／model_auto_compact_token_limit 保存为恢复基线并移除，关闭自动配置时恢复原值；这不会关闭Codex自身的压缩。后台保留外部编辑，显式同步可重新接管并保存外部恢复基线。窗口未知不猜测、不补造阈值；无目录的旧single保持原行为。Codex／app-server需重启读取目录，尚未执行真实上游压缩验收。契约见 [Codex统一设置](../design/codex-retries.md)。
+
+同版包含主线已提交的日志消耗趋势和固定档位参考费用修正，保留.81的Anthropic预算与历史兼容修复；沿用schema10。从干净隔离worktree的 `f8ab2667fa7b70c81a899d2ab4e1a64115fb4bb7` 构建，SOURCE dirty=false，输入摘要 `f9036b2381921ab668ad8129529611c453cf6ee1e070315411ecb8a8f9a67e28`。未纳入原工作区其他任务的未提交内容。于 `2026-11-03T02:13:47+08:00` 发布为dev prerelease，非latest；产物及证据位于 `dist/desktop/0.1.0-dev.desktop.82/`。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.82_amd64.deb` | 29284792 | `7caf09b19a4251cfe025a9a07104a97ed9a7b1a20e9b2b336cd57da13e8ece23` |
+| `Anchor-Desktop-0.1.0-dev.desktop.82-windows-amd64-setup.exe` | 31300572 | `0bcd0ba9c571c77a2559be171aef44063bdd4d0b8ca5693e952ea6e3fb346ae3` |
+
+复用功能轮隔离state／managed／desktop／cli四包测试、前端类型、4项设置单测及lint结果；本轮完成Go／TS契约比对、TypeScript／Vite、Windows AMD64和Ubuntu24.04 AMD64生产编译、NSIS／deb打包。11附件包括两平台安装包／runtime／CLI、两清单、含Go vendor和固定mihomo对应源码／vendor的源码包、许可元数据及SHA256SUMS。嵌入前端／mihomo、deb与runtime载荷、源码输入摘要、ZIP CRC及全部本地／远端大小和digest一致。tag指向实际构建提交，latest保持。
+
+默认dev源在隔离目录实际下载Linux runtime、旧客户端兼容deb和CLI，版本／目标／大小／SHA256及程序版本通过；Windows三个程序的远端digest匹配。本机通过现有runtime更新进行配置保留交接，核心同实例ready，桌面启动入口与CLI报告.82；自动重开桌面未观察到存活新进程，随后在用户图形会话重开成功。系统缺少StatusNotifierWatcher托盘服务，仅提示托盘不可用，未将此记为两平台窗口验收；新默认自动配置已由核心读取，已声明窗口模型的目录阈值核对通过，未知窗口保持未知。未请求付费上游、未扩大为全量／race／浏览器套件，未完成Windows原生窗口、系统安装器或真实SSH升级验收。证据见publication下preparation-verification.json、publication-verification.json、online-verification.json和local-install-verification.json；BUILD.json保留构建时未发布／未安装事实。
 
 <a id="claude-output-budget-81"></a>
 

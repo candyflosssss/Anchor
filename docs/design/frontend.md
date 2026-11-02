@@ -653,7 +653,7 @@ Codex 归属在核心通过已认证 Binding 采集，不在前端扫描客户�
 
 Agent 折叠面板把原「保存并应用」与「重新接管并同步」合并为唯一的「更新配置」，先打开确认对话框，显示本次选择的默认模型，说明同时更新连接和最新模型列表、保存外部字段为恢复基线、保留其他设置。overridden/conflict 显示「可重新接管」，不再只要求用户自行处理冲突；仍可停用。确认／取消由 hook Controller 管理，取消不提交；确认复用 EnrollAgent，一次提交冻结的表单草稿与当前 revision，不先 sync 再 enroll；核心独占校验、重基线与文件写入。初次「开启托管」保留；已停用目标同样显示「开启托管」，展开时开关确认并提交当前模型选择，折叠时仅按有效已保存值重新启用。CLI sync 继续支持只重新应用已保存设置。后台同步／启动不抢改外部值，失败重读、不自动重放。语义见[托管层设计](agent-management-layer.md)。此轮未构建安装包或执行原生桌面验收。
 
-## Codex统一设置（重试已随 desktop.52 发布；自动压缩为2026-11-03未发布源码）
+## Codex统一设置（重试已随 desktop.52 发布；自动压缩已随desktop.82发布）
 
 当前源码已将分模型重试迁移到「设置 → Codex」统一管理，默认额外重试5次，支持0–10整数，0关闭；请求与流中断分别采用此上限。模型设置不再提供或保存 channel_retries。Model → hook Controller → 类型化桥接 → 核心管理接口负责持久化与安全同步；外部配置冲突显示待同步实例，未知写入／revision冲突后要求重新读取。实例切换丢弃旧结果，不启用 Mock 回退。契约与迁移见 [Codex统一重试](codex-retries.md)。
 
@@ -816,6 +816,6 @@ Model统一校验可选password_saved并处理SessionResult.warning，hooks协�
 
 代理设置的节点编辑器新增「监听端口（HTTP / SOCKS5）」：留空或 0 自动分配，固定端口范围 1..65535；外部代理仍通过 URL 配置端口，不显示此字段。节点列表显示配置端口、实际 `127.0.0.1:port`、运行／旧配置排空／尚未启动状态；旧核心缺失字段显示不可用，不猜测运行数据。沿用「重新读取」手动刷新，不新增后台轮询。固定端口重复、占用及旧代排空的行为见[代理契约](proxy-settings.md#mihomo-监听端口proxy-v1-ports2026-10-27-已随-desktop75-dev-发布)。原有 MVC、秘密不回显、revision 和 unknown 重读流程保持；CLI 同能力 `proxy put --listen-port`／`proxy list`。已随 desktop.75 dev 同版打包发布，未安装或做两平台原生窗口验收。
 
-## Codex 自动压缩设置（2026-11-03 源码未发布）
+## Codex 自动压缩设置（2026-11-03 desktop.82 dev 已发布）
 
-「设置 → Codex」新增默认开启的自动配置上下文压缩开关和默认90%的阈值比例（1–99整数）。核心按各模型已声明的有效窗口导出阈值，未知窗口沿用模板／Codex 默认行为；关闭只停止 Anchor 自动配置，不关闭 Codex 自身压缩。继续沿用相同 Model／hook Controller／View、revision、未知结果和实例隔离规则；保存后需重启 Codex。契约见 [Codex统一设置](codex-retries.md)。未打包、未做原生窗口验收。
+「设置 → Codex」新增默认开启的自动配置上下文压缩开关和默认90%的阈值比例（1–99整数）。核心按各模型已声明的有效窗口导出阈值，未知窗口沿用模板／Codex 默认行为；关闭只停止 Anchor 自动配置，不关闭 Codex 自身压缩。继续沿用相同 Model／hook Controller／View、revision、未知结果和实例隔离规则；保存后需重启 Codex。契约见 [Codex统一设置](codex-retries.md)。已同版打包发布，本机已更新；未做两平台原生窗口验收。

@@ -1,11 +1,11 @@
 # Anchor CLI 指令变更历史
 
-## 2026-11-03 — Codex 自动压缩阈值配置（当前源码，未发布）
+## 2026-11-03 — Codex 自动压缩阈值配置（desktop.82 dev 已发布）
 
 - 类型：新增参数及默认行为修改。
 - 指令与参数：`agent codex-settings` 新增 `--auto-compact=BOOL`（默认 true）、`--compact-percent 1..99`（默认90）；任一设置可搭配当前 `--revision` 独立保存，未提供项保持不变。帮助和桌面「设置 → Codex」同步。
 - 旧 → 新：原先仅统一重试；现在 settings 增加 auto_compact／compact_percent，托管目录按各模型声明的上下文默认导出90%的 auto_compact_token_limit。开启时条件移除会覆盖目录的根级窗口／阈值，关闭时恢复原值；启动与自动同步沿用外部编辑保护。
-- 兼容与迁移：旧重试记录继承开启与90%，旧重试客户端可继续仅提交 retries。未知窗口不猜测；无目录的旧 single 不改变压缩行为；关闭 Anchor 自动配置不关闭 Codex 自身压缩。需升级核心并重启 Codex，未打包发布。
+- 兼容与迁移：旧重试记录继承开启与90%，旧重试客户端可继续仅提交 retries。未知窗口不猜测；无目录的旧 single 不改变压缩行为；关闭 Anchor 自动配置不关闭 Codex 自身压缩。已随desktop.82同版打包发布，本机已更新；其他设备需升级核心并重启 Codex。
 - 验证：隔离 Go 状态／托管／桌面桥接／CLI 测试，前端类型、Codex Model 单测和 lint；实际执行结果见本次任务记录。
 
 ## 2026-11-02 — 固定速度档位恢复标准 API 参考计价（当前源码未发布）
