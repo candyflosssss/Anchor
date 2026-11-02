@@ -100,9 +100,9 @@ func TestLogReferenceRefreshesSavedIdentityWithoutChangingSettings(t *testing.T)
 	if saved.Models[0].Pricing.Rates.Input != &oldRate || saved.FetchedAt >= time.Now().Add(-3*time.Hour).Unix() {
 		t.Fatal("logging changed saved model settings")
 	}
-	// Inference still refuses to infer a standard price for a speed variant.
-	if f.core.logReference(state.Model{ServiceTier: "priority", Candidates: []state.Candidate{{Model: "vision-reasoner"}}}) != nil {
-		t.Fatal("speed variant inferred a standard price")
+	// A fixed tier uses the same current API reference without saving settings.
+	if price := f.core.logReference(state.Model{ServiceTier: "priority", Candidates: []state.Candidate{{Model: "vision-reasoner"}}}); price == nil || *price.Pricing.Rates.Input != "2.5" || price.Stale {
+		t.Fatal("fixed tier lost the refreshed standard reference", price)
 	}
 }
 

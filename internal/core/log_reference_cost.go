@@ -50,9 +50,9 @@ func (s *Server) logReference(m state.Model) *logbook.ReferenceCost {
 		}
 		return referenceCost(saved)
 	}
-	// A speed variant has no inferred standard reference price. An explicitly
-	// selected reference above is still a reference, never a service-tier bill.
-	if m.ServiceTier != "" || len(m.Candidates) == 0 {
+	// Fixed service tiers still use standard API reference rates and the captured
+	// provider/Key factors. A tier alone does not establish an extra surcharge.
+	if len(m.Candidates) == 0 {
 		return nil
 	}
 	var selected *logbook.ReferenceCost

@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -177,6 +178,9 @@ func TestProbeReferenceCostUsesOnlyCachedCatalog(t *testing.T) {
 	if f.core.cachedLogReference("vision-reasoner") != nil {
 		t.Fatal("cold cache invented price")
 	}
+	if f.core.logReference(state.Model{ServiceTier: "priority", Candidates: []state.Candidate{{Model: "vision-reasoner"}}}) != nil {
+		t.Fatal("fixed tier invented a cold-cache price")
+	}
 	if _, err := f.core.modelCatalog.Resolve(t.Context(), "vision-reasoner"); err != nil {
 		t.Fatal(err)
 	}
@@ -213,11 +217,19 @@ func TestProbeReferenceCostUsesOnlyCachedCatalog(t *testing.T) {
 			t.Fatal("unpriced probe invented factors", r)
 		}
 	}
-	if f.core.logReference(state.Model{ServiceTier: "priority", Candidates: []state.Candidate{{Model: "vision-reasoner"}}}) != nil {
-		t.Fatal("inferred standard price for speed variant")
-	}
-	if f.core.logReference(state.Model{Candidates: []state.Candidate{{Model: "vision-reasoner"}, {Model: "text-only"}}}) != nil {
-		t.Fatal("mixed reference identities")
+	for _, tier := range []string{"", "priority", "ultrafast"} {
+		if price := f.core.logReference(state.Model{ServiceTier: tier, Candidates: []state.Candidate{{Model: "vision-reasoner"}}}); price == nil || price.ModelID != "vision-reasoner" {
+			t.Fatal("tier lost standard API reference", tier, price)
+		}
+		for _, candidates := range [][]state.Candidate{
+			nil,
+			{{Model: "not-in-catalog"}},
+			{{Model: "vision-reasoner"}, {Model: "text-only"}},
+		} {
+			if price := f.core.logReference(state.Model{ServiceTier: tier, Candidates: candidates}); price != nil {
+				t.Fatal("invented missing or mixed reference", tier, candidates, price)
+			}
+		}
 	}
 }
 
@@ -293,5 +305,113 @@ func TestLogCostAdjustmentUnknownZeroAndTiers(t *testing.T) {
 	noPrice.addAttempt(logbook.Attempt{CostAdjustment: logCostFactors(state.Provider{}, state.ProviderKey{})}, u)
 	if noPrice.row.Attempts[0].CostAdjustment != nil {
 		t.Fatal("no model price should skip cost")
+	}
+}
+
+func TestFixedServiceTierReferenceCostStoredAndExported(t *testing.T) {
+	for _, tier := range []string{"priority", "ultrafast"} {
+		for _, stream := range []bool{false, true} {
+			for _, usage := range []struct {
+				input      int64
+				raw, final string
+				inputRate  string
+			}{
+				{1000, "0.002600000000000000", "0.00104", "2.5"},
+				{250001, "1.249705000000000000", "0.499882", "5"},
+			} {
+				t.Run(fmt.Sprintf("%s/stream=%t/input=%d", tier, stream, usage.input), func(t *testing.T) {
+					f := setup(t)
+					installDefaultsCatalog(t, f)
+					if _, err := f.core.modelCatalog.Resolve(t.Context(), "lab/vision-reasoner"); err != nil {
+						t.Fatal(err)
+					}
+					up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						var sent struct {
+							Model       string `json:"model"`
+							ServiceTier string `json:"service_tier"`
+						}
+						if err := json.NewDecoder(r.Body).Decode(&sent); err != nil || sent.Model != "vision-reasoner" || sent.ServiceTier != tier {
+							t.Errorf("dispatch changed: %+v err=%v", sent, err)
+						}
+						// A provider may return default even when a fixed tier was sent.
+						// The reference remains the standard API price in either case.
+						response := fmt.Sprintf(`{"id":"r","status":"completed","service_tier":"default","output":[],"usage":{"input_tokens":%d,"output_tokens":100,"input_tokens_details":{"cached_tokens":400},"output_tokens_details":{"reasoning_tokens":30}}}`, usage.input)
+						if stream {
+							w.Header().Set("Content-Type", "text/event-stream")
+							fmt.Fprintf(w, "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":%s}\n\n", response)
+							return
+						}
+						w.Header().Set("Content-Type", "application/json")
+						io.WriteString(w, response)
+					}))
+					defer up.Close()
+					f.add(t, "p", up.URL, "synthetic-tier-price-key")
+					provider, err := f.store.Provider("p")
+					if err != nil {
+						t.Fatal(err)
+					}
+					provider.CostMultiplier = .5
+					provider, err = f.store.PutProvider(provider, provider.Revision, nil)
+					if err != nil {
+						t.Fatal(err)
+					}
+					group := .8
+					if err := f.store.CacheKeyRate("p", provider.Revision, "default", catalog.KeyRateCache{Multiplier: &group, Basis: "key_billing", ObservedAt: time.Now().UTC().Format(time.RFC3339Nano)}); err != nil {
+						t.Fatal(err)
+					}
+					// No saved reference: resolve the upstream ID from the cached catalog,
+					// independently of the public alias and fixed service tier.
+					mapping, err := f.store.PutModel(state.Model{ID: "custom-speed-alias", ServiceTier: tier, Streaming: true, Candidates: []state.Candidate{{ProviderID: "p", Model: "vision-reasoner"}}}, 0)
+					if err != nil {
+						t.Fatal(err)
+					}
+					resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, fmt.Sprintf(`{"model":"custom-speed-alias","input":"synthetic","stream":%t}`, stream))
+					io.Copy(io.Discard, resp.Body)
+					resp.Body.Close()
+					if resp.StatusCode != http.StatusOK {
+						t.Fatal(resp.StatusCode)
+					}
+					if err := f.core.logs.Flush(t.Context()); err != nil {
+						t.Fatal(err)
+					}
+					// Later policy edits must not reprice the stored request.
+					mapping.ServiceTier = ""
+					if _, err := f.store.PutModel(mapping, mapping.Revision); err != nil {
+						t.Fatal(err)
+					}
+					cl := logClient(t, f)
+					row, err := cl.LogDetail(t.Context(), resp.Header.Get("X-Anchor-Request-ID"))
+					if err != nil {
+						t.Fatal(err)
+					}
+					cost := row.ReferenceCost
+					if row.Status != "succeeded" || cost == nil || cost.USD == nil || *cost.USD != usage.raw || cost.Adjustment == nil || cost.Adjustment.USD == nil || *cost.Adjustment.USD != usage.final {
+						t.Fatalf("fixed tier lost standard/factored cost: %+v", row)
+					}
+					if cost.ModelID != "vision-reasoner" || *cost.Adjustment.Parts[0].Rate != usage.inputRate || len(row.Attempts) != 1 || row.Attempts[0].CostAdjustment == nil || *row.Attempts[0].CostAdjustment.USD != usage.final {
+						t.Fatalf("price tier/attempt snapshot: %+v", row)
+					}
+					if row.Evidence["sent_service_tier"] != tier || row.Evidence["upstream_service_tier"] != "default" || row.Evidence["fast_triggered"] != "false" {
+						t.Fatal("price estimation changed tier evidence", row.Evidence)
+					}
+					page, err := cl.Logs(t.Context(), logbook.Query{})
+					if err != nil || len(page.Requests) != 1 || page.Requests[0].ReferenceCost == nil || page.Requests[0].ReferenceCost.Adjustment == nil || page.Requests[0].ReferenceCost.Adjustment.USD == nil || *page.Requests[0].ReferenceCost.Adjustment.USD != usage.final {
+						t.Fatal("list lost fixed tier cost", page, err)
+					}
+					var exported bytes.Buffer
+					if err := cl.ExportLogs(t.Context(), logbook.Query{}, &exported); err != nil {
+						t.Fatal(err)
+					}
+					var exportedRow logbook.Request
+					if err := json.Unmarshal(exported.Bytes(), &exportedRow); err != nil || exportedRow.ReferenceCost == nil || exportedRow.ReferenceCost.Adjustment == nil || exportedRow.ReferenceCost.Adjustment.USD == nil || *exportedRow.ReferenceCost.Adjustment.USD != usage.final {
+						t.Fatal("export lost fixed tier cost", exported.String(), err)
+					}
+					stats, err := cl.LogStats(t.Context(), logbook.StatsQuery{})
+					if err != nil || stats.Summary.CostUSD == nil || *stats.Summary.CostUSD != usage.final || stats.Summary.CostSamples == nil || *stats.Summary.CostSamples != 1 {
+						t.Fatal("consumption statistics lost fixed tier cost", stats, err)
+					}
+				})
+			}
+		}
 	}
 }
