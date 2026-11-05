@@ -752,13 +752,15 @@ anchor agent codex-settings --retries 5 --revision 1
 anchor agent codex-settings --auto-compact=true --compact-percent 90 --revision 2
 ```
 
-无参数只读当前核心的统一 Codex 设置，返回 `settings`（`retries`、`auto_compact`、`compact_percent`、`revision`）和 `needs_sync`（待处理 Binding ID 数组）。重试默认5次，`--retries` 允许0–10整数，0关闭；次数不含首次请求，统一控制 provider 的 `request_max_retries` 和 `stream_max_retries`，两项分别受该次数限制，不是整个对话的总请求预算。
+无参数只读当前核心的统一 Codex 设置，返回 `settings`（`retries`、`auto_compact`、`compact_percent`、`revision`）、`needs_sync`（待处理 Binding ID 数组）及 `compaction`（2026-11-05 当前源码新增，未发布的逐模型配置检查数组）。重试默认5次，`--retries` 允许0–10整数，0关闭；次数不含首次请求，统一控制 provider 的 `request_max_retries` 和 `stream_max_retries`，两项分别受该次数限制，不是整个对话的总请求预算。
 
 2026-11-03 已随desktop.82 dev发布：`--auto-compact=BOOL` 默认 true，开启自动配置压缩阈值；`--compact-percent N` 默认90，范围1–99整数。阈值按每个模型导出的 `context_window × N / 100` 向下取整（至少1 token），默认即0.9倍上下文。窗口来自模型显式设置或已声明的 Codex 元数据／本地模板，未知窗口不按名称猜测、不补造阈值，继续使用模板／Codex 默认行为。生成目录的各模型分别写入 `auto_compact_token_limit`，切换模型使用相应值；开启时将会覆盖目录值的根级 `model_context_window` 和 `model_auto_compact_token_limit` 保存为恢复基线并移除。关闭自动配置（`--auto-compact=false`）恢复这两个根级原值，目录回到原始模板／显式模型设置；这不代表关闭 Codex 自身的自动压缩。没有目录的旧 single 绑定保留 Codex 原有行为。
 
+2026-11-05 核对：`compaction` 每项包含 `binding_id`、`model_id`、`is_default`、`context_window`、`token_limit`、`status`。`written` 表示只读核对实际文件后确认窗口和阈值已写入；`missing_context` 表示缺少模型窗口，即使 `needs_sync=[]` 也尚未配置阈值；`needs_sync` 表示文件不一致／检查失败，`unmanaged` 表示尚未应用／已恢复，`unsupported` 表示旧 single 无模型目录，`disabled` 表示关闭 Anchor 自动配置。未确认写入的窗口和阈值为 null，disabled 的阈值为 null；只列已启用 Codex 绑定，无目标返回空数组。读取不写模型或 Agent 配置、不加载建议草稿、不调用付费上游，也不证明运行中的 Codex 已加载或实际触发压缩。新桌面与核心需配套升级；字段语义与共享样例见 [Codex配置检查](../design/codex-retries.md#模型压缩配置检查2026-11-05-当前源码未发布)。
+
 保存时至少给出一个设置参数及当前 `--revision`，未给出的设置保持不变；过期版本返回 conflict，未提供 revision 不写入。已有重试设置自动继承开启、90%的默认值。
 
-保存后安全同步已启用且已接管的Codex，不修改其他Agent或未接管目标。部分同步失败仍返回已保存设置和非空 `needs_sync`，CLI输出结果后以非零退出；前往Agent页检查后显式同步并重启Codex。配置被外部修改时不会自动覆盖；之后接管的目标使用新值。管理写入结果未知时先重读，不自动重试。旧模型 `channel_retries` 不再生效，模型设置JSON需删除该字段。详细边界见 [Codex统一重试](../design/codex-retries.md)。
+保存后安全同步已启用且已接管的Codex，不修改其他Agent或未接管目标。部分同步失败仍返回已保存设置和非空 `needs_sync`，CLI输出结果后以非零退出；2026-11-05 当前源码在自动配置开启且任一模型为非 written 时也会在输出已保存结果后非零退出，明确配置未完成，不能因此重放保存请求；前往Agent页检查后显式同步并重启Codex。配置被外部修改时不会自动覆盖；之后接管的目标使用新值。管理写入结果未知时先重读，不自动重试。旧模型 `channel_retries` 不再生效，模型设置JSON需删除该字段。详细边界见 [Codex统一重试](../design/codex-retries.md)。
 
 ### `agent set-models`
 

@@ -1,0 +1,27 @@
+{
+  "settings": {
+    "retries": 5,
+    "auto_compact": true,
+    "compact_percent": 90,
+    "revision": 1
+  },
+  "needs_sync": [],
+  "compaction": [
+    {
+      "binding_id": "codex-work",
+      "model_id": "known",
+      "is_default": false,
+      "context_window": 272000,
+      "token_limit": 244800,
+      "status": "written"
+    },
+    {
+      "binding_id": "codex-work",
+      "model_id": "unknown",
+      "is_default": true,
+      "context_window": null,
+      "token_limit": null,
+      "status": "missing_context"
+    }
+  ]
+}

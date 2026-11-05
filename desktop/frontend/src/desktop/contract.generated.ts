@@ -137,9 +137,18 @@ export interface SaveCodexSettings {
   compact_percent: number | null;
   expected_revision: number;
 }
+export interface CodexCompactionStatus {
+  binding_id: string;
+  model_id: string;
+  is_default: boolean;
+  context_window: number | null;
+  token_limit: number | null;
+  status: string;
+}
 export interface CodexSettingsState {
   settings: CodexSettings;
   needs_sync: string[];
+  compaction: CodexCompactionStatus[];
 }
 export interface CodexSettingsResult {
   contract: string;

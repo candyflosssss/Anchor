@@ -417,6 +417,7 @@ type ProxyWorkspaceResult struct {
 
 type CodexSettings = state.CodexSettings
 type SaveCodexSettings = state.SaveCodexSettings
+type CodexCompactionStatus = managed.CodexCompactionStatus
 type CodexSettingsState = managed.CodexSettingsState
 type CodexSettingsResult struct {
 	Contract string              `json:"contract"`

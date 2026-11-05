@@ -5,7 +5,7 @@
 ## 接口与状态
 
 - Go DTO为规范源：`state.CodexSettings`、`state.SaveCodexSettings`、`managed.CodexSettingsState`，桌面契约从 `internal/desktop/contract.go` 生成TS；共享样例为 `desktop/contract/codex-settings.json`。
-- `GET /control/v1/settings/codex` 只读，返回 `{settings:{retries,auto_compact,compact_percent,revision},needs_sync:[]}`。未保存时返回 retries=5、auto_compact=true、compact_percent=90、revision=1，不写入默认值。
+- `GET /control/v1/settings/codex` 只读，返回 `{settings:{retries,auto_compact,compact_percent,revision},needs_sync:[],compaction:[]}`。未保存时返回 retries=5、auto_compact=true、compact_percent=90、revision=1，不写入默认值。
 - `POST` 同路径，输入 `{retries?,auto_compact?,compact_percent?,expected_revision}`，至少一个设置非 null，expected_revision 必填。retries 取0–10整数、auto_compact 为布尔值、compact_percent 取1–99整数；省略或 null 的项保持原值。校验通过后事务保存并递增revision；旧revision返回409 conflict，无效输入返回400 invalid。两端需要同时升级。
 - 接口沿用管理授权与 `X-Anchor-Instance`。CLI为 `agent codex-settings [--retries N] [--auto-compact=BOOL] [--compact-percent N] [--revision R]`，桌面为 `CodexSettings`／`SaveCodexSettings` 薄桥接；前端按Model／hook Controller／View组织。
 - 保存成功后仅安全同步已启用且已接管的Codex目标，不修改其他Agent、不扩大模型授权、不接管未登记目录、不恢复已停用目标。外部编辑引起冲突时保留外部配置，偏好仍保存，`needs_sync`列出待处理Binding；前往Agent页确认更新或使用既有 `agent sync` 显式重新接管。
@@ -22,9 +22,30 @@
 
 桌面设置沿用 Model／hook Controller／View，显示自动配置开关和阈值百分比；读取、保存、revision 冲突、unknown 写入与设备切换遵循原设置边界。配置落盘并不保证压缩请求成功；压缩由 Codex 触发和执行，Anchor 不增加压缩端点、后台摘要请求或恢复重试。
 
+## 模型压缩配置检查（2026-11-05 当前源码，未发布）
+
+统一设置 GET 与 POST 响应新增 `compaction` 数组。核心遍历已启用 Codex Binding 及当前授权模型，复用实际目录导出器取得窗口和阈值，并只读核对 journal、目标配置、根级覆盖和目录内容；不依赖内存中的上一次同步结果来判断文件健康。读取不补写模型草稿、不创建托管目标、不修复或覆盖外部文件，不请求上游。
+
+每项包含 `binding_id`、`model_id`、`is_default`、`context_window`（整数或 null）、`token_limit`（整数或 null）及 `status`：
+
+| status | 含义 |
+| --- | --- |
+| `written` | 当前目标文件与导出计划一致，该模型已写入自动计算的窗口和阈值；不表示客户端已加载。 |
+| `missing_context` | 文件同步完成，但模型没有声明窗口，无法配置阈值；窗口和阈值为 null。 |
+| `needs_sync` | 文件缺失、外部改动、计划已变化、检查失败或既有后台失败；不返回计划值冒充已写入值。 |
+| `unmanaged` | 目标尚未应用，或已恢复，未写入托管配置。 |
+| `unsupported` | 已应用的旧 single 绑定没有模型目录，不能自动导出阈值。 |
+| `disabled` | 自动配置已关闭且文件检查通过；token_limit 为 null，不表示关闭 Codex 自身压缩。 |
+
+禁用 Binding 不列入数组，无已启用目标时返回空数组。`needs_sync` 保持文件同步失败的 Binding 列表，不把缺失模型窗口伪装成文件同步失败；`missing_context` 可以与空 `needs_sync` 同时出现。任一检查失败仍返回其他目标的状态，不泄露配置正文、恢复原值或凭据。未写入的项不返回推测的窗口或阈值。
+
+CLI 沿用 `agent codex-settings`，读取输出上述检查结果。保存仍先持久化并返回 JSON；存在 needs_sync，或自动配置开启时有非 written 项，输出后以非零退出，明确“已保存但配置未完成”，不能按失败退出就自动重放写请求。没有目标时仍保存偏好，数组为空。桌面逐模型显示窗口、阈值和默认模型标记，缺失窗口／未应用／无目录／待同步保持可见；保存提示按配置完整性给出，不统一显示待重启。已写入值也始终注明需 Codex 重载、实际加载与触发未验证。无需自动修改数据库中的模型窗口、扩大供应商授权或终止客户端进程。
+
+DTO 规范源是 managed／desktop 的 Go 类型，经既有生成器生成 TypeScript；共享样例为 `desktop/contract/codex-settings.json`（无目标）及 `codex-settings-incomplete.json`（已写入与缺失窗口混合）。响应新增字段，旧 CLI 消费者须允许新增 JSON 字段；新桌面遇旧核心缺少 compaction 返回 unsupported，不能把能力缺失当作空列表正常状态。写入后响应结构不完整沿用结果未知并要求重读。宿主与核心需配套升级，无数据库迁移；未打包或原生窗口验收。
+
 ## 自动配置已开启但当前模型没有阈值的排查（2026-11-05）
 
-`auto_compact=true` 和 `needs_sync=[]` 只说明偏好已保存且没有已记录的同步失败，不保证每个模型都有可导出的窗口。已有映射缺少 `configuration.limits.context`、元数据和本地模板也未声明窗口时，生成目录会保留 `context_window: null`，不会产生 `auto_compact_token_limit`。`model settings` 读取时显示的 models.dev 补充值只是草稿；未显式保存就不会进入 Agent 目录，不能把页面中的建议窗口当作已生效配置。
+`auto_compact=true` 和 `needs_sync=[]` 只说明偏好已保存且文件同步检查未发现失败，不保证每个模型都有可导出的窗口。已有映射缺少 `configuration.limits.context`、元数据和本地模板也未声明窗口时，生成目录会保留 `context_window: null`，不会产生 `auto_compact_token_limit`。`model settings` 读取时显示的 models.dev 补充值只是草稿；未显式保存就不会进入 Agent 目录，不能把页面中的建议窗口当作已生效配置。
 
 排查时先读取 `agent codex-settings` 和 `model list`，确认实际保存的窗口；再核对 Codex 配置所指向的 Anchor 目录中当前 slug 的 `context_window` 与 `auto_compact_token_limit`。若窗口缺失，通过 `model settings --id ID` 取得建议并审核，按[指令大全](../cli/commands.md#模型能力与默认值设置2026-10-17源码未发布)的 revision 检查保存入口持久化；只修窗口时，从原已保存 configuration 整理写入对象，保留其他字段，避免无意接受整份能力草稿。随后验证目录中的阈值等于已保存窗口的设定百分比，根级覆盖不会遮蔽它，并核对同步状态。
 

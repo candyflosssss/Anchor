@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CodexSettingsState } from '../../desktop/contract.generated';
 import { DesktopProblem } from '../../desktop/transport';
-import { codexSettingsError, codexSettingsService, parseCompactPercent, parseRetries } from './codex-settings.model';
+import { codexSettingsError, codexSettingsNotice, codexSettingsService, parseCompactPercent, parseRetries } from './codex-settings.model';
 
 export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) => void) {
   const [state, setState] = useState<CodexSettingsState | null>(null);
@@ -30,7 +30,7 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
       const out = save ? await codexSettingsService.save({ retries, auto_compact: autoCompact, compact_percent: percent, expected_revision: state!.settings.revision }) : await codexSettingsService.read();
       if (at === epoch.current) {
         setState(out); setDraft(String(out.settings.retries)); setAutoCompact(out.settings.auto_compact); setCompactPercent(String(out.settings.compact_percent)); setNeedsRead(false);
-        if (save) setNotice(out.needs_sync.length ? '待同步' : '待重启');
+        if (save) setNotice(codexSettingsNotice(out));
       }
     } catch (e) {
       if (at === epoch.current) {

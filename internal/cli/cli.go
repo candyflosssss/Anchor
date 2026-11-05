@@ -120,7 +120,7 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   agent add --id ID --adapter codex|claude|claude-desktop|dsh|dsh-desktop --config-root ABS_DIR --model MODEL --approve
             [--model-scope all-compatible|all-mapped|single] [--anchor-executable ABS_PATH]
                                             Register; apply explicitly or on next serve
-  agent codex-settings [--retries 0..10] [--auto-compact=BOOL] [--compact-percent 1..99] [--revision N]  Codex retries/compaction; restart after saving
+  agent codex-settings [--retries 0..10] [--auto-compact=BOOL] [--compact-percent 1..99] [--revision N]  Codex retries/compaction and per-model file status; restart after saving
   agent list | agent inspect ID | agent plan ID
   agent apply ID --revision N --fingerprint SHA256
   agent sync|restore|enable|disable ID --revision N

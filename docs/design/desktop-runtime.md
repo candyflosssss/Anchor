@@ -241,3 +241,7 @@ AgentWorkspace/EnrollAgent/ManageAgent DTO 形状与桥接方法不变；agent/a
 ## 应用 API 服务（2026-10-22，当前源码，未发布）
 
 桥接新增 APIService / SaveAPIService / IssueAPIKey / RevokeAPIKey，复用选定实例的类型化管理连接、鉴权和安全错误映射。Go DTO、监听设置启动快照与待重启状态、Key一次性秘密返回及日志归属见[应用 API 服务契约](api-service.md)。独立监听与核心同生命周期；不把管理面暴露到LAN，不随窗口关闭停止。旧核心缺少api_service_v1时拒绝操作，未知写入不自动重放。未打包或替换运行版本。
+
+## Codex 压缩配置检查（2026-11-05 当前源码未发布）
+
+`CodexSettings()`／`SaveCodexSettings()` 的响应增加逐模型 `compaction` 数组，复用 Go DTO 及现有 TypeScript 生成器，不新增桥接方法。核心只读核对真实托管文件，桌面显示窗口缺失和文件待同步；已写入不等于运行中的 Codex 已加载。新前端遇旧核心缺少该字段显示 unsupported，写入后的不完整响应保持 unknown，需同步升级宿主和核心。CLI 同一接口的输出及保存退出规则见 [Codex统一设置](codex-retries.md#模型压缩配置检查2026-11-05-当前源码未发布)。

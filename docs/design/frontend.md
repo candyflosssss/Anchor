@@ -819,3 +819,7 @@ Model统一校验可选password_saved并处理SessionResult.warning，hooks协�
 ## Codex 自动压缩设置（2026-11-03 desktop.82 dev 已发布）
 
 「设置 → Codex」新增默认开启的自动配置上下文压缩开关和默认90%的阈值比例（1–99整数）。核心按各模型已声明的有效窗口导出阈值，未知窗口沿用模板／Codex 默认行为；关闭只停止 Anchor 自动配置，不关闭 Codex 自身压缩。继续沿用相同 Model／hook Controller／View、revision、未知结果和实例隔离规则；保存后需重启 Codex。契约见 [Codex统一设置](codex-retries.md)。已同版打包发布，本机已更新；未做两平台原生窗口验收。
+
+## Codex 压缩配置逐模型核对（2026-11-05 当前源码未发布）
+
+「设置 → Codex」按核心返回的 compaction 数组显示已启用绑定中各模型的窗口、阈值和默认模型标记。缺少已保存窗口明确显示“未配置压缩阈值”，即使 needs_sync 为空也不显示为完整配置；文件冲突／未应用／无目录各自提示，无目标时显示尚未配置。保存后区分偏好已保存、配置未完成、待同步和需重启；已写入不冒充客户端已加载或真实触发成功。继续使用现有 Model／hook Controller／View 和 Go 生成契约，Model 拒绝缺少状态字段的旧核心响应，写入结构不完整按 unknown 处理。契约及样例见 [Codex 统一设置](codex-retries.md#模型压缩配置检查2026-11-05-当前源码未发布)。未打包、未验收原生窗口。

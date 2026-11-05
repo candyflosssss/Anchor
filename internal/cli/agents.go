@@ -67,6 +67,13 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		if len(v.NeedsSync) > 0 {
 			return errors.New("settings saved; some Codex targets need agent sync; restart Codex after syncing")
 		}
+		if v.Settings.AutoCompact {
+			for _, row := range v.Compaction {
+				if row.Status != "written" {
+					return errors.New("settings saved; automatic compaction is incomplete; check compaction statuses, save missing model contexts and apply/sync before restarting Codex")
+				}
+			}
+		}
 		return nil
 
 	case "discover":
