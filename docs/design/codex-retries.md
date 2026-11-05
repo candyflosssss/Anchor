@@ -22,6 +22,14 @@
 
 桌面设置沿用 Model／hook Controller／View，显示自动配置开关和阈值百分比；读取、保存、revision 冲突、unknown 写入与设备切换遵循原设置边界。配置落盘并不保证压缩请求成功；压缩由 Codex 触发和执行，Anchor 不增加压缩端点、后台摘要请求或恢复重试。
 
+## 自动配置已开启但当前模型没有阈值的排查（2026-11-05）
+
+`auto_compact=true` 和 `needs_sync=[]` 只说明偏好已保存且没有已记录的同步失败，不保证每个模型都有可导出的窗口。已有映射缺少 `configuration.limits.context`、元数据和本地模板也未声明窗口时，生成目录会保留 `context_window: null`，不会产生 `auto_compact_token_limit`。`model settings` 读取时显示的 models.dev 补充值只是草稿；未显式保存就不会进入 Agent 目录，不能把页面中的建议窗口当作已生效配置。
+
+排查时先读取 `agent codex-settings` 和 `model list`，确认实际保存的窗口；再核对 Codex 配置所指向的 Anchor 目录中当前 slug 的 `context_window` 与 `auto_compact_token_limit`。若窗口缺失，通过 `model settings --id ID` 取得建议并审核，按[指令大全](../cli/commands.md#模型能力与默认值设置2026-10-17源码未发布)的 revision 检查保存入口持久化；只修窗口时，从原已保存 configuration 整理写入对象，保留其他字段，避免无意接受整份能力草稿。随后验证目录中的阈值等于已保存窗口的设定百分比，根级覆盖不会遮蔽它，并核对同步状态。
+
+完成文件核验后仍须完全退出并重新启动 Codex（包括使用该目录的 app-server），再恢复原聊天。已运行会话不会因 Anchor 保存成功而自动重载；文件核验不能冒充实际压缩成功。缺少上游请求与客户端触发证据时，只能报告配置已修复、运行时触发待验证。速度变体是独立映射，须分别核对保存值及是否进入当前启用供应商对应的目录，不假定继承基础模型的后续修改。
+
 ## 旧配置迁移与网关边界
 
 旧模型JSON中的 `channel_retries` 读取时忽略，不合并为统一值，之后模型设置保存不再输出此字段；模型管理API与文件写入拒绝该字段，旧导出文件须删除它。已托管Codex原先写入的0由正常启动同步或保存统一设置迁移，保留既有条件恢复基线。
