@@ -1105,3 +1105,11 @@
 - 旧 → 新：Messages 上游支持 Responses namespace／custom 工具与两轮身份还原；并行工具策略双向映射；Messages 入口支持普通工具 type=custom、metadata.user_id、受限 cache_control 和 tool_result.is_error。缓存提示与工具错误文本化分别标记 prompt_cache_control／tool_result_error_text；上游明文 thinking 分离为推理内容并标记 anthropic_thinking_plaintext。流式保留开始帧完整工具输入、合并分帧缓存用量，并拒绝损坏的块生命周期。
 - 兼容与迁移：需要升级处理请求的核心，无数据库或配置迁移。原生字段及 SSE 保留；签名历史、redacted thinking、多模态及专有预算的跨协议转换仍拒绝。没有新增重试或工具执行权限，grammar 仍只有描述约束；支持范围见 [Messages 桥接](../design/protocol-anthropic-bridge.md)。本轮未打包／发布。
 - 验证：协议回归与模拟 HTTP 网关验收覆盖普通／流式工具闭环、thinking 与正文分离、缓存／错误降级及日志脱敏；最终实际命令和执行结果见任务记录，未调用真实付费上游。
+
+## 2026-11-06 — Codex all-mapped 保留本地缓存模板（当前源码，未发布）
+
+- 类型：托管目录行为修复，无新增命令、参数或输出字段。
+- 指令与参数：沿用 `agent enroll --model-scope all-mapped`、`agent sync` 和核心启动刷新。
+- 旧 → 新：没有显式目录时忽略 Codex 原生缓存，导致已有完整指令与工具声明仍被通用条目替代；现在仅对没有显式元数据／目录匹配的模型，按精确公开 ID 或唯一上游 ID 复用通过校验的本地 `models_cache.json` 完整条目。无匹配时仍保守兜底，并明确遵循用户语言。
+- 兼容与迁移：共享元数据和显式目录优先；已声明版本冲突不采用缓存。可选缓存缺失／损坏／不安全不影响旧 all-mapped 选择，歧义拒绝，不按名称猜能力。升级核心并同步／重启核心，再重启 Codex；不改用户缓存、指令、凭据或恢复基线，不解除网页搜索／托管工具／跨协议限制。没有匹配模板不表示已恢复原生全部功能。
+- 验证：隔离合成缓存验证匹配、优先级、未匹配／非法／不安全缓存、版本冲突、模板字段保留、速度分身及重启迁移／无操作同步／恢复；实际执行结果见本轮任务记录。没有真实付费上游、原生 Codex 客户端或运行版本验收，未打包发布。

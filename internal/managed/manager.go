@@ -70,9 +70,9 @@ func (m *Manager) gatewayFor(b state.Binding, useTemplates bool) (GatewayBinding
 		version = ""
 	}
 	var templates map[string]json.RawMessage
-	if useTemplates && b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
+	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
 		var err error
-		templates, err = m.codexTemplates(b)
+		templates, err = m.codexTemplates(b, models, useTemplates)
 		if err != nil {
 			return GatewayBinding{}, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
 		}

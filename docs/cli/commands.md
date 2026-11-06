@@ -1,6 +1,6 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-11-03
+- 最近核对：2026-11-06
 - 2026-11-03 已随desktop.82 dev投放：`agent codex-settings` 新增自动配置压缩开关及阈值百分比，默认开启、90%；本机CLI／核心／GUI已更新，Codex需重启读取，见本节及[发行记录](../release/desktop.md#codex-compaction-82)。
 - 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
 - 2026-11-01 已随 desktop.80 dev 同版投放：Messages 目标可对历史思考做显式有损投影，记录 reasoning_history_omitted；已知消息阶段和图片精度选择器损失另记录，可见消息／工具链／图片保留。客户端原历史不改，实际核心需更新至 .80，无新增命令或参数，详见[发行记录](../release/desktop.md#claude-history-80)。
@@ -660,6 +660,8 @@ anchor agent sync ID --revision N
 发现范围为绝对路径 `CODEX_HOME`、`CLAUDE_CONFIG_DIR`、`DSH_HOME`，以及 `~/.codex`、`~/.claude`、`~/.dsh`、`~/.gemini`、`~/.config/opencode`；Windows 另查用户 `AppData/Roaming/opencode`。Claude Desktop 另查 Linux `${XDG_CONFIG_HOME:-~/.config}/Claude-3p/configLibrary`、Windows `%LOCALAPPDATA%/Claude-3p/configLibrary`（缺失变量时用用户 AppData/Local）、macOS `~/Library/Application Support/Claude-3p/configLibrary`。同一目录去重，不扫描全盘、执行 Agent 或请求上游。目录痕迹不证明已安装或运行。当前 Codex、Claude Code CLI（`claude`）、Claude Desktop（`claude-desktop`）、DSH Web（`dsh`）、DSH Desktop（`dsh-desktop`）可独立托管；Gemini/OpenCode 只识别。DSH 两端共用 home，但返回不同目标 ID；DSH Desktop 仅在 `profiles/desktop` 已存在时发现，不替桌面应用初始化 profile。
 
 `enroll` 的 target/model/approve 必填；`--model-scope all-mapped|all-compatible` 可选。省略时 Codex CLI 保留 all-compatible，Claude/DSH 默认 all-mapped；桌面显式提交 all-mapped。revision 默认0，仅新目标使用；已登记目标须传当前值。默认模型必须在相应授权范围内。all-mapped 采用所有具有启用供应商的公开映射，清除旧目标模板覆盖，不依赖本地模型缓存；Codex 会生成 Anchor 自有的模型目录并设置 `model_catalog_json`，Claude/DSH 则更新各自配置内的名单。Codex 优先保留模型已声明的元数据，或复用接管前配置明确引用、且位于配置根内的本地目录中精确公开 ID／唯一上游 ID 匹配项；不改写用户目录文件，停止托管时恢复原目录指针。没有模板时导出保守模型条目，并使用 Anchor 明示的通用编程助手指令（不是官方模型模板）；Codex 不接受完全缺失指令的条目。已有指令保持不变，不借用其他模型模板，不推测上下文长度或推理档位。模型名称来自映射，不能证明客户端或上游支持全部能力。桌面默认选择器显示全部映射，无启用供应商的项禁用并标明原因。
+
+2026-11-06 当前源码（未打包／未发布）：上述显式模板没有匹配项时，all-mapped 也只读复用配置根内通过完整校验的 `models_cache.json`，先精确公开 ID，再唯一上游 ID；缓存中的完整指令／personality 模板、工具、shell、图片及其他字段保留，再应用显式模型设置。不按模型家族、相似名称或速度后缀猜模板；速度分身须通过其实际候选 ID 匹配。共享元数据与显式目录优先，已有 Binding 声明的非空 Codex 版本与缓存不一致时不采用缓存。缓存缺失、损坏或不安全不阻止原 all-mapped 选择；仍无模板时使用通用兜底，新增明确跟随用户语言、尊重用户指定其他语言的规则，不承诺与原生 Codex 等价。有效缓存的多上游匹配歧义仍拒绝。升级核心后通过既有 `agent sync`、`agent enroll` 或核心启动刷新目录，并重启 Codex；不修改原缓存、用户指令或恢复基线。本修复不新增命令／参数，也不解除既有内置网页搜索禁用、托管工具与跨协议限制。
 
 DSH Web（`dsh`）与 Desktop（`dsh-desktop`）共享模型能力投影，各自写入独立 profile（当前源码未发布）：映射的 display_name → name、limits.context → contextWindow、输入 text/image 或显式 vision → input（vision=false 明确写 text）。未声明字段不编造，遵循 DSH 安装目录／路由回退；仅读取映射的生效 configuration，不直接拿 reference 快照当作已批准配置。保存模型设置会自动同步，也可用 `agent sync ID --revision N` 重试；CLI 设置入口沿用 `model settings --id ID` / `model settings --id ID --file FILE`。
 

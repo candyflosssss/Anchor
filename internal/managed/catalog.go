@@ -59,21 +59,11 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 				"input_modalities":  []string{"text"}, "context_window": nil,
 			})
 			_ = json.Unmarshal(raw, &entry)
-			// Exact public ID first, otherwise one unambiguous upstream ID.
-			// These entries come only from the operator's original local catalog.
-			source := model.ID
-			if _, ok := templates[source]; !ok {
-				source = ""
-				for _, candidate := range model.Candidates {
-					if _, ok := templates[candidate.Model]; ok {
-						if source != "" && source != candidate.Model {
-							return nil, nil, errors.New("ambiguous local Codex templates")
-						}
-						source = candidate.Model
-					}
-				}
+			template, err := mappedTemplate(model, templates)
+			if err != nil {
+				return nil, nil, err
 			}
-			if template := templates[source]; template != nil {
+			if template != nil {
 				metadataBytes += len(template)
 				if metadataBytes > maxConfig {
 					return nil, nil, errors.New("generated catalog exceeds 1 MiB")
@@ -209,7 +199,25 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 
 // A name-only catalog still has to deserialize as Codex ModelInfo. This is an
 // explicit Anchor policy, not an inferred vendor prompt or capability claim.
-const mappedBaseInstructions = "You are a coding assistant. Follow the user's instructions and use the provided tools when appropriate."
+const mappedBaseInstructions = "You are a coding assistant. Follow the user's instructions and use the provided tools when appropriate. Respond in the user's language unless they request another language."
+
+// Exact public ID first, otherwise one unambiguous upstream ID. Never infer a
+// source from a model family, similar name, speed suffix or default selection.
+func mappedTemplate(model state.Model, templates map[string]json.RawMessage) (json.RawMessage, error) {
+	if template, resolved := templates[model.ID]; resolved {
+		return template, nil
+	}
+	source := ""
+	for _, candidate := range model.Candidates {
+		if templates[candidate.Model] != nil {
+			if source != "" && source != candidate.Model {
+				return nil, errors.New("ambiguous local Codex templates")
+			}
+			source = candidate.Model
+		}
+	}
+	return templates[source], nil
+}
 
 func ensureMappedInstructions(entry map[string]json.RawMessage) error {
 	var base *string

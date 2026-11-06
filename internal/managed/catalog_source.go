@@ -9,10 +9,51 @@ import (
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
+// Prefer the explicitly configured catalog; otherwise reuse an exact match in
+// Codex's validated local cache. Clean rebuilds skip the discarded configuration.
+func (m *Manager) codexTemplates(b state.Binding, models []state.Model, useConfigured bool) (map[string]json.RawMessage, error) {
+	var templates map[string]json.RawMessage
+	if useConfigured {
+		var err error
+		templates, err = m.configuredCodexTemplates(b)
+		if err != nil {
+			return nil, err
+		}
+	}
+	version, cached, err := localCatalog(b.ConfigRoot)
+	if err != nil || (b.CodexVersion != "" && b.CodexVersion != version) {
+		return templates, nil
+	}
+	cache := make(map[string]json.RawMessage, len(cached))
+	for slug, meta := range cached {
+		cache[slug] = meta.Entry
+	}
+	resolved := make(map[string]json.RawMessage, len(models))
+	for _, model := range models {
+		if model.Codex != nil {
+			continue
+		}
+		template, err := mappedTemplate(model, templates)
+		if err != nil {
+			return nil, err
+		}
+		if template == nil {
+			template, err = mappedTemplate(model, cache)
+			if err != nil {
+				return nil, err
+			}
+		}
+		// Keep negative resolutions too: a candidate ID might coincide with
+		// another public alias whose template belongs to a different upstream.
+		resolved[model.ID] = template
+	}
+	return resolved, nil
+}
+
 // Read only the catalog explicitly referenced by the pre-management config.
 // Never use Anchor's last generated catalog as the next metadata baseline:
 // doing that would retain removed portable overrides indefinitely.
-func (m *Manager) codexTemplates(b state.Binding) (map[string]json.RawMessage, error) {
+func (m *Manager) configuredCodexTemplates(b state.Binding) (map[string]json.RawMessage, error) {
 	raw, _, err := readConfig(b.ConfigRoot, filepath.Join(b.ConfigRoot, "config.toml"))
 	if err != nil {
 		return nil, err

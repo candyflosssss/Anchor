@@ -13,6 +13,10 @@ import (
 
 func TestCodexCompactionStatusMissingWindowThenConfigured(t *testing.T) {
 	m, env, _ := workspaceManager(t)
+	// No matching native cache: the context really is unknown until configured.
+	if err := os.Remove(filepath.Join(env.CodexHome, "models_cache.json")); err != nil {
+		t.Fatal(err)
+	}
 	b, err := m.Add(state.Binding{ID: "codex", AdapterID: "codex", AdapterVersion: "1", ConfigRoot: env.CodexHome, Executable: env.Executable, Model: "public", ModelScope: "all-mapped", Enabled: true})
 	if err != nil {
 		t.Fatal(err)
