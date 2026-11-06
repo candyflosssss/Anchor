@@ -7,6 +7,7 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
   const [state, setState] = useState<CodexSettingsState | null>(null);
   const [draft, setDraft] = useState('5'), [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [needsRead, setNeedsRead] = useState(false);
   const [autoCompact, setAutoCompact] = useState(true), [compactPercent, setCompactPercent] = useState('90');
+  const [overrideCatalog, setOverrideCatalog] = useState(false);
   const epoch = useRef(0), lock = useRef(false);
   useEffect(() => {
     const lifecycle = { epoch, lock };
@@ -14,7 +15,7 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
     setState(null); setError(''); setNotice(''); setNeedsRead(false);
     lock.current = enabled; setBusy(enabled);
     if (enabled) void codexSettingsService.read().then(out => {
-      if (at === epoch.current) { setState(out); setDraft(String(out.settings.retries)); setAutoCompact(out.settings.auto_compact); setCompactPercent(String(out.settings.compact_percent)); }
+      if (at === epoch.current) { setState(out); setOverrideCatalog(out.settings.override_model_catalog); setDraft(String(out.settings.retries)); setAutoCompact(out.settings.auto_compact); setCompactPercent(String(out.settings.compact_percent)); }
     }).catch(e => { if (at === epoch.current) setError(codexSettingsError(e)); }).finally(() => {
       if (at === epoch.current) { lock.current = false; setBusy(false); }
     });
@@ -27,9 +28,9 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
     const at = epoch.current;
     lock.current = true; setBusy(true); setError(''); setNotice('');
     try {
-      const out = save ? await codexSettingsService.save({ retries, auto_compact: autoCompact, compact_percent: percent, expected_revision: state!.settings.revision }) : await codexSettingsService.read();
+      const out = save ? await codexSettingsService.save({ override_model_catalog: overrideCatalog, retries, auto_compact: autoCompact, compact_percent: percent, expected_revision: state!.settings.revision }) : await codexSettingsService.read();
       if (at === epoch.current) {
-        setState(out); setDraft(String(out.settings.retries)); setAutoCompact(out.settings.auto_compact); setCompactPercent(String(out.settings.compact_percent)); setNeedsRead(false);
+        setState(out); setOverrideCatalog(out.settings.override_model_catalog); setDraft(String(out.settings.retries)); setAutoCompact(out.settings.auto_compact); setCompactPercent(String(out.settings.compact_percent)); setNeedsRead(false);
         if (save) setNotice(codexSettingsNotice(out));
       }
     } catch (e) {
@@ -39,5 +40,5 @@ export function useCodexSettings(enabled: boolean, onActivity: (busy: boolean) =
       }
     } finally { if (at === epoch.current) { lock.current = false; setBusy(false); } }
   }
-  return { state, draft, setDraft, autoCompact, setAutoCompact, compactPercent, setCompactPercent, busy, error, notice, needsRead, valid: parseRetries(draft) !== null && parseCompactPercent(compactPercent) !== null, read: () => run(false), save: () => run(true) };
+  return { state, overrideCatalog, setOverrideCatalog, draft, setDraft, autoCompact, setAutoCompact, compactPercent, setCompactPercent, busy, error, notice, needsRead, valid: parseRetries(draft) !== null && parseCompactPercent(compactPercent) !== null, read: () => run(false), save: () => run(true) };
 }

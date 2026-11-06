@@ -11,16 +11,18 @@ const MaxCodexRetries = 10
 const DefaultCodexCompactPercent = 90
 
 type CodexSettings struct {
-	Retries        int   `json:"retries"`
-	AutoCompact    bool  `json:"auto_compact"`
-	CompactPercent int   `json:"compact_percent"`
-	Revision       int64 `json:"revision"`
+	OverrideModelCatalog bool  `json:"override_model_catalog"`
+	Retries              int   `json:"retries"`
+	AutoCompact          bool  `json:"auto_compact"`
+	CompactPercent       int   `json:"compact_percent"`
+	Revision             int64 `json:"revision"`
 }
 type SaveCodexSettings struct {
-	Retries          *int  `json:"retries"`
-	AutoCompact      *bool `json:"auto_compact"`
-	CompactPercent   *int  `json:"compact_percent"`
-	ExpectedRevision int64 `json:"expected_revision"`
+	OverrideModelCatalog *bool `json:"override_model_catalog"`
+	Retries              *int  `json:"retries"`
+	AutoCompact          *bool `json:"auto_compact"`
+	CompactPercent       *int  `json:"compact_percent"`
+	ExpectedRevision     int64 `json:"expected_revision"`
 }
 
 func DefaultCodexSettings() CodexSettings {
@@ -28,7 +30,7 @@ func DefaultCodexSettings() CodexSettings {
 }
 
 func (in SaveCodexSettings) Validate() error {
-	if (in.Retries == nil && in.AutoCompact == nil && in.CompactPercent == nil) ||
+	if (in.Retries == nil && in.AutoCompact == nil && in.CompactPercent == nil && in.OverrideModelCatalog == nil) ||
 		(in.Retries != nil && (*in.Retries < 0 || *in.Retries > MaxCodexRetries)) ||
 		(in.CompactPercent != nil && (*in.CompactPercent < 1 || *in.CompactPercent > 99)) ||
 		in.ExpectedRevision < 1 || in.ExpectedRevision >= 9007199254740991 {
@@ -67,6 +69,9 @@ func (s *Store) SaveCodexSettings(in SaveCodexSettings) (CodexSettings, error) {
 	}
 	if out.Revision != in.ExpectedRevision {
 		return out, ErrConflict
+	}
+	if in.OverrideModelCatalog != nil {
+		out.OverrideModelCatalog = *in.OverrideModelCatalog
 	}
 	if in.Retries != nil {
 		out.Retries = *in.Retries

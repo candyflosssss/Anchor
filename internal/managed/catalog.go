@@ -25,6 +25,10 @@ func buildGatewayCatalog(g GatewayBinding) ([]byte, []string, error) {
 	return buildCatalogWithSettings(g.Models, g.CatalogVersion, g.CatalogTemplates, codexCompactSettings(g))
 }
 
+func codexCatalogEnabled(g GatewayBinding) bool {
+	return codexCompactSettings(g).OverrideModelCatalog
+}
+
 func codexCompactSettings(g GatewayBinding) state.CodexSettings {
 	if g.CodexSettings != nil {
 		return *g.CodexSettings
@@ -199,7 +203,7 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 
 // A name-only catalog still has to deserialize as Codex ModelInfo. This is an
 // explicit Anchor policy, not an inferred vendor prompt or capability claim.
-const mappedBaseInstructions = "You are a coding assistant. Follow the user's instructions and use the provided tools when appropriate. Respond in the user's language unless they request another language."
+const mappedBaseInstructions = "You are a coding assistant. Follow the user's instructions and use the provided tools when appropriate."
 
 // Exact public ID first, otherwise one unambiguous upstream ID. Never infer a
 // source from a model family, similar name, speed suffix or default selection.

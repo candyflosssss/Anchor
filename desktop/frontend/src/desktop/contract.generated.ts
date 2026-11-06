@@ -126,12 +126,14 @@ export interface KeyCooldownSettingsResult {
   problem: Problem | null;
 }
 export interface CodexSettings {
+  override_model_catalog: boolean;
   retries: number;
   auto_compact: boolean;
   compact_percent: number;
   revision: number;
 }
 export interface SaveCodexSettings {
+  override_model_catalog: boolean | null;
   retries: number | null;
   auto_compact: boolean | null;
   compact_percent: number | null;

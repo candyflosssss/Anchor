@@ -108,7 +108,7 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 	var modelIDs []string
 	var catalogPath string
 	var e error
-	if len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+	if codexCatalogEnabled(g) && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
 		catalog, modelIDs, e = buildGatewayCatalog(g)
 		if e != nil {
 			return Plan{}, e
@@ -121,12 +121,11 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 		if catalogExists && catalogPath != ownedCatalog {
 			return Plan{}, errors.New("reserved Anchor catalog already exists; recover or resolve conflict first")
 		}
-		paths = append(paths, []string{"model_catalog_json"})
-	} else if b.ModelScope == "all-compatible" {
+	} else if codexCatalogEnabled(g) && b.ModelScope == "all-compatible" {
 		return Plan{}, errors.New("all-compatible requires catalog metadata")
 	}
-	if catalogPath != "" {
-		paths = append(paths, []string{"model_auto_compact_token_limit"}, []string{"model_context_window"})
+	if catalogPath != "" || ownedCatalog != "" {
+		paths = append(paths, []string{"model_catalog_json"}, []string{"model_auto_compact_token_limit"}, []string{"model_context_window"})
 	}
 	editor := TOMLEditor{}
 	values, e := editor.Values(raw, paths)
@@ -169,16 +168,14 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 	for i, path := range paths[:len(after)] {
 		p.Edits = append(p.Edits, Edit{Path: path, Before: values[i], After: Value{true, normalize(after[i])}})
 	}
-	if catalogPath != "" {
-		for i := len(after); i < len(paths); i++ {
-			// Global overrides shadow per-model limits, including after model switches.
-			// Disabled automation leaves the original value in place.
-			desired := values[i]
-			if codexCompactSettings(g).AutoCompact {
-				desired = Value{}
-			}
-			p.Edits = append(p.Edits, Edit{Path: paths[i], Before: values[i], After: desired})
+	for i := len(after); i < len(paths); i++ {
+		// Global overrides shadow per-model limits, including after model switches.
+		// Disabled automation leaves the original value in place.
+		desired := values[i]
+		if catalogPath != "" && codexCompactSettings(g).AutoCompact {
+			desired = Value{}
 		}
+		p.Edits = append(p.Edits, Edit{Path: paths[i], Before: values[i], After: desired})
 	}
 	if _, e = editor.Patch(raw, p.Edits); e != nil {
 		return Plan{}, e
@@ -209,7 +206,10 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 			return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "codex.retries")
 		}
 	}
-	if len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+	if !codexCatalogEnabled(g) && sameCatalogPath(m["model_catalog_json"], filepath.Join(b.ConfigRoot, catalogName(b.ID))) {
+		return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "model_catalog_json")
+	}
+	if codexCatalogEnabled(g) && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
 		path := filepath.Join(b.ConfigRoot, catalogName(b.ID))
 		if m["model_catalog_json"] != path {
 			return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "model_catalog_json")

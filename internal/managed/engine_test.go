@@ -2,6 +2,7 @@ package managed
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"os"
@@ -36,8 +37,21 @@ func target(t *testing.T, original string) (*state.Store, state.Binding, Gateway
 	if e != nil {
 		t.Fatal(e)
 	}
+	// Existing catalog lifecycle tests exercise the explicitly opted-in mode.
+	settings := state.DefaultCodexSettings()
+	settings.OverrideModelCatalog = true
+	rawSettings, _ := json.Marshal(settings)
+	db, err := sql.Open("sqlite", filepath.Join(st.Dir, "state.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`INSERT INTO meta(key,value) VALUES('codex_settings',?)`, string(rawSettings))
+	db.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	b := state.Binding{ID: "test", AdapterID: "codex", AdapterVersion: "1", ConfigRoot: root, Model: "public", Executable: exe, Enabled: true}
-	return st, b, GatewayBinding{BaseURL: "http://127.0.0.1:17860/v1", Model: b.Model, DataDir: st.Dir, Ready: true, Tools: true, Streaming: true}, NewEngine(st)
+	return st, b, GatewayBinding{CodexSettings: &settings, BaseURL: "http://127.0.0.1:17860/v1", Model: b.Model, DataDir: st.Dir, Ready: true, Tools: true, Streaming: true}, NewEngine(st)
 }
 func planApply(t *testing.T, b state.Binding, g GatewayBinding, e *Engine) Plan {
 	t.Helper()

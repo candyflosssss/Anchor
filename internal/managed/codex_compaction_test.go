@@ -15,6 +15,7 @@ import (
 func TestCodexCompactionUsesEachDeclaredWindow(t *testing.T) {
 	for _, percent := range []int{90, 80} {
 		settings := state.DefaultCodexSettings()
+		settings.OverrideModelCatalog = true
 		settings.CompactPercent = percent
 		models := []state.Model{}
 		windows := []int64{272000, 1000000, 32001, math.MaxInt64}
@@ -55,6 +56,7 @@ func TestCodexCompactionUsesPortableOverrideAndCanDisable(t *testing.T) {
 	before, _ := json.Marshal(model)
 	for _, enabled := range []bool{true, false} {
 		settings := state.DefaultCodexSettings()
+		settings.OverrideModelCatalog = true
 		settings.AutoCompact = enabled
 		raw, _, err := buildCatalogWithSettings([]state.Model{model}, model.Codex.Version, nil, settings)
 		if err != nil {
@@ -99,6 +101,7 @@ func TestCodexCompactionSyncDisableDriftAndRecovery(t *testing.T) {
 		t.Fatal(string(raw))
 	}
 	settings := state.DefaultCodexSettings()
+	settings.OverrideModelCatalog = true
 	settings.CompactPercent = 80
 	g.CodexSettings = &settings
 	if _, err := engine.Reconcile(b, g); err != nil {
@@ -145,6 +148,7 @@ func TestCodexCompactionMigratesLegacyJournal(t *testing.T) {
 	original := "model = \"original\"\nmodel_context_window = 500000\nmodel_auto_compact_token_limit = 450000\n"
 	_, b, g, engine := catalogTarget(t, original)
 	settings := state.DefaultCodexSettings()
+	settings.OverrideModelCatalog = true
 	settings.AutoCompact = false
 	g.CodexSettings = &settings
 	p := planApply(t, b, g, engine)
@@ -163,7 +167,8 @@ func TestCodexCompactionMigratesLegacyJournal(t *testing.T) {
 	if err = engine.save(j); err != nil {
 		t.Fatal(err)
 	}
-	g.CodexSettings = nil
+	settings.AutoCompact = true
+	g.CodexSettings = &settings
 	if _, err = engine.Reconcile(b, g); err != nil {
 		t.Fatal(err)
 	}

@@ -57,6 +57,14 @@ func restartCodexHome(t *testing.T) (string, []byte) {
 
 func enrollRestartBinding(t *testing.T, s *Session, b *Bridge, root string) (func(), func()) {
 	t.Helper()
+	on := true
+	settings := b.CodexSettings()
+	if settings.Problem != nil {
+		t.Fatal(settings)
+	}
+	if out := b.SaveCodexSettings(SaveCodexSettings{OverrideModelCatalog: &on, ExpectedRevision: settings.Data.Settings.Revision}); out.Problem != nil {
+		t.Fatal(out)
+	}
 	var requests atomic.Int32
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/responses" || r.Header.Get("Authorization") != "Bearer fixture-upstream" {

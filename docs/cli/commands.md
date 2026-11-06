@@ -640,6 +640,10 @@ anchor access revoke ID
 
 ## 8. Agent 托管与独立恢复
 
+**2026-11-06 当前源码修复（未发布）：Codex 托管默认不覆盖提示词与模型目录。** `agent codex-settings --override-model-catalog=true --revision N` 才明确允许 Anchor 目录替换基础指令和工具能力；`--override-model-catalog=false` 关闭并按原 journal 恢复目录指针／全局上下文设置。无参数读取输出 `settings.override_model_catalog`（布尔值），新安装及旧设置缺省 false；省略／null 写入保留原值。作用于所选 Context 的全部 Codex 绑定，需管理授权及最新 revision；旧客户端省略该字段不会开启。设置成功不等于各目标恢复成功，`needs_sync` 非空仍非零退出；关闭覆盖时不因压缩状态 disabled 误报失败。当前核心启动也会迁移旧托管目录，外部修改保持并报告冲突。需升级核心后同步并完全重启 Codex，新会话核验；本轮不自动升级或改运行配置。
+
+关闭时保留 Codex 原生／用户目录和指令文件；自定义别名及速度分身不保证进入原生选择器，目录内的逐模型压缩配置不启用。开启才使用下文完整模板／缓存／通用兜底的目录导出规则，可能改变模型行为；不是只同步名称。无新数据库 schema，命令读取／保存沿用统一设置接口；GUI 等价入口为「设置 → Codex → 允许 Anchor 覆盖模型提示词与目录」。详见[授权与迁移契约](../design/codex-retries.md#提示词与模型目录授权2026-11-06当前源码未发布)。
+
 > 映射变动自动同步与 Codex all-mapped 模型目录导出已随 desktop.37 宿主／核心发布 dev；本轮未安装本机，旧核心须升级后才有此行为。独立 CLI 公开 alpha.6 不含本轮能力。
 
 ### `agent discover` / `agent enroll` / `agent sync`
@@ -746,6 +750,8 @@ Codex 外部编辑保留了旧 Anchor 注释、并将项目或其他 provider �
 
 ### `agent codex-settings`
 
+完整语法：`anchor agent codex-settings [--override-model-catalog=BOOL] [--retries 0..10] [--auto-compact=BOOL] [--compact-percent 1..99] [--revision N]`。`--override-model-catalog` 默认 false，明确开启才允许生成目录覆盖基础提示词／工具能力；关闭恢复原目录及全局上下文。此设置适用于全部 Codex 托管范围，旧配置缺字段不视为已授权，迁移与模型列表限制见本节开头。
+
 ```sh
 anchor agent codex-settings
 # 使用上一步读取的 settings.revision；这里假设尚未保存（revision=1）
@@ -754,15 +760,15 @@ anchor agent codex-settings --retries 5 --revision 1
 anchor agent codex-settings --auto-compact=true --compact-percent 90 --revision 2
 ```
 
-无参数只读当前核心的统一 Codex 设置，返回 `settings`（`retries`、`auto_compact`、`compact_percent`、`revision`）、`needs_sync`（待处理 Binding ID 数组）及 `compaction`（2026-11-05 当前源码新增，未发布的逐模型配置检查数组）。重试默认5次，`--retries` 允许0–10整数，0关闭；次数不含首次请求，统一控制 provider 的 `request_max_retries` 和 `stream_max_retries`，两项分别受该次数限制，不是整个对话的总请求预算。
+无参数只读当前核心的统一 Codex 设置，返回 `settings`（`override_model_catalog`、`retries`、`auto_compact`、`compact_percent`、`revision`）、`needs_sync`（待处理 Binding ID 数组）及 `compaction`（2026-11-05 当前源码新增，未发布的逐模型配置检查数组）。重试默认5次，`--retries` 允许0–10整数，0关闭；次数不含首次请求，统一控制 provider 的 `request_max_retries` 和 `stream_max_retries`，两项分别受该次数限制，不是整个对话的总请求预算。
 
-2026-11-03 已随desktop.82 dev发布：`--auto-compact=BOOL` 默认 true，开启自动配置压缩阈值；`--compact-percent N` 默认90，范围1–99整数。阈值按每个模型导出的 `context_window × N / 100` 向下取整（至少1 token），默认即0.9倍上下文。窗口来自模型显式设置或已声明的 Codex 元数据／本地模板，未知窗口不按名称猜测、不补造阈值，继续使用模板／Codex 默认行为。生成目录的各模型分别写入 `auto_compact_token_limit`，切换模型使用相应值；开启时将会覆盖目录值的根级 `model_context_window` 和 `model_auto_compact_token_limit` 保存为恢复基线并移除。关闭自动配置（`--auto-compact=false`）恢复这两个根级原值，目录回到原始模板／显式模型设置；这不代表关闭 Codex 自身的自动压缩。没有目录的旧 single 绑定保留 Codex 原有行为。
+2026-11-03 自动压缩能力已随 desktop.82 dev 发布（2026-11-06 授权边界修订，当前源码未发布）：`--auto-compact=BOOL` 偏好默认 true，仅在 `override_model_catalog=true` 时执行自动配置压缩阈值；`--compact-percent N` 默认90，范围1–99整数。阈值按每个模型导出的 `context_window × N / 100` 向下取整（至少1 token），默认即0.9倍上下文。窗口来自模型显式设置或已声明的 Codex 元数据／本地模板，未知窗口不按名称猜测、不补造阈值，继续使用模板／Codex 默认行为。生成目录的各模型分别写入 `auto_compact_token_limit`，切换模型使用相应值；开启时将会覆盖目录值的根级 `model_context_window` 和 `model_auto_compact_token_limit` 保存为恢复基线并移除。关闭自动配置（`--auto-compact=false`）恢复这两个根级原值，目录回到原始模板／显式模型设置；这不代表关闭 Codex 自身的自动压缩。没有目录的旧 single 绑定保留 Codex 原有行为。
 
-2026-11-05 核对：`compaction` 每项包含 `binding_id`、`model_id`、`is_default`、`context_window`、`token_limit`、`status`。`written` 表示只读核对实际文件后确认窗口和阈值已写入；`missing_context` 表示缺少模型窗口，即使 `needs_sync=[]` 也尚未配置阈值；`needs_sync` 表示文件不一致／检查失败，`unmanaged` 表示尚未应用／已恢复，`unsupported` 表示旧 single 无模型目录，`disabled` 表示关闭 Anchor 自动配置。未确认写入的窗口和阈值为 null，disabled 的阈值为 null；只列已启用 Codex 绑定，无目标返回空数组。读取不写模型或 Agent 配置、不加载建议草稿、不调用付费上游，也不证明运行中的 Codex 已加载或实际触发压缩。新桌面与核心需配套升级；字段语义与共享样例见 [Codex配置检查](../design/codex-retries.md#模型压缩配置检查2026-11-05-当前源码未发布)。
+2026-11-05 核对：`compaction` 每项包含 `binding_id`、`model_id`、`is_default`、`context_window`、`token_limit`、`status`。`written` 表示只读核对实际文件后确认窗口和阈值已写入；`missing_context` 表示缺少模型窗口，即使 `needs_sync=[]` 也尚未配置阈值；`needs_sync` 表示文件不一致／检查失败，`unmanaged` 表示尚未应用／已恢复，`unsupported` 表示旧 single 无模型目录，`disabled` 表示关闭 Anchor 自动配置或未授权目录覆盖。未确认写入的窗口和阈值为 null，disabled 的阈值为 null；只列已启用 Codex 绑定，无目标返回空数组。读取不写模型或 Agent 配置、不加载建议草稿、不调用付费上游，也不证明运行中的 Codex 已加载或实际触发压缩。新桌面与核心需配套升级；字段语义与共享样例见 [Codex配置检查](../design/codex-retries.md#模型压缩配置检查2026-11-05-当前源码未发布)。
 
-保存时至少给出一个设置参数及当前 `--revision`，未给出的设置保持不变；过期版本返回 conflict，未提供 revision 不写入。已有重试设置自动继承开启、90%的默认值。
+保存时至少给出一个设置参数及当前 `--revision`，未给出的设置保持不变；过期版本返回 conflict，未提供 revision 不写入。已有重试设置继承压缩偏好开启、90%的默认值，但目录覆盖缺省 false，不能因保存重试／压缩偏好而自动授权。
 
-保存后安全同步已启用且已接管的Codex，不修改其他Agent或未接管目标。部分同步失败仍返回已保存设置和非空 `needs_sync`，CLI输出结果后以非零退出；2026-11-05 当前源码在自动配置开启且任一模型为非 written 时也会在输出已保存结果后非零退出，明确配置未完成，不能因此重放保存请求；前往Agent页检查后显式同步并重启Codex。配置被外部修改时不会自动覆盖；之后接管的目标使用新值。管理写入结果未知时先重读，不自动重试。旧模型 `channel_retries` 不再生效，模型设置JSON需删除该字段。详细边界见 [Codex统一重试](../design/codex-retries.md)。
+保存后安全同步已启用且已接管的Codex，不修改其他Agent或未接管目标。部分同步失败仍返回已保存设置和非空 `needs_sync`，CLI输出结果后以非零退出；目录覆盖与自动配置同时开启且任一模型为非 written 时也会在输出已保存结果后非零退出，明确配置未完成，不能因此重放保存请求；前往Agent页检查后显式同步并重启Codex。配置被外部修改时不会自动覆盖；之后接管的目标使用新值。管理写入结果未知时先重读，不自动重试。旧模型 `channel_retries` 不再生效，模型设置JSON需删除该字段。详细边界见 [Codex统一重试](../design/codex-retries.md)。
 
 ### `agent set-models`
 
@@ -856,7 +862,7 @@ anchor recover [--id ID]
 | SSH 连接与远程凭据 | CLI／桌面已实现 | context add --ssh、--ssh-password-stdin、context test 与 context password save/status/forget；系统凭据库显式可选，远端须已安装新版 Anchor，自动安装待实现 |
 | Agent 绑定/接管、条件恢复/recover | agent 管理子命令及 recover | 已提供 Codex 基础配置、Claude 用户 settings、DSH Web / Desktop 独立 profile、本地发现/登记/同步及桌面入口；全部映射默认选择和范围更新已提供；Gemini/OpenCode、除 Web/Desktop 外的 DSH profile、绑定删除/路径更新仍缺失 |
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 请求级协议翻译层；同协议受控原生透传、跨协议无状态文本／函数／SSE／用量、Responses → Chat 桥与 [Claude 工具／thinking 桥](../design/protocol-anthropic-bridge.md)；缓存提示、工具错误和明文思考降级可在 logs detail/export 查询，不支持内容明确报错，见[翻译层契约](../design/protocol-translation.md) |
-| Codex统一重试 | agent codex-settings [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
+| Codex统一重试 | agent codex-settings [--override-model-catalog=BOOL] [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
 | 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；desktop.57 已同版发布安装器／runtime／CLI feed，无数据库回滚，见 [在线更新](../design/online-updates.md) |
 | 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
 

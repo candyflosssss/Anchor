@@ -144,6 +144,12 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 				return err
 			}
 		}
+		// Keep ownership of a retired artifact for conditional recovery/cleanup.
+		// Its config pointer is restored by the plan; no retired prompt is loaded.
+		if b.AdapterID == "codex" && !codexCatalogEnabled(g) && p.catalog == nil && j.Catalog != nil {
+			retired := *j.Catalog
+			p.catalog = &retired
+		}
 		if p.Path != j.Path || (j.Catalog != nil && (p.catalog == nil || p.catalog.Path != j.Catalog.Path)) {
 			return ErrUnsafe
 		}

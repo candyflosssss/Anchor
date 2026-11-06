@@ -20,7 +20,7 @@ func TestCodexSettingsBridgeAndCLI(t *testing.T) {
 	b := NewBridge(s)
 	requireReady(t, b)
 	initial := b.CodexSettings()
-	if initial.Problem != nil || initial.Data == nil || initial.Data.Settings.Retries != 5 {
+	if initial.Problem != nil || initial.Data == nil || initial.Data.Settings.Retries != 5 || initial.Data.Settings.OverrideModelCatalog {
 		t.Fatal(initial)
 	}
 	n := 0
@@ -62,6 +62,17 @@ func TestCodexSettingsBridgeAndCLI(t *testing.T) {
 	run(true, "agent", "codex-settings", "--compact-percent", "100", "--revision", "4")
 	run(true, "agent", "codex-settings", "--auto-compact=false")
 	run(true, "agent", "codex-settings", "--revision", "4")
+	if got := run(false, "agent", "codex-settings", "--override-model-catalog=true", "--revision", "4"); !strings.Contains(got, `"override_model_catalog":true`) {
+		t.Fatal(got)
+	}
+	if read := b.CodexSettings(); read.Problem != nil || !read.Data.Settings.OverrideModelCatalog {
+		t.Fatal(read)
+	}
+	off := false
+	if saved := b.SaveCodexSettings(SaveCodexSettings{OverrideModelCatalog: &off, ExpectedRevision: 5}); saved.Problem != nil || saved.Data.Settings.OverrideModelCatalog {
+		t.Fatal(saved)
+	}
+
 }
 func TestSharedCodexSettingsFixture(t *testing.T) {
 	for _, path := range []string{"../../desktop/contract/codex-settings.json", "../../desktop/contract/codex-settings-incomplete.json"} {
@@ -114,6 +125,10 @@ func TestCodexCompactionMissingContextAcrossBridgeAndCLI(t *testing.T) {
 	if workspace.Problem != nil || workspace.Data == nil || len(workspace.Data.Targets) != 1 {
 		t.Fatal(workspace)
 	}
+	on := true
+	if opted := b.SaveCodexSettings(SaveCodexSettings{OverrideModelCatalog: &on, ExpectedRevision: 1}); opted.Problem != nil {
+		t.Fatal(opted)
+	}
 	applied := b.EnrollAgent(EnrollAgent{TargetID: workspace.Data.Targets[0].ID, Model: "public", ModelScope: "all-mapped", Approved: true})
 	if applied.Problem != nil || applied.Data == nil || applied.Data.Bindings[0].Status != "applied" {
 		t.Fatal(applied)
@@ -133,12 +148,12 @@ func TestCodexCompactionMissingContextAcrossBridgeAndCLI(t *testing.T) {
 	if err = run("context", "use", "local-test"); err != nil {
 		t.Fatal(err)
 	}
-	err = run("agent", "codex-settings", "--compact-percent", "80", "--revision", "1")
+	err = run("agent", "codex-settings", "--compact-percent", "80", "--revision", "2")
 	if err == nil || !strings.Contains(err.Error(), "settings saved; automatic compaction is incomplete") || !strings.Contains(stdout.String(), `"status":"missing_context"`) {
 		t.Fatal(stdout.String(), err)
 	}
 	saved := b.CodexSettings()
-	if saved.Problem != nil || saved.Data.Settings.Revision != 2 || saved.Data.Settings.CompactPercent != 80 {
+	if saved.Problem != nil || saved.Data.Settings.Revision != 3 || saved.Data.Settings.CompactPercent != 80 {
 		t.Fatal(saved)
 	}
 	// A successful model save synchronizes the same directory and clears the
@@ -152,7 +167,7 @@ func TestCodexCompactionMissingContextAcrossBridgeAndCLI(t *testing.T) {
 	if read.Problem != nil || read.Data.Compaction[0].Status != "written" || *read.Data.Compaction[0].TokenLimit != 217600 {
 		t.Fatal(read)
 	}
-	if err = run("agent", "codex-settings", "--compact-percent", "90", "--revision", "2"); err != nil || !strings.Contains(stdout.String(), `"token_limit":244800`) {
+	if err = run("agent", "codex-settings", "--compact-percent", "90", "--revision", "3"); err != nil || !strings.Contains(stdout.String(), `"token_limit":244800`) {
 		t.Fatal(stdout.String(), err)
 	}
 }

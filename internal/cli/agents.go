@@ -23,6 +23,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 	case "codex-settings":
 		f := a.flags("agent codex-settings")
 		retries := f.Int("retries", -1, "unified Codex request/stream retries, 0..10 (default 5)")
+		overrideCatalog := f.Bool("override-model-catalog", false, "allow Anchor to replace Codex model instructions and capabilities (default false; restart Codex)")
 		autoCompact := f.Bool("auto-compact", true, "automatically configure per-model compaction thresholds (default true)")
 		compactPercent := f.Int("compact-percent", 90, "compaction threshold as percent of declared context, 1..99 (default 90)")
 		revision := f.Int64("revision", 0, "expected settings revision (required when saving)")
@@ -33,6 +34,9 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		writing := false
 		f.Visit(func(flag *flag.Flag) {
 			switch flag.Name {
+			case "override-model-catalog":
+				in.OverrideModelCatalog = overrideCatalog
+				writing = true
 			case "retries":
 				in.Retries = retries
 				writing = true
@@ -46,7 +50,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		})
 		if !writing {
 			if *revision != 0 {
-				return errors.New("--revision requires --retries, --auto-compact or --compact-percent")
+				return errors.New("--revision requires --retries, --auto-compact, --compact-percent or --override-model-catalog")
 			}
 			v, err := c.CodexSettings(ctx)
 			if err != nil {
@@ -67,7 +71,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 		if len(v.NeedsSync) > 0 {
 			return errors.New("settings saved; some Codex targets need agent sync; restart Codex after syncing")
 		}
-		if v.Settings.AutoCompact {
+		if v.Settings.OverrideModelCatalog && v.Settings.AutoCompact {
 			for _, row := range v.Compaction {
 				if row.Status != "written" {
 					return errors.New("settings saved; automatic compaction is incomplete; check compaction statuses, save missing model contexts and apply/sync before restarting Codex")

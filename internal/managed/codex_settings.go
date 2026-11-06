@@ -76,6 +76,13 @@ func (m *Manager) codexCompaction(b state.Binding, settings state.CodexSettings)
 	if previous, ok := m.last[b.ID]; ok && previous.Status != "applied" {
 		fileStatus, needsSync = "needs_sync", true
 	}
+	if !settings.OverrideModelCatalog {
+		fallback[0].Status = fileStatus
+		if fileStatus == "written" {
+			fallback[0].Status = "disabled"
+		}
+		return fallback, needsSync
+	}
 	rows := []CodexCompactionStatus{}
 	if len(g.Models) == 0 || (b.ModelScope != "all-mapped" && g.CatalogVersion == "") {
 		fallback[0].Status = fileStatus

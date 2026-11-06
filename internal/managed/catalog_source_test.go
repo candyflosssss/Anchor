@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -205,7 +204,7 @@ func TestMappedCacheSelectionAndOptionalFailures(t *testing.T) {
 	}
 }
 
-func TestMappedTemplateRejectsAmbiguityAndKeepsLanguagePolicy(t *testing.T) {
+func TestMappedTemplateRejectsAmbiguityAndKeepsNegativeResolution(t *testing.T) {
 	model := state.Model{ID: "alias", Candidates: []state.Candidate{{Model: "one"}, {Model: "two"}}}
 	templates := map[string]json.RawMessage{"one": json.RawMessage(`{}`), "two": json.RawMessage(`{}`)}
 	if _, err := mappedTemplate(model, templates); err == nil {
@@ -219,7 +218,5 @@ func TestMappedTemplateRejectsAmbiguityAndKeepsLanguagePolicy(t *testing.T) {
 	if got, err := mappedTemplate(model, templates); err != nil || got != nil {
 		t.Fatal("negative resolution borrowed another alias template", err)
 	}
-	if !strings.Contains(mappedBaseInstructions, "Respond in the user's language unless they request another language.") {
-		t.Fatal("fallback has no user-language policy")
-	}
+
 }

@@ -69,14 +69,6 @@ func (m *Manager) gatewayFor(b state.Binding, useTemplates bool) (GatewayBinding
 	if b.ModelScope == "all-mapped" {
 		version = ""
 	}
-	var templates map[string]json.RawMessage
-	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
-		var err error
-		templates, err = m.codexTemplates(b, models, useTemplates)
-		if err != nil {
-			return GatewayBinding{}, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
-		}
-	}
 	var retries *int
 	var codexSettings *state.CodexSettings
 	if b.AdapterID == "codex" {
@@ -86,6 +78,14 @@ func (m *Manager) gatewayFor(b state.Binding, useTemplates bool) (GatewayBinding
 		}
 		retries = &retrySettings.Retries
 		codexSettings = &retrySettings
+	}
+	var templates map[string]json.RawMessage
+	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" && codexSettings.OverrideModelCatalog {
+		var err error
+		templates, err = m.codexTemplates(b, models, useTemplates)
+		if err != nil {
+			return GatewayBinding{}, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
+		}
 	}
 	return GatewayBinding{CodexSettings: codexSettings, CodexRetries: retries, Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
 }
@@ -298,7 +298,7 @@ func (m *Manager) Start() ([]Result, error) {
 				if e == nil {
 					g, e = m.gateway(b)
 				}
-				if e == nil && b.AdapterID == "codex" && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+				if e == nil && codexCatalogEnabled(g) && b.AdapterID == "codex" && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
 					_, _, e = buildGatewayCatalog(g)
 				}
 				if e == nil {
@@ -391,7 +391,7 @@ func (m *Manager) SetModels(id string, revision int64, model, scope string) (sta
 	if b.AdapterID == "codex" && b.ModelScope != "all-mapped" && (!g.Tools || !g.Streaming) {
 		return b, Result{}, errors.New("Codex model requires tools and streaming")
 	}
-	if len(g.Models) > 0 && g.CatalogVersion != "" {
+	if codexCatalogEnabled(g) && len(g.Models) > 0 && g.CatalogVersion != "" {
 		if _, _, err = buildGatewayCatalog(g); err != nil {
 			return b, Result{}, err
 		}

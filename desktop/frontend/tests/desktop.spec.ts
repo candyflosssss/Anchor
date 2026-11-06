@@ -50,7 +50,7 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
       SaveCodexSettings: async input => {
         counters.saves++;
         if (counters.writeError) return { contract, data: null, problem: { code: counters.writeError } };
-        codexState = { settings: { retries: input.retries ?? codexState.settings.retries, auto_compact: input.auto_compact ?? codexState.settings.auto_compact, compact_percent: input.compact_percent ?? codexState.settings.compact_percent, revision: codexState.settings.revision + 1 }, needs_sync: [], compaction: [] };
+        codexState = { settings: { override_model_catalog: input.override_model_catalog ?? codexState.settings.override_model_catalog, retries: input.retries ?? codexState.settings.retries, auto_compact: input.auto_compact ?? codexState.settings.auto_compact, compact_percent: input.compact_percent ?? codexState.settings.compact_percent, revision: codexState.settings.revision + 1 }, needs_sync: [], compaction: [] };
         return { contract, data: codexState, problem: null };
       },
       ProxyWorkspace: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
@@ -1208,7 +1208,7 @@ test('unified Codex retries default to five, save zero and lock on conflict (sim
   await expect(retries).toHaveValue('5');
   await retries.fill('0');
   await page.getByRole('region', { name: 'Codex', exact: true }).getByRole('button', { name: '保存', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: '设置已保存；尚无已启用' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: '设置已保存；待重启 Codex' })).toBeVisible();
   await page.getByRole('button', { name: '模型映射', exact: true }).click();
   await page.getByRole('button', { name: '模型设置 shared-one', exact: true }).click();
   await expect(page.getByLabel('同一渠道重试次数')).toHaveCount(0);
@@ -1746,4 +1746,24 @@ test('application API saves listener settings, issues a Key once, revokes and lo
   await section.getByRole('button', { name: '重新读取', exact: true }).click();
   await expect(section.getByRole('button', { name: '创建 Key', exact: true })).toBeEnabled();
   await expect(section.getByLabel('API 端口')).toHaveValue('18762');
+});
+
+test('Codex prompt override requires an explicit setting and can be disabled (simulated host)', async ({ page }) => {
+  await host(page, true);
+  await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
+  const section = page.getByRole('region', { name: 'Codex', exact: true });
+  const consent = section.getByRole('switch', { name: '允许 Anchor 覆盖模型提示词与目录' });
+  await expect(consent).not.toBeChecked();
+  await expect(section.getByText(/默认关闭。开启并保存后/)).toBeVisible();
+  await expect(section.getByRole('switch', { name: '自动配置上下文压缩' })).toBeDisabled();
+  await consent.check();
+  await section.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(section.getByRole('status').filter({ hasText: '设置已保存；尚无已启用' })).toBeVisible();
+  await section.getByRole('button', { name: '读取', exact: true }).click();
+  await expect(consent).toBeChecked();
+  await consent.uncheck();
+  await section.getByRole('button', { name: '保存', exact: true }).click();
+  await expect(section.getByRole('status').filter({ hasText: '设置已保存；待重启 Codex' })).toBeVisible();
+  await expect(consent).not.toBeChecked();
+  expect(await page.evaluate(() => window.desktopTest.saves)).toBe(2);
 });

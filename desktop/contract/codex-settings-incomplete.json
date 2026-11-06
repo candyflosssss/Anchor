@@ -3,7 +3,8 @@
     "retries": 5,
     "auto_compact": true,
     "compact_percent": 90,
-    "revision": 1
+    "revision": 1,
+    "override_model_catalog": true
   },
   "needs_sync": [],
   "compaction": [

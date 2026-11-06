@@ -18,6 +18,10 @@ import (
 
 func syncTestAgents(t *testing.T, f *fixture) map[string]string {
 	t.Helper()
+	on := true
+	if _, err := f.store.SaveCodexSettings(state.SaveCodexSettings{OverrideModelCatalog: &on, ExpectedRevision: 1}); err != nil {
+		t.Fatal(err)
+	}
 	paths := map[string]string{}
 	exe, err := os.Executable()
 	if err != nil {

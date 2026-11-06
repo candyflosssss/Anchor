@@ -5,6 +5,8 @@ import { prototype } from '../../desktop/environment';
 import { useCodexSettings } from './use-codex-settings';
 
 export function CodexCompactionStatus({ state }: { state: CodexSettingsState }) {
+  if (!state.settings.override_model_catalog && state.needs_sync.length) return <p role="alert" className="error-feedback">覆盖偏好已关闭，但部分目标尚未恢复原配置。请处理下方待同步目标后再重启 Codex。</p>;
+  if (!state.settings.override_model_catalog) return <p role="status">提示词与模型目录覆盖已关闭；Anchor 不配置目录内的压缩阈值，保留 Codex 自身设置。</p>;
   if (!state.compaction.length) return <p role="status">尚无已启用的 Codex 托管目标，自动压缩尚未配置。</p>;
   return <div aria-label="模型压缩配置" className="space-y-2">
     <p className="text-sm text-muted-foreground">以下核对的是配置文件；是否已被 Codex 加载、是否实际触发压缩，尚未验证。</p>
@@ -28,8 +30,11 @@ export function CodexSettings({ coreReady, onActivity }: { coreReady: boolean; o
     <header className="card-toolbar"><h2 id="codex-settings-title">Codex</h2></header>
     {!enabled ? <p role="status">{prototype ? '桌面专用' : '未连接'}</p> : <form className="space-y-4" onSubmit={e => { e.preventDefault(); void c.save(); }}>
       <label className="model-setting-field"><span>Codex 重试次数</span><input className="input-field" type="number" min="0" max="10" step="1" value={c.draft} disabled={c.busy || !c.state || c.needsRead} onChange={e => c.setDraft(e.target.value)} /></label>
-      <label className="model-setting-field"><span>自动配置上下文压缩</span><Switch checked={c.autoCompact} disabled={c.busy || !c.state || c.needsRead} onCheckedChange={c.setAutoCompact} /></label>
-      <label className="model-setting-field"><span>压缩阈值（上下文的 %）</span><input className="input-field" type="number" min="1" max="99" step="1" value={c.compactPercent} disabled={c.busy || !c.state || c.needsRead || !c.autoCompact} onChange={e => c.setCompactPercent(e.target.value)} /></label>
+      <label className="model-setting-field"><span>允许 Anchor 覆盖模型提示词与目录</span><Switch aria-describedby="codex-catalog-impact" checked={c.overrideCatalog} disabled={c.busy || !c.state || c.needsRead} onCheckedChange={c.setOverrideCatalog} /></label>
+      <p id="codex-catalog-impact" className="text-sm text-muted-foreground">默认关闭。开启并保存后，当前实例所有 Codex 托管目标将加载 Anchor 模型目录，其中的基础提示词、personality 和工具能力会替代 Codex 原生条目；无匹配模板时使用通用编程助手提示词。项目 AGENTS.md 和用户自定义指令保持不变。</p>
+      <p className="text-sm text-muted-foreground">关闭并保存后恢复托管前的模型目录与全局上下文设置；Codex 自行选择提示词。自定义模型别名不保证出现在原生模型列表中。两种操作都需要重启 Codex，已有会话仍可能保留旧指令。</p>
+      <label className="model-setting-field"><span>自动配置上下文压缩</span><Switch checked={c.autoCompact} disabled={c.busy || !c.state || c.needsRead || !c.overrideCatalog} onCheckedChange={c.setAutoCompact} /></label>
+      <label className="model-setting-field"><span>压缩阈值（上下文的 %）</span><input className="input-field" type="number" min="1" max="99" step="1" value={c.compactPercent} disabled={c.busy || !c.state || c.needsRead || !c.autoCompact || !c.overrideCatalog} onChange={e => c.setCompactPercent(e.target.value)} /></label>
       <p className="text-sm text-muted-foreground">按已保存的模型窗口和设定比例生成压缩阈值。缺少窗口时无法配置，需先保存模型上下文；保存后重启 Codex 加载。</p>
       <p className="text-sm text-muted-foreground">开启后按模型配置，并移除已有全局窗口和压缩阈值覆盖；关闭时恢复原值。</p>
       {c.state && <CodexCompactionStatus state={c.state} />}

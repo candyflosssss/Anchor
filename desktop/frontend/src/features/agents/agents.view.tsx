@@ -73,8 +73,9 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
     </>}
     <ConfirmAction open={!!c.updateInput} title={c.updateInput?.rebuild ? '备份并重建配置？' : c.binding?.enabled ? '更新配置？' : '开启托管？'} busy={c.busy} onCancel={() => c.setUpdateInput(null)} onConfirm={() => { void c.confirmUpdate(); }}>
       <p className="break-all">{c.selected?.config_root}</p><p>默认模型：{c.updateInput?.model}</p>{c.updateInput?.rebuild
-        ? <p>将先备份整个 config.toml，再替换为干净的托管配置，并同步最新模型列表。原来的其他设置也会从当前配置移除，完整原件和旧恢复记录保留在 Anchor 数据目录的 recovery 中。停用托管只清除新托管内容，不会自动恢复坏配置。完成后请重启 Codex。</p>
-        : <p>将使用当前选择更新连接配置，并同步最新模型列表。确认后开启或保持托管。其他软件改过的托管字段也会重新应用，外部值会先保存，停用托管时恢复；其他设置不动。更新后请重启对应 Agent。</p>}
+        ? <p>将先备份整个 config.toml，再替换为干净的托管配置，按已保存的设置更新模型列表。原来的其他设置也会从当前配置移除，完整原件和旧恢复记录保留在 Anchor 数据目录的 recovery 中。停用托管只清除新托管内容，不会自动恢复坏配置。完成后请重启 Codex。</p>
+        : <p>将使用当前选择更新连接配置，按已保存的设置更新模型列表。确认后开启或保持托管。其他软件改过的托管字段也会重新应用，外部值会先保存，停用托管时恢复；其他设置不动。更新后请重启对应 Agent。</p>}
+      {c.selected?.agent === 'codex' && <p>Codex 默认保留自身提示词和模型目录。只有在「设置 → Codex」明确开启「允许 Anchor 覆盖模型提示词与目录」后，才加载 Anchor 目录；此处批准托管不代表授权覆盖提示词。</p>}
       {c.selected?.agent === 'claude-desktop' && <p>此操作可能同时更改 Claude Desktop 的 Chat、Cowork 和 Code 请求去向及计费来源。将使用 Anchor 的绑定凭据和模型列表；原认证设置在停用时按字段恢复。请完全退出并重开 Claude Desktop，关闭窗口可能只是隐藏。</p>}
     </ConfirmAction>
     <ConfirmAction open={!!c.disableTarget} title="停用此 Agent 的托管？" busy={c.busy} onCancel={() => c.setDisableTarget(null)} onConfirm={() => { if (c.disableTarget) void c.manage(c.disableTarget, 'disable'); }}>

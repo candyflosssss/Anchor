@@ -13,12 +13,12 @@ describe('unified Codex settings', () => {
     for (const value of ["", "0", "100", "90.5", "NaN"]) expect(parseCompactPercent(value)).toBeNull();
     for (const n of [0, 5, 10]) expect(parseRetries(String(n))).toBe(n);
     for (const value of ['', '-1', '11', '1.5', 'NaN', ' ']) expect(parseRetries(value)).toBeNull();
-    for (const value of [null, {}, { ...fixture, settings: { retries: null, revision: 1 } }, { ...fixture, settings: { retries: 5, revision: 0 } }, { ...fixture, needs_sync: [null] }]) expect(() => checkedCodexSettings(value)).toThrow();
+    for (const value of [null, {}, { ...fixture, settings: { override_model_catalog: null, retries: null, revision: 1 } }, { ...fixture, settings: { override_model_catalog: null, retries: 5, revision: 0 } }, { ...fixture, needs_sync: [null] }]) expect(() => checkedCodexSettings(value)).toThrow();
   });
   it('saves explicit zero once and treats ignored settings as an uncertain write', async () => {
     const save = vi.fn(async () => ({ contract: CONTRACT, data: { settings: { ...fixture.settings, retries: 0, revision: 2 }, needs_sync: [], compaction: [] }, problem: null }));
     const service = createCodexSettingsService(() => ({ SaveCodexSettings: save, CodexSettings: vi.fn() }));
-    const input = { retries: 0, auto_compact: null, compact_percent: null, expected_revision: 1 };
+    const input = { override_model_catalog: null, retries: 0, auto_compact: null, compact_percent: null, expected_revision: 1 };
     expect((await service.save(input)).settings.retries).toBe(0);
     expect(save).toHaveBeenCalledExactlyOnceWith(input);
     for (const retries of [null, -1, 11, 0.5, NaN]) await expect(service.save({ ...input, retries })).rejects.toMatchObject({ code: 'invalid' });
@@ -30,7 +30,7 @@ describe('unified Codex settings', () => {
   it('saves compaction independently and detects an ignored automatic setting', async () => {
     const save = vi.fn(async () => ({ contract: CONTRACT, data: { ...fixture, settings: { ...fixture.settings, auto_compact: false, compact_percent: 80, revision: 2 } }, problem: null }));
     const service = createCodexSettingsService(() => ({ SaveCodexSettings: save, CodexSettings: vi.fn() }));
-    const input = { retries: null, auto_compact: false, compact_percent: 80, expected_revision: 1 };
+    const input = { override_model_catalog: null, retries: null, auto_compact: false, compact_percent: 80, expected_revision: 1 };
     expect((await service.save(input)).settings.compact_percent).toBe(80);
     for (const percent of [0, 100, 1.5, NaN]) await expect(service.save({ ...input, compact_percent: percent })).rejects.toMatchObject({ code: 'invalid' });
     expect(save).toHaveBeenCalledTimes(1);
@@ -40,7 +40,7 @@ describe('unified Codex settings', () => {
   it('preserves partial sync status and does not retry management errors', async () => {
     const service = createCodexSettingsService(() => ({ CodexSettings: vi.fn(async () => ({ contract: CONTRACT, data: { ...fixture, needs_sync: ['codex-work'] }, problem: null })), SaveCodexSettings: vi.fn(async () => ({ contract: CONTRACT, data: null, problem: { code: 'conflict' as const } })) }));
     expect((await service.read()).needs_sync).toEqual(['codex-work']);
-    await expect(service.save({ retries: 3, auto_compact: null, compact_percent: null, expected_revision: 1 })).rejects.toMatchObject({ code: 'conflict' as const });
+    await expect(service.save({ override_model_catalog: null, retries: 3, auto_compact: null, compact_percent: null, expected_revision: 1 })).rejects.toMatchObject({ code: 'conflict' as const });
   });
 });
 
@@ -51,7 +51,7 @@ describe('unified Codex settings', () => {
     expect(codexSettingsNotice(state)).toContain('自动压缩配置未完成');
     expect(codexSettingsNotice({ ...state, compaction: [state.compaction[0]] })).toBe('设置已保存；待重启 Codex');
     expect(codexSettingsNotice({ ...state, needs_sync: ['codex-work'] })).toContain('待同步');
-    expect(codexSettingsNotice(checkedCodexSettings(fixture))).toContain('尚无已启用');
+    expect(codexSettingsNotice(checkedCodexSettings(fixture))).toContain('待重启 Codex');
   });
   it('rejects old cores and false claims about configured values', () => {
     const { compaction: omitted, ...old } = fixture;
@@ -62,3 +62,23 @@ describe('unified Codex settings', () => {
     }
   });
  });
+
+describe('explicit model instruction consent', () => {
+  it('defaults off in the shared fixture and rejects older cores without consent state', () => {
+    expect(checkedCodexSettings(fixture).settings.override_model_catalog).toBe(false);
+    const { override_model_catalog: omitted, ...old } = fixture.settings;
+    expect(omitted).toBe(false);
+    expect(() => checkedCodexSettings({ ...fixture, settings: old })).toThrowError(expect.objectContaining({ code: 'unsupported' }));
+  });
+  it('saves opt-out once and detects servers that ignore it', async () => {
+    const data = { ...fixture, settings: { ...fixture.settings, override_model_catalog: false, revision: 2 } };
+    const save = vi.fn(async () => ({ contract: CONTRACT, data, problem: null }));
+    const service = createCodexSettingsService(() => ({ SaveCodexSettings: save, CodexSettings: vi.fn() }));
+    const input = { override_model_catalog: false, retries: null, auto_compact: null, compact_percent: null, expected_revision: 1 };
+    expect((await service.save(input)).settings.override_model_catalog).toBe(false);
+    expect(save).toHaveBeenCalledExactlyOnceWith(input);
+    save.mockResolvedValue({ contract: CONTRACT, data: { ...data, settings: { ...data.settings, override_model_catalog: true } }, problem: null });
+    await expect(service.save(input)).rejects.toMatchObject({ code: 'unknown' });
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+});
