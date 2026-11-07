@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-11-03。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.82](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.82)，发布于 `2026-11-03T02:13:47+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `f8ab2667fa7b70c81a899d2ab4e1a64115fb4bb7`、SOURCE dirty=false。
-- Codex 自动压缩配置默认开启，阈值为各模型已声明有效上下文的90%；设置页及CLI可修改自动配置开关与1–99%的比例，旧设置继承新默认值。
-- 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本机CLI／核心／GUI已更新至.82，托管凭据与恢复记录保留；未验收Windows原生窗口／系统安装器、真实SSH升级或付费上游压缩。
+- 更新：2026-11-07。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.83](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.83)，发布于 `2026-11-07T17:36:46+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `ca57a4d7d26f1a625c73780722a4fedfc33b865e`、SOURCE dirty=false。
+- Codex 默认不覆盖提示词与模型目录；「设置 → Codex」提供默认关闭的明确授权开关。旧托管按恢复记录还原，外部修改冲突显示待同步。
+- 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
+- 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+
+## .83 在线投放（2026-11-07）
+
+Codex 提示词与模型目录覆盖改为默认关闭、明确授权。11 附件摘要、构建 tag、非 latest 和默认源 runtime／CLI 真实下载验证通过，兼容安装器 URL 下载通过。未安装；升级后需重启 Codex 并新开会话。详见 [发行记录](../release/desktop.md#codex-prompt-consent-83)。
 
 ## .82 在线投放与本机更新（2026-11-03）
 

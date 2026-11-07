@@ -1,10 +1,29 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-11-03。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.82](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.82)，发布于 `2026-11-03T02:13:47+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `f8ab2667fa7b70c81a899d2ab4e1a64115fb4bb7`、SOURCE dirty=false。
-- Codex 自动压缩配置默认开启，阈值为各模型已声明有效上下文的90%；设置页及CLI可修改自动配置开关与1–99%的比例，旧设置继承新默认值。
-- 双平台生产编译／打包、11 附件远端摘要和三条默认源实际下载校验通过。入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。
-- 本机CLI／核心／GUI已更新至.82，托管凭据与恢复记录保留；未验收Windows原生窗口／系统安装器、真实SSH升级或付费上游压缩。
+- 更新：2026-11-07。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.83](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.83)，发布于 `2026-11-07T17:36:46+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `ca57a4d7d26f1a625c73780722a4fedfc33b865e`、SOURCE dirty=false。
+- Codex 默认不覆盖提示词与模型目录；「设置 → Codex」提供默认关闭的明确授权开关。旧托管按恢复记录还原，外部修改冲突显示待同步。
+- 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
+- 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+
+<a id="codex-prompt-consent-83"></a>
+
+## Codex 提示词覆盖授权 .83（已发布 dev）
+
+原来批准托管即加载含通用提示词的生成目录；现在默认保留 Codex 原有提示词与模型目录，只有在「设置 → Codex → 允许 Anchor 覆盖模型提示词与目录」主动开启并保存后才覆盖。CLI 对应 `agent codex-settings --override-model-catalog=true|false --revision N`。旧设置缺字段视为未授权，核心启动／同步按 journal 恢复目录指针和全局上下文原值，外部编辑保留并报告待同步。仅在覆盖授权开启时配置目录压缩阈值；偏好保持，不关闭 Codex 自身压缩。
+
+关闭时自定义别名不保证出现在原生选择器。需完全重启 Codex／app-server 并以新会话核验；网页搜索和既有跨协议限制未在本版解除。契约见 [Codex 统一设置](../design/codex-retries.md)。
+
+从干净提交 `ca57a4d7d26f1a625c73780722a4fedfc33b865e` 构建，SOURCE dirty=false，输入摘要 `02a9b36f7eaa6c8c790120786a177c2e71065b6efb21d045a723f508bcfe0947`；于 `2026-11-07T17:36:46+08:00` 发布为 dev prerelease、非 latest。安装包、两平台 runtime／CLI、两清单、含 Go vendor 与固定 mihomo 对应源码／vendor 的源码包、许可元数据及校验清单共 11 项附件。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.83_amd64.deb` | 29289924 | `296d602cfc73048df382d6da8d8044d987324e7c75a83fd04343fba1553b9edb` |
+| `Anchor-Desktop-0.1.0-dev.desktop.83-windows-amd64-setup.exe` | 31309867 | `3570425b4349a86a11c7162642438276130f66e3d122eefae6f357f601c7efd9` |
+
+沿用构建提交已通过的 5 个 Go 包、typecheck／lint、11 项单元及 4 项模拟宿主浏览器测试。本轮生产契约比对、TypeScript／Vite、Windows／Ubuntu24.04 AMD64 编译与 NSIS／deb 打包通过；嵌入前端／mihomo、deb 载荷、对应源码输入摘要、元数据 ZIP CRC、11 附件远端大小／SHA256、tag 与非 latest 核对通过。默认 dev 源实际下载 Linux runtime 与 CLI，核对版本／目标／大小／SHA256 和可执行版本；兼容安装器 URL 实际下载摘要通过，未执行旧客户端本身。Windows 安装器／runtime／CLI 的 GitHub digest 与本地匹配。
+
+证据位于 `dist/desktop/0.1.0-dev.desktop.83/publication/`。BUILD.json 保留构建时未发布／未安装／未原生验收事实；未调用付费上游、未安装或改动真实实例，不宣称运行中的 Codex 已恢复。
 
 <a id="codex-compaction-82"></a>
 

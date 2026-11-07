@@ -1,5 +1,7 @@
 # Anchor 托管层与 Agent 接入契约
 
+> 发行状态：本文 2026-11-06 的提示词授权修复已于 2026-11-07 随 desktop.83 dev 发布；下方“未发布”保留实现时点记录。仅在线投放，未安装／未做原生 Codex 会话验收。见[发行记录](../release/desktop.md#codex-prompt-consent-83)。
+
 - 日期：2026-10-10
 - 状态：部分落地；Codex、Claude CLI／Desktop、DSH Web／Desktop 配置适配已实现；声明式扩展等仍是设计
 - 适用范围：无头常驻服务与 CLI；Linux / Windows；优先 Codex、CC（Claude Code）、DSH。

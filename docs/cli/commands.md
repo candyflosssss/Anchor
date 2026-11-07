@@ -1,6 +1,8 @@
 # Anchor 最新 CLI 指令大全
 
-- 最近核对：2026-11-06
+- 2026-11-07 已随 desktop.83 dev 发布：`agent codex-settings --override-model-catalog=BOOL --revision N`，提示词与目录覆盖默认关闭；升级后需重启 Codex 并新开会话，见[发行记录](../release/desktop.md#codex-prompt-consent-83)。
+
+- 最近核对：2026-11-07
 - 2026-11-03 已随desktop.82 dev投放：`agent codex-settings` 新增自动配置压缩开关及阈值百分比，默认开启、90%；本机CLI／核心／GUI已更新，Codex需重启读取，见本节及[发行记录](../release/desktop.md#codex-compaction-82)。
 - 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
 - 2026-11-01 已随 desktop.80 dev 同版投放：Messages 目标可对历史思考做显式有损投影，记录 reasoning_history_omitted；已知消息阶段和图片精度选择器损失另记录，可见消息／工具链／图片保留。客户端原历史不改，实际核心需更新至 .80，无新增命令或参数，详见[发行记录](../release/desktop.md#claude-history-80)。
