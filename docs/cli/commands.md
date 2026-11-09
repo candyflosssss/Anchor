@@ -3,8 +3,8 @@
 - 2026-11-07 已随 desktop.83 dev 发布：`agent codex-settings --override-model-catalog=BOOL --revision N`，提示词与目录覆盖默认关闭；升级后需重启 Codex 并新开会话，见[发行记录](../release/desktop.md#codex-prompt-consent-83)。
 
 - 最近核对：2026-11-09
-- 2026-11-09 当前源码未发布：Windows 本机 `autostart status|enable|disable` 与设置页「本机登录自启」，默认关闭，仅当前用户登录后启动后台核心，见下方 §3。
-- 2026-11-09 当前源码未发布：Key 冷却保留计分与时长，改为全局低优先级兜底队列；先耗尽正常 Key，再尝试冷却 Key，全冷却仍可调度。无新增参数，见 §16。
+- 2026-11-09 已随 desktop.84 dev 发布：Windows 本机 `autostart status|enable|disable` 与设置页「本机登录自启」，默认关闭，仅当前用户登录后启动后台核心；Windows 原生登录未验收，见下方 §3 及[发行记录](../release/desktop.md#core-autostart-cooldown-84)。
+- 2026-11-09 已随 desktop.84 dev 发布：Key 冷却保留计分与时长，改为全局低优先级兜底队列；先耗尽正常 Key，再尝试冷却 Key，全冷却仍可调度。无新增参数，见 §16；实际处理请求的核心须更新，同版 CLI feed 已投放，公开 alpha.6 不含这些增量。
 - 2026-11-03 已随desktop.82 dev投放：`agent codex-settings` 新增自动配置压缩开关及阈值百分比，默认开启、90%；本机CLI／核心／GUI已更新，Codex需重启读取，见本节及[发行记录](../release/desktop.md#codex-compaction-82)。
 - 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
 - 2026-11-01 已随 desktop.80 dev 同版投放：Messages 目标可对历史思考做显式有损投影，记录 reasoning_history_omitted；已知消息阶段和图片精度选择器损失另记录，可见消息／工具链／图片保留。客户端原历史不改，实际核心需更新至 .80，无新增命令或参数，详见[发行记录](../release/desktop.md#claude-history-80)。
@@ -217,7 +217,7 @@ anchor serve
 两面绑定后才对已批准且 enabled 的 Binding 自动接管；某个目标失败不阻断其他目标，`status.bindings` 分别报告 pending/applied/overridden/conflict 等状态。正常停止先冻结托管写入并条件恢复，然后最多 10 秒排空请求。崩溃不会自动执行恢复；重新启动会核对原日志，或核心离线后用 `recover`。已运行的 Codex 会话可能缓存旧地址，恢复后应重启 Codex。
 
 2026-10-16 网关修订：`serve` 的 Responses / Chat Completions / Anthropic 请求体上限由 8 MiB 提高到 **32 MiB**，超限仍返回 HTTP 413 `request_too_large`，错误信息包含上限。该限制包括内嵌图片与完整历史，不是 token 限制；跨协议转换后的请求也受保护。当前源码全局保护上限64、供应商并发1..64、管理写入128 KiB；无新增 CLI 参数。需更新并重启核心才能生效，未发布新的官方桌面安装包，既有安装包不会自动改变。
-### `autostart`（Windows 当前用户登录自启，源码未发布）
+### `autostart`（Windows 当前用户登录自启，已随 desktop.84 dev 发布）
 
 ```text
 anchor [--data-dir DIR] autostart status [--desktop-executable ABS_PATH]
@@ -855,7 +855,7 @@ anchor recover [--id ID]
 | 托盘停止本机核心并退出 Anchor | 当前源码托盘「退出 Anchor（同时停止本机核心）」；未打包发布／原生验收 | 确认本机实例与影响后，复用普通鉴权停服并等待本机核心生命周期锁释放，再退出窗口和托盘；始终不停止远程核心。核心停服已有 `stop --approve`，CLI 仍按所选 Context 操作且仅返回请求接受，不新增／改变 CLI 契约；宿主退出为本机展示行为，取消／失败保持界面，无强杀或自动重试 |
 | 桌面单实例／重复启动恢复 | 桌面宿主已实现；原生两平台待验收 | 当前用户只运行一个 GUI 与托盘；重复打开恢复已有窗口，不新增管理命令。宿主锁独立于 `--data-dir`；后台核心和安装 helper 沿用原生命周期 |
 | Windows 安装盘符／路径 | NSIS 目录选择页或安装器 `/D=完整目录`（最后一项，不给值加引号） | 属于系统安装器，不新增 `anchor install` 子命令；升级记忆 `InstallLocation`，交互换目录需明确批准卸载旧程序，保留用户数据；`/S` 不授权跨目录迁移。2026-10-25 当前源码修复（未打包／未发布）允许目录及父目录尚不存在，由安装步骤自动创建；详见[安装说明](../release/desktop.md#windows-amd64)。CLI 单文件安装脚本仍用 `-InstallDir`，不受影响 |
-| 开机自启动设置 | Windows `autostart status|enable|disable` 与设置页，源码未发布 | 默认关闭，当前用户登录后只启动本机核心；Linux 不支持，Windows 原生登录未验收 |
+| 开机自启动设置 | Windows `autostart status|enable|disable` 与设置页，已随 desktop.84 dev 发布 | 默认关闭，当前用户登录后只启动本机核心；Linux 不支持，Windows 原生登录未验收 |
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
@@ -885,7 +885,7 @@ anchor recover [--id ID]
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 请求级协议翻译层；同协议受控原生透传、跨协议无状态文本／函数／SSE／用量、Responses → Chat 桥与 [Claude 工具／thinking 桥](../design/protocol-anthropic-bridge.md)；缓存提示、工具错误和明文思考降级可在 logs detail/export 查询，不支持内容明确报错，见[翻译层契约](../design/protocol-translation.md) |
 | Codex统一重试 | agent codex-settings [--override-model-catalog=BOOL] [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
 | 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；desktop.57 已同版发布安装器／runtime／CLI feed，无数据库回滚，见 [在线更新](../design/online-updates.md) |
-| 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，原生安装未验收）；Windows 用户登录自启已实现于源码，系统服务、Linux 自启与静默自动更新未实现 |
+| 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开 alpha.6 为 CLI，桌面 dev 安装包另行投放，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 已投放（[桌面说明](../release/desktop.md)，原生安装未验收）；Windows 用户登录自启已随 desktop.84 发布，系统服务、Linux 自启与静默自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 

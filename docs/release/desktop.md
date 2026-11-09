@@ -1,10 +1,31 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-11-07。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.83](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.83)，发布于 `2026-11-07T17:36:46+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `ca57a4d7d26f1a625c73780722a4fedfc33b865e`、SOURCE dirty=false。
-- Codex 默认不覆盖提示词与模型目录；「设置 → Codex」提供默认关闭的明确授权开关。旧托管按恢复记录还原，外部修改冲突显示待同步。
+- 更新：2026-11-09。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.84](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.84)，发布于 `2026-11-09T14:49:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `9a188b45c621ad550956e0e8170163b96d3d9fbc`、SOURCE dirty=false。
+- Windows 登录自启默认关闭，主动开启后只启动后台核心；Key 冷却保留计分与时长，改为正常候选耗尽后的低优先级兜底。保留 `.83` 的 Codex 提示词与模型目录覆盖授权修复。
 - 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
 - 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+
+<a id="core-autostart-cooldown-84"></a>
+
+## 后台核心登录自启与 Key 冷却兜底 .84（已发布 dev）
+
+Windows 增加「设置 → 本机登录自启」与同版 CLI `autostart status|enable|disable`，默认关闭。主动开启后，当前用户登录时只启动后台核心，不打开 GUI 或 Codex，不提权、不注册系统服务；安装器不自动开启，升级保留用户选择，系统任务管理器禁用状态只报告、不绕过。优先登记稳定安装启动器，沿用已校验 runtime 更新。完整契约见[桌面运行](../design/desktop-runtime.md)。
+
+登录启动沿用实例锁与已批准 Binding 的条件接管，不保证早于独立自启的 Codex；Codex 已缓存旧配置时仍需完全重启并新开会话。不是注销前运行的服务或崩溃自动重拉，Linux 登录自启未实现。
+
+Key 冷却保留错误分数、窗口和 CD 时长，但不再直接排除：先耗尽所有供应商的正常 Key，再尝试低优先级冷却 Key；全部冷却仍可兜底。两级内部保留原调度策略、来源范围与会话亲和，亲和／价格／延迟不跨级提升；同请求已失败候选不因进入冷却再次派发。手动停用、并发限制与禁止重放边界不变，无新增数据库迁移，沿用 schema10。详见[最新 CLI 大全](../cli/commands.md)。
+
+以远端 `.83` 最新主线 `9860afb` 为基线，仅合入本次两项功能，保留 Agent／DSH 及已有协议修复；原工作区其他未提交改动未纳入。构建提交 `9a188b45c621ad550956e0e8170163b96d3d9fbc`，SOURCE dirty=false，输入摘要 `a40e62a97f1e4ecf3acc05e273c7bad071076be7ef1aa3df07e652f2394cac4a`。于 `2026-11-09T14:49:27+08:00` 发布为 dev prerelease、非 latest，共 11 项附件：两平台安装包／runtime／CLI、两清单、含 Go vendor 和固定 mihomo 对应源码／vendor 的源码包、许可元数据及 SHA256SUMS。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.84_amd64.deb` | 29301716 | `511698756d0b35afc7a2c26780033120e29518aa1b64829f30521262e5b7903a` |
+| `Anchor-Desktop-0.1.0-dev.desktop.84-windows-amd64-setup.exe` | 31316402 | `96abb11f834ec0833e212f3aaf6ef499864ad5c33b370d8edacda10ec2d28c81` |
+
+本轮集成基线 `autostart／core／cli／desktop／managed` 五包测试通过；Go／TS 契约、TypeScript／Vite、Windows AMD64／Ubuntu24.04 AMD64 生产编译及 NSIS／deb 打包通过。内嵌前端与 mihomo、deb／runtime 载荷一致、vendored 源码输入摘要、元数据 ZIP CRC、11 附件远端大小／SHA256、tag 与非 latest 均已核对。默认 dev 源在隔离目录实际下载 Linux desktop runtime 与 CLI，版本／目标／大小／SHA256 及程序实际版本通过；兼容旧客户端的安装器 URL 实际下载校验通过，未执行旧客户端本身。Windows 安装器／runtime／CLI 的 GitHub digest 与本地一致，详见 `publication/online-verification.json`。
+
+证据位于 `dist/desktop/0.1.0-dev.desktop.84/publication/`，BUILD.json 保留构建时未发布／未安装／未原生验收事实，不事后改写。安装器未签名，Windows 原生登录、更新／迁移／卸载及双平台原生窗口未实机验收；未安装、重启或修改真实实例／Agent 配置，未请求付费上游或扩大为全量／race／浏览器套件。
 
 <a id="codex-prompt-consent-83"></a>
 

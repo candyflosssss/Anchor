@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-11-07。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.83](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.83)，发布于 `2026-11-07T17:36:46+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `ca57a4d7d26f1a625c73780722a4fedfc33b865e`、SOURCE dirty=false。
-- Codex 默认不覆盖提示词与模型目录；「设置 → Codex」提供默认关闭的明确授权开关。旧托管按恢复记录还原，外部修改冲突显示待同步。
+- 更新：2026-11-09。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.84](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.84)，发布于 `2026-11-09T14:49:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `9a188b45c621ad550956e0e8170163b96d3d9fbc`、SOURCE dirty=false。
+- Windows 登录自启默认关闭，主动开启后只启动后台核心；Key 冷却保留计分与时长，改为正常候选耗尽后的低优先级兜底。保留 `.83` 的 Codex 提示词与模型目录覆盖授权修复。
 - 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
 - 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+
+## .84 在线投放（2026-11-09）
+
+Windows 当前用户后台核心登录自启与全局两级 Key 队列同版交付，自启默认关闭、不启动 GUI 或 Codex，冷却 Key 在正常 Key 耗尽后兜底。11 附件远端大小／摘要、构建 tag 与非 latest 已核对；默认 dev 源实际下载 Linux runtime／CLI 及兼容旧客户端的安装器 URL，版本／目标／大小／SHA256 校验通过，Windows 三项程序远端 digest 匹配。详见[发行记录](../release/desktop.md#core-autostart-cooldown-84)。本轮仅在线投放，不自动开启自启或安装到真实实例；Windows 原生登录未验收，Linux 自启未实现。
 
 ## .83 在线投放（2026-11-07）
 

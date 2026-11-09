@@ -6,7 +6,7 @@
 
 ## 1. 宿主接口
 
-### Windows 登录自启（2026-11-09，源码未发布）
+### Windows 登录自启（2026-11-09，已随 desktop.84 dev 发布）
 
 设置页 `Autostart()` / `SaveAutostart({enabled, expected_revision, approved})` 是明确的**本机宿主能力**，不经当前选中的 SSH 核心。与源码 CLI `autostart` 共用 `internal/autostart`，前端不得提供命令或路径，CLI 可显式提供桌面 EXE 路径。它不属于核心 HTTP 管理 API，核心离线也可查询或移除。
 
@@ -16,7 +16,7 @@
 
 优先登记当前用户安装目录的稳定启动器，其原有 `--core` 转发继续选择已校验的在线更新运行时。便携目录必须保留启动器；发现旧路径可关闭或明确重登记。同目录安装保留既有选择，迁移安装目录只转移原启动器的自愿登记与原 data-dir 参数；卸载只清除属于本安装的登录项。任务管理器禁用时提示用户从系统启用，不写 StartupApproved 绕过策略。
 
-登录后核心沿用原实例锁、网关就绪检查与已批准 Binding 条件接管，不恢复窗口或自动启动 Codex。此机制不是开机前服务或崩溃监护，不保证早于独立自启的 Codex；已缓存旧配置的 Codex 仍须重启。共享隔离测试／浏览器模拟不替代 Windows 实际登录、更新、迁移及卸载验收，本轮未打包发布。
+登录后核心沿用原实例锁、网关就绪检查与已批准 Binding 条件接管，不恢复窗口或自动启动 Codex。此机制不是开机前服务或崩溃监护，不保证早于独立自启的 Codex；已缓存旧配置的 Codex 仍须重启。已随 desktop.84 dev 打包与在线投放，见[发行记录](../release/desktop.md#core-autostart-cooldown-84)；共享隔离测试／浏览器模拟不替代 Windows 实际登录、更新、迁移及卸载验收。
 
 规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Connections、ConnectSSH、UseConnection、ForgetConnectionPassword、Providers、SaveProvider、StopCore、RestartCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
 

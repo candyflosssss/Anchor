@@ -5,19 +5,19 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.83**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.84**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.83 已发布为 GitHub prerelease**，修复托管隐式覆盖 Codex 提示词：默认保留原目录，「设置 → Codex」提供默认关闭的覆盖授权开关。设置 → 在线更新 → dev 获取，安装后完全重启 Codex 并新开会话。本轮仅在线投放，详见[构建与发布记录](docs/release/desktop.md#codex-prompt-consent-83)。
+**desktop.84 已发布为 GitHub prerelease**，Windows 新增默认关闭的「设置 → 本机登录自启」，开启后登录只启动后台核心、不打开 GUI 或 Codex；Key 冷却改为正常队列耗尽后的低优先级兜底，保留计分与时长。保留 `.83` 的 Codex 提示词与模型目录覆盖授权修复。设置 → 在线更新 → dev 获取，本轮仅在线投放，Windows 原生登录未验收，详见[构建与发布记录](docs/release/desktop.md#core-autostart-cooldown-84)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.83/Anchor-Desktop-0.1.0-dev.desktop.83-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.83/anchor-desktop_0.1.0-dev.desktop.83_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.83)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.84/Anchor-Desktop-0.1.0-dev.desktop.84-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.84/anchor-desktop_0.1.0-dev.desktop.84_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.84)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -31,7 +31,7 @@ SQLite 供应商与模型配置、Responses / Chat Completions / Anthropic Messa
 
 供应商[第一优先六项](docs/design/provider-roadmap.md)已在当前源码完成：删除/复制/改名、目录与模型映射/推理测试、多 Key、冷却/熔断、三协议、用量及单价估算。桌面详情采用「密钥与状态」「模型与测试」「用量」「账户与余额」等页签，CLI 同步提供。实现边界和 schema3→4 迁移见[工作台契约](docs/design/provider-priority-one.md)，操作见[最新指令大全](docs/cli/commands.md)。这些能力已包含在 desktop.12 dev 桌面发行中；公开 alpha.6 CLI 不含这些增量。当前源码进一步把协议设置移至 Key，并支持按实际模型覆盖、默认动态继承 Key 协议；该协议继承已随 desktop.16 发布。desktop.21 加入三平台账户与计费查询核心接口，并升级到 schema5；desktop.22 接入「供应商 → 选择供应商 → 账户与余额」，可保存独立用户授权并分别刷新账户余额／Key 额度；desktop.23 默认查询全部启用 Key 的模型目录，同名模型合并并显示全部可选 Key、所属分组与抓取倍率，停用 Key 不抓取；desktop.25新增映射来源Key、逐Key分组倍率、拖动排序与实际调度菜单，并接入账户页分组倍率查询，升级到schema6。desktop.26修复NewAPI只配API Key时的billing余额查询，显示站点范围并保留明确单位，账户详情使用已有用户授权时仍优先查账户钱包。desktop.27修复列表忽略系统访问令牌的问题，并增加后台令牌的获取与配置说明。账单桌面页尚未接入，命令由源码CLI提供，公开alpha.6 CLI不含。
 
-**已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；desktop.14 关闭窗口隐藏到系统托盘，单击托盘图标恢复；无可用托盘时直接退出界面。「退出界面」退出宿主，均不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。桌面 dev 包已包含启动／复用与窗口生命周期实现；2026-11-09 当前源码新增 Windows 用户登录自启（设置页与 CLI，默认关闭，只启动核心），未打包／原生登录验收；Linux 自启未实现，原生安装与窗口行为未验收。
+**已确认的正式桌面目标（Windows 与 Linux 一致）**：安装后双击应用直接打开 GUI，由宿主自动启动或核验连接本机后台核心，无需手动开终端；desktop.14 关闭窗口隐藏到系统托盘，单击托盘图标恢复；无可用托盘时直接退出界面。「退出界面」退出宿主，均不停服，显式停服单独确认，开机自启动为默认关闭的独立设置。详见[桌面启动与生命周期规范](docs/design/frontend.md#11-已确认的桌面启动与生命周期目标2026-10-11)。桌面 dev 包已包含启动／复用与窗口生命周期实现；Windows 用户登录自启（设置页与 CLI，默认关闭，只启动核心）已随 desktop.84 dev 发布，原生登录未验收；Linux 自启未实现，原生安装与窗口行为未验收。
 
 ## 开发运行
 
