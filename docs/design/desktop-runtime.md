@@ -6,6 +6,18 @@
 
 ## 1. 宿主接口
 
+### Windows 登录自启（2026-11-09，源码未发布）
+
+设置页 `Autostart()` / `SaveAutostart({enabled, expected_revision, approved})` 是明确的**本机宿主能力**，不经当前选中的 SSH 核心。与源码 CLI `autostart` 共用 `internal/autostart`，前端不得提供命令或路径，CLI 可显式提供桌面 EXE 路径。它不属于核心 HTTP 管理 API，核心离线也可查询或移除。
+
+默认关闭；Windows 当前用户 HKCU Run 的 `AnchorDesktopCore` 值仅登记绝对桌面路径、`--data-dir` 和既有 `--core`，登录后无窗口运行。安装不隐含批准，不提权、不注册服务。启用须已有初始化状态及存在的桌面启动器；支持空格／中文／尾部反斜线的 Windows 参数引用，拒绝非本地绝对路径、控制字符及超长命令。只改下一次登录策略，不立即启动或停止核心，不新增 Binding 授权。
+
+返回 supported/enabled/matches_current/disabled_by_system/can_enable/revision；enabled 仅表示登记存在。revision 为原登记和 StartupApproved 字节的 SHA256，写入必须显式批准并匹配最近查询版本，当前用户跨数据目录串行锁，登记后重新读取核对。conflict/unknown 必须重新读取，不自动重放；不向 JS 返回原始路径或错误。宿主关闭／更新交接拒绝写入。Linux 返回明确不支持，不模拟服务。
+
+优先登记当前用户安装目录的稳定启动器，其原有 `--core` 转发继续选择已校验的在线更新运行时。便携目录必须保留启动器；发现旧路径可关闭或明确重登记。同目录安装保留既有选择，迁移安装目录只转移原启动器的自愿登记与原 data-dir 参数；卸载只清除属于本安装的登录项。任务管理器禁用时提示用户从系统启用，不写 StartupApproved 绕过策略。
+
+登录后核心沿用原实例锁、网关就绪检查与已批准 Binding 条件接管，不恢复窗口或自动启动 Codex。此机制不是开机前服务或崩溃监护，不保证早于独立自启的 Codex；已缓存旧配置的 Codex 仍须重启。共享隔离测试／浏览器模拟不替代 Windows 实际登录、更新、迁移及卸载验收，本轮未打包发布。
+
 规范源为 `internal/desktop/contract.go`，通过 `go run ./cmd/desktop-contract` 生成前端类型。Wails 只绑定 `Bridge` 的受限方法：Start、Status、Connections、ConnectSSH、UseConnection、ForgetConnectionPassword、Providers、SaveProvider、StopCore、RestartCore、ExitDesktop，以及在线更新增量 UpdateStatus、CheckUpdate、DownloadUpdate、InstallUpdate（详见[在线更新](online-updates.md)）。前端仅通过桌面传输适配器访问绑定，不能指定文件、命令、凭据或任意目标地址。
 
 每个结果带 `contract=anchor-desktop-v1`、data 与 problem；problem 仅含白名单 code，不返回原始错误、路径、管理令牌或供应商秘密。列表始终为数组。返回 Provider revision 为 1..Number.MAX_SAFE_INTEGER；写入 expected_revision 为 0..MAX_SAFE_INTEGER-1，且等于输入 provider.revision，超范围拒绝。SaveProvider 的 secret=null 保留、空字符串清除、非空替换；只入不出。写入发生网络/响应异常时返回 unknown，不自动重试；409 为 conflict、认证失败为 unauthorized。
@@ -37,7 +49,7 @@ CLI 与桌面共用 `connection.RestartLocal`：读取已有本机状态、核�
 本机部分已有隔离真实核心和模拟边界验证，已随 desktop.47 dev 发布；本次远程增量仅源码验证，不修改真实 Agent 文件、不请求付费上游，未打包发布、操作真实远程主机或执行原生验收。该操作不修正供应商模型分组、不重启客户端；缓存了旧代理地址的 Codex/app-server 仍需其自身重新加载。
 
 
-首次启动仅复用已批准的托管策略，不新增 Agent 授权。安装器沿用本契约，不在安装期间启动核心或登记服务；用户级开机自启动未实现，也不显示假开关，保持默认关闭。无图形环境继续使用 CLI。
+首次启动仅复用已批准的托管策略，不新增 Agent 授权。安装器沿用本契约，不在安装期间启动核心或登记服务；Windows 用户登录自启为独立、默认关闭的设置，见 §1；Linux 未实现，不显示假可用开关。无图形环境继续使用 CLI。
 
 ## 3. 前端模式
 

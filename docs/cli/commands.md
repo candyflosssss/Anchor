@@ -3,6 +3,7 @@
 - 2026-11-07 已随 desktop.83 dev 发布：`agent codex-settings --override-model-catalog=BOOL --revision N`，提示词与目录覆盖默认关闭；升级后需重启 Codex 并新开会话，见[发行记录](../release/desktop.md#codex-prompt-consent-83)。
 
 - 最近核对：2026-11-09
+- 2026-11-09 当前源码未发布：Windows 本机 `autostart status|enable|disable` 与设置页「本机登录自启」，默认关闭，仅当前用户登录后启动后台核心，见下方 §3。
 - 2026-11-09 当前源码未发布：Key 冷却保留计分与时长，改为全局低优先级兜底队列；先耗尽正常 Key，再尝试冷却 Key，全冷却仍可调度。无新增参数，见 §16。
 - 2026-11-03 已随desktop.82 dev投放：`agent codex-settings` 新增自动配置压缩开关及阈值百分比，默认开启、90%；本机CLI／核心／GUI已更新，Codex需重启读取，见本节及[发行记录](../release/desktop.md#codex-compaction-82)。
 - 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
@@ -105,6 +106,8 @@ anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [--json]
 | `--context NAME update check/upgrade` | 检查／更新指定 SSH 被控机 | SSH 账号权限；upgrade 需 --approve，远端需支持新命令 |
 | `update apply --approve` | 原位更新本机 CLI，保留上一版 | 已下载、核心已退出、用户可写安装路径；不自动重启 |
 | `init` | 初始化本机状态 | 本机；核心不应占用该状态目录 |
+| `autostart status` | 查询 Windows 本机后台核心登录项 | 当前用户；不依赖核心在线，Linux 返回不支持 |
+| `autostart enable/disable` | 登记／移除当前用户后台核心登录项 | `--revision SHA256 --approve`；启用须已有状态和桌面 EXE；不立即启停核心 |
 | `serve` | 前台运行核心 | 本机已初始化 |
 | `restart --approve [--timeout 30s]` | 本机重启／离线恢复，或显式 `--context NAME` 重启已登记 SSH 设备；等待 ready | 已初始化/核验目标；在线核心需支持 restart_handoff；远程 CLI 须支持身份与端口 pin |
 | `context add` | 登记本机或 SSH 实例 | 本机已初始化；SSH 目标已安装支持 bootstrap 的 Anchor |
@@ -214,6 +217,21 @@ anchor serve
 两面绑定后才对已批准且 enabled 的 Binding 自动接管；某个目标失败不阻断其他目标，`status.bindings` 分别报告 pending/applied/overridden/conflict 等状态。正常停止先冻结托管写入并条件恢复，然后最多 10 秒排空请求。崩溃不会自动执行恢复；重新启动会核对原日志，或核心离线后用 `recover`。已运行的 Codex 会话可能缓存旧地址，恢复后应重启 Codex。
 
 2026-10-16 网关修订：`serve` 的 Responses / Chat Completions / Anthropic 请求体上限由 8 MiB 提高到 **32 MiB**，超限仍返回 HTTP 413 `request_too_large`，错误信息包含上限。该限制包括内嵌图片与完整历史，不是 token 限制；跨协议转换后的请求也受保护。当前源码全局保护上限64、供应商并发1..64、管理写入128 KiB；无新增 CLI 参数。需更新并重启核心才能生效，未发布新的官方桌面安装包，既有安装包不会自动改变。
+### `autostart`（Windows 当前用户登录自启，源码未发布）
+
+```text
+anchor [--data-dir DIR] autostart status [--desktop-executable ABS_PATH]
+anchor [--data-dir DIR] autostart enable|disable --revision SHA256 --approve [--desktop-executable ABS_PATH]
+```
+
+- 完全本机操作，不依赖核心在线或所选 Context；显式 `--context NAME` 拒绝。桌面可执行文件也支持同一组无窗口命令。Linux 查询返回 `supported=false`，启停返回不支持，不创建服务。
+- 默认不登记。启停均要求 `--approve`（默认 false）与最近查询返回的64位小写十六进制 `--revision`；无交互提示、无自动重试。陈旧 revision、读写权限不足、未知参数、无确认均失败。跨数据目录写入共享当前用户锁。
+- `--desktop-executable` 默认空，优先使用当前用户安装记录中的 `anchor-desktop.exe`，否则查找当前桌面程序或 CLI 同目录下的同名文件；显式值必须是存在的本地绝对桌面 EXE 路径。启用前校验已有初始化状态，不自动 init；拒绝网络共享路径、引号／换行和超过 Windows Run 260字符上限的命令。关闭即使旧程序或状态已删除也可执行。
+- 使用 HKCU `Software\Microsoft\Windows\CurrentVersion\Run` 的唯一值 `AnchorDesktopCore`，命令为正确引用的桌面启动器、绝对数据目录和 `--core`。不需要管理员权限，不注册系统服务，不启动窗口、Codex 或其他 Agent；只在下次当前用户登录时生效，启停设置均不启动／停止当前核心，不改变托管授权。
+- stdout 为 JSON：`supported`（平台支持）、`enabled`（登录项存在，不代表已运行）、`matches_current`（与当前启动器及数据目录一致）、`disabled_by_system`（任务管理器禁用）、`can_enable`（程序和初始化状态可用）、`revision`（登记内容及系统批准状态的 SHA256）。不返回路径、完整命令或凭据。unsupported 的 revision 为空。查询成功退出0；写入 readback 成功退出0；失败／结果未知退出1，未知须先重新查询。
+- 不覆盖任务管理器的禁用策略；存在但被系统禁用时须在「启动应用」启用 `AnchorDesktopCore`。只有一个用户级登记值，更换数据目录须先查询并明确批准替换。安装不默认启用；同目录升级保留登记，更换安装目录仅转移既有自愿登记；卸载只清理指向该安装器所属启动器的值。
+- 核心登录启动沿用既有实例锁与已批准 Binding 的条件接管，不保证与独立自启的 Codex 的先后顺序。Codex 已缓存旧配置时仍应重启 Codex。不是崩溃自动重拉或注销前运行的系统服务；Windows 登录／安装器原生行为尚未验收。
+
 
 ### `stop`（当前开发版）
 
@@ -837,7 +855,7 @@ anchor recover [--id ID]
 | 托盘停止本机核心并退出 Anchor | 当前源码托盘「退出 Anchor（同时停止本机核心）」；未打包发布／原生验收 | 确认本机实例与影响后，复用普通鉴权停服并等待本机核心生命周期锁释放，再退出窗口和托盘；始终不停止远程核心。核心停服已有 `stop --approve`，CLI 仍按所选 Context 操作且仅返回请求接受，不新增／改变 CLI 契约；宿主退出为本机展示行为，取消／失败保持界面，无强杀或自动重试 |
 | 桌面单实例／重复启动恢复 | 桌面宿主已实现；原生两平台待验收 | 当前用户只运行一个 GUI 与托盘；重复打开恢复已有窗口，不新增管理命令。宿主锁独立于 `--data-dir`；后台核心和安装 helper 沿用原生命周期 |
 | Windows 安装盘符／路径 | NSIS 目录选择页或安装器 `/D=完整目录`（最后一项，不给值加引号） | 属于系统安装器，不新增 `anchor install` 子命令；升级记忆 `InstallLocation`，交互换目录需明确批准卸载旧程序，保留用户数据；`/S` 不授权跨目录迁移。2026-10-25 当前源码修复（未打包／未发布）允许目录及父目录尚不存在，由安装步骤自动创建；详见[安装说明](../release/desktop.md#windows-amd64)。CLI 单文件安装脚本仍用 `-InstallDir`，不受影响 |
-| 开机自启动设置 | 未实现；无 GUI 开关或 CLI | 独立、默认不启用；未来实现需同步提供 CLI，安装和启动宿主不自动注册服务 |
+| 开机自启动设置 | Windows `autostart status|enable|disable` 与设置页，源码未发布 | 默认关闭，当前用户登录后只启动本机核心；Linux 不支持，Windows 原生登录未验收 |
 | 本机连接、默认选择、检查 | context 五个子命令 | 已提供 CLI；删除、重绑定未实现 |
 | 状态查询 | status | 已提供 CLI |
 | 供应商、模型管理 | provider / model 的 add、put、list；provider delete/rename/copy/model-put/model-delete | GUI 和 CLI 共用引用保护与 revision |
@@ -867,7 +885,7 @@ anchor recover [--id ID]
 | Chat/Anthropic 转换 | provider key-put / key-model-protocol；桌面 Key 与模型协议 | 请求级协议翻译层；同协议受控原生透传、跨协议无状态文本／函数／SSE／用量、Responses → Chat 桥与 [Claude 工具／thinking 桥](../design/protocol-anthropic-bridge.md)；缓存提示、工具错误和明文思考降级可在 logs detail/export 查询，不支持内容明确报错，见[翻译层契约](../design/protocol-translation.md) |
 | Codex统一重试 | agent codex-settings [--override-model-catalog=BOOL] [--retries N --revision R]；设置 → Codex | 默认5、0–10、请求与流重试共用配置；安全同步后重启Codex，旧模型重试字段移除 |
 | 在线升级 | update config/configure/check/download/apply/upgrade/desktop；显式 SSH check/upgrade；桌面设置页 | 新增本机 update upgrade/desktop 与显式 SSH check/upgrade；新版 runtime 在旁路目录准备，最终一次核心交接并验证、桌面重开。旧 feed 保留系统安装器路径；desktop.57 已同版发布安装器／runtime／CLI feed，无数据库回滚，见 [在线更新](../design/online-updates.md) |
-| 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，desktop.16 已发布 dev，原生安装未验收）；系统服务、自启动与静默自动更新未实现 |
+| 分发、系统服务 | 发行脚本与外部安装脚本 | 单文件打包及公开 Release 下载/校验安装脚本已实现（见 [安装说明](../release/install.md)）；公开下载仍为 CLI，见仓库 README。脚本替换需显式授权，不停服/迁移；Windows 当前用户安装器与 Ubuntu24.04 AMD64 `.deb` 打包入口已实现（[桌面说明](../release/desktop.md)，原生安装未验收）；Windows 用户登录自启已实现于源码，系统服务、Linux 自启与静默自动更新未实现 |
 
 未实现项目不是可用指令；新增/删除命令及其他契约变化必须同步本文件与指令变更历史。
 

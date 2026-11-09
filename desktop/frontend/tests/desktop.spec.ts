@@ -32,6 +32,8 @@ async function host(page: Page, rateMappings = false, detectedPlatform = '') {
     let cooldownState = structuredClone(keyCooldown);
     window.keyCooldownTest = { saves: 0 };
     const api: DesktopBridge = {
+      Autostart: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
+      SaveAutostart: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),
       ForgetConnectionPassword: async () => ({ contract, data: [], problem: { code: 'unsupported' } }),
       APIService: async () => ({ contract, data: apiService, problem: null }),
       SaveAPIService: async () => ({ contract, data: null, problem: { code: 'unsupported' } }),

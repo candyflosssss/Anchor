@@ -1,4 +1,4 @@
-; Current-user development installer. No service, Run key, PATH or user-state changes.
+; Current-user installer. No service, PATH changes or default login registration.
 Unicode true
 RequestExecutionLevel user
 ManifestDPIAware true
@@ -11,6 +11,8 @@ SetCompressorDictSize 16
 
 !define APP_NAME "Anchor Desktop"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\AnchorDesktop"
+!define RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
+!define RUN_VALUE "AnchorDesktopCore"
 !define WEBVIEW_KEY "Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "${OUTPUT_FILE}"
@@ -18,6 +20,7 @@ InstallDir "$LOCALAPPDATA\Programs\Anchor Desktop"
 ; HKCU Software is shared between registry views. NSIS gives /D= precedence.
 InstallDirRegKey HKCU "${UNINSTALL_KEY}" "InstallLocation"
 Var PreviousInstallDir
+Var RelocatedAutostartArgs
 VIProductVersion "${NUMERIC_VERSION}"
 VIAddVersionKey /LANG=2052 "ProductName" "${APP_NAME}"
 VIAddVersionKey /LANG=2052 "FileDescription" "Anchor 当前用户开发版安装程序"
@@ -30,7 +33,7 @@ VIAddVersionKey /LANG=2052 "LegalCopyright" "Anchor contributors; AGPL-3.0-only"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\anchor-desktop.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "打开 Anchor（将自动启动或连接后台核心）"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
-!define MUI_FINISHPAGE_TEXT "开发版安装完成。打开应用会自动启动或连接本机核心；关闭窗口不会停服。开机自启动未启用。更新或卸载前，请在界面明确停止核心，等待退出后关闭所有窗口。此版本尚未完成原生安装和运行验收。"
+!define MUI_FINISHPAGE_TEXT "开发版安装完成。打开应用会自动启动或连接本机核心；关闭窗口不会停服。安装不会默认启用登录自启，可在设置中主动开启。更新或卸载前，请在界面明确停止核心，等待退出后关闭所有窗口。此版本尚未完成原生安装和运行验收。"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "${DOCS_DIR}/LICENSE"
 !insertmacro MUI_PAGE_COMPONENTS
@@ -164,6 +167,20 @@ Function RelocateInstalledApp
   IfErrors relocation_failed
   Call CheckPreviousStopped
   Call CheckStopped
+  ; Preserve only an existing opt-in owned by the old installed launcher.
+  ; The old uninstaller removes it; install reuses the exact data-dir arguments.
+  ReadRegStr $0 HKCU "${RUN_KEY}" "${RUN_VALUE}"
+  StrCpy $1 '$\"$PreviousInstallDir\anchor-desktop.exe$\"'
+  StrLen $2 $1
+  StrCpy $3 $0 $2
+  ${If} $3 == $1
+    StrCpy $3 $0 13 $2
+    StrCpy $4 $0 7 -7
+    ${If} $3 == ' --data-dir $\"'
+    ${AndIf} $4 == " --core"
+      StrCpy $RelocatedAutostartArgs $0 "" $2
+    ${EndIf}
+  ${EndIf}
   ClearErrors
   ; _?= must be last and unquoted, even with spaces: wait for the original
   ; uninstaller instead of a detached temporary copy. It retains all user state.
@@ -267,6 +284,15 @@ Section "Anchor（必需）" main
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
   IfErrors install_failed
+  ${If} $RelocatedAutostartArgs != ""
+    StrCpy $0 '$\"$INSTDIR\anchor-desktop.exe$\"$RelocatedAutostartArgs'
+    StrLen $1 $0
+    ${If} $1 > 260
+      Goto install_failed
+    ${EndIf}
+    WriteRegStr HKCU "${RUN_KEY}" "${RUN_VALUE}" $0
+    IfErrors install_failed
+  ${EndIf}
   Goto install_done
   install_failed:
   MessageBox MB_OK|MB_ICONSTOP "安装文件写入失败。未强制关闭任何进程；请检查文件权限并在明确停止核心、退出所有窗口后重试。" /SD IDOK
@@ -296,6 +322,18 @@ Section "Uninstall"
   ClearErrors
   Delete "$INSTDIR\anchor-desktop.exe"
   IfErrors uninstall_failed
+  ; Remove this install's owned login item only, never the whole Run key.
+  ReadRegStr $0 HKCU "${RUN_KEY}" "${RUN_VALUE}"
+  StrCpy $1 '$\"$INSTDIR\anchor-desktop.exe$\"'
+  StrLen $2 $1
+  StrCpy $3 $0 $2
+  StrCpy $4 $0 7 -7
+  ${If} $3 == $1
+  ${AndIf} $4 == " --core"
+    ClearErrors
+    DeleteRegValue HKCU "${RUN_KEY}" "${RUN_VALUE}"
+    IfErrors uninstall_failed
+  ${EndIf}
   Delete "$DESKTOP\Anchor.lnk"
   Delete "$SMPROGRAMS\Anchor\Anchor.lnk"
   RMDir "$SMPROGRAMS\Anchor"

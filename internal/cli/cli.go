@@ -28,6 +28,9 @@ Usage: anchor [--data-dir DIR] [--context NAME] [--ssh-password-stdin] COMMAND [
   serve                              Run the local foreground core
       Inference: one ordinary attempt per channel with safe key/candidate failover; no replay after output or unknown execution.
       Codex owns request/stream retries (default 5); management writes are not retried.
+  autostart status [--desktop-executable ABS_PATH]
+  autostart enable|disable --revision SHA256 --approve [--desktop-executable ABS_PATH]
+                                     Windows current-user login: background core only; default off, local-only
   restart --approve [--timeout 30s]   Restart local core, or explicit --context SSH target; preserve configuration
       Local safety pins: [--expected-instance ID] [--control-port N] (not with --context).
   context add NAME --local           Authenticate and bind a local instance
@@ -172,7 +175,7 @@ Agent enable requires an existing default model; use agent set-models to replace
 Provider, Key, public model and Context names accept 1..128 Unicode letters (including Chinese), decimal digits, and ._-; start with a letter or digit.
 Agent binding names use the same characters, with a 64 UTF-8 byte limit.
 Secrets may enter through stdin only. No secret-bearing command-line arguments.
-init/serve/access/context/recover/agent token operate locally. update is local except explicit --context check/upgrade. restart is local unless --context explicitly selects SSH. Business commands use the selected context.
+init/serve/autostart/access/context/recover/agent token operate locally. update is local except explicit --context check/upgrade. restart is local unless --context explicitly selects SSH. Business commands use the selected context.
 Codex, Claude Code CLI (claude), Claude Desktop (claude-desktop) and independent DSH Web (dsh) / Desktop (dsh-desktop) profile management are available; runtime connection remains unverified.
 Claude CLI modelPicker lists mapped aliases on Claude Code >=2.1.242; older clients may show a partial list.
 Claude Desktop requires an applied local configLibrary profile; it can affect Chat/Cowork/Code. Organization/bootstrap profiles are not managed. Fully quit and relaunch Desktop.
@@ -199,10 +202,11 @@ Protocol conversion supports stateless text, function tools and streaming; unsup
 `
 
 type App struct {
-	In            io.Reader
-	Out, Err      io.Writer
-	sshPassword   string
-	PasswordVault connection.PasswordVault
+	autostartManager autostartManager
+	In               io.Reader
+	Out, Err         io.Writer
+	sshPassword      string
+	PasswordVault    connection.PasswordVault
 }
 
 func (a App) output(v any) error { return json.NewEncoder(a.Out).Encode(v) }
@@ -298,6 +302,11 @@ func (a App) Run(ctx context.Context, args []string) error {
 		return a.output(map[string]string{"version": core.Version})
 	}
 	switch args[0] {
+	case "autostart":
+		if target != "" {
+			return errors.New("autostart is local-only; do not specify --context")
+		}
+		return a.autostart(dir, args[1:])
 	case "update":
 		if target != "" {
 			return a.remoteUpdate(ctx, dir, target, args[1:])

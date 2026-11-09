@@ -35,7 +35,7 @@ func IsCLIInvocation(args []string) bool {
 			continue
 		}
 		switch args[i] {
-		case "update", "version", "serve", "restart", "context", "stop":
+		case "update", "version", "serve", "restart", "context", "stop", "autostart":
 			return true
 		}
 		return false

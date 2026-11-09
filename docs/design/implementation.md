@@ -17,7 +17,7 @@
 | 默认目录 | `os.UserConfigDir()/anchor`，可用 `--data-dir` 覆盖 | 持久状态、当前用户引导凭据与本机 Context 存在这个目录；后续远程控制端仍不复制远端供应商数据 |
 | 默认端口 | 模型 `127.0.0.1:17860`，管理 `127.0.0.1:17861` | 初始化可覆盖，仅允许数值回环地址与 1..65535 端口；已初始化实例不会被再次 init 改写 |
 | 凭据保护 | Linux 当前用户目录 0700 / 文件 0600；Windows 当前用户受保护 DACL | **不是静态加密**。供应商秘密暂存在受保护的 SQLite 中；本机拥有者令牌在 owner.token 中；普通 access 授权只保存 SHA-256 摘要；Binding helper 凭据另在受保护 SQLite 中保存秘密与摘要 |
-| 运行方式 | CLI 前台 `serve`；新增开发桌面宿主协调独立核心 | serve 仍不自动后台化；GUI 关窗不停止其独立核心；不注册系统服务／自启动；见[桌面运行契约](desktop-runtime.md) |
+| 运行方式 | CLI 前台 `serve`；开发桌面宿主协调独立核心；Windows 用户登录自启 | serve 仍不自动后台化；GUI 关窗不停止其独立核心；自启默认关闭，通过设置页或 CLI 明确批准，只启动本机核心；不注册系统服务，Linux 自启未实现；见[桌面运行契约](desktop-runtime.md) |
 | CLI 输出 | 正常输出 JSON（agent token 除外）；日志 / 诊断 stderr | `access grant --show-once` 和本机 `agent token` 是含秘密 stdout 例外；供应商秘密只从 stdin 输入 |
 | 协议支持 | Responses / Chat Completions / Anthropic Messages | 三入口及文本/函数/SSE/用量转换；上游协议按 Key 的实际模型覆盖 → Key 默认值解析；不支持的内容明确报错，不宣称 CC / DSH 或所有 Codex 能力已兼容 |
 
@@ -155,7 +155,7 @@ Go 测试与静态检查也通过同一保护入口执行，设置 `GOMAXPROCS=2
 2. Codex profile、升级后的 helper 路径更新、全工具实测与 Windows 原生接入；Binding 级鉴权与全局自动接管已提供。
 3. 更多适配器、JSON/YAML 声明式描述、通用多文件补偿；Codex 配置+自有 JSON 目录的补偿、字段所有权、持久恢复日志、条件恢复与 recover 已提供。
 4. 全量跨协议能力、CC / DSH 配置托管与声明式适配器。
-5. 桌面双平台原生窗口／安装验收、GUI 公开发行、系统服务、自启动和自动升级迁移。CLI 的公开版本与实际验收以仓库 README 为准；桌面内部构建见[桌面开发版说明](../release/desktop.md)，两者不能互相替代。
+5. 桌面双平台原生窗口／安装验收、GUI 公开发行、系统服务、Linux 自启动和自动升级迁移。Windows 用户登录自启已在2026-11-09源码实现，未打包／原生登录验收。CLI 的公开版本与实际验收以仓库 README 为准；桌面内部构建见[桌面开发版说明](../release/desktop.md)，两者不能互相替代。
 6. 管理日志订阅、日志保留、用量时间筛选和历史计费；累计用量与当前价估算已实现。
 
 下一步继续补 Codex 覆盖与跨平台验收、其他适配器及核心连接契约（SSH / Context）。不能把当前里程碑对外称为完成 A01–A14。

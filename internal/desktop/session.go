@@ -25,6 +25,7 @@ type Options struct {
 	PasswordVault                                   connection.PasswordVault
 }
 type Session struct {
+	autostartManager     autostartManager
 	mu                   sync.Mutex
 	updateMu             sync.Mutex
 	updateCheck          *updater.Check

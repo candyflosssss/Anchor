@@ -96,6 +96,26 @@ class WindowsInstallerContractTests(unittest.TestCase):
         self.assertIn('"UninstallString" \'"$INSTDIR\\Uninstall.exe"\'', self.source)
         self.assertIn("RequestExecutionLevel user", self.source)
 
+    def test_autostart_is_never_enabled_by_default_and_relocation_preserves_opt_in(self):
+        section = self.main_section()
+        registration = 'WriteRegStr HKCU "${RUN_KEY}" "${RUN_VALUE}" $0'
+        self.assertEqual(self.source.count(registration), 1)
+        self.assertIn('${If} $RelocatedAutostartArgs != ""', section)
+        self.assertIn('${If} $1 > 260', section)
+        relocation = self.function("RelocateInstalledApp")
+        self.assertLess(relocation.index('ReadRegStr $0 HKCU "${RUN_KEY}"'), relocation.index('ExecWait'))
+        self.assertIn('StrCpy $3 $0 13 $2', relocation)
+        self.assertIn('${AndIf} $4 == " --core"', relocation)
+        self.assertIn('StrCpy $RelocatedAutostartArgs $0 "" $2', relocation)
+
+    def test_uninstall_removes_only_the_owned_login_item(self):
+        uninstall = self.source.split('Section "Uninstall"\n', 1)[1]
+        self.assertIn('${If} $3 == $1', uninstall)
+        self.assertIn('${AndIf} $4 == " --core"', uninstall)
+        self.assertIn('DeleteRegValue HKCU "${RUN_KEY}" "${RUN_VALUE}"', uninstall)
+        self.assertNotIn('DeleteRegKey HKCU "${RUN_KEY}"', self.source)
+        self.assertNotIn('WriteReg', self.function('.onInit'))
+
 
 if __name__ == "__main__":
     unittest.main()

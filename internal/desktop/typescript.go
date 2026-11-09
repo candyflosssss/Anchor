@@ -46,31 +46,10 @@ func TypeScript() string {
 		}
 	}
 	for _, v := range []any{APIServiceSettings{}, SaveAPIServiceSettings{}, APIServiceWorkspace{}, APIAccess{}, IssueAPIKey{}, IssuedAPIKey{}, RevokeAPIKey{}, APIServiceResult{}, IssuedAPIKeyResult{}, CCImportRequest{}, CCImportSource{}, CCImportKey{}, CCImportProvider{}, CCImportModel{}, CCImportIssue{}, CCImportReport{}, CCImportResult{}, ConfirmRemoteUpdate{}, KeyCooldownSettings{}, SaveKeyCooldownSettings{}, KeyCooldownSettingsResult{}, CodexSettings{}, SaveCodexSettings{}, CodexCompactionStatus{}, CodexSettingsState{}, CodexSettingsResult{}, ProxyProfile{}, ProxyBinding{}, ProxyTarget{}, ProxyListener{}, ProxyEngine{}, ProxyWorkspace{}, ProxyAction{}, ProxyWorkspaceResult{}, SkillFile{}, SkillVersion{}, Skill{}, SkillScope{}, SkillSource{}, SkillMount{}, SkillWorkspace{}, SkillEdit{}, SkillAction{}, SkillQuery{}, SkillDifference{}, SkillDetail{}, SkillWorkspaceResult{}, SkillDetailResult{}, ConnectionProfile{}, SSHConnectionInput{}, SelectConnection{}, ConnectionProfilesResult{}, ReasoningDefault{}, ModelConfiguration{}, ModelSettingsQuery{}, ModelSettingsState{}, SaveModelSettings{}, ModelSettingsResult{}, ModelCatalogQuery{}, CatalogProvider{}, CatalogCapabilities{}, CatalogLimits{}, ReasoningOption{}, CatalogRates{}, CatalogTier{}, CatalogPricing{}, ContextPolicy{}, CatalogModel{}, ModelCatalog{}, CatalogUsage{}, CatalogEstimateInput{}, CatalogEstimate{}, ModelCatalogResult{}, CatalogEstimateResult{}, SourceRoute{}, RouteCandidate{}, ModelRouting{}, ModelRoutingState{}, ModelRoutingResult{}, ChatMessage{}, ChatRequest{}, ProbeRequest{}, ProbeProgress{}, ProbeProgressResult{}, AccountRate{}, AccountRateObservation{}, AccountRateObservationResult{}, AccountSettings{}, SaveAccountSettings{}, AccountQuery{}, AccountAmount{}, AccountWindow{}, AccountAllowance{}, AccountObservation{}, AccountSettingsResult{}, AccountObservationResult{}, CatalogTemplate{}, AgentTarget{}, AgentModel{}, ManagedAgent{}, AgentWorkspace{}, EnrollAgent{}, ManageAgent{}, AgentWorkspaceResult{}, Problem{}, Provider{}, InitialProviderKey{}, SaveProvider{}, SessionInfo{}, ConfirmStop{}, StopInfo{}, SessionResult{}, ProvidersResult{}, SaveResult{}, StopResult{}, UpdateInfo{}, ConfirmUpdate{}, UpdateResult{}, DiscoverProviderModels{}, ModelEntry{}, CatalogKey{}, ProviderModels{}, ProviderModelsResult{}, Price{}, Estimate{}, Action{}, ModelProtocol{}, KeyRateCache{}, KeyStatus{}, Probe{}, ModelMapping{}, UsageRow{}, Workspace{}, WorkspaceQuery{}, WorkspaceResult{}, LogSuggestionsQuery{}, LogSuggestion{}, LogSuggestions{}, LogSuggestionsResult{}, LogStatsQuery{}, LogStatsValues{}, LogStatsGroup{}, LogStatsErrors{}, LogStatsErrorGroup{}, LogStatsBucket{}, LogStats{}, LogStatsResult{}, LogReferenceCost{}, LogCostAdjustment{}, LogCostPart{}, LogMetrics{}, LogAttempt{}, LogKnownUsage{}, RequestLog{}, SystemLog{}, LogQuery{}, LogPage{}, LogHealth{}, LogSettings{}, LogsResult{}, LogDetailResult{}, LogSettingsResult{}} {
-		t := reflect.TypeOf(v)
-		fmt.Fprintf(&out, "export interface %s {\n", t.Name())
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			parts := strings.Split(f.Tag.Get("json"), ",")
-			name := parts[0]
-			if name == "-" {
-				continue
-			}
-			for _, option := range parts[1:] {
-				if option == "omitempty" {
-					name += "?"
-					break
-				}
-			}
-			typ := ts(f.Type)
-			if t.Name() == "Action" && f.Name == "KeyIDs" {
-				typ += " | null"
-			}
-			if t.Name() == "Problem" && f.Name == "Code" {
-				typ = "ProblemCode"
-			}
-			fmt.Fprintf(&out, "  %s: %s;\n", name, typ)
-		}
-		out.WriteString("}\n")
+		writeTypeScriptDTO(&out, reflect.TypeOf(v), ts)
+	}
+	for _, v := range []any{AutostartState{}, SaveAutostart{}, AutostartResult{}} {
+		writeTypeScriptDTO(&out, reflect.TypeOf(v), ts)
 	}
 	out.WriteString("export interface DesktopBridge {\n")
 	b := reflect.TypeOf((*Bridge)(nil))
@@ -84,4 +63,31 @@ func TypeScript() string {
 	}
 	out.WriteString("}\n")
 	return out.String()
+}
+
+func writeTypeScriptDTO(out *strings.Builder, t reflect.Type, ts func(reflect.Type) string) {
+	fmt.Fprintf(out, "export interface %s {\n", t.Name())
+	for i := 0; i < t.NumField(); i++ {
+		f := t.Field(i)
+		parts := strings.Split(f.Tag.Get("json"), ",")
+		name := parts[0]
+		if name == "-" {
+			continue
+		}
+		for _, option := range parts[1:] {
+			if option == "omitempty" {
+				name += "?"
+				break
+			}
+		}
+		typ := ts(f.Type)
+		if t.Name() == "Action" && f.Name == "KeyIDs" {
+			typ += " | null"
+		}
+		if t.Name() == "Problem" && f.Name == "Code" {
+			typ = "ProblemCode"
+		}
+		fmt.Fprintf(out, "  %s: %s;\n", name, typ)
+	}
+	out.WriteString("}\n")
 }

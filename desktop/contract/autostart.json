@@ -1,0 +1,5 @@
+{
+  "contract": "anchor-desktop-v1",
+  "data": {"supported": true, "enabled": false, "matches_current": false, "disabled_by_system": false, "can_enable": true, "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+  "problem": null
+}

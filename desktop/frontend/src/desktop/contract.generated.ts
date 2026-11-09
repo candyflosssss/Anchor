@@ -1233,9 +1233,28 @@ export interface LogSettingsResult {
   data: Settings | null;
   problem: Problem | null;
 }
+export interface AutostartState {
+  supported: boolean;
+  enabled: boolean;
+  matches_current: boolean;
+  disabled_by_system: boolean;
+  can_enable: boolean;
+  revision: string;
+}
+export interface SaveAutostart {
+  enabled: boolean | null;
+  expected_revision: string;
+  approved: boolean;
+}
+export interface AutostartResult {
+  contract: string;
+  data: AutostartState | null;
+  problem: Problem | null;
+}
 export interface DesktopBridge {
   APIService(): Promise<APIServiceResult>;
   AgentWorkspace(): Promise<AgentWorkspaceResult>;
+  Autostart(): Promise<AutostartResult>;
   CheckRemoteUpdate(input1: string): Promise<UpdateResult>;
   CheckUpdate(input1: string): Promise<UpdateResult>;
   CodexSettings(): Promise<CodexSettingsResult>;
@@ -1278,6 +1297,7 @@ export interface DesktopBridge {
   RestartCore(input1: ConfirmStop): Promise<SessionResult>;
   RevokeAPIKey(input1: RevokeAPIKey): Promise<APIServiceResult>;
   SaveAPIService(input1: SaveAPIServiceSettings): Promise<APIServiceResult>;
+  SaveAutostart(input1: SaveAutostart): Promise<AutostartResult>;
   SaveCodexSettings(input1: SaveCodexSettings): Promise<CodexSettingsResult>;
   SaveKeyCooldownSettings(input1: SaveKeyCooldownSettings): Promise<KeyCooldownSettingsResult>;
   SaveModelSettings(input1: SaveModelSettings): Promise<ModelSettingsResult>;
