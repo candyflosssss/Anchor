@@ -27,8 +27,8 @@ func TestKeyCooldownConfiguredPolicyAndLiveDisable(t *testing.T) {
 		t.Fatal(status(), h)
 	}
 	for i := 0; i < 3; i++ {
-		if _, ok := f.core.chooseKey(p, nil); ok {
-			t.Fatal("cooling Key selected")
+		if _, ok := f.core.chooseKey(p, nil); !ok {
+			t.Fatal("single cooling Key unavailable as fallback")
 		}
 	}
 	if _, err := f.core.saveKeyCooldownSettings(in); err != state.ErrConflict || status() != "cooling" {

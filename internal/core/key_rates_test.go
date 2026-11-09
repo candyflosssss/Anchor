@@ -105,7 +105,7 @@ func TestRoutingUnknownZeroAndCachedFailure(t *testing.T) {
 	// Health penalties retain free routes while favoring healthier unknown rates.
 	f.core.finishKey(p, "default", 403, "60", false)
 	r, err = f.core.routeCandidates(m)
-	if err != nil || len(r) != 1 || r[0].ProviderID != "b" {
+	if err != nil || len(r) != 2 || r[0].ProviderID != "b" || r[1].ProviderID != "a" {
 		t.Fatal(r, err)
 	}
 }

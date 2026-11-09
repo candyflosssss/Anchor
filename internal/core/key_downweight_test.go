@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestKeyCooldownExcludesOnlyFailedKey(t *testing.T) {
+func TestKeyCooldownUsesSeparateFallbackQueue(t *testing.T) {
 	for _, strategy := range []string{"priority", "round-robin"} {
 		t.Run(strategy, func(t *testing.T) {
 			f := setup(t)
@@ -26,12 +26,18 @@ func TestKeyCooldownExcludesOnlyFailedKey(t *testing.T) {
 					t.Fatal(k, ok)
 				}
 			}
-			if _, ok := f.core.chooseKey(p, map[string]bool{"second": true}); ok {
-				t.Fatal("cooling Key selected")
+			if k, ok := f.core.chooseRouteKey(p, nil, nil, "default"); !ok || k.ID != "second" {
+				t.Fatal("preferred cooling Key bypassed the normal queue", k, ok)
+			}
+			if k, ok := f.core.chooseKey(p, map[string]bool{"second": true}); !ok || k.ID != "default" {
+				t.Fatal("cooling Key unavailable as fallback", k, ok)
 			}
 			f.core.finishKey(p, "second", 403, "", false)
-			if _, ok := f.core.chooseKey(p, nil); ok {
-				t.Fatal("all cooling Keys selected")
+			if _, ok := f.core.chooseKey(p, nil); !ok {
+				t.Fatal("all cooling Keys excluded")
+			}
+			if _, ok := f.core.chooseKey(p, map[string]bool{"default": true, "second": true}); ok {
+				t.Fatal("tried Key selected again")
 			}
 			f.core.health[healthID(p, "default")].Until = time.Now().Add(-time.Second)
 			for i := 0; i < 3; i++ {
@@ -43,7 +49,7 @@ func TestKeyCooldownExcludesOnlyFailedKey(t *testing.T) {
 		})
 	}
 }
-func TestAllStrategiesKeepSessionsAndSkipCooldown(t *testing.T) {
+func TestAllStrategiesKeepSessionsWithinHealthQueue(t *testing.T) {
 	for _, strategy := range []string{"priority", "round-robin", "lowest-price", "lowest-latency", "cache-priority"} {
 		t.Run(strategy, func(t *testing.T) {
 			f := setup(t)
@@ -56,7 +62,7 @@ func TestAllStrategiesKeepSessionsAndSkipCooldown(t *testing.T) {
 			b, _ := f.store.Provider("b")
 			f.core.finishKey(a, "default", 403, "", false)
 			routes, err := f.core.routeCandidatesFor(m, "session")
-			if err != nil || len(routes) != 1 || routes[0].ProviderID != "b" {
+			if err != nil || len(routes) != 2 || routes[0].ProviderID != "b" || routes[1].ProviderID != "a" {
 				t.Fatal(routes, err)
 			}
 			f.core.rememberRoute(m, m.Candidates[1], b, "default", "session", time.Millisecond)
@@ -74,13 +80,13 @@ func TestAllStrategiesKeepSessionsAndSkipCooldown(t *testing.T) {
 			}
 			f.core.finishKey(b, "default", 403, "", false)
 			routes, err = f.core.routeCandidatesFor(m, "session")
-			if err != nil || len(routes) != 1 || routes[0].ProviderID != "a" {
+			if err != nil || len(routes) != 2 || routes[0].ProviderID != "a" || routes[1].ProviderID != "b" {
 				t.Fatal("session prevented fallback", routes, err)
 			}
 			f.core.finishKey(a, "default", 403, "", false)
 			routes, err = f.core.routeCandidates(m)
-			if err != nil || len(routes) != 0 {
-				t.Fatal("all cooling routes selected", routes, err)
+			if err != nil || len(routes) != 2 {
+				t.Fatal("all cooling routes excluded", routes, err)
 			}
 		})
 	}

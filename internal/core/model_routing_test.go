@@ -167,19 +167,19 @@ func TestWeightedCandidatesSkipUnavailableAndFailOver(t *testing.T) {
 	p, _ := f.store.Provider("a")
 	f.core.finishKey(p, "default", 401, "", false)
 	routes, err := f.core.routeCandidates(m)
-	if err != nil || len(routes) != 1 || routes[0].ProviderID != "b" {
+	if err != nil || len(routes) != 2 || routes[0].ProviderID != "b" || routes[1].ProviderID != "a" {
 		t.Fatal(routes, err)
 	}
 	if err = f.store.MutateProvider("b", 1, "key-put", "default", "", "", false, false); err != nil {
 		t.Fatal(err)
 	}
 	routes, err = f.core.routeCandidates(m)
-	if err != nil || len(routes) != 0 {
+	if err != nil || len(routes) != 1 || routes[0].ProviderID != "a" {
 		t.Fatal("disabled key scheduled", routes, err)
 	}
 	r = request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","input":"hi"}`)
 	raw = text(t, r)
-	if r.StatusCode != 503 || failed.Load() != 1 {
+	if r.StatusCode != 503 || failed.Load() != 2 {
 		t.Fatal(r.StatusCode, raw)
 	}
 }

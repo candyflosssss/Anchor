@@ -26,7 +26,10 @@ describe('mapping channel availability', () => {
   it('distinguishes cooling, invalid, and ambiguous half-open status', () => {
     expect(channelAvailability(true, [], [key('a', 'degraded')]).state).toBe('available');
     expect(keyAvailability({ id: 'a', key: key('a', 'degraded', false), anonymous: false }).state).toBe('unavailable');
-    for (const state of ['cooling', 'invalid', 'disabled']) expect(channelAvailability(true, [], [key('a', state)]).state).toBe('unavailable');
+    expect(keyAvailability({ id: 'a', key: key('a', 'cooling'), anonymous: false })).toMatchObject({ state: 'available', label: '冷却中（低优先级）' });
+    expect(channelAvailability(true, [], [key('a', 'cooling')]).state).toBe('available');
+    expect(channelAvailability(true, [], [key('a', 'cooling', false)]).state).toBe('unavailable');
+    for (const state of ['invalid', 'disabled']) expect(channelAvailability(true, [], [key('a', state)]).state).toBe('unavailable');
     for (const state of ['half-open', 'future-state']) expect(channelAvailability(true, [], [key('a', state)]).state).toBe('unknown');
     expect(channelAvailability(true, [], [key('a', 'half-open'), key('b')]).state).toBe('available');
     expect(keyAvailability({ id: 'a', key: key('a', 'ready', false), anonymous: false }).state).toBe('unavailable');
@@ -35,6 +38,11 @@ describe('mapping channel availability', () => {
     const summary = summarize({ ...providers.providers[0], enabled: true }, { ...fixture, keys: [key('a', 'degraded')] });
     expect(summary).toMatchObject({ code: 'degraded', tone: 'warn', label: 'Key 已降权', hint: '1 / 1 个 Key 已降权，仍可调度' });
     expect(attention([summary])[0]).toMatchObject({ title: 'Key 调度状态需留意', tab: 'keys' });
+  });
+  it('keeps all-cooling mappings available as low-priority fallback', () => {
+    const summary = summarize({ ...providers.providers[0], enabled: true }, { ...fixture, keys: [key('a', 'cooling')], models: [{ ...mapping, key_ids: ['a'] }] });
+    expect(summary).toMatchObject({ code: 'degraded', tone: 'warn', hint: '1 / 1 个 Key 处于低优先级，仍可兜底调度' });
+    expect(aggregateModels([summary])[0].candidates[0].availability.state).toBe('available');
   });
   it('allows anonymous only when the core would synthesize an anonymous Key', () => {
     expect(channelAvailability(true, [], []).state).toBe('available');

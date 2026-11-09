@@ -62,7 +62,7 @@ func TestIndependentKeyOrderPersistenceAndScheduling(t *testing.T) {
 	a, _ := f.store.Provider("a")
 	f.core.finishKey(a, "second", 401, "", false)
 	routes, _ = f.core.routeCandidates(got)
-	if len(routes) != 2 || routes[0].ProviderID != "b" || routes[1].ProviderID != "a" || routes[1].KeyIDs[0] != "default" {
+	if len(routes) != 3 || routes[0].ProviderID != "b" || routes[1].ProviderID != "a" || routes[1].KeyIDs[0] != "default" || routes[2].KeyIDs[0] != "second" {
 		t.Fatal(routes)
 	}
 	send(input, 409)

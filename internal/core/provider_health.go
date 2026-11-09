@@ -23,6 +23,14 @@ type keyError struct {
 	until time.Time
 }
 
+type keyQueue uint8
+
+const (
+	readyKeyQueue keyQueue = iota
+	coolingKeyQueue
+	anyKeyQueue
+)
+
 func (h *keyHealth) expire(now time.Time) {
 	if !h.Until.IsZero() && !h.Until.After(now) {
 		h.Until = time.Time{}
@@ -60,6 +68,10 @@ func (s *Server) chooseKey(p state.Provider, tried map[string]bool) (state.Provi
 	return s.chooseRouteKey(p, tried, nil, "")
 }
 func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed []string, preferred string) (state.ProviderKey, bool) {
+	return s.chooseRouteKeyInQueue(p, tried, allowed, preferred, anyKeyQueue)
+}
+
+func (s *Server) chooseRouteKeyInQueue(p state.Provider, tried map[string]bool, allowed []string, preferred string, queue keyQueue) (state.ProviderKey, bool) {
 	keys, err := s.Store.ProviderKeys(p.ID)
 	if err != nil {
 		return state.ProviderKey{}, false
@@ -74,24 +86,27 @@ func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed
 	eligible := []state.ProviderKey{}
 	weights := []float64{}
 	now := time.Now()
-	maximum := 0.0
+	bestQueue := anyKeyQueue
 	for _, k := range keys {
 		if !k.Enabled || tried[k.ID] || !candidateAllowsKey(allowed, k.ID) {
 			continue
 		}
-		weight := s.keyWeightLocked(p, k.ID, now)
-		if weight == 0 {
+		q := s.keyQueueLocked(p, k.ID, now)
+		if (queue != anyKeyQueue && q != queue) || q > bestQueue {
 			continue
 		}
+		if q < bestQueue {
+			eligible, weights = eligible[:0], weights[:0]
+			bestQueue = q
+		}
 		eligible = append(eligible, k)
-		weights = append(weights, weight)
-		maximum = max(maximum, weight)
+		weights = append(weights, 1)
 	}
 	if len(eligible) == 0 {
 		return state.ProviderKey{}, false
 	}
-	for i, k := range eligible {
-		if k.ID == preferred && weights[i] == maximum {
+	for _, k := range eligible {
+		if k.ID == preferred {
 			return k, true
 		}
 	}
@@ -100,6 +115,9 @@ func (s *Server) chooseRouteKey(p state.Provider, tried map[string]bool, allowed
 	} else {
 		raw, _ := json.Marshal([]any{p.Revision, eligible, weights})
 		scheduleID := "keys\x00" + p.ID
+		if bestQueue == coolingKeyQueue {
+			scheduleID += "\x00cooling"
+		}
 		schedule := s.routing[scheduleID]
 		if schedule == nil || schedule.signature != string(raw) {
 			schedule = &modelSchedule{signature: string(raw), current: make([]float64, len(eligible))}
@@ -188,7 +206,7 @@ func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeySta
 		out.Failures = h.Failures
 		out.ErrorScore = h.Score
 		out.Test = h.Test
-		if s.keyWeightLocked(p, k.ID, time.Now()) < 1 {
+		if s.keyQueueLocked(p, k.ID, time.Now()) == coolingKeyQueue {
 			out.State = "cooling"
 			out.RetryAt = h.Until.Unix()
 		}
@@ -199,16 +217,16 @@ func (s *Server) keyStatus(p state.Provider, k state.ProviderKey) catalog.KeySta
 	return out
 }
 
-// keyWeightLocked is a scheduling factor, independent of billing multipliers.
+// keyQueueLocked separates fallback eligibility from billing multipliers.
 // Call with s.mu held. Expiry has no exclusive probe or request reservation.
-func (s *Server) keyWeightLocked(p state.Provider, key string, now time.Time) float64 {
+func (s *Server) keyQueueLocked(p state.Provider, key string, now time.Time) keyQueue {
 	if h := s.health[healthID(p, key)]; h != nil {
 		h.expire(now)
 		if s.keyPolicy.Enabled && h.Until.After(now) {
-			return 0
+			return coolingKeyQueue
 		}
 	}
-	return 1
+	return readyKeyQueue
 }
 
 // pickURL rotates across a provider's request base URLs for load balancing.

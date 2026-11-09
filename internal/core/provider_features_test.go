@@ -49,8 +49,8 @@ func TestPriorityKeysFailoverDownweightAndUsage(t *testing.T) {
 	}
 	p, _ := f.store.Provider("p")
 	f.core.finishKey(p, "second", 403, "120", false)
-	if _, ok := f.core.chooseKey(p, nil); ok {
-		t.Fatal("cooling keys selected")
+	if _, ok := f.core.chooseKey(p, nil); !ok {
+		t.Fatal("cooling keys unavailable as fallback")
 	}
 	f.core.mu.Lock()
 	f.core.health[healthID(p, "second")].Until = time.Now().Add(-time.Second)

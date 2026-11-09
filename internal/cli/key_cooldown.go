@@ -13,10 +13,10 @@ func (a App) keyCooldownSettings(ctx context.Context, c *client.Client, args []s
 		return errors.New("settings requires key-cooldown")
 	}
 	f := a.flags("settings key-cooldown")
-	enabled := f.Bool("enabled", true, "enable automatic key cooldown (default true)")
+	enabled := f.Bool("enabled", true, "enable automatic low-priority key cooldown (default true; cooling keys remain fallback candidates)")
 	threshold := f.Int("failure-threshold", 100, "error score threshold, 1..100 (default 100)")
 	window := f.Int("error-window-seconds", 300, "error score lifetime, 1..3600 (default 300); transient errors expire within 60 seconds")
-	seconds := f.Int("cooldown-seconds", 300, "key cooldown seconds, 1..3600 (default 300)")
+	seconds := f.Int("cooldown-seconds", 300, "low-priority key cooldown seconds, 1..3600 (default 300)")
 	rate := f.Int("rate-limit-seconds", 300, "429 fallback seconds, 1..3600 (default 300); cooldown uses the longer delay")
 	weight := f.Int("weight-percent", 10, "deprecated compatibility field, 1..100 (ignored by cooldown)")
 	revision := f.Int64("revision", 0, "expected settings revision (required when saving)")

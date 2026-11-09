@@ -181,43 +181,53 @@ func (s *Server) responses(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	affinity := requestRoutingAffinity(r, modelID)
-	candidates, err := s.routeCandidatesFor(model, affinity)
-	if err != nil {
-		apiError(w, err)
-		return
-	}
-	for _, c := range candidates {
-		provider, err := s.Store.Provider(c.ProviderID)
+	// Re-evaluate the fallback queue after normal attempts, without replaying a
+	// channel that just failed and entered cooldown during this request.
+	triedRoutes := map[state.SourceRoute]map[string]bool{}
+	for _, queue := range []keyQueue{readyKeyQueue, coolingKeyQueue} {
+		candidates, err := s.routeCandidatesForQueue(model, affinity, queue)
 		if err != nil {
 			apiError(w, err)
 			return
 		}
-		if !provider.Enabled {
-			continue
-		}
-		if !s.take(provider.ID, provider.MaxConcurrent) {
-			continue
-		}
-		keys, err := s.Store.ProviderKeys(provider.ID)
-		if err != nil {
-			s.release(provider.ID)
-			apiError(w, err)
-			return
-		}
-		tried := map[string]bool{}
-		for n := 0; n < max(1, len(keys)); n++ {
-			key, ok := s.chooseRouteKey(provider, tried, c.KeyIDs, s.preferredRouteKey(model, c, provider, affinity))
-			if !ok {
-				break
-			}
-			tried[key.ID] = true
-			retry := s.forward(w, r, translation, modelID, c, provider, key, stream, model, affinity)
-			if !retry {
-				s.release(provider.ID)
+		for _, c := range candidates {
+			provider, err := s.Store.Provider(c.ProviderID)
+			if err != nil {
+				apiError(w, err)
 				return
 			}
+			if !provider.Enabled {
+				continue
+			}
+			if !s.take(provider.ID, provider.MaxConcurrent) {
+				continue
+			}
+			keys, err := s.Store.ProviderKeys(provider.ID)
+			if err != nil {
+				s.release(provider.ID)
+				apiError(w, err)
+				return
+			}
+			route := state.SourceRoute{ProviderID: c.ProviderID, Model: c.Model}
+			tried := triedRoutes[route]
+			if tried == nil {
+				tried = map[string]bool{}
+				triedRoutes[route] = tried
+			}
+			for n := 0; n < max(1, len(keys)); n++ {
+				key, ok := s.chooseRouteKeyInQueue(provider, tried, c.KeyIDs, s.preferredRouteKey(model, c, provider, affinity), queue)
+				if !ok {
+					break
+				}
+				tried[key.ID] = true
+				retry := s.forward(w, r, translation, modelID, c, provider, key, stream, model, affinity)
+				if !retry {
+					s.release(provider.ID)
+					return
+				}
+			}
+			s.release(provider.ID)
 		}
-		s.release(provider.ID)
 	}
 	setLogStage(r, "route")
 	fail(w, apierror.NoAvailableCandidate)

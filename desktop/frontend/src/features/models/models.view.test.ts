@@ -102,7 +102,8 @@ describe('model channel availability presentation', () => {
     const summary = makeSummary(true, 'cooling');
     const id = JSON.stringify([summary.provider.id, summary.workspace!.keys[0].id]);
     const html = render([summary], { ...rates, keys: { [id]: { ...summary.workspace!.keys[0], state: 'ready', effective_multiplier: 0.4 } } });
-    expect(html).toContain('冷却中');
+    expect(html).toContain('冷却中（低优先级）');
+    expect(html).not.toContain('无有效渠道');
     expect(html).toContain('相对倍率 0.4×');
     expect(html).toContain('aria-label="排序倍率 未知"');
   });

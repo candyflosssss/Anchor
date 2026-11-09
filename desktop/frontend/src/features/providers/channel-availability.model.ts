@@ -21,7 +21,7 @@ export function keyAvailability(source: SourceKey): ChannelAvailability {
   if (k.state === 'degraded') return { state: 'available', label: '已降权', reason: '调度权重已降低，仍可参与请求。' };
   if (k.state === 'ready') return { state: 'available', label: '当前可用', reason: 'Key 已启用且未处于冷却或认证失效状态。' };
   if (k.state === 'invalid') return { state: 'unavailable', label: '认证失效', reason: 'Key 被上游拒绝，需替换或恢复。' };
-  if (k.state === 'cooling') return { state: 'unavailable', label: '冷却中', reason: 'Key 暂处于冷却状态，请刷新配置核对恢复情况。' };
+  if (k.state === 'cooling') return { state: 'available', label: '冷却中（低优先级）', reason: '正常 Key 耗尽后可兜底调度，冷却到期恢复正常优先级。' };
   // The core's half-open snapshot does not distinguish a pending probe from an
   // in-flight probe. Do not promise availability or guess from a client clock.
   return { state: 'unknown', label: k.state === 'half-open' ? '恢复探测中' : '状态未知', reason: '当前快照不能确认 Key 可调度，请刷新配置核对。' };

@@ -48,8 +48,10 @@ export function summarize(provider: Provider, workspace: Workspace | null | unde
   if (!provider.enabled) return out('disabled', 'muted', '已停用', '不参与路由；配置和密钥均保留');
   if (keys.length && !enabled.length) return out('no-enabled-key', 'bad', '无可用 Key', '所有 Key 都已停用');
   if (enabled.length && enabled.every(k => k.state === 'invalid')) return out('auth', 'bad', '认证失效', '所有启用的 Key 都被上游拒绝');
-  const degraded = enabled.filter(k => ['cooling', 'half-open', 'invalid'].includes(k.state));
-  if (degraded.length) return out('degraded', 'warn', '部分 Key 冷却/失效', `${degraded.length} / ${enabled.length} 个 Key 暂不可调度`);
+  const degraded = enabled.filter(k => ['half-open', 'invalid'].includes(k.state));
+  if (degraded.length) return out('degraded', 'warn', '部分 Key 失效/待确认', `${degraded.length} / ${enabled.length} 个 Key 暂不可调度`);
+  const cooling = enabled.filter(k => k.state === 'cooling');
+  if (cooling.length) return out('degraded', 'warn', 'Key 冷却中', `${cooling.length} / ${enabled.length} 个 Key 处于低优先级，仍可兜底调度`);
   const downweighted = enabled.filter(k => k.state === 'degraded');
   if (downweighted.length) return out('degraded', 'warn', 'Key 已降权', `${downweighted.length} / ${enabled.length} 个 Key 已降权，仍可调度`);
   if (!w.models.length) return out('unmapped', 'warn', '未映射模型', 'Agent 还不能通过此供应商使用任何模型');

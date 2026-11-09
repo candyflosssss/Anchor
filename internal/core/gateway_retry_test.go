@@ -169,7 +169,10 @@ func TestGatewayFailoverDoNotReplayCommittedStream(t *testing.T) {
 	}))
 	defer up.Close()
 	f.add(t, "p", up.URL, "synthetic")
-	f.model(t, state.Candidate{ProviderID: "p", Model: "up"})
+	f.add(t, "fallback", up.URL, "synthetic-fallback")
+	pFallback, _ := f.store.Provider("fallback")
+	f.core.finishKey(pFallback, "default", 401, "", false)
+	f.model(t, state.Candidate{ProviderID: "p", Model: "up"}, state.Candidate{ProviderID: "fallback", Model: "up"})
 	resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public","stream":true}`)
 	body := text(t, resp)
 	if resp.StatusCode != 200 || calls.Load() != 1 || !strings.Contains(body, "partial") {
@@ -237,7 +240,10 @@ func TestGatewayFailoverDoNotReplayRejectedOrInvalidResponses(t *testing.T) {
 			}))
 			defer up.Close()
 			f.add(t, "p", up.URL+"/v1", "synthetic")
-			f.model(t, state.Candidate{ProviderID: "p", Model: "up"})
+			f.add(t, "fallback", up.URL+"/v1", "synthetic-fallback")
+			pFallback, _ := f.store.Provider("fallback")
+			f.core.finishKey(pFallback, "default", 401, "", false)
+			f.model(t, state.Candidate{ProviderID: "p", Model: "up"}, state.Candidate{ProviderID: "fallback", Model: "up"})
 			resp := request(t, "POST", f.gateway.URL+"/v1/responses", f.token, `{"model":"public"}`)
 			body := text(t, resp)
 			if resp.StatusCode != 502 || calls.Load() != 1 {

@@ -2,7 +2,8 @@
 
 - 2026-11-07 已随 desktop.83 dev 发布：`agent codex-settings --override-model-catalog=BOOL --revision N`，提示词与目录覆盖默认关闭；升级后需重启 Codex 并新开会话，见[发行记录](../release/desktop.md#codex-prompt-consent-83)。
 
-- 最近核对：2026-11-07
+- 最近核对：2026-11-09
+- 2026-11-09 当前源码未发布：Key 冷却保留计分与时长，改为全局低优先级兜底队列；先耗尽正常 Key，再尝试冷却 Key，全冷却仍可调度。无新增参数，见 §16。
 - 2026-11-03 已随desktop.82 dev投放：`agent codex-settings` 新增自动配置压缩开关及阈值百分比，默认开启、90%；本机CLI／核心／GUI已更新，Codex需重启读取，见本节及[发行记录](../release/desktop.md#codex-compaction-82)。
 - 2026-11-01 已随desktop.81 dev投放：Messages缺省预算消费已保存default_output_tokens，其次limits.output，未知才回退4096，显式客户端上限保持；日志记录准备值与来源。无新增命令／参数，规则见模型设置章节及[发行记录](../release/desktop.md#claude-output-budget-81)。
 - 2026-11-01 已随 desktop.80 dev 同版投放：Messages 目标可对历史思考做显式有损投影，记录 reasoning_history_omitted；已知消息阶段和图片精度选择器损失另记录，可见消息／工具链／图片保留。客户端原历史不改，实际核心需更新至 .80，无新增命令或参数，详见[发行记录](../release/desktop.md#claude-history-80)。
@@ -387,7 +388,7 @@ anchor usage
 | key-model-protocol | target 必填已存 Key，model 为实际模型名（不是公开别名，1..256 UTF-8 字节，无首尾空白/控制/格式字符）；protocol 为上述三协议；省略、空值或 inherit 删除覆盖，恢复动态继承 Key 默认值；不修改模型映射 |
 | key-delete / key-reset | target 与 approve 必填；delete 在同一事务删除指定 Key、秘密和对应模型来源：共享来源列表只移除该 Key，来源耗尽才移除候选；保留其他 Key／供应商提供的同名模型。不限 Key 的候选在仍有已存 Key 时保留，删除最后一个已存 Key 时移除，避免意外转为匿名。仅失去全部候选时删除公开模型；已启用 Binding 默认模型引用仍返回409 referenced并整体回滚。受影响模型 revision 加一，失去本供应商候选时清理其价格，供应商 revision 加一；reset 只清空该配置版本的内存失败/测试状态，不改变 enabled 或 revision |
 | key-reset-all | 2026-10-30 当前源码未发布；id、当前 revision 与 approve 必填，不接受非空 target。一次清除当前供应商全部已存 Key 在该配置版本的内存失败计数、错误分数、冷却限制及最近测试；不修改密钥、协议、enabled、供应商 revision 或其他供应商。无已存 Key 时成功返回空工作台；重复执行安全。输出为恢复后的 workspace；版本过期返回409，未批准或携带 target 返回400，管理错误非零退出。上游凭据真正失效时仍需更新 Key；GUI 在列表与详情有异常 Key 时显示「恢复所有 Key」，确认后复用同一核心动作。写入结果未知须先重新读取，不自动重放。 |
-| strategy | 默认 round-robin，另可 priority；前者在可用 Key 中轮询，后者按 Key ID 顺序；都跳过停用或冷却 Key |
+| strategy | 默认 round-robin，另可 priority；前者在同级 Key 中轮询，后者按 Key ID 顺序；都排除停用 Key，冷却 Key 在正常候选耗尽后兜底 |
 | test | model 必填上游模型 ID，approve 确认少量推理用量；target 省略时选第一个启用 Key，无 Key 才匿名。显式 target 可测试停用/降权 Key。固定短文本、最多16输出 token、最多10秒并受并发限制；结果看 probe.failure，失败结果仍退出0，管理错误非零 |
 | model-put | target 为公开别名；model 为上游 ID；model-revision 默认0创建或加入已有别名（当前供应商不能已映射），编辑须提供当前模型 revision。旧模型倍率 multiplier 范围0.01..1000，省略/0保留旧值，新候选默认1；该字段不参与运行时加权／低价策略，但参与桌面「按倍率」快速排序。新模型 strategy 默认 round-robin（按供应商倍率×Key缓存分组倍率的倒数加权轮询），可选 priority（候选顺序）、cache-priority（缓存亲和）、lowest-price（供应商倍率×Key缓存分组倍率升序）、lowest-latency（近期成功延迟）；编辑省略 strategy 保留原策略。加入已有别名保留它的策略、能力和元数据；tools 默认 false、streaming 默认 true（新建和编辑均如此，关闭须传 `--streaming=false`），能力与策略对该别名所有供应商生效。只更新当前供应商的候选，保留其他候选 |
 | model-delete | target、model-revision、approve 必填；只移除当前供应商的候选及对应价格；存在其他候选时保留公开模型、Binding 和其他供应商价格，模型 revision 加一。移除最后一个候选才删除公开模型，已启用 Binding 默认模型引用时409 referenced，事务回滚；已禁用 Binding 不阻止删除且配置保持不变 |
@@ -1130,9 +1131,9 @@ anchor settings key-cooldown --revision N [--enabled=true|false] [--failure-thre
 
 作用域为所选 Context 的在线核心，需管理凭据与实例身份。无修改参数时只读；保存未指定项保留当前值。读／写均输出包含上述配置及 revision 的 JSON；成功退出 0，越界、缺 revision、冲突、连接／身份／鉴权错误非零。写入不重试，结果未知先重读。成功 revision +1，清除临时分数与 CD，不修改供应商 revision、Agent 文件或请求上游。
 
-401/403 每次加 100 分，429 加 50 分，408／网络／5xx 加 25 分；其他错误不加分。成功不清窗口分数，分数过期自动扣除。达到阈值后该 Key 不可调度，其他 Key 正常。429 支持秒数或 HTTP 日期 Retry-After，最终冷却限制 1 秒..1 小时。CD 内在途结果不提前解除或延长，到期清分直接放开；只有一个 Key 或所有 Key 都冷却时也不会绕过。全部候选不可用返回 503 no_available_candidate（全部渠道不可用）。
+401/403 每次加 100 分，429 加 50 分，408／网络／5xx 加 25 分；其他错误不加分。成功不清窗口分数，分数过期自动扣除。达到阈值后该 Key 进入低优先级队列，其他 Key 正常。2026-11-09 当前源码：先耗尽所有供应商的正常候选，再尝试冷却候选，各级内部保留原调度策略和会话亲和，亲和／价格／延迟不得跨级提升冷却 Key；不是按权重概率混选。429 支持秒数或 HTTP 日期 Retry-After，最终冷却限制 1 秒..1 小时。CD 内成功／失败不提前解除或延长，到期清分回正常队列；只有一个 Key 或所有 Key 都冷却时仍能兜底，不修改 enabled。手动停用、来源 Key 范围与并发门禁仍生效；同请求已失败渠道不因降级重试，连接后结果不明或已交付流式内容仍不重放。两级均耗尽才返回 503 no_available_candidate（全部渠道不可用）。
 
-显式会话通过 `X-Anchor-Session` 或支持的 Codex 会话元数据识别，按调用者／公开模型隔离；成功后保持渠道，优先渠道恢复不回切。当前渠道不可用再按当前规则 fallback，新会话按当前规则选择。亲和限进程内 1024 条 LRU，重启或淘汰后重新选择，不以提示词推断会话。连接后结果未知或已开始输出的流不重放。
+显式会话通过 `X-Anchor-Session` 或支持的 Codex 会话元数据识别，按调用者／公开模型隔离；成功后在同级队列保持渠道，同级优先渠道恢复不回切，冷却亲和不能压过正常 Key。当前渠道不可用再按当前规则 fallback，新会话按当前规则选择。亲和限进程内 1024 条 LRU，重启或淘汰后重新选择，不以提示词推断会话。连接后结果未知或已开始输出的流不重放。
 
 兼容旧命令、路径与字段；旧持久设置没有窗口时补 300 秒，原连续失败阈值乘 25（最高 100），保留原时长和开关。客户端与核心需配套升级。GUI「设置 → Key 冷却」提供同能力；模型页拖动及两种快速排序均保存为 priority，保存后可继续手调。
 

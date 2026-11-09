@@ -63,8 +63,17 @@ func (s *Server) routeCandidates(m state.Model) ([]state.Candidate, error) {
 	return s.routeCandidatesFor(m, "")
 }
 
-// Cooling Keys are excluded. Availability and concurrency are rechecked before forwarding.
+// Queue priority is global: affinity, price and latency only order within a queue.
 func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Candidate, error) {
+	ready, err := s.routeCandidatesForQueue(m, affinity, readyKeyQueue)
+	if err != nil {
+		return nil, err
+	}
+	cooling, err := s.routeCandidatesForQueue(m, affinity, coolingKeyQueue)
+	return append(ready, cooling...), err
+}
+
+func (s *Server) routeCandidatesForQueue(m state.Model, affinity string, queue keyQueue) ([]state.Candidate, error) {
 	// Cost-based rules schedule actual provider/model/Key routes. The stored
 	// candidate multiplier is reserved and intentionally never used here.
 	strategy := m.RoutingStrategy()
@@ -144,8 +153,8 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 			continue
 		}
 		for _, k := range keys[i] {
-			if k.Enabled && candidateAllowsKey(c.KeyIDs, k.ID) {
-				healthWeights[i] = max(healthWeights[i], s.keyWeightLocked(p, k.ID, now))
+			if k.Enabled && candidateAllowsKey(c.KeyIDs, k.ID) && s.keyQueueLocked(p, k.ID, now) == queue {
+				healthWeights[i] = 1
 			}
 		}
 		if healthWeights[i] > 0 {
@@ -185,10 +194,14 @@ func (s *Server) routeCandidatesFor(m state.Model, affinity string) ([]state.Can
 			// public model revision and endpoint count have not changed.
 			signatureBytes, _ := json.Marshal([]any{m.Candidates, providers, costs, healthWeights})
 			signature := string(signatureBytes)
-			schedule := s.routing[m.ID]
+			scheduleID := m.ID
+			if queue == coolingKeyQueue {
+				scheduleID += "\x00cooling"
+			}
+			schedule := s.routing[scheduleID]
 			if schedule == nil || schedule.revision != m.Revision || schedule.signature != signature || len(schedule.current) != len(m.Candidates) {
 				schedule = &modelSchedule{signature: signature, revision: m.Revision, current: make([]float64, len(m.Candidates))}
-				s.routing[m.ID] = schedule
+				s.routing[scheduleID] = schedule
 			}
 			usable := map[int]bool{}
 			for _, i := range available {
