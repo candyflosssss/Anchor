@@ -1,10 +1,27 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-11-09。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.84](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.84)，发布于 `2026-11-09T14:49:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `9a188b45c621ad550956e0e8170163b96d3d9fbc`、SOURCE dirty=false。
-- Windows 登录自启默认关闭，主动开启后只启动后台核心；Key 冷却保留计分与时长，改为正常候选耗尽后的低优先级兜底。保留 `.83` 的 Codex 提示词与模型目录覆盖授权修复。
+- 更新：2026-11-12。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.85](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.85)，发布于 `2026-11-12T02:27:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `33a3ec77b4a2448b056046cb505eff3a8337d5a9`、SOURCE dirty=false。
+- Codex 模型列表始终随托管同步，开关改为「允许 Anchor 覆盖模型能力与自动压缩」；没有原生模板的映射模型参照 CLIProxyAPI 复制 Codex 官方条目。保留 `.84` 登录自启与 Key 冷却兜底。
 - 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
 - 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+
+<a id="codex-model-list-85"></a>
+
+## Codex 模型列表同步与无模板模型条目 .85（已发布 dev）
+
+修复 `.83` 引入的耦合：关闭覆盖开关时不再撤下 Anchor 模型目录，Codex 模型选择器始终显示映射模型。开关改名「允许 Anchor 覆盖模型能力与自动压缩」，只控制模型设置能力投影与自动压缩；CLI 参数与字段不变。有原生模板的模型关闭时原样保留；无模板映射模型参照 CLIProxyAPI 复制缓存中的 gpt-5.5 条目，去掉 GPT 专属能力并使用短提示词，上下文留空。已有托管在核心启动或下次同步时自动恢复列表。契约见 [Codex 统一设置](../design/codex-retries.md)。
+
+以远端主线 `33a3ec7` 为源码（含 `.84` 及本轮两项 Codex 修复），在独立干净 worktree 构建，SOURCE dirty=false，输入摘要 `a7a6e6b2eabe245f165d3e6025a28e7e7d8d9fedb4fdd1409e6250252809f87d`；未纳入主工作区其他未提交内容。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `anchor-desktop_0.1.0-dev.desktop.85_amd64.deb` | 29303992 | `16654781335a9c73382807d098a0be2c35314242e0e43094c9306be3a28fba17` |
+| `Anchor-Desktop-0.1.0-dev.desktop.85-windows-amd64-setup.exe` | 31317570 | `838e20d390fe5bfcfd36558006b043b6232a10337184731c6a405903fdc30ac8` |
+
+复用功能轮在同一源码上通过的 managed／cli／desktop／state 及 core 相关测试、前端类型检查／lint／单元测试与 4 项 Codex 模拟宿主浏览器测试，以及隔离 CODEX_HOME 中 Codex 0.166 加载生成目录的验证。本轮 Go／TS 契约、TypeScript／Vite、Windows／Ubuntu24.04 AMD64 生产编译与 NSIS／deb 打包通过；deb 载荷与 runtime 一致、含 vendor 与固定 mihomo 载荷的源码包可离线编译、元数据 13 项、11 附件远端大小／digest、tag 指向构建提交与 latest 状态未变均核对通过。默认 dev 源在隔离目录实际下载 Linux runtime（从 .84 检查）、CLI 及兼容旧客户端的 deb，版本／大小／SHA256 及程序版本通过。
+
+证据位于 `dist/desktop/0.1.0-dev.desktop.85/publication/`。安装器未签名，双平台系统安装及 GUI 窗口未实机验收；未安装、重启或修改真实实例／Agent 配置，未请求付费上游。
 
 <a id="core-autostart-cooldown-84"></a>
 

@@ -1,10 +1,14 @@
 # 在线更新 v1
 
-- 更新：2026-11-09。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.84](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.84)，发布于 `2026-11-09T14:49:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `9a188b45c621ad550956e0e8170163b96d3d9fbc`、SOURCE dirty=false。
-- Windows 登录自启默认关闭，主动开启后只启动后台核心；Key 冷却保留计分与时长，改为正常候选耗尽后的低优先级兜底。保留 `.83` 的 Codex 提示词与模型目录覆盖授权修复。
+- 更新：2026-11-12。
+- 当前线上桌面 dev 版：[0.1.0-dev.desktop.85](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.85)，发布于 `2026-11-12T02:27:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `33a3ec77b4a2448b056046cb505eff3a8337d5a9`、SOURCE dirty=false。
+- Codex 模型列表始终随托管同步，开关改为「允许 Anchor 覆盖模型能力与自动压缩」；没有原生模板的映射模型参照 CLIProxyAPI 复制 Codex 官方条目。保留 `.84` 登录自启与 Key 冷却兜底。
 - 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
 - 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+
+## .85 在线投放（2026-11-12）
+
+Codex 模型列表同步与能力覆盖拆分，无模板映射模型参照 CLIProxyAPI 复制 Codex 官方条目。构建提交 `33a3ec7`，11 附件远端大小／摘要、构建 tag 与非 latest 已核对；默认 dev 源实际下载 Linux runtime（从 .84 检查）、CLI 及兼容旧客户端的 deb URL 通过，Windows 三项程序远端 digest 匹配。未安装；升级后需重启 Codex 并新开会话。详见 [发行记录](../release/desktop.md#codex-model-list-85)。
 
 ## .84 在线投放（2026-11-09）
 

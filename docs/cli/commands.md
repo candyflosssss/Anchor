@@ -3,7 +3,7 @@
 - 2026-11-07 已随 desktop.83 dev 发布：`agent codex-settings --override-model-catalog=BOOL --revision N`，提示词与目录覆盖默认关闭；升级后需重启 Codex 并新开会话，见[发行记录](../release/desktop.md#codex-prompt-consent-83)。
 
 - 最近核对：2026-11-12
-- 2026-11-12 当前源码未发布：Codex 模型列表同步与 `--override-model-catalog` 拆分；关闭该开关不再撤下 Anchor 模型列表，开关只控制能力覆盖与自动压缩，见 §8。
+- 2026-11-12 已随 desktop.85 dev 发布：Codex 模型列表同步与 `--override-model-catalog` 拆分；关闭该开关不再撤下 Anchor 模型列表，开关只控制能力覆盖与自动压缩，见 §8。
 - 2026-11-09 已随 desktop.84 dev 发布：Windows 本机 `autostart status|enable|disable` 与设置页「本机登录自启」，默认关闭，仅当前用户登录后启动后台核心；Windows 原生登录未验收，见下方 §3 及[发行记录](../release/desktop.md#core-autostart-cooldown-84)。
 - 2026-11-09 已随 desktop.84 dev 发布：Key 冷却保留计分与时长，改为全局低优先级兜底队列；先耗尽正常 Key，再尝试冷却 Key，全冷却仍可调度。无新增参数，见 §16；实际处理请求的核心须更新，同版 CLI feed 已投放，公开 alpha.6 不含这些增量。
 - 2026-11-03 已随desktop.82 dev投放：`agent codex-settings` 新增自动配置压缩开关及阈值百分比，默认开启、90%；本机CLI／核心／GUI已更新，Codex需重启读取，见本节及[发行记录](../release/desktop.md#codex-compaction-82)。
@@ -662,7 +662,7 @@ anchor access revoke ID
 
 ## 8. Agent 托管与独立恢复
 
-**2026-11-12 当前源码修复（未发布）：Codex 模型列表同步与能力覆盖分开控制。** all-mapped（或带已声明元数据的 all-compatible／single）Codex 托管始终生成 Anchor 自有目录并设置 `model_catalog_json`，模型选择器显示 Anchor 映射模型，不再受 `override_model_catalog` 影响。该开关默认 false，只决定是否把模型设置中的上下文窗口、输入模态、并行工具、思考档位写入目录，以及是否执行下文自动压缩（逐模型 `auto_compact_token_limit`，并移除根级 `model_context_window`／`model_auto_compact_token_limit`）。
+**2026-11-12 修复（已随 desktop.85 dev 发布）：Codex 模型列表同步与能力覆盖分开控制。** all-mapped（或带已声明元数据的 all-compatible／single）Codex 托管始终生成 Anchor 自有目录并设置 `model_catalog_json`，模型选择器显示 Anchor 映射模型，不再受 `override_model_catalog` 影响。该开关默认 false，只决定是否把模型设置中的上下文窗口、输入模态、并行工具、思考档位写入目录，以及是否执行下文自动压缩（逐模型 `auto_compact_token_limit`，并移除根级 `model_context_window`／`model_auto_compact_token_limit`）。
 
 关闭时，已声明元数据、接管前用户目录或 Codex 本地缓存中精确匹配的原生模板按原样复制，只设置列表身份与传输必需字段（slug、显示名、visibility、supported_in_api、关闭 WebSocket／responses lite、清除 upgrade），全局上下文设置保持原值。2026-11-12 起，没有原生模板的映射模型（如 Claude、DeepSeek 映射）参照 CLIProxyAPI：复制 Codex 本地 `models_cache.json` 中的官方条目（优先 gpt-5.5，否则取优先级最高的条目）以保持 shell、截断、推理档位等客户端行为；清除 apply_patch、搜索工具、速度档位、图像原图细节、升级提示等 GPT 专属能力，`tool_mode` 设为 direct；提示词替换为与 CLIProxyAPI 相同的短句 "You are Codex, a coding agent. You and the user share one workspace."（完整模板提示词会使目录超过 Codex 1 MiB 上限）；上下文窗口留空，不沿用 GPT 的值；在选择器中排在所有原生模型之后并按名称排序。缓存不可用或版本不匹配时退回保守的模型名条目，使用同一句提示词。无论开关如何都如此。`model_instructions_file`、developer instructions、personality、AGENTS.md 不受影响。
 
