@@ -80,14 +80,15 @@ func (m *Manager) gatewayFor(b state.Binding, useTemplates bool) (GatewayBinding
 		codexSettings = &retrySettings
 	}
 	var templates map[string]json.RawMessage
+	var fallback json.RawMessage
 	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
 		var err error
-		templates, err = m.codexTemplates(b, models, useTemplates)
+		templates, fallback, err = m.codexTemplates(b, models, useTemplates)
 		if err != nil {
 			return GatewayBinding{}, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
 		}
 	}
-	return GatewayBinding{CodexSettings: codexSettings, CodexRetries: retries, Token: token, CatalogTemplates: templates, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
+	return GatewayBinding{CodexSettings: codexSettings, CodexRetries: retries, Token: token, CatalogTemplates: templates, CatalogFallback: fallback, Models: models, CatalogVersion: version, BaseURL: "http://" + cfg.GatewayAddress + "/v1", Model: b.Model, DataDir: m.Store.Dir, Ready: m.ready && !m.stopping, Tools: model.Tools, Streaming: model.Streaming}, nil
 }
 func (m *Manager) Add(b state.Binding) (state.Binding, error) {
 	m.mu.Lock()

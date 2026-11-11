@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/candyflosssss/Anchor/internal/state"
@@ -22,7 +23,7 @@ func buildCatalogTemplates(models []state.Model, version string, templates map[s
 }
 
 func buildGatewayCatalog(g GatewayBinding) ([]byte, []string, error) {
-	return buildCatalogWithSettings(g.Models, g.CatalogVersion, g.CatalogTemplates, codexCompactSettings(g))
+	return buildCatalogWithFallback(g.Models, g.CatalogVersion, g.CatalogTemplates, g.CatalogFallback, codexCompactSettings(g))
 }
 
 // The catalog is Codex's only model-list source, so its presence follows the
@@ -43,36 +44,51 @@ func codexCompactSettings(g GatewayBinding) state.CodexSettings {
 }
 
 func buildCatalogWithSettings(models []state.Model, version string, templates map[string]json.RawMessage, settings state.CodexSettings) ([]byte, []string, error) {
-	raw, ids, err := encodeCatalogTemplates(models, version, templates, settings)
+	return buildCatalogWithFallback(models, version, templates, nil, settings)
+}
+
+func buildCatalogWithFallback(models []state.Model, version string, templates map[string]json.RawMessage, fallback json.RawMessage, settings state.CodexSettings) ([]byte, []string, error) {
+	raw, ids, err := encodeCatalogTemplates(models, version, templates, fallback, settings)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", ErrCatalogInvalid, err)
 	}
 	return raw, ids, nil
 }
 
-func encodeCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage, settings state.CodexSettings) ([]byte, []string, error) {
+func encodeCatalogTemplates(models []state.Model, version string, templates map[string]json.RawMessage, fallback json.RawMessage, settings state.CodexSettings) ([]byte, []string, error) {
 	entries := []map[string]json.RawMessage{}
 	ids := []string{}
+	cloned := []int{}
 	metadataBytes := 0
 	for _, model := range models {
-		// all-mapped is a model-name catalog, not a claim of official model
-		// capabilities. Unknown context/efforts remain unspecified. Codex requires
-		// instructions even for a name-only entry: use an explicit generic Anchor
-		// fallback only when no operator instructions exist, never another model's.
+		// Models without their own template follow CLIProxyAPI: clone a cached
+		// Codex entry for client behaviour, strip GPT-only capabilities and use a
+		// compact instruction. Unknown context stays unspecified. Without a cache
+		// a conservative name-only entry is exported instead.
 		var entry map[string]json.RawMessage
 		if version == "" && model.Codex == nil {
-			raw, _ := json.Marshal(map[string]any{
-				"display_name": model.ID, "description": "Anchor mapped model; upstream capabilities are not verified",
-				"supported_reasoning_levels": []any{}, "shell_type": "default", "priority": 0,
-				"support_verbosity": false, "experimental_supported_tools": []string{},
-				"truncation_policy": map[string]any{"mode": "tokens", "limit": 10000},
-				"input_modalities":  []string{"text"}, "context_window": nil,
-			})
-			_ = json.Unmarshal(raw, &entry)
 			template, err := mappedTemplate(model, templates)
 			if err != nil {
 				return nil, nil, err
 			}
+			if template == nil && fallback != nil {
+				if json.Unmarshal(fallback, &entry) != nil || entry == nil {
+					return nil, nil, ErrUnsafe
+				}
+				genericCodexEntry(entry)
+				cloned = append(cloned, len(entries))
+			} else {
+				raw, _ := json.Marshal(map[string]any{
+					"supported_reasoning_levels": []any{}, "shell_type": "default", "priority": 0,
+					"support_verbosity": false, "experimental_supported_tools": []string{},
+					"truncation_policy": map[string]any{"mode": "tokens", "limit": 10000},
+					"input_modalities":  []string{"text"}, "context_window": nil,
+				})
+				_ = json.Unmarshal(raw, &entry)
+			}
+			set := func(k string, v any) { raw, _ := json.Marshal(v); entry[k] = raw }
+			set("display_name", model.ID)
+			set("description", "Anchor mapped model; upstream capabilities are not verified")
 			if template != nil {
 				metadataBytes += len(template)
 				if metadataBytes > maxConfig {
@@ -201,6 +217,9 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 	if len(entries) == 0 {
 		return nil, nil, errors.New("no compatible authorized catalog models")
 	}
+	if err := rankClonedEntries(entries, cloned, fallback); err != nil {
+		return nil, nil, err
+	}
 	raw, err := json.MarshalIndent(map[string]any{"models": entries}, "", "  ")
 	if len(raw)+1 > maxConfig {
 		return nil, nil, errors.New("generated catalog exceeds 1 MiB")
@@ -208,9 +227,86 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 	return append(raw, '\n'), ids, err
 }
 
-// A name-only catalog still has to deserialize as Codex ModelInfo. This is an
-// explicit Anchor policy, not an inferred vendor prompt or capability claim.
-const mappedBaseInstructions = "You are a coding assistant. Follow the user's instructions and use the provided tools when appropriate."
+// Codex rejects a catalog entry without instructions, and full cloned prompts
+// push the catalog past Codex's 1 MiB limit. Same literal as CLIProxyAPI.
+const mappedBaseInstructions = "You are Codex, a coding agent. You and the user share one workspace."
+
+// genericCodexEntry adapts a cloned Codex entry for a model it does not know.
+// Required keys stay present: Codex rejects the whole catalog when they are missing.
+func genericCodexEntry(entry map[string]json.RawMessage) {
+	set := func(k string, v any) { raw, _ := json.Marshal(v); entry[k] = raw }
+	set("base_instructions", mappedBaseInstructions)
+	set("model_messages", map[string]any{
+		"instructions_template": mappedBaseInstructions, "instructions_variables": nil, "approvals": nil,
+		"collaboration_modes": nil, "auto_review": nil, "permissions": nil, "multi_agent": nil,
+	})
+	set("apply_patch_tool_type", nil)
+	set("tool_mode", "direct")
+	set("supports_search_tool", false)
+	set("service_tiers", []any{})
+	set("additional_speed_tiers", []any{})
+	set("availability_nux", nil)
+	for _, k := range []string{"supports_reasoning_effort_updates", "supports_image_detail_original"} {
+		if _, ok := entry[k]; ok {
+			set(k, false)
+		}
+	}
+	set("context_window", nil)
+	delete(entry, "max_context_window")
+}
+
+// Cloned entries list after every templated model, alphabetically, as in CLIProxyAPI.
+func rankClonedEntries(entries []map[string]json.RawMessage, cloned []int, fallback json.RawMessage) error {
+	if len(cloned) == 0 {
+		return nil
+	}
+	var template map[string]json.RawMessage
+	if json.Unmarshal(fallback, &template) != nil {
+		return ErrUnsafe
+	}
+	priority := func(raw json.RawMessage) (int64, error) {
+		var v int64
+		return v, json.Unmarshal(raw, &v)
+	}
+	base, err := priority(template["priority"])
+	if err != nil {
+		return ErrUnsafe
+	}
+	isCloned := map[int]bool{}
+	for _, i := range cloned {
+		isCloned[i] = true
+	}
+	for i, entry := range entries {
+		if isCloned[i] {
+			continue
+		}
+		p, err := priority(entry["priority"])
+		if err != nil {
+			return ErrUnsafe
+		}
+		base = max(base, p)
+	}
+	name := func(i int) (string, string) {
+		var display, slug string
+		_ = json.Unmarshal(entries[i]["display_name"], &display)
+		_ = json.Unmarshal(entries[i]["slug"], &slug)
+		return strings.ToLower(display), slug
+	}
+	order := append([]int(nil), cloned...)
+	sort.SliceStable(order, func(a, b int) bool {
+		leftName, leftSlug := name(order[a])
+		rightName, rightSlug := name(order[b])
+		if leftName != rightName {
+			return leftName < rightName
+		}
+		return leftSlug < rightSlug
+	})
+	for rank, i := range order {
+		raw, _ := json.Marshal(base + int64(100*(rank+1)))
+		entries[i]["priority"] = raw
+	}
+	return nil
+}
 
 // Exact public ID first, otherwise one unambiguous upstream ID. Never infer a
 // source from a model family, similar name, speed suffix or default selection.

@@ -75,7 +75,7 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
       <p className="break-all">{c.selected?.config_root}</p><p>默认模型：{c.updateInput?.model}</p>{c.updateInput?.rebuild
         ? <p>将先备份整个 config.toml，再替换为干净的托管配置，按已保存的设置更新模型列表。原来的其他设置也会从当前配置移除，完整原件和旧恢复记录保留在 Anchor 数据目录的 recovery 中。停用托管只清除新托管内容，不会自动恢复坏配置。完成后请重启 Codex。</p>
         : <p>将使用当前选择更新连接配置，按已保存的设置更新模型列表。确认后开启或保持托管。其他软件改过的托管字段也会重新应用，外部值会先保存，停用托管时恢复；其他设置不动。更新后请重启对应 Agent。</p>}
-      {c.selected?.agent === 'codex' && <p>Codex 模型列表随托管同步；有原生模板的模型保留其提示词和工具能力，没有模板的映射模型使用 Anchor 通用编程助手提示词（Codex 要求每个模型都有提示词）。上下文等能力覆盖与自动压缩需在「设置 → Codex」另行开启，此处批准托管不代表授权。</p>}
+      {c.selected?.agent === 'codex' && <p>Codex 模型列表随托管同步；有原生模板的模型保留其提示词和工具能力，没有模板的映射模型参照 CPA 复制 Codex 官方模板并去掉 GPT 专属能力，提示词只有一句简短的 Codex 身份说明。上下文等能力覆盖与自动压缩需在「设置 → Codex」另行开启，此处批准托管不代表授权。</p>}
       {c.selected?.agent === 'claude-desktop' && <p>此操作可能同时更改 Claude Desktop 的 Chat、Cowork 和 Code 请求去向及计费来源。将使用 Anchor 的绑定凭据和模型列表；原认证设置在停用时按字段恢复。请完全退出并重开 Claude Desktop，关闭窗口可能只是隐藏。</p>}
     </ConfirmAction>
     <ConfirmAction open={!!c.disableTarget} title="停用此 Agent 的托管？" busy={c.busy} onCancel={() => c.setDisableTarget(null)} onConfirm={() => { if (c.disableTarget) void c.manage(c.disableTarget, 'disable'); }}>

@@ -11,18 +11,19 @@ import (
 
 // Prefer the explicitly configured catalog; otherwise reuse an exact match in
 // Codex's validated local cache. Clean rebuilds skip the discarded configuration.
-func (m *Manager) codexTemplates(b state.Binding, models []state.Model, useConfigured bool) (map[string]json.RawMessage, error) {
+// The returned fallback is the cache entry cloned for models without a match.
+func (m *Manager) codexTemplates(b state.Binding, models []state.Model, useConfigured bool) (map[string]json.RawMessage, json.RawMessage, error) {
 	var templates map[string]json.RawMessage
 	if useConfigured {
 		var err error
 		templates, err = m.configuredCodexTemplates(b)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	version, cached, err := localCatalog(b.ConfigRoot)
 	if err != nil || (b.CodexVersion != "" && b.CodexVersion != version) {
-		return templates, nil
+		return templates, nil, nil
 	}
 	cache := make(map[string]json.RawMessage, len(cached))
 	for slug, meta := range cached {
@@ -35,19 +36,41 @@ func (m *Manager) codexTemplates(b state.Binding, models []state.Model, useConfi
 		}
 		template, err := mappedTemplate(model, templates)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if template == nil {
 			template, err = mappedTemplate(model, cache)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
 		// Keep negative resolutions too: a candidate ID might coincide with
 		// another public alias whose template belongs to a different upstream.
 		resolved[model.ID] = template
 	}
-	return resolved, nil
+	return resolved, fallbackTemplate(cache), nil
+}
+
+// Same choice as CLIProxyAPI: gpt-5.5 when cached, otherwise the entry Codex
+// ranks first. Map order is random, so ties resolve by slug.
+func fallbackTemplate(cache map[string]json.RawMessage) json.RawMessage {
+	if template, ok := cache["gpt-5.5"]; ok {
+		return template
+	}
+	var chosen json.RawMessage
+	chosenSlug, chosenPriority := "", int64(0)
+	for slug, template := range cache {
+		var meta struct {
+			Priority int64 `json:"priority"`
+		}
+		if json.Unmarshal(template, &meta) != nil {
+			continue
+		}
+		if chosen == nil || meta.Priority < chosenPriority || (meta.Priority == chosenPriority && slug < chosenSlug) {
+			chosen, chosenSlug, chosenPriority = template, slug, meta.Priority
+		}
+	}
+	return chosen
 }
 
 // Read only the catalog explicitly referenced by the pre-management config.

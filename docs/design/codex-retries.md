@@ -20,9 +20,9 @@
 
 `override_model_catalog` 默认 false，已有 settings 缺少该字段也按 false 读取，旧版托管／导入元数据不视为授权。GUI 入口为「设置 → Codex → 允许 Anchor 覆盖模型能力与自动压缩」，CLI 为 `--override-model-catalog=true --revision N`。字段名保持不变以兼容旧客户端，语义收窄为两项：是否把可移植模型设置（上下文窗口、输入模态／视觉、并行工具调用、思考档位）写入目录条目，以及是否执行下文自动压缩（逐模型阈值，并移除根级 `model_context_window`／`model_auto_compact_token_limit`）。设置作用于当前实例的所有 Codex 绑定；同一 revision 保护、管理鉴权、保存后同步、冲突与 unknown 规则继续适用。新前端遇到缺少此字段的旧核心返回 unsupported，不能显示为“安全关闭”；旧客户端省略／null 保留已存授权，不能隐式开启。
 
-两种状态的条目来源相同：已声明元数据 → 接管前用户目录 → 精确匹配的 Codex 本地 `models_cache.json` → 通用编程助手兜底。关闭时有来源的条目按原样复制，只设置列表身份与传输必需字段（slug、显示名、`visibility=list`、`supported_in_api`、关闭 `prefer_websockets`／`use_responses_lite`、清除 `upgrade`），原生基础指令、personality、工具声明和上下文保持不变；根级上下文字段保留原值。
+两种状态的条目来源相同：已声明元数据 → 接管前用户目录 → 精确匹配的 Codex 本地 `models_cache.json` → 复制缓存中的官方条目 → 保守条目。关闭时有来源的条目按原样复制，只设置列表身份与传输必需字段（slug、显示名、`visibility=list`、`supported_in_api`、关闭 `prefer_websockets`／`use_responses_lite`、清除 `upgrade`），原生基础指令、personality、工具声明和上下文保持不变；根级上下文字段保留原值。
 
-Codex 0.166 解析目录时，若条目同时缺少 `base_instructions` 和 `model_messages.instructions_template`，整个目录会被拒绝；空字符串则使该模型不带任何基础指令。Codex 对未知模型的内置兜底提示词也无法写入目录。因此没有来源的映射模型（如 Claude、DeepSeek 映射）在两种状态下都使用 Anchor 明示的通用编程助手指令。这是目录格式的限制，不是授权扩展，界面与文档须明确说明。`model_instructions_file`、developer instructions、personality、AGENTS.md 均不由本开关修改；网页搜索／协议限制不因本开关解除。
+Codex 0.166 解析目录时，若条目同时缺少 `base_instructions` 和 `model_messages.instructions_template`，整个目录会被拒绝；空字符串则使该模型不带任何基础指令。Codex 对未知模型的内置兜底提示词也无法写入目录。2026-11-12 起，没有原生模板的映射模型（如 Claude、DeepSeek 映射）参照 CLIProxyAPI：复制 Codex 本地 `models_cache.json` 中的官方条目（优先 gpt-5.5，否则取优先级最高的条目）以保持 shell、截断、推理档位等客户端行为；清除 apply_patch、搜索工具、速度档位、图像原图细节、升级提示等 GPT 专属能力，`tool_mode` 设为 direct；提示词替换为与 CLIProxyAPI 相同的短句 "You are Codex, a coding agent. You and the user share one workspace."（完整模板提示词会使目录超过 Codex 1 MiB 上限）；上下文窗口留空，不沿用 GPT 的值；在选择器中排在所有原生模型之后并按名称排序。缓存不可用或版本不匹配时退回保守的模型名条目，使用同一句提示词。这一处理在两种开关状态下相同；开启时再叠加模型设置的能力与压缩。复制来的工具行为不证明上游支持，缓存更新会使目录内容变化并在下次同步时刷新。`model_instructions_file`、developer instructions、personality、AGENTS.md 均不由本开关修改；网页搜索／协议限制不因本开关解除。
 
 升级后的核心启动、保存设置或同步会为已应用的托管重新发布目录指针：上一版关闭时留在 journal 中的退役目录直接复用所有权，没有目录记录的托管按普通同步新增目录；恢复基线、凭据与授权范围保持不变。外部修改不覆盖，`needs_sync` 明确列出未完成的目标。范围变为无目录时（例如模型清空），继续保留退役目录所有权并还原指针；正常恢复时只在内容仍匹配且没有引用时清理，不能删用户文件。清洁重建同样遵循范围与开关。
 

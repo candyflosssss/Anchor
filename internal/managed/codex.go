@@ -24,6 +24,7 @@ type GatewayBinding struct {
 	CatalogVersion   string
 	Token            string
 	CatalogTemplates map[string]json.RawMessage
+	CatalogFallback  json.RawMessage
 }
 type Inspection struct {
 	AdapterID           string   `json:"adapter_id"`

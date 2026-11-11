@@ -186,7 +186,7 @@ func TestMappedCacheSelectionAndOptionalFailures(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			templates, err := m.codexTemplates(b, []state.Model{model}, mode != "rebuild")
+			templates, _, err := m.codexTemplates(b, []state.Model{model}, mode != "rebuild")
 			if err != nil || (templates[model.ID] != nil) != want {
 				t.Fatal("incorrect cache selection", err)
 			}
