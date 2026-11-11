@@ -80,7 +80,7 @@ func (m *Manager) gatewayFor(b state.Binding, useTemplates bool) (GatewayBinding
 		codexSettings = &retrySettings
 	}
 	var templates map[string]json.RawMessage
-	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" && codexSettings.OverrideModelCatalog {
+	if b.AdapterID == "codex" && b.ModelScope == "all-mapped" {
 		var err error
 		templates, err = m.codexTemplates(b, models, useTemplates)
 		if err != nil {
@@ -298,7 +298,7 @@ func (m *Manager) Start() ([]Result, error) {
 				if e == nil {
 					g, e = m.gateway(b)
 				}
-				if e == nil && codexCatalogEnabled(g) && b.AdapterID == "codex" && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+				if e == nil && b.AdapterID == "codex" && codexCatalogPlanned(b, g) {
 					_, _, e = buildGatewayCatalog(g)
 				}
 				if e == nil {
@@ -391,7 +391,7 @@ func (m *Manager) SetModels(id string, revision int64, model, scope string) (sta
 	if b.AdapterID == "codex" && b.ModelScope != "all-mapped" && (!g.Tools || !g.Streaming) {
 		return b, Result{}, errors.New("Codex model requires tools and streaming")
 	}
-	if codexCatalogEnabled(g) && len(g.Models) > 0 && g.CatalogVersion != "" {
+	if len(g.Models) > 0 && g.CatalogVersion != "" {
 		if _, _, err = buildGatewayCatalog(g); err != nil {
 			return b, Result{}, err
 		}

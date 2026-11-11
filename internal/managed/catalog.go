@@ -25,7 +25,13 @@ func buildGatewayCatalog(g GatewayBinding) ([]byte, []string, error) {
 	return buildCatalogWithSettings(g.Models, g.CatalogVersion, g.CatalogTemplates, codexCompactSettings(g))
 }
 
-func codexCatalogEnabled(g GatewayBinding) bool {
+// The catalog is Codex's only model-list source, so its presence follows the
+// binding scope. Consent only adds Anchor-authored capabilities and compaction.
+func codexCatalogPlanned(b state.Binding, g GatewayBinding) bool {
+	return len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "")
+}
+
+func codexOverridesEnabled(g GatewayBinding) bool {
 	return codexCompactSettings(g).OverrideModelCatalog
 }
 
@@ -101,8 +107,9 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 			set("display_name", model.DisplayName)
 		}
 		// Apply explicit portable overrides to fields understood by the matched
-		// Codex catalog. Instruction templates remain operator-supplied.
-		if model.Settings != nil {
+		// Codex catalog. Instruction templates remain operator-supplied. Without
+		// consent, native templates stay verbatim apart from list identity.
+		if settings.OverrideModelCatalog && model.Settings != nil {
 			cfg := model.Settings.Configuration
 			if err := cfg.Validate(); err != nil {
 				return nil, nil, err
@@ -155,7 +162,7 @@ func encodeCatalogTemplates(models []state.Model, version string, templates map[
 				}
 			}
 		}
-		if settings.AutoCompact {
+		if settings.OverrideModelCatalog && settings.AutoCompact {
 			var context *int64
 			if raw, ok := entry["context_window"]; ok {
 				if json.Unmarshal(raw, &context) != nil {

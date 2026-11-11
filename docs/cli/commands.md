@@ -2,7 +2,8 @@
 
 - 2026-11-07 已随 desktop.83 dev 发布：`agent codex-settings --override-model-catalog=BOOL --revision N`，提示词与目录覆盖默认关闭；升级后需重启 Codex 并新开会话，见[发行记录](../release/desktop.md#codex-prompt-consent-83)。
 
-- 最近核对：2026-11-09
+- 最近核对：2026-11-12
+- 2026-11-12 当前源码未发布：Codex 模型列表同步与 `--override-model-catalog` 拆分；关闭该开关不再撤下 Anchor 模型列表，开关只控制能力覆盖与自动压缩，见 §8。
 - 2026-11-09 已随 desktop.84 dev 发布：Windows 本机 `autostart status|enable|disable` 与设置页「本机登录自启」，默认关闭，仅当前用户登录后启动后台核心；Windows 原生登录未验收，见下方 §3 及[发行记录](../release/desktop.md#core-autostart-cooldown-84)。
 - 2026-11-09 已随 desktop.84 dev 发布：Key 冷却保留计分与时长，改为全局低优先级兜底队列；先耗尽正常 Key，再尝试冷却 Key，全冷却仍可调度。无新增参数，见 §16；实际处理请求的核心须更新，同版 CLI feed 已投放，公开 alpha.6 不含这些增量。
 - 2026-11-03 已随desktop.82 dev投放：`agent codex-settings` 新增自动配置压缩开关及阈值百分比，默认开启、90%；本机CLI／核心／GUI已更新，Codex需重启读取，见本节及[发行记录](../release/desktop.md#codex-compaction-82)。
@@ -661,9 +662,11 @@ anchor access revoke ID
 
 ## 8. Agent 托管与独立恢复
 
-**2026-11-06 当前源码修复（未发布）：Codex 托管默认不覆盖提示词与模型目录。** `agent codex-settings --override-model-catalog=true --revision N` 才明确允许 Anchor 目录替换基础指令和工具能力；`--override-model-catalog=false` 关闭并按原 journal 恢复目录指针／全局上下文设置。无参数读取输出 `settings.override_model_catalog`（布尔值），新安装及旧设置缺省 false；省略／null 写入保留原值。作用于所选 Context 的全部 Codex 绑定，需管理授权及最新 revision；旧客户端省略该字段不会开启。设置成功不等于各目标恢复成功，`needs_sync` 非空仍非零退出；关闭覆盖时不因压缩状态 disabled 误报失败。当前核心启动也会迁移旧托管目录，外部修改保持并报告冲突。需升级核心后同步并完全重启 Codex，新会话核验；本轮不自动升级或改运行配置。
+**2026-11-12 当前源码修复（未发布）：Codex 模型列表同步与能力覆盖分开控制。** all-mapped（或带已声明元数据的 all-compatible／single）Codex 托管始终生成 Anchor 自有目录并设置 `model_catalog_json`，模型选择器显示 Anchor 映射模型，不再受 `override_model_catalog` 影响。该开关默认 false，只决定是否把模型设置中的上下文窗口、输入模态、并行工具、思考档位写入目录，以及是否执行下文自动压缩（逐模型 `auto_compact_token_limit`，并移除根级 `model_context_window`／`model_auto_compact_token_limit`）。
 
-关闭时保留 Codex 原生／用户目录和指令文件；自定义别名及速度分身不保证进入原生选择器，目录内的逐模型压缩配置不启用。开启才使用下文完整模板／缓存／通用兜底的目录导出规则，可能改变模型行为；不是只同步名称。无新数据库 schema，命令读取／保存沿用统一设置接口；GUI 等价入口为「设置 → Codex → 允许 Anchor 覆盖模型提示词与目录」。详见[授权与迁移契约](../design/codex-retries.md#提示词与模型目录授权2026-11-06当前源码未发布)。
+关闭时，已声明元数据、接管前用户目录或 Codex 本地缓存中精确匹配的原生模板按原样复制，只设置列表身份与传输必需字段（slug、显示名、visibility、supported_in_api、关闭 WebSocket／responses lite、清除 upgrade），全局上下文设置保持原值。Codex 拒绝缺少指令的目录条目，Codex 对未知模型的内置兜底提示词也无法写入目录，因此没有原生模板的映射模型（如 Claude 映射）无论开关如何都使用 Anchor 明示的通用编程助手指令。`model_instructions_file`、developer instructions、personality、AGENTS.md 不受影响。
+
+2026-11-06 版本曾让该开关同时控制目录是否生成，关闭后模型列表随之回到 Codex 原生目录。当前核心启动或下次同步会为既有托管重新发布列表，外部修改保持并报告冲突。无参数读取输出 `settings.override_model_catalog`（布尔值），新安装及旧设置缺省 false；省略／null 写入保留原值。作用于所选 Context 的全部 Codex 绑定，需管理授权及最新 revision；旧客户端省略该字段不会开启。设置成功不等于各目标同步成功，`needs_sync` 非空仍非零退出；关闭覆盖时不因压缩状态 disabled 误报失败。需升级核心后同步并完全重启 Codex，新会话核验；本轮不自动升级或改运行配置。无新数据库 schema；GUI 等价入口为「设置 → Codex → 允许 Anchor 覆盖模型能力与自动压缩」。详见[授权与迁移契约](../design/codex-retries.md#模型列表与能力覆盖授权2026-11-12当前源码未发布)。
 
 > 映射变动自动同步与 Codex all-mapped 模型目录导出已随 desktop.37 宿主／核心发布 dev；本轮未安装本机，旧核心须升级后才有此行为。独立 CLI 公开 alpha.6 不含本轮能力。
 
@@ -771,7 +774,7 @@ Codex 外部编辑保留了旧 Anchor 注释、并将项目或其他 provider �
 
 ### `agent codex-settings`
 
-完整语法：`anchor agent codex-settings [--override-model-catalog=BOOL] [--retries 0..10] [--auto-compact=BOOL] [--compact-percent 1..99] [--revision N]`。`--override-model-catalog` 默认 false，明确开启才允许生成目录覆盖基础提示词／工具能力；关闭恢复原目录及全局上下文。此设置适用于全部 Codex 托管范围，旧配置缺字段不视为已授权，迁移与模型列表限制见本节开头。
+完整语法：`anchor agent codex-settings [--override-model-catalog=BOOL] [--retries 0..10] [--auto-compact=BOOL] [--compact-percent 1..99] [--revision N]`。`--override-model-catalog` 默认 false，明确开启才把模型设置中的能力写入目录并配置自动压缩；模型列表目录无论开关如何都会同步，关闭时保留原生模板及全局上下文。此设置适用于全部 Codex 托管范围，旧配置缺字段不视为已授权，迁移与无模板模型的指令限制见本节开头。
 
 ```sh
 anchor agent codex-settings
@@ -785,7 +788,7 @@ anchor agent codex-settings --auto-compact=true --compact-percent 90 --revision 
 
 2026-11-03 自动压缩能力已随 desktop.82 dev 发布（2026-11-06 授权边界修订，当前源码未发布）：`--auto-compact=BOOL` 偏好默认 true，仅在 `override_model_catalog=true` 时执行自动配置压缩阈值；`--compact-percent N` 默认90，范围1–99整数。阈值按每个模型导出的 `context_window × N / 100` 向下取整（至少1 token），默认即0.9倍上下文。窗口来自模型显式设置或已声明的 Codex 元数据／本地模板，未知窗口不按名称猜测、不补造阈值，继续使用模板／Codex 默认行为。生成目录的各模型分别写入 `auto_compact_token_limit`，切换模型使用相应值；开启时将会覆盖目录值的根级 `model_context_window` 和 `model_auto_compact_token_limit` 保存为恢复基线并移除。关闭自动配置（`--auto-compact=false`）恢复这两个根级原值，目录回到原始模板／显式模型设置；这不代表关闭 Codex 自身的自动压缩。没有目录的旧 single 绑定保留 Codex 原有行为。
 
-2026-11-05 核对：`compaction` 每项包含 `binding_id`、`model_id`、`is_default`、`context_window`、`token_limit`、`status`。`written` 表示只读核对实际文件后确认窗口和阈值已写入；`missing_context` 表示缺少模型窗口，即使 `needs_sync=[]` 也尚未配置阈值；`needs_sync` 表示文件不一致／检查失败，`unmanaged` 表示尚未应用／已恢复，`unsupported` 表示旧 single 无模型目录，`disabled` 表示关闭 Anchor 自动配置或未授权目录覆盖。未确认写入的窗口和阈值为 null，disabled 的阈值为 null；只列已启用 Codex 绑定，无目标返回空数组。读取不写模型或 Agent 配置、不加载建议草稿、不调用付费上游，也不证明运行中的 Codex 已加载或实际触发压缩。新桌面与核心需配套升级；字段语义与共享样例见 [Codex配置检查](../design/codex-retries.md#模型压缩配置检查2026-11-05-当前源码未发布)。
+2026-11-05 核对：`compaction` 每项包含 `binding_id`、`model_id`、`is_default`、`context_window`、`token_limit`、`status`。`written` 表示只读核对实际文件后确认窗口和阈值已写入；`missing_context` 表示缺少模型窗口，即使 `needs_sync=[]` 也尚未配置阈值；`needs_sync` 表示文件不一致／检查失败，`unmanaged` 表示尚未应用／已恢复，`unsupported` 表示旧 single 无模型目录，`disabled` 表示关闭 Anchor 自动配置或未授权能力覆盖（模型列表目录仍会同步）。未确认写入的窗口和阈值为 null，disabled 的阈值为 null；只列已启用 Codex 绑定，无目标返回空数组。读取不写模型或 Agent 配置、不加载建议草稿、不调用付费上游，也不证明运行中的 Codex 已加载或实际触发压缩。新桌面与核心需配套升级；字段语义与共享样例见 [Codex配置检查](../design/codex-retries.md#模型压缩配置检查2026-11-05-当前源码未发布)。
 
 保存时至少给出一个设置参数及当前 `--revision`，未给出的设置保持不变；过期版本返回 conflict，未提供 revision 不写入。已有重试设置继承压缩偏好开启、90%的默认值，但目录覆盖缺省 false，不能因保存重试／压缩偏好而自动授权。
 

@@ -3,34 +3,63 @@ package managed
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/candyflosssss/Anchor/internal/modeldev"
 	"github.com/candyflosssss/Anchor/internal/state"
 )
 
-func TestCodexCatalogDefaultDoesNotReplaceInstructions(t *testing.T) {
+func buildConsentedCatalog(models []state.Model, version string) ([]byte, []string, error) {
+	settings := state.DefaultCodexSettings()
+	settings.OverrideModelCatalog = true
+	return buildCatalogWithSettings(models, version, nil, settings)
+}
+
+func catalogEntries(t *testing.T, raw []byte) []map[string]any {
+	t.Helper()
+	var catalog struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal(raw, &catalog); err != nil {
+		t.Fatal(err)
+	}
+	return catalog.Models
+}
+
+func TestCodexCatalogDefaultListsModelsWithoutAnchorOverrides(t *testing.T) {
 	for _, scope := range []string{"single", "all-compatible", "all-mapped"} {
 		t.Run(scope, func(t *testing.T) {
 			_, b, g, engine := catalogTarget(t, "model = \"old\"\nmodel_catalog_json = \"user.json\"\nmodel_instructions_file = \"instructions.md\"\ndeveloper_instructions = \"我的指令\"\npersonality = \"friendly\"\nmodel_context_window = 42000\nmodel_auto_compact_token_limit = 38000\n")
 			b.ModelScope = scope
-			// The production default must be safe even with complete imported metadata.
+			g.Models[0].Settings = &state.ModelSettings{Configuration: state.ModelConfiguration{Limits: modeldev.CatalogLimits{Context: settingsPtr(int64(272000))}, ParallelToolCalls: settingsPtr(false)}}
+			// The production default must still publish the model list.
 			g.CodexSettings = nil
 			original := readSyncFile(t, filepath.Join(b.ConfigRoot, "config.toml"))
 			p := planApply(t, b, g, engine)
-			if p.catalog != nil || p.CatalogPath != "" {
-				t.Fatal("default published a prompt-bearing catalog")
+			if p.catalog == nil || p.CatalogPath != filepath.Join(b.ConfigRoot, catalogName(b.ID)) || len(p.AvailableModels) != 2 {
+				t.Fatal("default did not publish the model list", p.CatalogPath, p.AvailableModels)
 			}
-			if _, err := os.Stat(filepath.Join(b.ConfigRoot, catalogName(b.ID))); !os.IsNotExist(err) {
-				t.Fatal("unexpected catalog", err)
+			for i, entry := range catalogEntries(t, readSyncFile(t, p.CatalogPath)) {
+				if entry["slug"] != g.Models[i].ID || entry["visibility"] != "list" || entry["context_window"] != float64(32000) || entry["supports_parallel_tool_calls"] != true || !strings.Contains(entry["base_instructions"].(string), "Test fixture") {
+					t.Fatal("native template not kept verbatim", entry)
+				}
+				if _, ok := entry["auto_compact_token_limit"]; ok {
+					t.Fatal("compaction configured without consent", entry)
+				}
 			}
 			doc, err := document(readSyncFile(t, p.Path))
 			if err != nil {
 				t.Fatal(err)
 			}
+			if doc["model_catalog_json"] != p.CatalogPath {
+				t.Fatal("model list pointer not applied")
+			}
 			before, _ := document(original)
-			for _, key := range []string{"model_catalog_json", "model_instructions_file", "developer_instructions", "personality", "model_context_window", "model_auto_compact_token_limit"} {
+			for _, key := range []string{"model_instructions_file", "developer_instructions", "personality", "model_context_window", "model_auto_compact_token_limit"} {
 				if doc[key] != before[key] {
 					t.Fatalf("changed %s", key)
 				}
@@ -41,11 +70,39 @@ func TestCodexCatalogDefaultDoesNotReplaceInstructions(t *testing.T) {
 			if _, err := engine.Recover(b.ID); err != nil {
 				t.Fatal(err)
 			}
+			doc, _ = document(readSyncFile(t, p.Path))
+			if doc["model_catalog_json"] != "user.json" {
+				t.Fatal("original catalog pointer not restored")
+			}
 		})
 	}
 }
 
-func TestCodexCatalogConsentToggleAndLegacyStartup(t *testing.T) {
+func TestCodexNameOnlyCatalogAddsAnchorFieldsOnlyWithConsent(t *testing.T) {
+	model := state.Model{ID: "claude-alias", Settings: &state.ModelSettings{Configuration: state.ModelConfiguration{Limits: modeldev.CatalogLimits{Context: settingsPtr(int64(200000))}, Capabilities: modeldev.CatalogCapabilities{Vision: settingsPtr(true)}}}}
+	raw, ids, err := buildCatalogWithSettings([]state.Model{model}, "", nil, state.DefaultCodexSettings())
+	if err != nil || len(ids) != 1 {
+		t.Fatal(ids, err)
+	}
+	entry := catalogEntries(t, raw)[0]
+	// Codex rejects instruction-less entries; the explicit fallback keeps the list valid.
+	if entry["slug"] != "claude-alias" || entry["base_instructions"] != mappedBaseInstructions || entry["context_window"] != nil || len(entry["input_modalities"].([]any)) != 1 {
+		t.Fatal("Anchor capability overrides exported without consent", entry)
+	}
+	if _, ok := entry["auto_compact_token_limit"]; ok {
+		t.Fatal("compaction configured without consent", entry)
+	}
+	raw, _, err = buildConsentedCatalog([]state.Model{model}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entry = catalogEntries(t, raw)[0]
+	if entry["context_window"] != float64(200000) || entry["auto_compact_token_limit"] != float64(180000) || len(entry["input_modalities"].([]any)) != 2 {
+		t.Fatal("consented overrides missing", entry)
+	}
+}
+
+func TestCodexCatalogConsentKeepsModelListAndLegacyStartup(t *testing.T) {
 	for _, legacy := range []bool{false, true} {
 		t.Run(map[bool]string{false: "toggle", true: "legacy-startup"}[legacy], func(t *testing.T) {
 			m, env, _ := workspaceManager(t)
@@ -94,20 +151,28 @@ func TestCodexCatalogConsentToggleAndLegacyStartup(t *testing.T) {
 				}
 			}
 			defer m.Stop()
-			checkNative := func() {
+			catalogPath := filepath.Join(root, catalogName(b.ID))
+			checkListOnly := func() {
 				t.Helper()
 				doc, err := document(readSyncFile(t, filepath.Join(root, "config.toml")))
 				if err != nil {
 					t.Fatal(err)
 				}
-				if doc["model_catalog_json"] != "user.json" || doc["model_instructions_file"] != "instructions.md" || doc["developer_instructions"] != "保留我的提示词" || doc["model_context_window"] != int64(42000) || doc["model_auto_compact_token_limit"] != int64(38000) {
-					t.Fatal("original instruction settings not restored")
+				if doc["model_catalog_json"] != catalogPath {
+					t.Fatal("model list stopped syncing without prompt consent")
+				}
+				if doc["model_instructions_file"] != "instructions.md" || doc["developer_instructions"] != "保留我的提示词" || doc["model_context_window"] != int64(42000) || doc["model_auto_compact_token_limit"] != int64(38000) {
+					t.Fatal("original instruction or context settings not preserved")
+				}
+				entries := catalogEntries(t, readSyncFile(t, catalogPath))
+				if len(entries) != 1 || entries[0]["slug"] != "public" || entries[0]["base_instructions"] == mappedBaseInstructions {
+					t.Fatal("list-only catalog did not keep the native template", entries)
 				}
 				if !bytes.Equal(userCatalog, readSyncFile(t, filepath.Join(root, "user.json"))) {
 					t.Fatal("user catalog changed")
 				}
 			}
-			checkNative()
+			checkListOnly()
 			after, err := m.Engine.load(b.ID)
 			if err != nil || !bytes.Equal(before.Original, after.Original) {
 				t.Fatal("recovery baseline changed", err)
@@ -120,7 +185,7 @@ func TestCodexCatalogConsentToggleAndLegacyStartup(t *testing.T) {
 				t.Fatal(rows, err)
 			}
 			if !bytes.Equal(snapshot, readSyncFile(t, m.Engine.journalPath(b.ID))) {
-				t.Fatal("no-op native sync changed journal")
+				t.Fatal("no-op list-only sync changed journal")
 			}
 			out, err := m.CodexSettings()
 			if err != nil || out.Settings.OverrideModelCatalog || out.Compaction[0].Status != "disabled" {
@@ -132,7 +197,7 @@ func TestCodexCatalogConsentToggleAndLegacyStartup(t *testing.T) {
 				t.Fatal(out, err)
 			}
 			doc, _ := document(readSyncFile(t, filepath.Join(root, "config.toml")))
-			if doc["model_catalog_json"] != filepath.Join(root, catalogName(b.ID)) {
+			if _, ok := doc["model_context_window"]; doc["model_catalog_json"] != catalogPath || ok {
 				t.Fatal("explicit opt-in not applied")
 			}
 			off := false
@@ -140,18 +205,84 @@ func TestCodexCatalogConsentToggleAndLegacyStartup(t *testing.T) {
 			if err != nil || len(out.NeedsSync) != 0 {
 				t.Fatal(out, err)
 			}
-			checkNative()
+			checkListOnly()
 			if rows, err := m.Stop(); err != nil || rows[0].Status != "restored" {
 				t.Fatal(rows, err)
 			}
-			if _, err := os.Stat(filepath.Join(root, catalogName(b.ID))); !os.IsNotExist(err) {
-				t.Fatal("retired artifact not cleaned", err)
+			doc, _ = document(readSyncFile(t, filepath.Join(root, "config.toml")))
+			if doc["model_catalog_json"] != "user.json" {
+				t.Fatal("original catalog pointer not restored")
+			}
+			if _, err := os.Stat(catalogPath); !os.IsNotExist(err) {
+				t.Fatal("generated catalog not cleaned", err)
 			}
 		})
 	}
 }
 
-func TestCodexCatalogOptOutPreservesExternalChanges(t *testing.T) {
+func TestCodexRetiredCatalogIsAdoptedForModelList(t *testing.T) {
+	m, env, _ := workspaceManager(t)
+	b, err := m.Add(state.Binding{ID: "retired", AdapterID: "codex", AdapterVersion: "1", ConfigRoot: env.CodexHome, Executable: env.Executable, Model: "public", ModelScope: "all-mapped", Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := m.Start(); err != nil || rows[0].Status != "applied" {
+		t.Fatal(rows, err)
+	}
+	defer m.Stop()
+	// Earlier cores removed the pointer on opt-out and kept the file as a retired
+	// journal artifact. The next sync must republish the list from that state.
+	path := filepath.Join(env.CodexHome, "config.toml")
+	raw := readSyncFile(t, path)
+	catalogPath := filepath.Join(env.CodexHome, catalogName(b.ID))
+	retired := bytes.Replace(raw, []byte("model_catalog_json = \""+catalogPath+"\"\n"), nil, 1)
+	if bytes.Equal(raw, retired) {
+		t.Fatal("fixture pointer not found")
+	}
+	j, err := m.Engine.load(b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, edit := range j.Edits {
+		if sameField(edit.Path, []string{"model_catalog_json"}) {
+			j.Edits[i].After = edit.Before
+		}
+	}
+	j.LastWritten = retired
+	if err := m.Engine.save(j); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, retired, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if rows, err := m.SyncMappings(); err != nil || rows[0].Status != "applied" {
+		t.Fatal(rows, err)
+	}
+	doc, err := document(readSyncFile(t, path))
+	if err != nil || doc["model_catalog_json"] != catalogPath {
+		t.Fatal("retired catalog not republished", err)
+	}
+	if _, err := (Codex{}).Verify(b, mustGateway(t, m, b)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func mustGateway(t *testing.T, m *Manager, b state.Binding) GatewayBinding {
+	t.Helper()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	current, err := m.Store.Binding(b.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := m.gateway(current)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return g
+}
+
+func TestCodexCatalogSettingSyncPreservesExternalChanges(t *testing.T) {
 	m, env, _ := workspaceManager(t)
 	b, err := m.Add(state.Binding{ID: "conflict", AdapterID: "codex", AdapterVersion: "1", ConfigRoot: env.CodexHome, Executable: env.Executable, Model: "public", ModelScope: "all-mapped", Enabled: true})
 	if err != nil {
@@ -179,7 +310,7 @@ func TestCodexCatalogOptOutPreservesExternalChanges(t *testing.T) {
 	}
 }
 
-func TestCodexOptOutRemovesGeneratedPointerWithoutReadingTemplates(t *testing.T) {
+func TestCodexOptOutToleratesCorruptNativeCache(t *testing.T) {
 	m, env, _ := workspaceManager(t)
 	b, err := m.Add(state.Binding{ID: "no-original-catalog", AdapterID: "codex", AdapterVersion: "1", ConfigRoot: env.CodexHome, Executable: env.Executable, Model: "public", ModelScope: "all-mapped", Enabled: true})
 	if err != nil {
@@ -197,17 +328,21 @@ func TestCodexOptOutRemovesGeneratedPointerWithoutReadingTemplates(t *testing.T)
 	if err != nil || len(out.NeedsSync) != 0 {
 		t.Fatal(out, err)
 	}
+	catalogPath := filepath.Join(env.CodexHome, catalogName(b.ID))
 	doc, err := document(readSyncFile(t, filepath.Join(env.CodexHome, "config.toml")))
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || doc["model_catalog_json"] != catalogPath {
+		t.Fatal("model list pointer removed", err)
 	}
-	for _, key := range []string{"model_catalog_json", "model_context_window", "model_auto_compact_token_limit"} {
+	for _, key := range []string{"model_context_window", "model_auto_compact_token_limit"} {
 		if _, ok := doc[key]; ok {
 			t.Fatalf("unexpected managed override: %s", key)
 		}
 	}
+	if entries := catalogEntries(t, readSyncFile(t, catalogPath)); len(entries) != 1 || entries[0]["slug"] != "public" {
+		t.Fatal(entries)
+	}
 	workspace, err := m.Workspace(env)
-	if err != nil || workspace.Bindings[0].ID != b.ID || workspace.Bindings[0].CatalogPath != "" || workspace.Bindings[0].Status != "applied" {
+	if err != nil || workspace.Bindings[0].ID != b.ID || workspace.Bindings[0].CatalogPath != catalogPath || workspace.Bindings[0].Status != "applied" {
 		t.Fatal(workspace, err)
 	}
 	if rows, err := m.Stop(); err != nil || rows[0].Status != "restored" {

@@ -146,7 +146,7 @@ func (e *Engine) reconcile(b state.Binding, g GatewayBinding, reclaim bool) (Res
 		}
 		// Keep ownership of a retired artifact for conditional recovery/cleanup.
 		// Its config pointer is restored by the plan; no retired prompt is loaded.
-		if b.AdapterID == "codex" && !codexCatalogEnabled(g) && p.catalog == nil && j.Catalog != nil {
+		if b.AdapterID == "codex" && p.catalog == nil && j.Catalog != nil {
 			retired := *j.Catalog
 			p.catalog = &retired
 		}

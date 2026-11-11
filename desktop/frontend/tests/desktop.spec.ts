@@ -1750,13 +1750,13 @@ test('application API saves listener settings, issues a Key once, revokes and lo
   await expect(section.getByLabel('API 端口')).toHaveValue('18762');
 });
 
-test('Codex prompt override requires an explicit setting and can be disabled (simulated host)', async ({ page }) => {
+test('Codex capability override requires an explicit setting and can be disabled (simulated host)', async ({ page }) => {
   await host(page, true);
   await page.getByRole('button', { name: '设置 / 在线更新', exact: true }).click();
   const section = page.getByRole('region', { name: 'Codex', exact: true });
-  const consent = section.getByRole('switch', { name: '允许 Anchor 覆盖模型提示词与目录' });
+  const consent = section.getByRole('switch', { name: '允许 Anchor 覆盖模型能力与自动压缩' });
   await expect(consent).not.toBeChecked();
-  await expect(section.getByText(/默认关闭。开启并保存后/)).toBeVisible();
+  await expect(section.getByText(/默认关闭。模型列表始终随托管同步/)).toBeVisible();
   await expect(section.getByRole('switch', { name: '自动配置上下文压缩' })).toBeDisabled();
   await consent.check();
   await section.getByRole('button', { name: '保存', exact: true }).click();

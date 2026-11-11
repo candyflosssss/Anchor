@@ -113,13 +113,9 @@ func (m *Manager) Workspace(env Environment) (AgentWorkspace, error) {
 	if err != nil {
 		return out, err
 	}
-	settings, err := m.Store.CodexSettings()
-	if err != nil {
-		return out, err
-	}
 	for _, b := range bindings {
 		row := ManagedAgent{ID: b.ID, AdapterID: b.AdapterID, ConfigRoot: b.ConfigRoot, Model: b.Model, Enabled: b.Enabled, Revision: b.Revision, ModelScope: b.ModelScope, CatalogVersion: b.CodexVersion, Status: statusMap[b.ID], AvailableModels: []string{}, CatalogPath: filepath.Join(b.ConfigRoot, catalogName(b.ID)), ModelTemplates: map[string]string{}}
-		if b.AdapterID != "codex" || !settings.OverrideModelCatalog {
+		if b.AdapterID != "codex" {
 			row.CatalogPath = ""
 		}
 		for alias, source := range b.ModelTemplates {
@@ -241,7 +237,7 @@ func (m *Manager) Enroll(env Environment, in EnrollAgent) (state.Binding, error)
 	if err != nil {
 		return b, err
 	}
-	if codexCatalogEnabled(g) && b.ModelScope == "all-compatible" {
+	if b.ModelScope == "all-compatible" {
 		if _, _, err := buildCatalog(g.Models, g.CatalogVersion); err != nil {
 			return b, err
 		}
@@ -349,7 +345,7 @@ func (m *Manager) Refresh(id string, revision int64) (Result, error) {
 		return r, e
 	}
 	// Validate the next catalog before restoring the working configuration.
-	if codexCatalogEnabled(g) && len(g.Models) > 0 && g.CatalogVersion != "" {
+	if len(g.Models) > 0 && g.CatalogVersion != "" {
 		if _, _, err = buildCatalog(g.Models, g.CatalogVersion); err != nil {
 			return Result{}, err
 		}

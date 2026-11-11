@@ -23,7 +23,7 @@ func (a App) agents(ctx context.Context, c *client.Client, args []string) error 
 	case "codex-settings":
 		f := a.flags("agent codex-settings")
 		retries := f.Int("retries", -1, "unified Codex request/stream retries, 0..10 (default 5)")
-		overrideCatalog := f.Bool("override-model-catalog", false, "allow Anchor to replace Codex model instructions and capabilities (default false; restart Codex)")
+		overrideCatalog := f.Bool("override-model-catalog", false, "allow Anchor model capability overrides and per-model compaction in the synced Codex catalog; the model list syncs either way (default false; restart Codex)")
 		autoCompact := f.Bool("auto-compact", true, "automatically configure per-model compaction thresholds (default true)")
 		compactPercent := f.Int("compact-percent", 90, "compaction threshold as percent of declared context, 1..99 (default 90)")
 		revision := f.Int64("revision", 0, "expected settings revision (required when saving)")

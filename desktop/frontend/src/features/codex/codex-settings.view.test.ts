@@ -18,10 +18,10 @@ describe('per-model compaction status', () => {
     expect(html).toContain('是否实际触发压缩，尚未验证');
     expect(html).not.toContain('已生效');
   });
-  it('does not claim prompt restoration when opt-out synchronization failed', () => {
+  it('does not claim completed synchronization when opt-out synchronization failed', () => {
     const state = checkedCodexSettings({ ...fixture, needs_sync: ['codex-work'] });
     const html = renderToStaticMarkup(createElement(CodexCompactionStatus, { state }));
-    expect(html).toContain('尚未恢复原配置');
+    expect(html).toContain('部分目标尚未同步');
     expect(html).toContain('role="alert"');
     expect(html).not.toContain('保留 Codex 自身设置');
   });
@@ -31,6 +31,6 @@ describe('per-model compaction status', () => {
       const html = renderToStaticMarkup(createElement(CodexCompactionStatus, { state }));
       expect(html).toContain(text); expect(html).toContain('role="alert"');
     }
-    expect(renderToStaticMarkup(createElement(CodexCompactionStatus, { state: checkedCodexSettings(fixture) }))).toContain('提示词与模型目录覆盖已关闭');
+    expect(renderToStaticMarkup(createElement(CodexCompactionStatus, { state: checkedCodexSettings(fixture) }))).toContain('模型能力覆盖已关闭；模型列表照常同步');
   });
 });

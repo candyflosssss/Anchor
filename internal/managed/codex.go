@@ -108,7 +108,7 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 	var modelIDs []string
 	var catalogPath string
 	var e error
-	if codexCatalogEnabled(g) && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+	if codexCatalogPlanned(b, g) {
 		catalog, modelIDs, e = buildGatewayCatalog(g)
 		if e != nil {
 			return Plan{}, e
@@ -121,7 +121,7 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 		if catalogExists && catalogPath != ownedCatalog {
 			return Plan{}, errors.New("reserved Anchor catalog already exists; recover or resolve conflict first")
 		}
-	} else if codexCatalogEnabled(g) && b.ModelScope == "all-compatible" {
+	} else if b.ModelScope == "all-compatible" {
 		return Plan{}, errors.New("all-compatible requires catalog metadata")
 	}
 	if catalogPath != "" || ownedCatalog != "" {
@@ -172,7 +172,7 @@ func (Codex) planFrom(b state.Binding, g GatewayBinding, raw []byte, exists bool
 		// Global overrides shadow per-model limits, including after model switches.
 		// Disabled automation leaves the original value in place.
 		desired := values[i]
-		if catalogPath != "" && codexCompactSettings(g).AutoCompact {
+		if catalogPath != "" && codexOverridesEnabled(g) && codexCompactSettings(g).AutoCompact {
 			desired = Value{}
 		}
 		p.Edits = append(p.Edits, Edit{Path: paths[i], Before: values[i], After: desired})
@@ -206,15 +206,15 @@ func (Codex) Verify(b state.Binding, g GatewayBinding) (Inspection, error) {
 			return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "codex.retries")
 		}
 	}
-	if !codexCatalogEnabled(g) && sameCatalogPath(m["model_catalog_json"], filepath.Join(b.ConfigRoot, catalogName(b.ID))) {
+	if !codexCatalogPlanned(b, g) && sameCatalogPath(m["model_catalog_json"], filepath.Join(b.ConfigRoot, catalogName(b.ID))) {
 		return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "model_catalog_json")
 	}
-	if codexCatalogEnabled(g) && len(g.Models) > 0 && (b.ModelScope == "all-mapped" || g.CatalogVersion != "") {
+	if codexCatalogPlanned(b, g) {
 		path := filepath.Join(b.ConfigRoot, catalogName(b.ID))
 		if m["model_catalog_json"] != path {
 			return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", "model_catalog_json")
 		}
-		if codexCompactSettings(g).AutoCompact {
+		if codexOverridesEnabled(g) && codexCompactSettings(g).AutoCompact {
 			for _, key := range []string{"model_auto_compact_token_limit", "model_context_window"} {
 				if _, exists := m[key]; exists {
 					return out, withDiagnostic(ErrChanged, "verify_configuration", "managed_field_mismatch", key)

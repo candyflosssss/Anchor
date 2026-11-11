@@ -21,7 +21,7 @@ func TestCatalogAppliesPortableSettingsAndPreservesInstructions(t *testing.T) {
 		DefaultReasoning:   &state.ReasoningDefault{Type: "effort", Value: settingsPtr("high")},
 		ParallelToolCalls:  settingsPtr(false),
 	}}}
-	raw, _, err := buildCatalog([]state.Model{model}, "0.159.3")
+	raw, _, err := buildConsentedCatalog([]state.Model{model}, "0.159.3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestCatalogAppliesPortableSettingsAndPreservesInstructions(t *testing.T) {
 	}
 	model.Settings.Configuration.SupportedReasoning[0].Values = []*string{settingsPtr("max")}
 	model.Settings.Configuration.DefaultReasoning = nil
-	raw, _, err = buildCatalog([]state.Model{model}, "0.159.3")
+	raw, _, err = buildConsentedCatalog([]state.Model{model}, "0.159.3")
 	if err != nil {
 		t.Fatal("upstream-only effort blocked catalog", err)
 	}
@@ -54,7 +54,7 @@ func TestCatalogAppliesPortableSettingsAndPreservesInstructions(t *testing.T) {
 	}
 	model.Settings.Configuration.SupportedReasoning = nil
 	model.Settings.Configuration.Capabilities.Reasoning = settingsPtr(false)
-	raw, _, err = buildCatalog([]state.Model{model}, "0.159.3")
+	raw, _, err = buildConsentedCatalog([]state.Model{model}, "0.159.3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestCatalogProjectsNativeReasoningWithoutMutatingMappings(t *testing.T) {
 					version = model.Codex.Version
 				}
 				before, _ := json.Marshal(model)
-				raw, _, err := buildCatalog([]state.Model{model}, version)
+				raw, _, err := buildConsentedCatalog([]state.Model{model}, version)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -131,7 +131,7 @@ func TestCatalogExportsPriceAwareWindowInsteadOfModelMaximum(t *testing.T) {
 		t.Fatal(err)
 	}
 	model := state.Model{ID: "mapped", Codex: metadata(t), Settings: &state.ModelSettings{Configuration: modelconfig.FillCatalog(state.ModelConfiguration{}, source)}}
-	raw, _, err = buildCatalog([]state.Model{model}, model.Codex.Version)
+	raw, _, err = buildConsentedCatalog([]state.Model{model}, model.Codex.Version)
 	if err != nil {
 		t.Fatal(err)
 	}
