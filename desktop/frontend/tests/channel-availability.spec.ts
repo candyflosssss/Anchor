@@ -63,7 +63,7 @@ test('Key switch preserves its setting independently and disabled Keys remain vi
   await expect(card).toContainText('1/2 渠道可用');
 });
 
-test('unavailable sources and models are shorter, neutral and still operable', async ({ page }) => {
+test('only unavailable sources become compact and neutral inside the family card', async ({ page }) => {
   await page.goto('/');
   await setProvider(page, '备用供应商', false);
   const card = await mappings(page);
@@ -71,6 +71,15 @@ test('unavailable sources and models are shorter, neutral and still operable', a
   const inactive = card.locator('.mapping-key-card.availability-unavailable').first();
   const liveHeight = (await live.boundingBox())!.height;
   const fullHeight = (await card.boundingBox())!.height;
+  const themes = ['浅色', '深色'] as const;
+  const familyBackground = new Map<string, string>();
+  for (const theme of themes) {
+    await page.getByRole('button', { name: theme, exact: true }).click();
+    const background = await card.evaluate(el => getComputedStyle(el).backgroundImage);
+    expect(background).toContain('gradient');
+    familyBackground.set(theme, background);
+  }
+  await page.getByRole('button', { name: '浅色', exact: true }).click();
   await expect(inactive.locator('.mapping-key-pricing')).toHaveCount(0);
   await expect(live.locator('.mapping-key-pricing')).toBeVisible();
   expect((await inactive.boundingBox())!.height).toBeLessThan(liveHeight * 0.8);
@@ -88,13 +97,13 @@ test('unavailable sources and models are shorter, neutral and still operable', a
   await expect(card.locator('.mapping-key-card.is-compact')).toHaveCount(3);
   await expect(card.getByLabel('调度规则 coding-main')).toBeEnabled();
   await expect(card.getByRole('button', { name: '模型设置 coding-main', exact: true })).toBeEnabled();
-  for (const theme of ['浅色', '深色'] as const) {
+  for (const theme of themes) {
     await page.getByRole('button', { name: theme, exact: true }).click();
     const colors = await card.evaluate(el => {
       const source = el.querySelector('.mapping-key-card')!;
       return { background: getComputedStyle(el).backgroundImage, source: getComputedStyle(source).backgroundColor, status: getComputedStyle(source.querySelector('.channel-status')!).backgroundColor };
     });
-    expect(colors.background).toBe('none');
+    expect(colors.background).toBe(familyBackground.get(theme));
     expect(colors.source).toMatch(/rgba?\((\d+), \1, \1/);
     expect(colors.status).toMatch(/rgba?\((\d+), \1, \1/);
     if (process.env.ANCHOR_MAPPING_PREVIEW) await card.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/unavailable-${theme === '浅色' ? 'light' : 'dark'}.png` });

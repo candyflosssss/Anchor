@@ -116,19 +116,7 @@
   background: hsl(var(--muted)); border-color: hsl(var(--border)); box-shadow: none;
 }
 .mapping-key-card.is-compact[data-sortable]:hover { border-color: hsl(var(--muted-foreground) / .45); }
-.model-card.availability-unavailable,
-.dark .model-card.availability-unavailable {
-  padding: 12px; background: hsl(var(--muted) / .55); box-shadow: none;
-  -webkit-backdrop-filter: none; backdrop-filter: none;
-}
-.model-card.availability-unavailable::before { display: none; }
-.model-card.availability-unavailable:hover:not(.is-sorting) { translate: none; box-shadow: none; }
-.model-card.availability-unavailable .model-title h2 { color: hsl(var(--muted-foreground)); }
-.model-card.availability-unavailable .model-channel-count { color: hsl(var(--muted-foreground)); }
-.model-card.availability-unavailable > .model-section-header { gap: 4px 8px; padding-bottom: 0; margin-bottom: 8px; border-bottom: 0; }
-.model-card.availability-unavailable .candidate-list { gap: 6px; }
 @media (hover: none) { .mapping-key-card.is-compact[data-sortable] { padding-bottom: 36px; } }
 @media (forced-colors: active) {
-  .model-card.availability-unavailable, .mapping-key-card.is-compact, .model-card .mapping-key-card.is-compact { background: Canvas; border-color: GrayText; }
-  .model-card.availability-unavailable .model-title h2 { color: CanvasText; }
+  .mapping-key-card.is-compact, .model-card .mapping-key-card.is-compact { background: Canvas; border-color: GrayText; }
 }
