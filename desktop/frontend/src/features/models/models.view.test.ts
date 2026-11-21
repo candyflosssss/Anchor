@@ -118,3 +118,35 @@ describe('model channel availability presentation', () => {
   });
 
 });
+
+describe('compact unavailable source cards', () => {
+  it.each([
+    ['disabled', false], ['invalid', true],
+  ])('uses a compact card without empty pricing for %s Keys', (state, enabled) => {
+    const html = render([makeSummary(true, state, enabled)]);
+    expect(html).toContain('availability-unavailable is-compact');
+    expect(html).toContain('class="mapping-key-availability"');
+    expect(html).not.toContain('class="mapping-key-pricing"');
+    expect(html).not.toContain('class="mapping-key-issue"');
+    expect(html).toContain('编辑映射');
+    expect(html).toContain('来源 Key');
+  });
+  it('compacts disabled providers and missing scoped Keys while retaining failures', () => {
+    const summary = makeSummary(false);
+    const id = JSON.stringify([summary.provider.id, summary.workspace!.keys[0].id]);
+    const html = render([summary], { ...rates, errors: { [id]: '查询失败' } });
+    expect(html).toContain('availability-unavailable is-compact');
+    expect(html).toContain('倍率刷新失败');
+    expect(html).toContain('role="alert"');
+    summary.provider.enabled = true;
+    summary.workspace!.models[0].key_ids = ['missing'];
+    const missing = render([summary]);
+    expect(missing).toContain('availability-unavailable is-compact');
+    expect(missing).toContain('Key 不存在');
+  });
+  it.each(['ready', 'degraded', 'cooling', 'half-open', 'unknown'])('keeps full presentation for %s Keys', state => {
+    const html = render([makeSummary(true, state)]);
+    expect(html).not.toContain('is-compact');
+    expect(html).toContain('class="mapping-key-pricing"');
+  });
+});

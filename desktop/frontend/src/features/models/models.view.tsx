@@ -24,12 +24,13 @@ function MappingKey({ source, candidate: m, rates, children, disabled, onOpen, d
   const failure = rates.errors[id] || (value?.failure && (rateFailureText[value.failure] ?? '查询失败，分组倍率未知。'));
   const keyState = keyAvailability(source);
   const state = m.provider_enabled ? keyState : m.availability;
+  const compact = state.state === 'unavailable';
   // Billing refreshes must never overwrite the workspace's scheduling state.
   const key = rates.keys[id] ?? source.key;
   const multiplier = effectiveRouteMultiplier({ ...m, key_ids: [source.id], keys: key ? [{ ...key, enabled: source.key?.enabled ?? false, state: source.key?.state ?? 'disabled' }] : [] });
   const rateDetail = `供应商 ${m.cost_multiplier}× · 模型 ${m.multiplier}× · 分组倍率 ${key?.rate?.multiplier == null ? '未知' : `${key.rate.multiplier}×`} · 相对倍率 ${key?.effective_multiplier == null ? '未知' : `${key.effective_multiplier}×`}${key?.rate?.failure ? key.rate.multiplier == null ? ' · 刷新失败，尚无有效缓存。' : ' · 刷新失败，沿用上次成功缓存。' : ''}`;
   const group = key?.rate?.group_name || key?.rate?.group;
-  return <div className={`mapping-key-card mapping-key-rate availability-${state.state}`} role="group" data-source-key={source.id} data-sortable={sortable || undefined} {...dragProps} aria-label={`${m.provider_id} · ${source.anonymous ? '匿名来源' : `Key ${source.id}`}`}>
+  return <div className={`mapping-key-card mapping-key-rate availability-${state.state}${compact ? ' is-compact' : ''}`} role="group" data-source-key={source.id} data-sortable={sortable || undefined} {...dragProps} aria-label={`${m.provider_id} · ${source.anonymous ? '匿名来源' : `Key ${source.id}`}`}>
     <div className="mapping-key-identity">
       <div className="mapping-source-header">
         <span className={`channel-status state-${state.state}`} title={`${m.provider_enabled ? '供应商已启用' : '供应商已停用'} · ${state.reason}`}><span className="sr-only">{state.label}</span></span>
@@ -39,13 +40,13 @@ function MappingKey({ source, candidate: m, rates, children, disabled, onOpen, d
       <span className="mapping-key-status sr-only">{source.key && (source.key.enabled ? 'Key 已启用' : 'Key 已停用')}</span>
     </div>
     <div className="mapping-key-feedback">
-      {(state.state !== 'available' || source.key?.state === 'degraded') && <span className="mapping-key-issue">{state.label}</span>}
+      {!compact && (state.state !== 'available' || source.key?.state === 'degraded') && <span className="mapping-key-issue">{state.label}</span>}
       {failure && <span className="mapping-rate-failure" role="alert" title={failure}>倍率刷新失败<span className="sr-only">：{failure}</span></span>}
     </div>
-    <div className="mapping-key-pricing">
+    {compact ? <span className="mapping-key-availability" title={state.reason}>{state.label}</span> : <div className="mapping-key-pricing">
       <strong className="mapping-effective-rate" tabIndex={0} aria-label={`排序倍率 ${multiplier == null ? '未知' : `${Number(multiplier.toPrecision(6))}倍`}`} title={rateDetail}>{rates.pending === id ? <LoaderCircle size={14} className="route-spinner" aria-label="查询中" /> : multiplier == null ? '—' : `${Number(multiplier.toPrecision(6))}×`}</strong>
       <span className="mapping-key-group" aria-label={`分组 ${group || '未知'}`} title={group || '分组未知'}>{group || '—'}</span>
-    </div>
+    </div>}
     {children}
   </div>;
 

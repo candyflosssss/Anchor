@@ -27,7 +27,6 @@
 .model-card .model-title h2 { color: color-mix(in srgb, hsl(var(--model-accent)) 27%, hsl(var(--foreground))); }
 .model-card .model-settings-trigger { border-radius: 8px; background: hsl(var(--card) / .55); }
 .model-card .mapping-key-card { background: hsl(var(--card) / .82); border-color: hsl(var(--foreground) / .06); }
-.model-card .mapping-key-card.availability-unavailable { border-color: hsl(var(--destructive) / .16); }
 .dark .model-card .mapping-key-card { background: hsl(0 0% 10% / .72); }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .model-card { background-color: hsl(var(--card)); }
@@ -101,5 +100,35 @@
 .mapping-key-card .channel-status.state-available { background: hsl(var(--success)); }
 .mapping-key-card .channel-status.state-unavailable { background: hsl(var(--destructive)); }
 .mapping-key-card .channel-status.state-unknown { background: hsl(var(--muted-foreground)); }
-.mapping-key-card.availability-unavailable { border-color: hsl(var(--destructive) / .3); }
 .model-grid:empty, .candidate-list:empty { display: none; }
+
+/* Unavailable sources remain editable and sortable, but do not compete with live routes. */
+.mapping-key-card.is-compact {
+  grid-template-columns: minmax(0, 1fr) auto 20px; min-height: 52px; padding: 8px 10px 8px 12px; gap: 4px 8px;
+}
+.mapping-key-card.is-compact .mapping-key-identity { gap: 2px; }
+.mapping-key-card.is-compact .candidate { color: hsl(var(--muted-foreground)); }
+.mapping-key-availability { grid-column: 2; grid-row: 1; max-width: 7em; font-size: 12px; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+.mapping-key-card.is-compact .channel-status { background: hsl(var(--muted-foreground)); }
+.mapping-key-card.is-compact,
+.model-card .mapping-key-card.is-compact,
+.dark .model-card .mapping-key-card.is-compact {
+  background: hsl(var(--muted)); border-color: hsl(var(--border)); box-shadow: none;
+}
+.mapping-key-card.is-compact[data-sortable]:hover { border-color: hsl(var(--muted-foreground) / .45); }
+.model-card.availability-unavailable,
+.dark .model-card.availability-unavailable {
+  padding: 12px; background: hsl(var(--muted) / .55); box-shadow: none;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+.model-card.availability-unavailable::before { display: none; }
+.model-card.availability-unavailable:hover:not(.is-sorting) { translate: none; box-shadow: none; }
+.model-card.availability-unavailable .model-title h2 { color: hsl(var(--muted-foreground)); }
+.model-card.availability-unavailable .model-channel-count { color: hsl(var(--muted-foreground)); }
+.model-card.availability-unavailable > .model-section-header { gap: 4px 8px; padding-bottom: 0; margin-bottom: 8px; border-bottom: 0; }
+.model-card.availability-unavailable .candidate-list { gap: 6px; }
+@media (hover: none) { .mapping-key-card.is-compact[data-sortable] { padding-bottom: 36px; } }
+@media (forced-colors: active) {
+  .model-card.availability-unavailable, .mapping-key-card.is-compact, .model-card .mapping-key-card.is-compact { background: Canvas; border-color: GrayText; }
+  .model-card.availability-unavailable .model-title h2 { color: CanvasText; }
+}
