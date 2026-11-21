@@ -63,7 +63,7 @@ test('Key switch preserves its setting independently and disabled Keys remain vi
   await expect(card).toContainText('1/2 渠道可用');
 });
 
-test('only unavailable sources become compact and neutral inside the family card', async ({ page }) => {
+test('compacts individual unavailable sources and darkens the group once all sources are unavailable', async ({ page }) => {
   await page.goto('/');
   await setProvider(page, '备用供应商', false);
   const card = await mappings(page);
@@ -72,12 +72,10 @@ test('only unavailable sources become compact and neutral inside the family card
   const liveHeight = (await live.boundingBox())!.height;
   const fullHeight = (await card.boundingBox())!.height;
   const themes = ['浅色', '深色'] as const;
-  const familyBackground = new Map<string, string>();
   for (const theme of themes) {
     await page.getByRole('button', { name: theme, exact: true }).click();
     const background = await card.evaluate(el => getComputedStyle(el).backgroundImage);
     expect(background).toContain('gradient');
-    familyBackground.set(theme, background);
   }
   await page.getByRole('button', { name: '浅色', exact: true }).click();
   await expect(inactive.locator('.mapping-key-pricing')).toHaveCount(0);
@@ -101,9 +99,11 @@ test('only unavailable sources become compact and neutral inside the family card
     await page.getByRole('button', { name: theme, exact: true }).click();
     const colors = await card.evaluate(el => {
       const source = el.querySelector('.mapping-key-card')!;
-      return { background: getComputedStyle(el).backgroundImage, source: getComputedStyle(source).backgroundColor, status: getComputedStyle(source.querySelector('.channel-status')!).backgroundColor };
+      return { background: getComputedStyle(el).backgroundImage, surface: getComputedStyle(el).backgroundColor, source: getComputedStyle(source).backgroundColor, status: getComputedStyle(source.querySelector('.channel-status')!).backgroundColor };
     });
-    expect(colors.background).toBe(familyBackground.get(theme));
+    expect(colors.background).toBe('none');
+    expect(colors.surface).toMatch(/^rgb\((\d+), \1, \1\)$/);
+    expect(Number(colors.surface.match(/\d+/)![0])).toBeLessThan(64);
     expect(colors.source).toMatch(/rgba?\((\d+), \1, \1/);
     expect(colors.status).toMatch(/rgba?\((\d+), \1, \1/);
     if (process.env.ANCHOR_MAPPING_PREVIEW) await card.screenshot({ path: `${process.env.ANCHOR_MAPPING_PREVIEW}/unavailable-${theme === '浅色' ? 'light' : 'dark'}.png` });

@@ -19,8 +19,8 @@
 .dark .model-card { background: radial-gradient(ellipse at 0% 0%, hsl(var(--model-accent) / .2), transparent 70%), linear-gradient(150deg, hsl(0 0% 13% / .94), hsl(0 0% 8% / .84)); box-shadow: inset 0 1px 0 hsl(0 0% 100% / .07), 0 3px 8px hsl(0 0% 0% / .16), 0 12px 28px hsl(0 0% 0% / .22); }
 .dark .model-card::before { opacity: .16; }
 @media (hover: hover) and (pointer: fine) {
-  .model-card:hover:not(.is-sorting) { translate: 0 -4px; box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), 0 5px 12px hsl(var(--model-accent) / .08), 0 18px 30px hsl(var(--model-accent) / .14); }
-  .dark .model-card:hover:not(.is-sorting) { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .14), 0 6px 14px hsl(0 0% 0% / .2), 0 18px 32px hsl(var(--model-accent) / .13); }
+  .model-card:hover:not(.is-sorting, .availability-unavailable) { translate: 0 -4px; box-shadow: inset 0 1px 0 hsl(0 0% 100% / .55), 0 5px 12px hsl(var(--model-accent) / .08), 0 18px 30px hsl(var(--model-accent) / .14); }
+  .dark .model-card:hover:not(.is-sorting, .availability-unavailable) { box-shadow: inset 0 1px 0 hsl(0 0% 100% / .14), 0 6px 14px hsl(0 0% 0% / .2), 0 18px 32px hsl(var(--model-accent) / .13); }
 }
 .model-card:focus-within { border-color: hsl(var(--ring) / .12); }
 .model-card > .model-section-header { padding-bottom: 14px; border-bottom: 1px solid hsl(var(--foreground) / .05); }
@@ -117,6 +117,23 @@
 }
 .mapping-key-card.is-compact[data-sortable]:hover { border-color: hsl(var(--muted-foreground) / .45); }
 @media (hover: none) { .mapping-key-card.is-compact[data-sortable] { padding-bottom: 36px; } }
+/* The whole group uses its local dark palette only once every channel is unavailable. */
+.model-card.availability-unavailable {
+  color-scheme: dark;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.model-card.availability-unavailable::before { display: none; }
+.model-card.availability-unavailable .model-title h2 { color: inherit; }
+.model-card.availability-unavailable > .model-section-header { gap: 4px 8px; padding-bottom: 0; margin-bottom: 8px; border-bottom: 0; }
+.model-card.availability-unavailable .candidate-list { gap: 4px; }
 @media (forced-colors: active) {
+  .model-card.availability-unavailable { background: Canvas; color: CanvasText; border-color: CanvasText; }
   .mapping-key-card.is-compact, .model-card .mapping-key-card.is-compact { background: Canvas; border-color: GrayText; }
 }
