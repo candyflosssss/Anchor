@@ -117,18 +117,20 @@
 }
 .mapping-key-card.is-compact[data-sortable]:hover { border-color: hsl(var(--muted-foreground) / .45); }
 @media (hover: none) { .mapping-key-card.is-compact[data-sortable] { padding-bottom: 36px; } }
-/* The whole group uses its local dark palette only once every channel is unavailable. */
+/* Only confirmed unavailable groups use the compact neutral surface. */
 .model-card.availability-unavailable {
-  color-scheme: dark;
+  --unavailable-surface: 0 0% 87%;
   padding: 10px 12px;
   border-radius: 16px;
   border-color: hsl(var(--border));
-  background: hsl(var(--card));
+  background: hsl(var(--unavailable-surface));
   color: hsl(var(--foreground));
   box-shadow: none;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+.dark .model-card.availability-unavailable { --unavailable-surface: 0 0% 30%; }
+.model-card.availability-unavailable .model-channel-count { color: inherit; }
 .model-card.availability-unavailable::before { display: none; }
 .model-card.availability-unavailable .model-title h2 { color: inherit; }
 .model-card.availability-unavailable > .model-section-header { gap: 4px 8px; padding-bottom: 0; margin-bottom: 8px; border-bottom: 0; }

@@ -64,7 +64,6 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
   const available = candidates.filter(c => c.availability.state === 'available').length;
   const unknown = !g.complete || candidates.some(c => c.availability.state === 'unknown');
   const availability = modelAvailability(g);
-  const cardTheme = availability === 'unavailable' ? ' dark' : '';
   const renderSource = ({ candidate: m, source, ref }: typeof sources[number], i: number) => {
     const id = sourceID(ref), suffix = ` Key ${source.id}`;
     const move = (offset: number) => { void routing.move(g, i, i + offset); };
@@ -84,7 +83,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
       </MappingKey>
     </li>;
   };
-  return <article className={`model-card availability-${availability}${cardTheme}${dragged ? ' is-sorting' : ''}`} data-model-family={modelFamily(g)} aria-label={`模型 ${g.alias}`}>
+  return <article className={`model-card availability-${availability}${dragged ? ' is-sorting' : ''}`} data-model-family={modelFamily(g)} aria-label={`模型 ${g.alias}`}>
     <header className="model-section-header"><div className="model-title"><h2 className="mono">{g.alias}</h2><span className={`model-channel-count state-${availability}`} role="status" title={`${available} / ${candidates.length} 个渠道当前可用`}>{available ? <>{available}/{candidates.length}<span className="sr-only"> 渠道可用</span></> : unknown ? '可用性待确认' : '无有效渠道'}</span></div>
         <div className="route-toolbar"><select aria-label={`调度规则 ${g.alias}`} className="select-field" disabled={!canEdit} value={draft.strategy} onChange={e => { void routing.change(g, { strategy: e.target.value }); }}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select>
         {sources.length > 1 && <div className="route-quick-sort">
@@ -108,7 +107,7 @@ function ModelCard({ group: g, disabled, rates, routing, onOpen, settings }: Com
       <p>将对 {sources.filter(v => v.candidate.provider_enabled && (v.source.anonymous || v.source.key?.enabled && ['ready', 'degraded'].includes(v.source.key.state))).length} 个可用 Key 各发送 1 次推理请求，可能产生费用。</p>
     </ConfirmAction>
     <span className="sr-only" role="status">{drag.announcement}</span>
-    {dragged && drag.drag && createPortal(<div className={`route-drag-preview${cardTheme}`} aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}>
+    {dragged && drag.drag && createPortal(<div className="route-drag-preview" aria-hidden="true" style={{ left: drag.drag.x - drag.drag.offsetX, top: drag.drag.y - drag.drag.offsetY, width: drag.drag.width }}>
       <MappingKey source={dragged.source} candidate={dragged.candidate} rates={rates} disabled onOpen={onOpen}><div className="mapping-route-controls"><GripVertical size={16} /></div></MappingKey>
     </div>, document.body)}
   </article>;
