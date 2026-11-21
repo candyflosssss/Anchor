@@ -1,10 +1,22 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-11-12。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.85](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.85)，发布于 `2026-11-12T02:27:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `33a3ec77b4a2448b056046cb505eff3a8337d5a9`、SOURCE dirty=false。
-- Codex 模型列表始终随托管同步，开关改为「允许 Anchor 覆盖模型能力与自动压缩」；没有原生模板的映射模型参照 CLIProxyAPI 复制 Codex 官方条目。保留 `.84` 登录自启与 Key 冷却兜底。
-- 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
-- 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+- 更新：2026-11-21。
+- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.86](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.86)，发布于 `2026-11-21T21:20:02+08:00`。GitHub prerelease 含 11 项附件，构建提交 `f8a49fc86ed82109693842946a22f79bb13a9b15`。
+- 模型映射将不可用渠道显示为灰色矮卡。全部渠道不可用时整张模型卡切换为紧凑灰底。
+- 获取路径为「设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新」。
+
+<a id="mapping-cards-86"></a>
+
+## 模型映射紧凑灰卡 .86（已发布 dev）
+
+从干净提交 `f8a49fc` 构建 Windows AMD64 安装器和 Ubuntu 24.04 AMD64 deb。可用渠道保留完整卡片和模型家族色。不可用渠道保留状态、编辑和排序入口。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `Anchor-Desktop-0.1.0-dev.desktop.86-windows-amd64-setup.exe` | 31320608 | `ec647c71a9bfa020da0a50c7aee306ce0d28b0d9c5558bd15a3147fb51989808` |
+| `anchor-desktop_0.1.0-dev.desktop.86_amd64.deb` | 29304060 | `c07a2c4ed2740696392a6b8bfc94bcfd447c6af5a76e6ae168ab776771df779a` |
+
+默认 dev 源从 .85 实际下载 Linux 桌面 runtime，独立 CLI 与兼容安装器下载也已核对 SHA256。Windows 安装器、runtime 和 CLI 的远端大小及 SHA256 与本地产物一致。本轮验证覆盖打包与下载，双平台原生安装和窗口验收待完成。
 
 <a id="codex-model-list-85"></a>
 

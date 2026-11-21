@@ -1,10 +1,13 @@
 # 在线更新 v1
 
-- 更新：2026-11-12。
-- 当前线上桌面 dev 版：[0.1.0-dev.desktop.85](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.85)，发布于 `2026-11-12T02:27:27+08:00`；GitHub prerelease，非 latest，11 项附件同版投放，构建提交 `33a3ec77b4a2448b056046cb505eff3a8337d5a9`、SOURCE dirty=false。
-- Codex 模型列表始终随托管同步，开关改为「允许 Anchor 覆盖模型能力与自动压缩」；没有原生模板的映射模型参照 CLIProxyAPI 复制 Codex 官方条目。保留 `.84` 登录自启与 Key 冷却兜底。
-- 入口：设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新。升级后完全重启 Codex／app-server 并开始新会话。
-- 本轮仅在线投放，未安装或改动真实实例／Agent 配置；未做两平台原生窗口或系统安装验收。
+- 更新：2026-11-21。
+- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.86](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.86)，发布于 `2026-11-21T21:20:02+08:00`。GitHub prerelease 含 11 项附件，构建提交 `f8a49fc86ed82109693842946a22f79bb13a9b15`。
+- 模型映射将不可用渠道显示为灰色矮卡。全部渠道不可用时整张模型卡切换为紧凑灰底。
+- 获取路径为「设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新」。
+
+## .86 在线投放（2026-11-21）
+
+默认 dev 源从 .85 实际下载 Linux 桌面 runtime，独立 CLI 与兼容安装器下载也已核对 SHA256。Windows 安装器、runtime 和 CLI 的远端大小及 SHA256 与本地产物一致。本轮验证覆盖打包与下载，双平台原生安装和窗口验收待完成。 [发行记录](../release/desktop.md#mapping-cards-86)。
 
 ## .85 在线投放（2026-11-12）
 
