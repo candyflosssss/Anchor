@@ -425,6 +425,8 @@ func fromResponses(m Object, to string) (Object, error) {
 	if !ok {
 		return nil, ErrUnsupported
 	}
+	// Tool results pair only with a call that appears earlier in this input.
+	called := map[string]bool{}
 	for _, v := range input {
 		item := obj(v)
 		switch str(item["type"]) {
@@ -488,6 +490,7 @@ func fromResponses(m Object, to string) (Object, error) {
 			if err := allowed(item, "type id call_id name arguments status"); err != nil {
 				return nil, err
 			}
+			called[str(item["call_id"])] = true
 			if to == "anthropic" {
 				var args Object
 				if json.Unmarshal([]byte(str(item["arguments"])), &args) != nil || args == nil {
@@ -498,8 +501,19 @@ func fromResponses(m Object, to string) (Object, error) {
 				messages = append(messages, Object{"role": "assistant", "content": nil, "tool_calls": []any{Object{"id": item["call_id"], "type": "function", "function": Object{"name": item["name"], "arguments": item["arguments"]}}}})
 			}
 		case "function_call_output":
-			if str(item["call_id"]) == "" {
-				return nil, ErrUnsupported
+			if id := str(item["call_id"]); id == "" || !called[id] {
+				// Codex injects standalone outputs (for example goal context)
+				// without a call. Neither target accepts an unpaired tool
+				// result, so keep the output as user content; see
+				// orphanToolOutputDegradations.
+				content, err := orphanToolOutput(item, to)
+				if err != nil {
+					return nil, err
+				}
+				if content != nil {
+					messages = append(messages, Object{"role": "user", "content": content})
+				}
+				continue
 			}
 			if err := allowed(item, "type id call_id output status"); err != nil {
 				return nil, err

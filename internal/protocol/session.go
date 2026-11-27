@@ -185,6 +185,7 @@ func (s *Session) Prepare(o AttemptOptions) (*Attempt, error) {
 			return nil, newTranslationError(s.client, o.Protocol, StageRequest, ConversionReason(err), err)
 		}
 		a.diagnostics.Degradations = requestDegradations(raw, o.Protocol)
+		a.diagnostics.Degradations = append(a.diagnostics.Degradations, orphanToolOutputDegradations(raw, o.Protocol)...)
 		if o.Protocol == "anthropic" {
 			a.diagnostics.Degradations = append(a.diagnostics.Degradations, anthropicEgressDegradations(raw)...)
 		}

@@ -52,6 +52,8 @@ Responses／Chat → Messages 允许 system／developer 文本出现在会话中
 
 Messages 目标现对已校验的历史 reasoning 在当前 Attempt 副本中省略，以 `reasoning_history_omitted` 明确记录思考及其摘要连续性损失；assistant 的已知 phase 记录 `message_phase_omitted`。可见消息、工具调用／结果及 user／工具结果图片按限定标准转换并保留，图片精度选择器损失记录 `image_detail_omitted`；非法容器、其他不透明内容仍拒绝。原 Session、客户端历史、原生与 Responses → Chat 边界及网络／恢复预算不变。空 output_text annotations／logprobs 可规范化，非空仍拒绝。完整历史与图片保留验证见 [Messages 支持表](protocol-anthropic-bridge.md#已有会话的历史投影与图片2026-11-01当前源码未发布)。
 
+Responses → Chat／Messages 对没有配对调用的 function_call_output（call_id 为空，或本次 input 此前没有同 id 的调用，例如 Codex goal 注入的 goal_objective）不生成工具结果，改以 user 内容按原位置保留 output，并以 `orphan_tool_output_text` 明确报告工具身份丢失。无配对项的字符串 name／namespace 只校验不发送；其他未知字段与不可表示内容仍拒绝，已配对结果、原生候选与客户端历史不变。详见 [Messages 支持表](protocol-anthropic-bridge.md#无配对调用的工具结果2026-11-28)。
+
 缺省 Messages 输出预算由 protocol.OutputTokenPolicy 承载保存的 Default／Maximum 声明，Session 依次选择默认输出、最大输出、旧回退4096；core 不自行改协议字段。记录 translation_max_output_tokens 和固定 translation_output_budget_source，候选隔离、无派发时不冒充发送。实际 max_tokens 结束保持 incomplete，不伪造完成或自动续写；详见 [Messages 输出预算](protocol-anthropic-bridge.md#缺省输出预算2026-11-01当前源码未发布)。
 
 不按供应商或模型名推测 thinking、预算或 Token 字段。AttemptOptions 中的档位来自已保存的明确路由策略；若以后增加供应商能力配置，应在 Prepare 的显式选项边界扩展，经验证后由适配器消费，而不是向调度分支添加名称猜测。

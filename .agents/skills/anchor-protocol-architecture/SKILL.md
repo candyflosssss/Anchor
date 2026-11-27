@@ -58,6 +58,7 @@ description: 约束 Anchor 协议翻译层与网关的职责、会话隔离、�
 - Messages 目标允许 assistant message 的已知 phase=commentary／final_answer 校验后省略并记录 message_phase_omitted；原字段／未知值与非法角色不放宽到其他方向。历史 output_text 的空／null annotations／logprobs 不承载内容，可以规范化；非空或错误容器继续拒绝，不删除真实引用或采样数据。
 - Messages 目标的 user 内容与 function/custom 工具结果可按序保留文本及 input_image：仅已验证 PNG／JPEG／GIF／WebP data URL（校验 base64）或 HTTP(S) URL 映射到标准 image.source，不下载、不重编码、不放开 file_id／音频／任意内容。detail=low／high／original 无对应选择器时记录 image_detail_omitted，auto／缺失／null 不记此项；图片字节／URL、媒介类型、顺序和工具配对必须保持，禁止用占位或删除图片冒充成功。
 - Messages 与 Chat 目标复用同一请求局部 namespace／custom 工具索引；不得维护另一套命名、历史重建和返回还原规则。Messages 原生 type=custom 仅代表客户端执行函数，不扩大到托管工具。
+- Responses → Chat／Messages 的无配对工具结果（call_id 为空，或本次 input 此前没有同 id 的 function／custom 调用，如 Codex goal 注入项）不得伪造 tool_use／调用 ID，也不得因此整段拒绝或静默删除：按原位置转为 user 内容，保留 output 文本（Messages 另按上条保留已验证图片），记录 orphan_tool_output_text。仅无配对项接受字符串 name／namespace 且只校验不发送；已配对结果的字段集合、未知字段与不可表示内容的拒绝、原生候选及客户端历史不变。
 - 密文不可解密时不伪造明文，不将思考作为正文。非空密文历史除上述 Messages 目标的显式投影外，不能跨协议转换时必须拒绝；图片仅按上述已验证 user／工具结果方向支持，tool_search、签名思考等仍按已验证方向声明支持。
 - 保留明确的原生 Responses 密文拒绝恢复：未向客户端交付、同渠道至多一次、原期限内，由派生 Session 清理历史 reasoning，明确记录有损语义，不扩大触发或重试预算。
 - 区分已实现的原生预清理：仅派发副本中 input 顶层 reasoning 的 encrypted_content 显式为 null、非字符串或空串时删除该字段及该项 id；保留条目、summary、其他字段与非空密文，缺失字段不改。此操作不修改客户端历史、不额外请求、不消耗恢复预算、不记为拒绝后恢复。变更此例外须同步契约与保留边界测试。

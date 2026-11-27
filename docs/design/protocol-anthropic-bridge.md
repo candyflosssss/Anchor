@@ -13,6 +13,7 @@
 | Messages system／文本块／工具声明／tool_result 中的 cache_control | 仅接受 ephemeral，ttl 可省略或为 5m／1h；跨协议不发送缓存断点，记录 `prompt_cache_control`；原生请求保留 |
 | Messages tool_result.is_error | 必须为布尔值；true 时将结果文本加上 `[Tool execution failed]\n`，记录 `tool_result_error_text`；false 不加前缀 |
 | Responses／Chat 后置 system／developer | 按原输入相对顺序合并到顶层 system，instructions 在前；非空指令晚于会话内容时记录 instruction_scope_hoisted，明确作用域扩大；前缀或空后置指令不记降级 |
+| Responses 无配对 function_call_output | call_id 为空或此前无同 id 调用时不生成 tool_result，按原位置转为 user 内容并保留 output 文本／已验证图片；记录 orphan_tool_output_text；字符串 name／namespace 只校验不发送 |
 | Messages metadata.user_id | 映射到 Responses／Chat 的 user；未知 metadata 字段拒绝 |
 
 工具结果通过下一次请求携带的声明、历史、namespace／name／call_id 重新建立映射；没有跨 HTTP 请求的工具注册表。未知字段、非法角色和工具输入类型仍拒绝，不用宽松过滤来掩盖丢失。
@@ -131,3 +132,18 @@ user 消息与 function/custom 工具结果中的 input_image 按标准 Messages
 普通与流式的真实 max_tokens 结束仍编码 incomplete／max_output_tokens，不伪装 completed，不在内容已交付后自动续写或重放。回归覆盖已保存128000却发送4096的修复前复现、默认预算优先、显式小／大预算、null／未知声明、候选隔离、30组普通／流式网关组合和最终日志；未请求真实付费上游。
 
 已随desktop.81 dev投放；需升级实际处理请求的核心。本轮模拟请求／两平台构建与默认源下载通过，未自动安装或验收用户真实生成。
+
+
+<a id="无配对调用的工具结果2026-11-28"></a>
+
+## 无配对调用的工具结果（2026-11-28）
+
+11-27／11-28 的真实失败由 desktop.85 核心处理，Responses → Messages 在 request_convert 以 request_content 拒绝，尚未派发。对应 Codex 会话启用 goal 后写入一条 `type=function_call_output`、`namespace=agent`、`name=goal_objective` 且没有 call_id 的输出，之前也没有对应调用。共享编码器要求 call_id 非空且只接受 `type id call_id output status`，Messages 也要求 tool_result 对应前一条 assistant 的 tool_use，因此该条使此后同一会话的每次请求都在同处失败。
+
+参照 [CLIProxyAPI dbe641f](https://github.com/router-for-me/CLIProxyAPI/blob/dbe641f286a489ecb39e3c041c554371e6add864/internal/translator/claude/openai/responses/claude_openai-responses_request.go) 对 standalone 工具输出的处理（其 Chat 方向同样转为 user 文本），独立实现，没有复制源码或引入依赖：
+
+- function_call_output 的 call_id 为空，或本次 input 中此前没有同 call_id 的 function／custom 调用时，视为无配对输出：不生成 tool_result／tool 消息，以 user 内容按原位置保留 output。Messages 目标沿用文本及已验证图片规则，Chat 目标仅文本；空输出不生成空消息。
+- 无配对输出额外接受字符串 name／namespace 作为客户端身份，仅用于校验，不发送上游、不入诊断；其他未知字段、非字符串身份、file／音频等不可表示内容继续拒绝。已配对结果的字段集合不变。
+- 记录 `orphan_tool_output_text` 降级，表示工具结果身份丢失、改为普通用户上下文；原生 Responses 候选、Session 基线与客户端历史保持原样，不增加请求或恢复预算。
+
+验证：在隔离 worktree 对两份真实会话 input（2957／4213 项）做无网络转换。修复前 HEAD 两份均复现 request_content；修复后均准备成功，775／1093 个调用及结果全部保留，goal 输出文本 1／1 保留，`goal_objective` 在请求体中的出现次数与正文自身一致，说明 name 未发送；原生候选保留原条目。私有副本只放任务临时目录，未打印、提交或打包，已清理。工具声明按历史合成最小声明，不称为完整线上请求重放；未请求真实付费上游。
