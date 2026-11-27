@@ -22,7 +22,7 @@ async function addMapping(page: Page) {
 test('selection and partial bulk edit preserve per-row upstreams, keys, tier and untouched capabilities', async ({ page }) => {
   await mappings(page); await addMapping(page);
   const all = page.getByRole('checkbox', { name: '全选模型映射', exact: true });
-  await expect(page.getByRole('button', { name: '批量编辑', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '批量编辑', exact: true })).toHaveCount(0);
   await page.getByRole('checkbox', { name: '选择模型映射 coding-main', exact: true }).check();
   await expect(all).toBeChecked({ indeterminate: true });
   await all.check();
@@ -49,7 +49,7 @@ test('selection and partial bulk edit preserve per-row upstreams, keys, tier and
   await expect(dialog.getByLabel('Anchor 固定速度档位')).toHaveValue('');
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
   await page.getByRole('button', { name: '清空选择', exact: true }).click();
-  await expect(page.getByRole('button', { name: '批量编辑', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: '批量编辑', exact: true })).toHaveCount(0);
 });
 
 test('bulk tests require cost confirmation and retain a result for every selected mapping', async ({ page }) => {
@@ -68,7 +68,7 @@ test('bulk tests require cost confirmation and retain a result for every selecte
   await page.getByRole('button', { name: '返回供应商列表' }).click();
   await page.getByRole('button', { name: '备用供应商', exact: true }).click();
   await page.getByRole('tab', { name: /^模型/ }).click();
-  await expect(page.getByRole('group', { name: '模型映射批量操作' })).toContainText('已选 0 / 1');
+  await expect(page.getByRole('group', { name: '模型映射批量操作' })).toHaveCount(0);
 });
 
 test('bulk delete is confirmed, removes only selected provider mappings and clears deleted selection', async ({ page }) => {

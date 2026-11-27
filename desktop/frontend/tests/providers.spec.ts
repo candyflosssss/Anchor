@@ -354,7 +354,7 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await page.getByLabel('Key 默认协议').selectOption('anthropic');
   await page.getByRole('button', { name: '保存 Key', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
-  await detail.getByRole('button', { name: '配置 Key second 的模型协议', exact: true }).click();
+  await detail.getByRole('tab', { name: /^模型/ }).click();
   await expect(page.getByLabel('查询 Key', { exact: true })).toHaveCount(0);
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   const model = page.getByLabel('demo-model · Key second 的协议', { exact: true });
@@ -379,7 +379,7 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await page.getByLabel('Key 默认协议').selectOption('responses');
   await page.getByRole('button', { name: '保存 Key', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
-  await detail.getByRole('button', { name: '配置 Key second 的模型协议', exact: true }).click();
+  await detail.getByRole('tab', { name: /^模型/ }).click();
   await expect(model).toHaveValue('chat-completions');
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   await expect(detail).toContainText('已获取 2 个模型');

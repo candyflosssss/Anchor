@@ -842,3 +842,18 @@ Model统一校验可选password_saved并处理SessionResult.warning，hooks协�
 配置模型步骤仅在识别或设置为 NewAPI 平台时显示分组倍率区块；Key 诊断只在部分或全部失败时显示；目录列头为「上游模型 / Key / 倍率 / 协议 / 映射」，空状态为「尚未获取模型」，去除可用 Key 计数与目录说明，非配置步骤保留 revision。有模型时底部提供「去配置 Agent」，关闭弹窗并切到 Agent 页。供应商详情、Key／分身／service_tier 对话框和 Claude Code／Desktop 卡片提示改为短句，风险确认文字不变。
 
 仅调整 View、hook Controller 中新建名称跟随与 Model 纯函数 `providerIdFromURL`，桌面契约、核心规则与 CLI 不变。验证为 typecheck、lint、vitest 及模拟浏览器 Playwright（providers／provider-protocol／provider-recovery／refresh／provider-ime、provider-setup／agents、desktop 供应商相关用例）；与改动前基线同样失败的既有用例单独记录。未做原生 Wails 窗口验收。已随 desktop.87 dev 打包发布，见[发行记录](../release/desktop.md#provider-setup-87)。
+
+### 供应商列表与详情页精简（2026-11-28，当前源码，未打包）
+
+用户反馈 .87 的供应商页「无变化」：上一轮只改了新建弹窗，列表和详情页布局未动。本轮调整列表与详情页，不改桌面契约、核心规则与 CLI。
+
+- 列表：去掉标题上方的「配置管理」；「启用状态」与「健康」两列合并为「状态」列，开关旁显示健康标签或「已停用」，健康说明移到悬停提示。开关的无障碍名称不变。
+- 详情头部：去掉与健康标签重复的「已启用」徽标，地址与健康标签同一行，长地址省略显示，不撑宽窗口。
+- 分组倍率／NewAPI 用户令牌卡片原先显示在所有页签上方，改为只在「概况」页显示；倍率数值仍在「模型」页各映射行和目录中展示。
+- 概况：「接入检查」改名「状态」，去掉与头部重复的请求地址行和「账户与余额」快捷按钮（页签仍在）；未测试时检查项直接显示「模型推理尚未测试」，测试详情卡只在失败时显示。「配置」卡合并首字／整条超时与并发为一行；主页仅在已设置时显示；多个请求地址时才列出地址。出站代理面板从概况移除。
+- Key 页：出站代理面板改为默认折叠的「出站代理」，说明缩为一句「代理失败不会自动直连」；调度策略选项改为「轮流调度／按顺序优先」；无覆盖时不显示「0 个覆盖」；去掉只是跳到模型页签的「模型协议」按钮。
+- 模型页：批量操作栏仅在勾选映射后出现；列头「来源 Key / 相对倍率」改为「Key / 倍率」。
+
+统计（相对 `41f218e`）：详情视图中文字符 691 → 618，按钮 26 → 24；列表视图中文字符 259 → 245，列 8 → 7；详情内代理面板中文字符 61 → 25，并在概况页不再出现。风险确认文字不变。
+
+验证：typecheck、lint、vitest 469 项通过；模拟浏览器 Playwright providers／provider-recovery／provider-mapping-batch／refresh／provider-protocol／provider-test／channel-availability／provider-ime 58 项中 55 项通过（其余 3 项 provider-protocol:3、providers 完整编辑、refresh:29 在改动前基线同样失败），desktop.spec 供应商相关 16 项中 13 项通过（549、647、1341 三项改动前同样失败，1341 与 provider-protocol:3 同为 Key 单元格精确名称匹配问题）。未做原生 Wails 窗口验收。

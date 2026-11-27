@@ -24,8 +24,9 @@ export function ProxyBindings({ c, providerId }: { c: Controller; providerId?: s
 }
 export function ProviderProxyPanel({ providerId, disabled }: { providerId: string; disabled: boolean }) {
   const c = useProxiesController();
-  return <section className="mt-4 rounded-lg border p-4" aria-label="供应商代理设置"><div className="flex items-center justify-between gap-2"><h3 className="font-medium">出站代理</h3><Button variant="ghost" size="sm" disabled={c.busy || disabled} onClick={() => void c.refresh()}><RefreshCw />重新读取</Button></div>
-    <p className="my-2 text-sm text-muted-foreground">在侧栏“代理设置”添加节点；Key 可继承、不使用应用代理、使用系统代理或选择指定节点。代理连接失败不会自动直连。</p><Feedback c={c} /><ProxyBindings c={{ ...c, disabled: c.disabled || disabled }} providerId={providerId} /></section>;
+  return <details className="detail-card pricing-details mt-4" aria-label="供应商代理设置"><summary>出站代理</summary>
+    <div className="mt-3 flex items-center justify-between gap-2"><p className="text-sm text-muted-foreground">代理失败不会自动直连。</p><Button variant="ghost" size="sm" disabled={c.busy || disabled} onClick={() => void c.refresh()}><RefreshCw />重新读取</Button></div>
+    <Feedback c={c} /><ProxyBindings c={{ ...c, disabled: c.disabled || disabled }} providerId={providerId} /></details>;
 }
 export function ProxiesView({ onActivity }: { onActivity?: (busy: boolean) => void }) {
   const c = useProxiesController(onActivity);

@@ -10,7 +10,6 @@ import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowLeft, CircleAlert, CircleCheck, CircleDashed, Copy, KeyRound, List, LoaderCircle, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Trash2, TextCursorInput } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Switch } from '../../components/ui/switch';
-import { StatusBadge } from '../../components/shared/status-badge';
 import { ConfirmAction } from '../../components/shared/confirm-action';
 import { MenuItem, Popover } from '../../components/shared/popover-menu';
 import { ProviderPricingView } from './provider-pricing.view';
@@ -22,8 +21,8 @@ import type { ProviderController } from './use-provider-controller';
 const tabs: [DetailTab, string][] = [['overview', '概况'], ['keys', 'Key'], ['models', '模型'], ['usage', '用量'], ['account', '账户与余额']];
 type Ask = { action: string; title: string; body: string; fields: Partial<Action> };
 
-export function HealthPill({ tone, label }: { tone: Tone; label: string }) {
-  return <span className={`health-pill tone-${tone}`}><span className="mini-dot" aria-hidden="true" />{label}</span>;
+export function HealthPill({ tone, label, title }: { tone: Tone; label: string; title?: string }) {
+  return <span className={`health-pill tone-${tone}`} title={title}><span className="mini-dot" aria-hidden="true" />{label}</span>;
 }
 
 export function ProbeCard({ probe }: { probe: Probe }) {
@@ -54,8 +53,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
       <span className="provider-avatar large" aria-hidden="true">{Array.from(p.id)[0]}</span>
       <div className="detail-title">
         <h1>{p.id}</h1>
-        <div className="detail-meta"><StatusBadge enabled={p.enabled} />{summary && <HealthPill tone={summary.tone} label={summary.label} />}</div>
-        <span className="provider-url mono" title={p.base_urls.join('\n')}>{p.base_urls[0]}{p.base_urls.length > 1 ? ` +${p.base_urls.length - 1}` : ''}</span>
+        <div className="detail-meta">{summary && p.enabled && <HealthPill tone={summary.tone} label={summary.label} title={summary.hint} />}<span className="provider-url mono" title={p.base_urls.join('\n')}>{p.base_urls[0]}{p.base_urls.length > 1 ? ` +${p.base_urls.length - 1}` : ''}</span></div>
       </div>
       <div className="detail-actions">
         {w?.keys.some(keyNeedsRecovery) && <Button variant="outline" disabled={blocked || f.needsRead} onClick={() => c.openDialog({ kind: 'key-reset-all' })}><RotateCcw />恢复所有 Key</Button>}
@@ -69,7 +67,6 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
         </Popover>
       </div>
     </header>
-    {c.detailTab !== 'account' && !c.editor && <ProviderGroupRates key={`${p.id}:${p.revision}`} c={c} />}
     <div className="detail-tabs" role="tablist" aria-label="供应商详情分区" onKeyDown={tabKeys}>
       {tabs.map(([id, title]) => <button key={id} ref={node => { tabRefs.current[id] = node; }} role="tab" id={`tab-${id}`} aria-controls={`panel-${id}`} aria-selected={c.detailTab === id} tabIndex={c.detailTab === id ? 0 : -1} onClick={() => c.setDetailTab(id)}>
         {title}{id === 'keys' && w ? <span className="tab-count">{w.keys.length}</span> : id === 'models' && w ? <span className="tab-count">{w.models.length}</span> : null}
@@ -78,7 +75,7 @@ export function ProviderDetail({ c, summary, onEdit }: { c: ProviderController; 
     <div role="tabpanel" id={`panel-${c.detailTab}`} aria-labelledby={`tab-${c.detailTab}`} className="detail-panel" tabIndex={0}>
       {f.error && !c.dialog && <div className="feedback error-feedback" role="alert"><CircleAlert size={16} /><span>{f.error}</span><Button variant="outline" size="sm" disabled={f.busy} onClick={() => void (f.needsRead ? c.load() : f.refresh())}>重新读取</Button></div>}
       {c.detailTab === 'account' ? <ProviderAccountView c={c} /> : !w ? (!f.error && <div className="empty-state compact" role="status"><LoaderCircle className="loading-icon" size={24} /><p>正在读取 Key、模型与用量…</p></div>)
-        : c.detailTab === 'overview' ? <><OverviewTab c={c} p={p} w={w} /><ProviderProxyPanel key={p.id} providerId={p.id} disabled={blocked} /></>
+        : c.detailTab === 'overview' ? <><OverviewTab c={c} p={p} w={w} />{!c.editor && <ProviderGroupRates key={`${p.id}:${p.revision}`} c={c} />}</>
         : c.detailTab === 'keys' ? <><KeysTab c={c} w={w} disabled={blocked} ask={setAsk} /><ProviderProxyPanel key={p.id} providerId={p.id} disabled={blocked} /></>
         : c.detailTab === 'models' ? <ModelsTab key={w.provider_id} c={c} w={w} disabled={blocked} ask={setAsk} />
         : <UsageTab c={c} w={w} disabled={blocked} />}
@@ -97,35 +94,30 @@ function Check({ ok, warn, title, detail, action }: { ok: boolean; warn?: boolea
 
 function OverviewTab({ c, p, w }: { c: ProviderController; p: Provider; w: Workspace }) {
   const disabled = c.blocked || !!c.dialog;
-  const enabled = w.keys.filter(k => k.enabled);
-  const ready = enabled.filter(k => k.state === 'ready');
+  const ready = w.keys.filter(k => k.enabled && k.state === 'ready');
   const probe = [w.probe, ...w.keys.map(k => k.test)].reduce<Probe | null>((b, x) => x && (!b || x.at > b.at) ? x : b, null);
   return <div className="overview-grid">
-    <section className="detail-card"><div className="card-toolbar"><h2>接入检查</h2><Button size="sm" variant="outline" disabled={disabled} onClick={() => c.setDetailTab('account')}>账户与余额</Button></div>
+    <section className="detail-card"><h2>状态</h2>
       <ul className="checklist">
-        {!p.enabled && <Check ok={false} title="供应商已停用" detail="已停用" action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.toggleProvider(p)}>重新启用</Button>} />}
-        <Check ok title="请求地址" detail={p.base_urls.length > 1 ? `${p.base_urls.length} 个地址轮询 · ${p.base_urls[0]}` : p.base_urls[0]} />
+        {!p.enabled && <Check ok={false} title="供应商已停用" detail="不参与路由" action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.toggleProvider(p)}>重新启用</Button>} />}
         <Check ok={ready.length > 0} warn={!w.keys.length} title="访问 Key" detail={w.keys.length ? `${ready.length} 个可调度 / 共 ${w.keys.length} 个` : '未配置 · 匿名'}
           action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => w.keys.length ? c.setDetailTab('keys') : c.openDialog({ kind: 'key' })}>{w.keys.length ? '管理 Key' : '添加 Key'}</Button>} />
-        <Check ok={w.models.length > 0} title="模型映射" detail={w.models.length ? `已映射 ${w.models.length} 个公开模型` : '暂无模型映射'}
+        <Check ok={w.models.length > 0} title="模型映射" detail={w.models.length ? `已映射 ${w.models.length} 个模型` : '暂无模型映射'}
           action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.setDetailTab('models')}>{w.models.length ? '查看映射' : '映射模型'}</Button>} />
-        <Check ok={!!probe && !probe.failure} warn={!probe} title="推理测试" detail={probe ? `${probe.failure ? '失败' : '成功'} · ${probe.model} · ${formatAgo(probe.at)}` : '尚未测试'}
+        <Check ok={!!probe && !probe.failure} warn={!probe} title="推理测试" detail={probe ? `${probe.failure ? '失败' : '成功'} · ${probe.model} · ${formatAgo(probe.at)}` : '模型推理尚未测试'}
           action={<Button size="sm" variant="outline" disabled={disabled} onClick={() => c.openDialog({ kind: 'test' })}><Play />{probe ? '重新测试' : '测试连通'}</Button>} />
       </ul>
+      {probe?.failure && <ProbeCard probe={probe} />}
     </section>
     <section className="detail-card"><h2>配置</h2>
       <dl className="detail-properties">
-        <dt>供应商主页</dt><dd className="break-all">{p.homepage_url ? <a className="text-link" href={p.homepage_url} target="_blank" rel="noopener noreferrer">{p.homepage_url}</a> : '未设置'}</dd>
-        <dt>请求地址</dt><dd className="mono break-all">{p.base_urls.map(u => <div key={u}>{u}</div>)}</dd>
         <dt>请求渠道</dt><dd>{p.protocol ? protocolName[p.protocol] : '未提供'}</dd>
-        <dt>凭据</dt><dd className="flex items-center gap-2"><KeyRound size={14} />{p.has_secret ? '已配置 · 密钥不可回显' : '未配置密钥'}</dd>
-        <dt>首字超时</dt><dd>{p.first_token_timeout_seconds ?? 30} 秒</dd>
-        <dt>整条请求超时</dt><dd>{p.timeout_seconds} 秒</dd>
-        <dt>最大并发</dt><dd>{p.max_concurrent} 个请求</dd>
-        <dt>配置版本</dt><dd className="mono">revision {p.revision}</dd>
+        {p.base_urls.length > 1 && <><dt>请求地址</dt><dd className="mono break-all">{p.base_urls.map(u => <div key={u}>{u}</div>)}</dd></>}
+        <dt>凭据</dt><dd className="flex items-center gap-2"><KeyRound size={14} />{p.has_secret ? '已配置' : '未配置密钥'}</dd>
+        <dt>超时 / 并发</dt><dd>首字 {p.first_token_timeout_seconds ?? 30} 秒 · 整条 {p.timeout_seconds} 秒 · 并发 {p.max_concurrent}</dd>
+        {p.homepage_url && <><dt>主页</dt><dd className="break-all"><a className="text-link" href={p.homepage_url} target="_blank" rel="noopener noreferrer">{p.homepage_url}</a></dd></>}
+        <dt>版本</dt><dd><span className="mono">revision {p.revision}</span></dd>
       </dl>
-      <h2 className="mt-5">最近测试</h2>
-      {probe ? <ProbeCard probe={probe} /> : <p className="card-hint">模型推理尚未测试。</p>}
     </section>
   </div>;
 }
@@ -138,18 +130,17 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
       <div className="toolbar-actions">
         <label className="sr-only" htmlFor="key-strategy">Key 调度策略</label>
         <select id="key-strategy" className="select-field" value={w.strategy} disabled={disabled || !w.keys.length} onChange={e => void f.run('strategy', { strategy: e.target.value })}>
-          <option value="round-robin">轮流使用可用 Key</option><option value="priority">优先使用首个可用 Key（ID 顺序）</option>
+          <option value="round-robin">轮流调度</option><option value="priority">按顺序优先</option>
         </select>
         <Button disabled={disabled || w.keys.length >= 64} onClick={() => c.openDialog({ kind: 'key' })}><Plus />添加 Key</Button>
       </div>
     </div>
-    {w.keys.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">Key</th><th scope="col">默认协议 / 模型覆盖</th><th scope="col">状态</th><th scope="col">最近测试</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
+    {w.keys.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col">Key</th><th scope="col">协议</th><th scope="col">状态</th><th scope="col">最近测试</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
       {w.keys.map(k => <tr key={k.id}>
-        <td><span className="mono">{k.id}</span><KeyGroupName rate={k.rate} /></td><td>{protocolName[k.protocol as keyof typeof protocolName]}<span className="cell-hint"> · {k.model_protocols.length} 个覆盖</span></td>
+        <td><span className="mono">{k.id}</span><KeyGroupName rate={k.rate} /></td><td>{protocolName[k.protocol as keyof typeof protocolName]}{k.model_protocols.length > 0 && <span className="cell-hint"> · {k.model_protocols.length} 个覆盖</span>}</td>
         <td><span className={`health-label ${k.state}`}>{healthText[k.state] ?? k.state}</span>{(k.error_score ?? 0) > 0 && <span className="cell-hint">错误分数 {k.error_score}</span>}</td>
         <td>{k.test ? <span className={k.test.failure ? 'text-destructive' : ''}>{k.test.failure ? '失败' : '成功'} · {k.test.elapsed_ms} ms · {formatAgo(k.test.at)}</span> : <span className="cell-hint">未测试</span>}</td>
         <td className="row-actions">
-          <Button size="sm" variant="ghost" disabled={disabled} aria-label={`配置 Key ${k.id} 的模型协议`} onClick={() => { c.setDetailTab('models'); }}>模型协议</Button>
           <Button size="sm" variant="ghost" disabled={disabled} aria-label={`测试 Key ${k.id}`} onClick={() => c.openDialog({ kind: 'test', keyId: k.id })}><Play />测试</Button>
           <label className="key-toggle" data-state={k.enabled ? 'checked' : 'unchecked'}>
             <Switch className="key-toggle-switch" checked={k.enabled} disabled={disabled} aria-label={`Key ${k.id} 启用状态`} onCheckedChange={enabled => void f.run('key-put', { target: k.id, enabled })} />
@@ -171,7 +162,7 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
     <section className="detail-card">
       <div className="card-toolbar"><div><h2>模型映射</h2><p className="card-hint">供应商倍率 {c.selected?.cost_multiplier}×</p></div>
         <Button variant="outline" disabled={disabled} onClick={() => c.openDialog({ kind: 'mapping' })}><Plus />手动添加映射</Button></div>
-      {w.models.length > 0 && <div className="card-toolbar" role="group" aria-label="模型映射批量操作">
+      {selection.ids.length > 0 && <div className="card-toolbar" role="group" aria-label="模型映射批量操作">
         <span className="card-hint" role="status">已选 {selection.ids.length} / {w.models.length} 个映射</span>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" disabled={disabled || !selection.ids.length || c.features.needsRead} onClick={() => batch('test')}><Play />批量测试</Button>
@@ -180,7 +171,7 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
           <Button size="sm" variant="ghost" disabled={disabled || !selection.ids.length} onClick={selection.clear}>清空选择</Button>
         </div>
       </div>}
-      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col"><input type="checkbox" aria-label="全选模型映射" checked={selection.all} disabled={disabled} ref={node => { if (node) node.indeterminate = selection.ids.length > 0 && !selection.all; }} onChange={event => selection.selectAll(event.target.checked)} /></th><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col">来源 Key / 相对倍率</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
+      {w.models.length ? <div className="table-scroll"><table className="data-table"><thead><tr><th scope="col"><input type="checkbox" aria-label="全选模型映射" checked={selection.all} disabled={disabled} ref={node => { if (node) node.indeterminate = selection.ids.length > 0 && !selection.all; }} onChange={event => selection.selectAll(event.target.checked)} /></th><th scope="col">公开别名</th><th scope="col">上游模型</th><th scope="col">能力</th><th scope="col">Key / 倍率</th><th scope="col" className="text-right">操作</th></tr></thead><tbody>
         {w.models.map(m => <tr key={m.id}>
           <td><input type="checkbox" aria-label={`选择模型映射 ${m.id}`} checked={selection.ids.includes(m.id)} disabled={disabled} onChange={event => selection.toggle(m.id, event.target.checked)} /></td>
           <td className="mono">{m.id}</td><td className="mono break-all">{m.upstream}</td>
