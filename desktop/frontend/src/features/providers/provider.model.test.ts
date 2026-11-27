@@ -1,6 +1,6 @@
 import { actionFor } from './provider-features.model';
 import { describe, expect, it } from 'vitest';
-import { isDirty, newDraft, toSave, validateDraft, type Provider } from './provider.model';
+import { isDirty, newDraft, providerIdFromURL, toSave, validateDraft, type Provider } from './provider.model';
 import { MockProviderTransport } from './provider.mock';
 const source: Provider = { cost_multiplier: 1, id: '摸鱼AI', homepage_url: 'https://www.example.com', base_urls: ['https://api.example.com/v1', 'https://api2.example.com/v1'], enabled: false, timeout_seconds: 90, max_concurrent: 2, revision: 4, has_secret: true };
 const valid = () => ({ ...newDraft(), id: '新供应商', base_urls: ['https://api.example.com/v1'] });
@@ -161,4 +161,17 @@ it('uses new request defaults and round-trips first token timeout independently'
   const custom = { ...source, first_token_timeout_seconds: 75 };
   expect(toSave(newDraft(custom), custom).provider.first_token_timeout_seconds).toBe(75);
   for (const value of ['', '0', '3601', '1.5']) expect(validateDraft({ ...valid(), firstTokenTimeout: value }).firstTokenTimeout).toBeDefined();
+});
+
+describe('providerIdFromURL', () => {
+  it('derives a valid name from the first request root', () => {
+    expect(providerIdFromURL('https://api.moyu.ai/v1')).toBe('moyu.ai');
+    expect(providerIdFromURL(' https://www.Example.com ')).toBe('example.com');
+    expect(providerIdFromURL('http://127.0.0.1:8317/v1')).toBe('127.0.0.1');
+  });
+  it('returns empty when no name can be derived', () => {
+    expect(providerIdFromURL('')).toBe('');
+    expect(providerIdFromURL('not a url')).toBe('');
+    expect(providerIdFromURL('http://[::1]:8080/v1')).toBe('');
+  });
 });

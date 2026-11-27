@@ -2,7 +2,7 @@ import { reconcileEntities } from '../../lib/keyed-refresh';
 import { useProviderAccount } from './use-provider-account';
 import { useProviderFeatures } from './use-provider-features';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { clearDraftSecrets, clearSaveSecrets, newDraft, problemText, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
+import { clearDraftSecrets, clearSaveSecrets, newDraft, problemText, providerIdFromURL, ProviderProblem, toSave, validateDraft, type FieldErrors, type ProblemCode, type Provider, type ProviderDraft, type ProviderModels } from './provider.model';
 import type { Scenario } from './provider.mock';
 import type { DetailTab, ProviderDialog } from './provider-summary.model';
 import type { ProviderEnvironment } from '../../desktop/environment';
@@ -93,8 +93,13 @@ export function useProviderController(environment: ProviderEnvironment, observat
     setNotice(''); setEditor({ source, draft: newDraft(source) }); setErrors({});
   }
   function changeDraft<K extends keyof ProviderDraft>(key: K, value: ProviderDraft[K]) {
-    setEditor(old => old && { ...old, draft: { ...old.draft, [key]: value,
-      ...(key === 'secretMode' ? { secret: '', confirmClear: false } : {}) } });
+    setEditor(old => {
+      if (!old) return old;
+      const draft = { ...old.draft, [key]: value, ...(key === 'secretMode' ? { secret: '', confirmClear: false } : {}) };
+      // New providers follow the first request root until the name is typed by hand.
+      if (key === 'base_urls' && !old.source && (!old.draft.id || old.draft.id === providerIdFromURL(old.draft.base_urls[0] ?? ''))) draft.id = providerIdFromURL(draft.base_urls[0] ?? '');
+      return { ...old, draft };
+    });
     setErrors(old => {
       const next = { ...old }; delete next[key as keyof FieldErrors];
       if (key === 'initialKeys') for (const name of Object.keys(next)) if (name.startsWith('initial_key_')) delete next[name as keyof FieldErrors];

@@ -134,7 +134,7 @@ function KeysTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspace;
   const f = c.features;
   return <section className="detail-card">
     <div className="card-toolbar">
-      <div><h2>访问 Key</h2><p className="card-hint">Key 开关独立保存；供应商停用时，即使 Key 已启用也不参与路由。</p></div>
+      <h2>访问 Key</h2>
       <div className="toolbar-actions">
         <label className="sr-only" htmlFor="key-strategy">Key 调度策略</label>
         <select id="key-strategy" className="select-field" value={w.strategy} disabled={disabled || !w.keys.length} onChange={e => void f.run('strategy', { strategy: e.target.value })}>
@@ -169,7 +169,7 @@ function ModelsTab({ c, w, disabled, ask }: { c: ProviderController; w: Workspac
   const batch = (operation: 'test' | 'edit' | 'delete') => c.openDialog({ kind: 'mapping-batch', operation, workspace: structuredClone(w), ids: [...selection.ids] });
   return <div className="stack">
     <section className="detail-card">
-      <div className="card-toolbar"><div><h2>模型映射</h2><p className="card-hint">供应商倍率 {c.selected?.cost_multiplier}× · 相对倍率 = 供应商倍率 × Key 缓存分组倍率</p></div>
+      <div className="card-toolbar"><div><h2>模型映射</h2><p className="card-hint">供应商倍率 {c.selected?.cost_multiplier}×</p></div>
         <Button variant="outline" disabled={disabled} onClick={() => c.openDialog({ kind: 'mapping' })}><Plus />手动添加映射</Button></div>
       {w.models.length > 0 && <div className="card-toolbar" role="group" aria-label="模型映射批量操作">
         <span className="card-hint" role="status">已选 {selection.ids.length} / {w.models.length} 个映射</span>

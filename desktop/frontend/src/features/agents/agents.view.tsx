@@ -49,8 +49,8 @@ export function AgentsView({ onActivity }: { onActivity: (busy: boolean) => void
               {!canConfigure && binding && <div><dt>默认模型</dt><dd>{binding.model}</dd></div>}
             </dl>
             {!target && !binding && <p className="card-hint">未发现此平台的本机配置。</p>}
-            {row.agent === 'claude' && <p className="card-hint">映射模型同步到 /model 菜单；完整列表需要 Claude Code 2.1.242 或更新版本。旧版可能只显示部分模型。配置成功不代表实际请求已验证。</p>}
-            {row.agent === 'claude-desktop' && <p className="card-hint">接管当前已应用的本地第三方配置，可能同时影响 Chat、Cowork 和 Code。请先在 Claude Desktop 开启 Developer Mode 并应用本地配置。公司策略和远程配置不接管；切换配置后需返回原配置才能继续更新。应用或恢复后请完全退出并重开 Claude Desktop。</p>}
+            {row.agent === 'claude' && <p className="card-hint">完整 /model 列表需要 Claude Code 2.1.242+。</p>}
+            {row.agent === 'claude-desktop' && <p className="card-hint">需先在 Claude Desktop 开启 Developer Mode 并应用本地配置。</p>}
             {(canConfigure || canRebuild) && <form onSubmit={e => { e.preventDefault(); c.update(); }}>
               <fieldset disabled={c.busy}>
                 {binding && !c.availableModels.some(m => m.id === binding.model) && <p className="field-error">已保存的默认模型「{binding.model}」{c.data!.models.some(m => m.id === binding.model) ? '在当前托管范围内不可用，请检查候选供应商或选择新的默认模型。' : '已删除，请选择新的默认模型。'}</p>}

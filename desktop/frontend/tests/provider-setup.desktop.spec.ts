@@ -60,7 +60,7 @@ async function host(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: '添加供应商', exact: true }).first().click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('供应商名称 / ID').fill('一站式供应商');
+  await dialog.getByLabel('供应商名称', { exact: true }).fill('一站式供应商');
   await dialog.getByLabel('API 根地址', { exact: true }).fill('https://api.example.com/v1');
   return dialog;
 }
@@ -92,7 +92,7 @@ test('optional Key and cancellation do not trigger model discovery', async ({ pa
   expect(await page.evaluate(() => window.providerSetupTest.saves)).toBe(0);
   await page.getByRole('button', { name: '添加供应商', exact: true }).first().click();
   await expect(dialog.getByLabel('API Key（可选）')).toHaveValue('');
-  await dialog.getByLabel('供应商名称 / ID').fill('无Key供应商');
+  await dialog.getByLabel('供应商名称', { exact: true }).fill('无Key供应商');
   await dialog.getByLabel('API 根地址', { exact: true }).fill('https://api.example.com/v1');
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).click();
   await expect(dialog).toBeHidden();

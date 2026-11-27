@@ -201,17 +201,16 @@ function MappingBody({ c, d, run }: { c: ProviderController; d: Extract<Provider
         <select id="mapping-service-tier" className="select-field" value={serviceTier} onChange={e => { setServiceTier(e.target.value); setSpeedVariants([]); }}>
           <option value="">不固定（沿用请求参数）</option><option value="priority">Fast（priority）</option><option value="ultrafast">Ultrafast</option>
         </select>
-        <p className="field-hint">固定后由 Anchor 覆盖请求的 service_tier；同名公开模型的所有渠道共用，上游模型 ID 保持不变。需要上游支持，可能增加费用。</p>
+        <p className="field-hint">需要上游支持，可能增加费用。</p>
       </div>
       {!serviceTier && !/\((fast|ultrafast)\)$/.test(alias) && <div className="field"><label>额外创建速度分身（可选）</label>
         {['fast', 'ultrafast'].map(speed => <label className="checkbox-row" key={speed}><input type="checkbox" checked={speedVariants.includes(speed)} onChange={e => setSpeedVariants(values => e.target.checked ? [...values, speed] : values.filter(value => value !== speed))} />{speed === 'fast' ? 'Fast' : 'Ultrafast'} · {alias || '模型别名'}({speed})</label>)}
-        <p className="field-hint">与当前映射一起保存，名称冲突时整体不保存。分身仅复制当前供应商渠道，是独立快照，后续编辑不会自动同步；不继承普通档位参考价格。</p>
+        <p className="field-hint">独立快照，之后不随本映射同步。</p>
       </div>}
       {speedError && <p className="field-error" role="alert">{speedError}</p>}
-      <p className="field-hint">相对倍率自动取「供应商倍率 × 来源 Key 的缓存分组倍率」。模型倍率暂不启用。</p>
       {editing && <div className="field"><label htmlFor="mapping-strategy">公开模型调度策略</label>
         <select id="mapping-strategy" className="select-field" value={strategy} onChange={e => setStrategy(e.target.value)}>{Object.entries(routingRules).map(([id, rule]) => <option key={id} value={id}>{rule.label}</option>)}</select></div>}
-      <div className="field"><label>来源 Key（ID）</label><p className="field-hint">不勾选表示允许所有启用 Key；导入时默认保留目录来源。</p>
+      <div className="field"><label>来源 Key（ID）</label><p className="field-hint">不勾选即使用全部启用 Key。</p>
         {w.keys.map(k => <label key={k.id} className="checkbox-row"><input type="checkbox" checked={keyIDs.includes(k.id)} onChange={e => setKeyIDs(ids => e.target.checked ? [...ids, k.id] : ids.filter(id => id !== k.id))} />{k.id}{!k.enabled && ' · 已停用'}</label>)}
         {keyIDs.includes('anonymous') && <label className="checkbox-row"><input type="checkbox" checked onChange={() => setKeyIDs([])} />anonymous · 匿名来源</label>}
       </div>

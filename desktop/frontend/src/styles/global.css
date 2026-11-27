@@ -154,6 +154,11 @@ input[readonly] { background: hsl(var(--muted)); color: hsl(var(--muted-foregrou
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .url-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px; }
 .url-row .field-error { grid-column: 1 / -1; margin-top: 0; }
+.credential-fields { display: grid; gap: 12px; }
+.editor-advanced { border-top: 1px solid hsl(var(--border)); padding-top: 12px; }
+.editor-advanced > summary { cursor: pointer; font-size: 13px; font-weight: 500; color: hsl(var(--muted-foreground)); width: fit-content; }
+.editor-advanced > summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; border-radius: 4px; }
+.editor-advanced-fields { display: grid; gap: 16px; padding-top: 16px; }
 .enabled-field { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; }
 .enabled-field strong { font-size: 13px; font-weight: 500; display: block; }
 .enabled-field input { width: 20px; height: 20px; }

@@ -115,7 +115,7 @@ test('a new provider automatically reconciles concurrent changes before its next
     };
   });
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
-  await page.getByLabel('供应商名称 / ID').fill('新建供应商');
+  await page.getByLabel('供应商名称', { exact: true }).fill('新建供应商');
   await page.getByLabel('API 根地址', { exact: true }).fill('https://new.example.com/v1');
   await page.getByRole('dialog').getByRole('button', { name: '添加供应商', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();

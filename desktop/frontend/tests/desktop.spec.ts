@@ -189,7 +189,7 @@ test('desktop starts once, loads real-mode data and submits without persisting s
   await expect(page.getByRole('dialog', { name: '切换设备' })).not.toContainText('test-local-instance');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
-  await page.getByLabel('供应商名称 / ID').fill('桌面供应商');
+  await page.getByLabel('供应商名称', { exact: true }).fill('桌面供应商');
   await page.getByLabel('API 根地址', { exact: true }).fill('https://desktop.example.com/v1');
   await page.getByRole('dialog').getByRole('button', { name: '添加供应商', exact: true }).dblclick();
   await expect(page.getByRole('dialog')).toBeHidden();
@@ -1520,7 +1520,7 @@ test('new provider setup detects NewAPI, saves authorization and reloads its cat
   await host(page, true, 'newapi');
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByLabel('供应商名称 / ID').fill('NewAPI测试');
+  await dialog.getByLabel('供应商名称', { exact: true }).fill('NewAPI测试');
   await dialog.getByLabel('API 根地址', { exact: true }).fill('https://newapi.example.test/v1');
   await dialog.getByLabel('API Key（可选）', { exact: true }).fill('synthetic-inference-key');
   await dialog.getByRole('button', { name: '添加并获取模型', exact: true }).click();

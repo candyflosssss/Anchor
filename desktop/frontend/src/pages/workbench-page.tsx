@@ -54,7 +54,7 @@ export function WorkbenchPage({ environment, balanceCache, page, navSeq, onNavig
       : c.selected && !c.quickId ? <div className="workspace">{banner}<ProviderDetail c={c} summary={summary} onEdit={() => edit(c.selected ?? undefined)} /><Notice text={c.features.notice || c.notice} /></div>
       : <ProviderList c={c} summaries={summaries} balances={balances.entries} onRefreshBalance={balances.refresh} onEdit={edit} onCreate={() => edit()} onImport={ccImport.show}>{banner}</ProviderList>}
     {prototype && c.mock && <div className="workspace pt-0"><footer className="prototype-controls mt-4"><div><SlidersHorizontal size={14} /><label htmlFor="scenario">原型场景</label><select id="scenario" value={c.scenario} disabled={busy} onChange={event => c.changeScenario(event.target.value as Scenario)}>{Object.entries(scenarios).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div></footer></div>}
-    {c.editor && <ProviderEditor c={c} restoreFocus={() => { requestAnimationFrame(() => { if (opener.current?.isConnected) opener.current.focus(); }); }} />}
+    {c.editor && <ProviderEditor c={c} onUseInAgent={() => onNavigate('agents')} restoreFocus={() => { requestAnimationFrame(() => { if (opener.current?.isConnected) opener.current.focus(); }); }} />}
     <ProviderDialogs c={c} />
     <CCImportDialog c={ccImport} />
   </>;

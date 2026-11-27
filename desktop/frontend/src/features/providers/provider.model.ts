@@ -55,6 +55,14 @@ export function newDraft(provider?: Provider): ProviderDraft {
     secretMode: 'keep', secret: '', confirmClear: false, initialKeys: [],
   };
 }
+/** Suggest a provider name from the first request root, e.g. https://api.moyu.ai/v1 → moyu.ai. Empty when no valid name can be derived. */
+export function providerIdFromURL(raw: string): string {
+  let url: URL;
+  try { url = new URL(raw.trim()); } catch { return ''; }
+  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/^(?:api|www|openai|gateway)\./, '');
+  const id = [...host].slice(0, 128).join('');
+  return isValidId(id) ? id : '';
+}
 export function validateDraft(draft: ProviderDraft): FieldErrors {
   const errors: FieldErrors = {};
   if (!isValidId(draft.id)) errors.id = '1–128 个中文／字母／数字或 ._-，以字母或数字开头。';

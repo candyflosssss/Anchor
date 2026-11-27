@@ -40,8 +40,9 @@ test('new provider validates fields, handles Chinese ID and never persists secre
   await expect(dialog.getByLabel('整条请求超时（秒）')).toHaveValue('500');
   await expect(dialog.getByLabel('最大并发')).toHaveValue('20');
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).click();
-  await expect(page.getByLabel('供应商名称 / ID')).toBeFocused();
-  await page.getByLabel('供应商名称 / ID').fill('中文供应商');
+  await expect(page.getByLabel('API 根地址', { exact: true })).toBeFocused();
+  await page.getByLabel('供应商名称', { exact: true }).fill('中文供应商');
+  await dialog.getByText('高级设置', { exact: true }).click();
   await page.getByLabel('供应商主页（可选）').fill('https://www.new.example.com');
   await page.getByLabel('API 根地址', { exact: true }).fill('https://new.example.com/v1');
   await page.getByRole('button', { name: '添加请求地址' }).click();
@@ -62,7 +63,7 @@ test('new provider validates fields, handles Chinese ID and never persists secre
 });
 test('complete edit preserves disabled status, limits and keep-secret semantics', async ({ page }) => {
   await ready(page); await edit(page, '本地调试');
-  await expect(page.getByLabel('供应商名称 / ID')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('供应商名称', { exact: true })).toHaveAttribute('readonly', '');
   await expect(page.getByRole('switch', { name: '启用此供应商' })).not.toBeChecked();
   await expect(page.getByLabel('整条请求超时（秒）')).toHaveValue('90');
   await page.getByLabel('最大并发').fill('3');
@@ -76,7 +77,7 @@ test('complete edit preserves disabled status, limits and keep-secret semantics'
 });
 test('cancel, close and escape discard directly; keyboard trap and focus restoration', async ({ page }) => {
   await ready(page); const trigger = page.getByRole('button', { name: '编辑 摸鱼AI', exact: true });
-  await trigger.click(); await expect(page.getByLabel('供应商名称 / ID')).toBeFocused();
+  await trigger.click(); await expect(page.getByLabel('API 根地址', { exact: true })).toBeFocused();
   await page.getByRole('button', { name: '替换密钥' }).click();
   await page.getByLabel('新的 API 密钥').fill('discard-test-only');
   for (let i = 0; i < 18; i++) { await page.keyboard.press('Tab'); expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true); }
@@ -317,7 +318,7 @@ test('long Chinese IDs and root URLs stay readable without widening the window',
   const id = '供'.repeat(128);
   const url = `https://example.com/${'gateway/'.repeat(20)}v1`;
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
-  await page.getByLabel('供应商名称 / ID').fill(id);
+  await page.getByLabel('供应商名称', { exact: true }).fill(id);
   await page.getByLabel('API 根地址', { exact: true }).fill(url);
   await page.getByRole('dialog').getByRole('button', { name: '添加供应商', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
@@ -365,7 +366,7 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await expect(defaultModel).toHaveValue('inherit');
   await expect(detail.getByText('demo-model', { exact: true })).toHaveCount(1);
   const merged = detail.getByLabel('上游模型 ID').locator('li').filter({ has: page.getByText('demo-model', { exact: true }) });
-  await expect(merged).toContainText('2 个可用 Key');
+  await expect(merged.getByLabel('demo-model 的可选 Key').locator('.catalog-model-key')).toHaveCount(2);
   await expect(merged.getByLabel('demo-model 的可选 Key')).toContainText('Key second');
   await expect(merged).toContainText('0.8×');
   await expect(merged).toContainText('1.5×');
@@ -392,7 +393,7 @@ test('key defaults and actual model overrides stay independent and inherit dynam
   await detail.getByRole('tab', { name: /^模型/ }).click();
   await detail.getByRole('button', { name: '获取模型目录', exact: true }).click();
   await expect(detail).toContainText('已获取 2 个模型');
-  await expect(merged).toContainText('1 个可用 Key');
+  await expect(merged.getByLabel('demo-model 的可选 Key').locator('.catalog-model-key')).toHaveCount(1);
   await expect(merged.getByLabel('demo-model 的可选 Key')).not.toContainText('Key second');
   await expect(detail.getByLabel('Key 查询结果')).not.toContainText('Key second');
   await detail.getByRole('tab', { name: /^Key/ }).click();
@@ -413,7 +414,7 @@ test('catalog search and mapping filters preserve the import flow', async ({ pag
   const detail = page.getByLabel('摸鱼AI 的详情');
   await detail.getByRole('tab', { name: /^模型/ }).click();
   const catalog = detail.getByRole('region', { name: '上游模型目录', exact: true });
-  await expect(catalog).toContainText('获取可用模型，开始配置');
+  await expect(catalog).toContainText('尚未获取模型');
   await catalog.getByRole('button', { name: '获取模型目录', exact: true }).click();
   const rows = catalog.getByLabel('上游模型 ID').locator(':scope > li');
   await expect(rows).toHaveCount(2);
@@ -455,7 +456,6 @@ test('catalog quick import defaults capabilities on and editing preserves opt ou
   await expect(dialog.getByLabel('函数工具', { exact: true })).toBeChecked();
   await expect(dialog.getByLabel('流式输出', { exact: true })).toBeChecked();
   await expect(dialog.getByLabel('此供应商的相对倍率')).toHaveCount(0);
-  await expect(dialog).toContainText('相对倍率自动取');
   await dialog.getByLabel('函数工具', { exact: true }).uncheck();
   await dialog.getByLabel('流式输出', { exact: true }).uncheck();
   await dialog.getByRole('button', { name: '保存映射', exact: true }).click();

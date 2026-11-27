@@ -28,7 +28,7 @@ test('new anonymous supplier uses its selected request channel', async ({ page }
   await page.getByRole('button', { name: '添加供应商', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByLabel('请求渠道', { exact: true })).toHaveValue('responses');
-  await dialog.getByLabel('供应商名称 / ID', { exact: true }).fill('渠道测试');
+  await dialog.getByLabel('供应商名称', { exact: true }).fill('渠道测试');
   await dialog.getByLabel('API 根地址', { exact: true }).fill('https://example.invalid/v1');
   await dialog.getByLabel('请求渠道', { exact: true }).selectOption('anthropic');
   await dialog.getByRole('button', { name: '添加供应商', exact: true }).click();
