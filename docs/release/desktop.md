@@ -1,9 +1,24 @@
 # 桌面开发版构建与安装
 
 - 更新：2026-11-28。
-- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.87](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.87)，发布于 `2026-11-28T03:47:43+08:00`。GitHub prerelease 含 11 项附件，构建提交 `c7e4d3fd1f608cded924f6c7892d73e255be8f67`。
-- 新增供应商只需填写请求地址，名称自动生成，次要设置收进「高级设置」；导入模型后可直接去配置 Agent，说明文字精简为短句。
+- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.88](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.88)，发布于 `2026-11-28T04:56:36+08:00`。GitHub prerelease 含 11 项附件，构建提交 `e0f7aefb40d66eab12b23f7067b226aa373a9497`。
+- 修复 Codex 开启 goal 后经 Claude（Messages）或 Chat Completions 供应商的会话持续报 `unsupported_conversion`；更新核心后重试原会话即可继续。
 - 获取路径为「设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新」。
+
+<a id="orphan-tool-output-88"></a>
+
+## goal 无配对工具输出转换修复 .88（已发布 dev）
+
+从干净提交 `e0f7aef` 构建 Windows AMD64 安装器和 Ubuntu 24.04 AMD64 deb，SOURCE dirty=false，输入摘要 `10a0254f0c41b1299dfa49c8a0babcdf231065d35530138739f192312ebbee29`；未纳入主工作区其他未提交内容。修复 Codex 开启 goal 后写入无 call_id、无对应调用的 `function_call_output`（`goal_objective`），使 Responses → Messages／Chat 在 request_convert 以 request_content 拒绝、此后同一会话持续失败的问题：无配对输出按原位置转为 user 内容并记录 `orphan_tool_output_text`，已配对结果与原生候选不变。参照 CLIProxyAPI 思路独立实现；无新增命令或参数。需更新实际处理请求的核心后重试原会话。设计见 [Messages 支持表](../design/protocol-anthropic-bridge.md#无配对调用的工具结果2026-11-28)。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `Anchor-Desktop-0.1.0-dev.desktop.88-windows-amd64-setup.exe` | 31319390 | `24b565c7fefb6447f4eb18df72ca4fdb5240a48d2595c7c4400fc1fbae2e51a4` |
+| `anchor-desktop_0.1.0-dev.desktop.88_amd64.deb` | 29304904 | `c1fa12ad8f2bbc1abe499e5d1a3cc6d40f5abc10f2544e5b84c08126503ce70b` |
+
+修复提交在隔离 worktree 上通过 gofmt、go vet 与 protocol／core 测试；两份真实会话无网络转换修复前复现 request_content、修复后成功，调用与结果全部保留。本轮完成双平台生产编译与 NSIS／deb 打包，内嵌前端与固定 mihomo、deb 载荷与 runtime 一致，源码包输入摘要与构建一致。11 项附件远端大小与 GitHub digest 和本地一致，tag 指向构建提交，仓库 latest 状态未变。默认 dev 源以 .87 身份实际下载 Linux 桌面 runtime，用 .87 CLI 下载 .88 CLI 且程序报告 0.1.0-dev.desktop.88，兼容旧客户端的 deb 直接下载 SHA256 一致；Windows 安装器、runtime 和 CLI 仅比对远端 digest。
+
+证据位于 `dist/desktop/0.1.0-dev.desktop.88/publication/`。安装器未签名；未执行在线安装（apply）、系统安装器或双平台原生窗口验收，未跑 Go 全量与 race 测试，未请求真实付费上游。
 
 <a id="provider-setup-87"></a>
 

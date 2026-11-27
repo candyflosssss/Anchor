@@ -1,7 +1,7 @@
 # 在线更新 v1
 
 - 更新：2026-11-28。
-- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.87](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.87)，发布于 `2026-11-28T03:47:43+08:00`。GitHub prerelease 含 11 项附件，构建提交 `c7e4d3fd1f608cded924f6c7892d73e255be8f67`。
+- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.88](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.88)，发布于 `2026-11-28T04:56:36+08:00`。GitHub prerelease 含 11 项附件，构建提交 `e0f7aefb40d66eab12b23f7067b226aa373a9497`。
 - 新增供应商只需填写请求地址，名称自动生成，次要设置收进「高级设置」；导入模型后可直接去配置 Agent，说明文字精简为短句。
 - 获取路径为「设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新」。
 

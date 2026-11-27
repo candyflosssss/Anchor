@@ -5,19 +5,19 @@
 
 ## 公开下载
 
-当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.87**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
+当前公开 CLI 预发行版 **0.1.0-alpha.6**，包含中文供应商名称支持；桌面 dev 版为 **0.1.0-dev.desktop.88**，可在已有更新入口中选择 dev 检查／下载；从 `.34` 及更早版首次迁移须安排维护窗口并手动安装，详见下方升级注意：
 
 - [Windows x64 单文件 EXE](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_windows_amd64.exe)
 - [Linux x64 单文件](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-alpha.6/anchor_0.1.0-alpha.6_linux_amd64)
 - [发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-alpha.6)
 
-**desktop.87 已发布为 GitHub prerelease**。新增供应商只需填写请求地址，名称自动生成，次要设置收进「高级设置」，导入模型后可直接去配置 Agent。安装包与校验值见[桌面发行记录](docs/release/desktop.md#provider-setup-87)。
+**desktop.88 已发布为 GitHub prerelease**。修复 Codex 开启 goal 后，经 Claude（Messages）或 Chat Completions 供应商的会话持续报 `unsupported_conversion`：没有对应调用的工具输出改为普通用户内容保留。安装包与校验值见[桌面发行记录](docs/release/desktop.md#orphan-tool-output-88)。
 
 桌面 dev 安装包（旧版代理接入失败时可手动升级一次）：
 
-- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.87/Anchor-Desktop-0.1.0-dev.desktop.87-windows-amd64-setup.exe)
-- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.87/anchor-desktop_0.1.0-dev.desktop.87_amd64.deb)
-- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.87)
+- [Windows x64 图形界面安装器](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.88/Anchor-Desktop-0.1.0-dev.desktop.88-windows-amd64-setup.exe)
+- [Ubuntu24.04 x64 安装包](https://github.com/candyflosssss/Anchor/releases/download/v0.1.0-dev.desktop.88/anchor-desktop_0.1.0-dev.desktop.88_amd64.deb)
+- [桌面发行页、SHA256 和对应源码](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.88)
 
 CLI 下载无需登录 GitHub。也可按 [一键安装说明](docs/release/install.md) 下载并自动校验。Windows 原生核心烟测及 PowerShell 5.1/7 安装器回归已通过；这是命令行预发行程序，不是图形界面安装器，尚无代码签名或自启动。
 
@@ -105,9 +105,9 @@ Codex 托管使用稳定 Anchor 二进制及明确批准的配置根，登记后
 
 已新增 Linux／Windows 桌面应用内 runtime 更新、Linux 一步命令更新和当前 SSH 被控机更新：先下载／校验，最后短暂交接核心并检查恢复，桌面自动重开。正在生成的回答仍可能中断。旧启动器／远端需先引导升级，SSH 沿用现有 POSIX/Linux 被控机支持范围；完整命令、来源／权限及失败边界见[最新指令大全](docs/cli/commands.md#11-本机与-ssh-在线更新)与[在线更新设计](docs/design/online-updates.md#runtime-与-ssh-更新2026-10-20源码未发布)。这些能力自 desktop.57 起已发布；desktop.60 包含 SSH 更新失败提示修复。
 
-### 在线更新（desktop.87 已投放 dev 渠道）
+### 在线更新（desktop.88 已投放 dev 渠道）
 
-**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认源提供 `0.1.0-dev.desktop.87` 的 Windows 和 Linux 安装器、runtime、CLI 及更新清单。[发行记录](docs/release/desktop.md#provider-setup-87)。
+**设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新**。默认源提供 `0.1.0-dev.desktop.88` 的 Windows 和 Linux 安装器、runtime、CLI 及更新清单。[发行记录](docs/release/desktop.md#orphan-tool-output-88)。
 
 **desktop.34 及更早版的旧升级器不含修复，首次迁移请备份状态、安排维护窗口、普通停止旧核心并退出全部界面，再手动安装 `.85` 并重新打开 Anchor，核对核心和 Agent 真实连接。** 新宿主遇到不支持交接的旧核心会拒绝在线安装，不降级为普通停服或强杀。主机与核心均升级后，后续更新才使用保留交接；仍有停机窗口，安装器不自动启动核心，既有 Codex 会话缓存地址不会自动迁移。SSH 远端核心须另行升级。本版核心将 state.db 迁移到 schema10，从旧版升级须备份，旧核心不能打开迁移后的数据库，核心与桌面须配套升级。公开 alpha.6 CLI 不含本轮修复，旧 desktop.8 无更新入口。
 

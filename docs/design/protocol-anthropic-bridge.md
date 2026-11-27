@@ -147,3 +147,5 @@ user 消息与 function/custom 工具结果中的 input_image 按标准 Messages
 - 记录 `orphan_tool_output_text` 降级，表示工具结果身份丢失、改为普通用户上下文；原生 Responses 候选、Session 基线与客户端历史保持原样，不增加请求或恢复预算。
 
 验证：在隔离 worktree 对两份真实会话 input（2957／4213 项）做无网络转换。修复前 HEAD 两份均复现 request_content；修复后均准备成功，775／1093 个调用及结果全部保留，goal 输出文本 1／1 保留，`goal_objective` 在请求体中的出现次数与正文自身一致，说明 name 未发送；原生候选保留原条目。私有副本只放任务临时目录，未打印、提交或打包，已清理。工具声明按历史合成最小声明，不称为完整线上请求重放；未请求真实付费上游。
+
+已随 [desktop.88 dev](../release/desktop.md#orphan-tool-output-88) 投放；需升级实际处理请求的核心。
