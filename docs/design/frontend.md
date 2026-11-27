@@ -835,10 +835,10 @@ Model统一校验可选password_saved并处理SessionResult.warning，hooks协�
 
 沿用现有 Model／hook Controller／View 和生成 DTO，语义及迁移见 [Codex统一设置](codex-retries.md#模型列表与能力覆盖授权2026-11-12当前源码未发布)。本轮未打包或做两平台原生窗口验收。
 
-### 供应商添加流程精简（2026-11-28，当前源码，未打包）
+### 供应商添加流程精简（2026-11-28，已随 desktop.87 dev 发布）
 
 新增供应商弹窗按「请求地址 → API Key（可选）与初始 Key → 供应商名称、请求渠道」排列，打开后焦点落在 API 根地址。名称默认按第一个请求地址的主机名生成（去掉 `api.`／`www.`／`openai.`／`gateway.` 前缀，最长 128 字符，不合法时留空），手动修改后不再跟随；标签由「供应商名称 / ID」改为「供应商名称」。主页、供应商倍率、最大并发、首字超时、整条请求超时与启用开关收进「高级设置」，新建时默认折叠，编辑时展开，任一字段报错时自动展开；校验失败按页面顺序聚焦第一个错误字段。编辑模式保留默认 API 密钥区块，未设置时显示「未设置」。
 
 配置模型步骤仅在识别或设置为 NewAPI 平台时显示分组倍率区块；Key 诊断只在部分或全部失败时显示；目录列头为「上游模型 / Key / 倍率 / 协议 / 映射」，空状态为「尚未获取模型」，去除可用 Key 计数与目录说明，非配置步骤保留 revision。有模型时底部提供「去配置 Agent」，关闭弹窗并切到 Agent 页。供应商详情、Key／分身／service_tier 对话框和 Claude Code／Desktop 卡片提示改为短句，风险确认文字不变。
 
-仅调整 View、hook Controller 中新建名称跟随与 Model 纯函数 `providerIdFromURL`，桌面契约、核心规则与 CLI 不变。验证为 typecheck、lint、vitest 及模拟浏览器 Playwright（providers／provider-protocol／provider-recovery／refresh／provider-ime、provider-setup／agents、desktop 供应商相关用例）；与改动前基线同样失败的既有用例单独记录。未做原生 Wails 窗口验收，未打包或发布。
+仅调整 View、hook Controller 中新建名称跟随与 Model 纯函数 `providerIdFromURL`，桌面契约、核心规则与 CLI 不变。验证为 typecheck、lint、vitest 及模拟浏览器 Playwright（providers／provider-protocol／provider-recovery／refresh／provider-ime、provider-setup／agents、desktop 供应商相关用例）；与改动前基线同样失败的既有用例单独记录。未做原生 Wails 窗口验收。已随 desktop.87 dev 打包发布，见[发行记录](../release/desktop.md#provider-setup-87)。

@@ -1,9 +1,24 @@
 # 桌面开发版构建与安装
 
-- 更新：2026-11-21。
-- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.86](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.86)，发布于 `2026-11-21T21:20:02+08:00`。GitHub prerelease 含 11 项附件，构建提交 `f8a49fc86ed82109693842946a22f79bb13a9b15`。
-- 模型映射将不可用渠道显示为灰色矮卡。全部渠道不可用时整张模型卡切换为紧凑灰底。
+- 更新：2026-11-28。
+- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.87](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.87)，发布于 `2026-11-28T03:47:43+08:00`。GitHub prerelease 含 11 项附件，构建提交 `c7e4d3fd1f608cded924f6c7892d73e255be8f67`。
+- 新增供应商只需填写请求地址，名称自动生成，次要设置收进「高级设置」；导入模型后可直接去配置 Agent，说明文字精简为短句。
 - 获取路径为「设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新」。
+
+<a id="provider-setup-87"></a>
+
+## 供应商接入流程精简 .87（已发布 dev）
+
+从干净提交 `c7e4d3f` 构建 Windows AMD64 安装器和 Ubuntu 24.04 AMD64 deb，未纳入主工作区其他未提交内容。新建供应商必填项由 2 项减为 1 项（请求地址），名称按地址主机名自动生成；首屏控件由 20 个减为 16 个，主页、倍率、并发、两项超时与启用开关收进默认折叠的「高级设置」，出错时自动展开。分组倍率仅 NewAPI 显示，Key 诊断仅失败时显示，导入模型后可点「去配置 Agent」。供应商、Key 与 Claude Agent 五个视图的说明文字由 407 字减为 107 字，风险确认不变。设计说明见[前端设计](../design/frontend.md#供应商添加流程精简2026-11-28已随-desktop87-dev-发布)。
+
+| 安装包 | 字节数 | SHA256 |
+| --- | ---: | --- |
+| `Anchor-Desktop-0.1.0-dev.desktop.87-windows-amd64-setup.exe` | 31316871 | `e12a8da21cc737d47103ea1b6c9a19c6b25fab04c1d555f39f70023bab05bd01` |
+| `anchor-desktop_0.1.0-dev.desktop.87_amd64.deb` | 29303788 | `9ae4741eff8701df9259cb191c43db1f94b5ed2c3375eabefcc9a3c4890a2991` |
+
+功能轮在同一源码上通过前端类型检查、lint 与 469 项单元测试；模拟宿主浏览器测试 99 项中 91 项通过，其余 8 项在基线 `c1af671` 上同样失败。11 项附件远端大小与 GitHub digest 和本地一致，tag 指向构建提交，仓库 latest 状态未变。默认 dev 源从 .86 实际下载 Linux 桌面 runtime，用 .86 CLI 下载 .87 CLI 并核对程序版本，兼容旧客户端的 deb 直接下载 SHA256 一致；Windows 安装器、runtime 和 CLI 远端 digest 与本地一致。
+
+证据位于 `dist/desktop/0.1.0-dev.desktop.87/publication/`。安装器未签名；未执行在线安装（apply）、系统安装器或双平台原生窗口验收，未跑 Go 全量与 race 测试。
 
 <a id="mapping-cards-86"></a>
 

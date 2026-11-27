@@ -1,9 +1,13 @@
 # 在线更新 v1
 
-- 更新：2026-11-21。
-- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.86](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.86)，发布于 `2026-11-21T21:20:02+08:00`。GitHub prerelease 含 11 项附件，构建提交 `f8a49fc86ed82109693842946a22f79bb13a9b15`。
-- 模型映射将不可用渠道显示为灰色矮卡。全部渠道不可用时整张模型卡切换为紧凑灰底。
+- 更新：2026-11-28。
+- 当前线上桌面 dev 版为 [0.1.0-dev.desktop.87](https://github.com/candyflosssss/Anchor/releases/tag/v0.1.0-dev.desktop.87)，发布于 `2026-11-28T03:47:43+08:00`。GitHub prerelease 含 11 项附件，构建提交 `c7e4d3fd1f608cded924f6c7892d73e255be8f67`。
+- 新增供应商只需填写请求地址，名称自动生成，次要设置收进「高级设置」；导入模型后可直接去配置 Agent，说明文字精简为短句。
 - 获取路径为「设置 → 在线更新 → dev · 快速测试 → 检查更新 → 下载更新 → 安装更新」。
+
+## .87 在线投放（2026-11-28）
+
+供应商接入流程精简，构建提交 `c7e4d3f`。11 附件远端大小／digest、构建 tag 与非 latest 已核对；默认 dev 源从 .86 实际下载 Linux runtime，.86 CLI 下载 .87 CLI 并报告新版本，兼容旧客户端的 deb 直接下载 SHA256 一致，Windows 三项程序远端 digest 匹配。未执行 apply、系统安装或原生窗口验收。详见[发行记录](../release/desktop.md#provider-setup-87)。
 
 ## .86 在线投放（2026-11-21）
 
